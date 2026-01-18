@@ -89,6 +89,9 @@ export default function LandingPage() {
                 {/* Header Spacer */}
 
                 <View className="px-6 pt-10 items-center">
+                    <View className="bg-primary/10 px-3 py-1 rounded-full mb-4">
+                        <Text className="text-primary text-[8px] font-bold uppercase tracking-[2px]">Build v1.0.12 - Secure</Text>
+                    </View>
                     <Text className="text-xl font-extrabold text-slate text-center leading-[28px] mb-4">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>

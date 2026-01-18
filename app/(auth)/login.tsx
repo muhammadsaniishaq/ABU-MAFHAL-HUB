@@ -42,8 +42,8 @@ export default function Login() {
 
                 const role = profile?.role || 'user';
 
-                if (role === 'admin') {
-                    router.replace('/admin');
+                if (role === 'admin' || role === 'super_admin') {
+                    router.replace('/manage');
                 } else {
                     router.replace('/(app)/dashboard');
                 }

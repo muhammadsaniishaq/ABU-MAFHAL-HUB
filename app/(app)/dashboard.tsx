@@ -94,7 +94,7 @@ export default function Dashboard() {
                     </TouchableOpacity>
                     {['admin', 'super_admin'].includes(userData?.role || '') && (
                         <TouchableOpacity
-                            onPress={() => router.push('/admin')}
+                            onPress={() => router.push('/manage')}
                             className="bg-primary px-3 py-2 rounded-lg flex-row items-center border border-primary/20"
                         >
                             <Ionicons name="shield-checkmark" size={16} color="white" />
