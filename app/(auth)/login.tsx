@@ -10,9 +10,16 @@ export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert('Error', 'Please enter your email and password');
+            return;
+        }
+
+        setLoading(true);
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
@@ -22,7 +29,19 @@ export default function Login() {
             if (error) throw error;
 
             if (data.user) {
-                const role = data.user.app_metadata?.role;
+                // Fetch role from profiles table
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', data.user.id)
+                    .single();
+
+                if (profileError) {
+                    console.error('Profile fetch error:', profileError);
+                }
+
+                const role = profile?.role || 'user';
+
                 if (role === 'admin') {
                     router.replace('/management-v4-core');
                 } else {
@@ -31,6 +50,8 @@ export default function Login() {
             }
         } catch (error: any) {
             Alert.alert('Login Failed', error.message || 'Please check your credentials');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -100,9 +121,12 @@ export default function Login() {
                         {/* Login Button */}
                         <TouchableOpacity
                             onPress={handleLogin}
-                            className="bg-primary w-full h-16 rounded-2xl items-center justify-center mt-10 shadow-lg shadow-primary/30"
+                            disabled={loading}
+                            className={`bg-primary w-full h-16 rounded-2xl items-center justify-center mt-10 shadow-lg shadow-primary/30 ${loading ? 'opacity-70' : ''}`}
                         >
-                            <Text className="text-white font-bold text-lg">Sign In</Text>
+                            <Text className="text-white font-bold text-lg">
+                                {loading ? 'Signing In...' : 'Sign In'}
+                            </Text>
                         </TouchableOpacity>
 
                         {/* Fingerprint / FaceID Placeholder */}

@@ -1,23 +1,47 @@
-import { View, Text, FlatList, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Switch, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
-
-// Mock Sessions
-const initialSessions = [
-    { id: '1', device: 'iPhone 14 Pro', ip: '102.12.98.2', loc: 'Lagos, NG', current: true, lastActive: 'Now' },
-    { id: '2', device: 'MacBook Pro M2', ip: '197.210.45.1', loc: 'Abuja, NG', current: false, lastActive: '2h ago' },
-    { id: '3', device: 'Chrome (Win 11)', ip: '45.23.11.90', loc: 'Kano, NG', current: false, lastActive: '1d ago' },
-];
+import { useEffect, useState } from 'react';
+import { supabase } from '../../services/supabase';
 
 export default function SecurityHub() {
-    const [sessions, setSessions] = useState(initialSessions);
+    const [sessions, setSessions] = useState<any[]>([]);
     const [twoFactor, setTwoFactor] = useState(true);
     const [biometric, setBiometric] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchSecurityState();
+    }, []);
+
+    const fetchSecurityState = async () => {
+        setLoading(true);
+        try {
+            // Mocking live sessions based on real login data if possible, 
+            // otherwise using a more realistic placeholder that acknowledges 'Live' state
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setSessions([
+                    { id: '1', device: 'Current Device', ip: 'Hidden', loc: 'Your Location', current: true, lastActive: 'Now' }
+                ]);
+                // In a real high-end app, we'd fetch this from a 'user_settings' table
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const revokeSession = (id: string) => {
         setSessions(prev => prev.filter(s => s.id !== id));
     };
+
+    if (loading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-slate-900">
+                <ActivityIndicator size="large" color="#3B82F6" />
+            </View>
+        );
+    }
 
     return (
         <ScrollView className="flex-1 bg-slate-900">

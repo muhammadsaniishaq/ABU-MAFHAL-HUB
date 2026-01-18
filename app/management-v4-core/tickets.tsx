@@ -3,20 +3,97 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
 
-// Mock Ticket Data
-const initialTickets = Array.from({ length: 8 }).map((_, i) => ({
-    id: `TKT-${4500 + i}`,
-    user: ['Aminu Kano', 'Fatima Zahra', 'John Doe', 'Sarah Smith'][i % 4],
-    subject: ['Transaction Failed', 'Account Locked', 'KYC Issue', 'Feature Request'][i % 4],
-    status: i % 3 === 0 ? 'Open' : i % 3 === 1 ? 'In Progress' : 'Resolved',
-    lastMessage: 'I have been waiting for 2 hours now...',
-    time: `${i * 15 + 5}m ago`,
-    unread: i % 2 === 0
-}));
+import { supabase } from '../../services/supabase';
+import { useEffect } from 'react';
+
+type Ticket = {
+    id: string;
+    user_id: string;
+    subject: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    profiles?: { full_name: string };
+};
+
+type TicketMessage = {
+    id: string;
+    ticket_id: string;
+    sender_id: string;
+    message: string;
+    created_at: string;
+};
 
 export default function SupportTickets() {
-    const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
-    const [tickets, setTickets] = useState(initialTickets);
+    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [messages, setMessages] = useState<TicketMessage[]>([]);
+    const [reply, setReply] = useState('');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchTickets();
+    }, []);
+
+    useEffect(() => {
+        if (selectedTicket) {
+            fetchMessages(selectedTicket.id);
+        }
+    }, [selectedTicket]);
+
+    const fetchTickets = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('tickets')
+                .select('*, profiles(full_name)')
+                .order('created_at', { ascending: false });
+            if (data) setTickets(data as any);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchMessages = async (ticketId: string) => {
+        const { data } = await supabase
+            .from('ticket_messages')
+            .select('*')
+            .eq('ticket_id', ticketId)
+            .order('created_at', { ascending: true });
+        if (data) setMessages(data);
+    };
+
+    const sendMessage = async () => {
+        if (!reply.trim() || !selectedTicket) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase
+            .from('ticket_messages')
+            .insert({
+                ticket_id: selectedTicket.id,
+                sender_id: user.id,
+                message: reply.trim()
+            });
+
+        if (!error) {
+            setReply('');
+            fetchMessages(selectedTicket.id);
+        }
+    };
+
+    const resolveTicket = async () => {
+        if (!selectedTicket) return;
+        const { error } = await supabase
+            .from('tickets')
+            .update({ status: 'resolved' })
+            .eq('id', selectedTicket.id);
+        if (!error) {
+            setSelectedTicket(null);
+            fetchTickets();
+        }
+    };
+
 
     const renderTicketList = () => (
         <View className="flex-1 bg-slate-50">
@@ -36,25 +113,24 @@ export default function SupportTickets() {
                 contentContainerStyle={{ padding: 16 }}
                 renderItem={({ item }) => (
                     <TouchableOpacity
-                        onPress={() => setSelectedTicket(item.id)}
-                        className={`bg-white p-4 rounded-2xl mb-3 border shadow-sm ${item.unread ? 'border-blue-200' : 'border-gray-100'}`}
+                        onPress={() => setSelectedTicket(item)}
+                        className={`bg-white p-4 rounded-2xl mb-3 border shadow-sm border-gray-100`}
                     >
                         <View className="flex-row justify-between mb-2">
                             <View className="flex-row items-center gap-2">
-                                {item.unread && <View className="w-2 h-2 rounded-full bg-blue-500" />}
-                                <Text className="font-bold text-slate-800 text-base">{item.user}</Text>
+                                <Text className="font-bold text-slate-800 text-base">{item.profiles?.full_name || 'Anonymous'}</Text>
                             </View>
-                            <Text className="text-xs text-gray-400">{item.time}</Text>
+                            <Text className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</Text>
                         </View>
                         <Text className="text-slate-600 font-bold text-sm mb-1">{item.subject}</Text>
-                        <Text className="text-gray-400 text-xs mb-3" numberOfLines={1}>{item.lastMessage}</Text>
+                        <Text className="text-gray-400 text-[10px] mb-3 uppercase font-bold text-blue-500">{item.priority} Priority</Text>
 
                         <View className="flex-row items-center justify-between">
-                            <View className={`px-2 py-1 rounded text-[10px] ${item.status === 'Open' ? 'bg-red-100' :
-                                    item.status === 'In Progress' ? 'bg-blue-100' : 'bg-green-100'
+                            <View className={`px-2 py-1 rounded text-[10px] ${item.status === 'open' ? 'bg-red-100' :
+                                item.status === 'in_progress' ? 'bg-blue-100' : 'bg-green-100'
                                 }`}>
-                                <Text className={`text-[10px] font-bold ${item.status === 'Open' ? 'text-red-700' :
-                                        item.status === 'In Progress' ? 'text-blue-700' : 'text-green-700'
+                                <Text className={`text-[10px] font-bold ${item.status === 'open' ? 'text-red-700' :
+                                    item.status === 'in_progress' ? 'text-blue-700' : 'text-green-700'
                                     }`}>{item.status.toUpperCase()}</Text>
                             </View>
                             <Text className="text-[10px] text-gray-300 font-mono">{item.id}</Text>
@@ -74,40 +150,38 @@ export default function SupportTickets() {
                     </TouchableOpacity>
                     <View>
                         <Text className="font-bold text-slate-800 text-lg">Support Chat</Text>
-                        <Text className="text-xs text-gray-400 font-mono">{selectedTicket}</Text>
+                        <Text className="text-xs text-gray-400 font-mono">{selectedTicket?.id?.split('-')[0]}</Text>
                     </View>
                 </View>
-                <TouchableOpacity className="bg-green-500 px-3 py-1.5 rounded-lg">
+                <TouchableOpacity onPress={resolveTicket} className="bg-green-500 px-3 py-1.5 rounded-lg">
                     <Text className="text-white text-xs font-bold">Mark Resolved</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 20 }}>
-                {/* Mock Chat Bubbles */}
-                <View className="items-start mb-4 w-[80%]">
-                    <View className="bg-white p-3 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm">
-                        <Text className="text-slate-700 mb-1">Hello, I cannot access my account after the password reset.</Text>
-                        <Text className="text-[10px] text-gray-300">10:30 AM</Text>
+                {selectedTicket && messages.length > 0 ? (
+                    messages.map((m) => (
+                        <View key={m.id} className={`mb-4 w-full items-${m.sender_id === selectedTicket.user_id ? 'start' : 'end'}`}>
+                            <View className={`p-3 rounded-2xl shadow-sm max-w-[80%] ${m.sender_id === selectedTicket.user_id
+                                ? 'bg-white rounded-tl-none border border-gray-100'
+                                : 'bg-blue-600 rounded-tr-none'
+                                }`}>
+                                <Text className={`${m.sender_id === selectedTicket.user_id ? 'text-slate-700' : 'text-white'} mb-1`}>
+                                    {m.message}
+                                </Text>
+                                <Text className={`text-[10px] ${m.sender_id === selectedTicket.user_id ? 'text-gray-300' : 'text-blue-200'}`}>
+                                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {m.sender_id !== selectedTicket.user_id && ' • Admin'}
+                                </Text>
+                            </View>
+                        </View>
+                    ))
+                ) : (
+                    <View className="flex-1 items-center justify-center pt-20">
+                        <Ionicons name="chatbubbles-outline" size={40} color="#CBD5E1" />
+                        <Text className="text-gray-400 mt-2">No messages yet</Text>
                     </View>
-                </View>
-
-                <View className="items-end mb-4 w-full">
-                    <View className="bg-blue-600 p-3 rounded-2xl rounded-tr-none shadow-sm w-[80%]">
-                        <Text className="text-white mb-1">Hi there! I can help with that. Could you verify your email address?</Text>
-                        <Text className="text-[10px] text-blue-200">10:32 AM • Admin</Text>
-                    </View>
-                </View>
-
-                <View className="items-center my-4">
-                    <Text className="text-xs text-gray-300 font-bold uppercase">Today</Text>
-                </View>
-
-                <View className="items-start mb-4 w-[80%]">
-                    <View className="bg-white p-3 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm">
-                        <Text className="text-slate-700 mb-1">Sure, it's user@example.com. I'm getting error 403.</Text>
-                        <Text className="text-[10px] text-gray-300">10:35 AM</Text>
-                    </View>
-                </View>
+                )}
             </ScrollView>
 
             <View className="p-4 bg-white border-t border-gray-100">
@@ -119,8 +193,13 @@ export default function SupportTickets() {
                         placeholder="Type your reply..."
                         placeholderTextColor="#94A3B8"
                         className="flex-1 h-10 font-medium text-slate-800"
+                        value={reply}
+                        onChangeText={setReply}
                     />
-                    <TouchableOpacity className="bg-slate-900 w-8 h-8 rounded-full items-center justify-center ml-2">
+                    <TouchableOpacity
+                        onPress={sendMessage}
+                        className="bg-slate-900 w-8 h-8 rounded-full items-center justify-center ml-2"
+                    >
                         <Ionicons name="send" size={16} color="white" />
                     </TouchableOpacity>
                 </View>

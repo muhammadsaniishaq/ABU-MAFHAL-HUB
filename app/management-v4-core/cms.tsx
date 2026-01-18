@@ -1,23 +1,61 @@
-import { View, Text, FlatList, TouchableOpacity, Image, Switch } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
-
-// Mock Banners
-const initialBanners = [
-    { id: '1', title: 'Welcome Promo', status: true, image: 'https://via.placeholder.com/300x150/3B82F6/ffffff?text=Promo+1', clicks: 1205 },
-    { id: '2', title: 'Weekend Sale', status: false, image: 'https://via.placeholder.com/300x150/10B981/ffffff?text=Promo+2', clicks: 850 },
-    { id: '3', title: 'Crypto Alert', status: true, image: 'https://via.placeholder.com/300x150/F59E0B/ffffff?text=Promo+3', clicks: 3400 },
-];
+import { supabase } from '../../services/supabase';
+import { useEffect, useState } from 'react';
 
 export default function ContentManager() {
-    const [banners, setBanners] = useState(initialBanners);
+    const [banners, setBanners] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const toggleSwitch = (id: string) => {
-        setBanners(prev => prev.map(b =>
-            b.id === id ? { ...b, status: !b.status } : b
-        ));
+    useEffect(() => {
+        fetchBanners();
+    }, []);
+
+    const fetchBanners = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('banners')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (data) setBanners(data);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const toggleSwitch = async (id: string, currentStatus: boolean) => {
+        const { error } = await supabase
+            .from('banners')
+            .update({ is_active: !currentStatus })
+            .eq('id', id);
+
+        if (!error) {
+            setBanners(prev => prev.map(b =>
+                b.id === id ? { ...b, is_active: !currentStatus } : b
+            ));
+        }
+    };
+
+    const deleteBanner = async (id: string) => {
+        const { error } = await supabase
+            .from('banners')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setBanners(prev => prev.filter(b => b.id !== id));
+        }
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-slate-50">
+                <ActivityIndicator size="large" color="#4F46E5" />
+            </View>
+        );
+    }
 
     return (
         <View className="flex-1 bg-slate-50 p-4">
@@ -58,13 +96,13 @@ export default function ContentManager() {
                         <View className="flex-row items-center justify-between">
                             <View>
                                 <Text className="font-bold text-slate-800 text-lg">{item.title}</Text>
-                                <Text className={`text-xs font-bold ${item.status ? 'text-green-600' : 'text-gray-400'}`}>
-                                    {item.status ? '● LIVE' : '○ DISABLED'}
+                                <Text className={`text-xs font-bold ${item.is_active ? 'text-green-600' : 'text-gray-400'}`}>
+                                    {item.is_active ? '● LIVE' : '○ DISABLED'}
                                 </Text>
                             </View>
                             <Switch
-                                value={item.status}
-                                onValueChange={() => toggleSwitch(item.id)}
+                                value={item.is_active}
+                                onValueChange={() => toggleSwitch(item.id, item.is_active)}
                                 trackColor={{ false: '#E2E8F0', true: '#4F46E5' }}
                                 thumbColor={'white'}
                             />
@@ -74,7 +112,10 @@ export default function ContentManager() {
                             <TouchableOpacity className="flex-1 bg-gray-50 py-2 rounded-lg items-center border border-gray-100">
                                 <Text className="text-slate-600 font-bold text-xs">Edit</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity className="flex-1 bg-red-50 py-2 rounded-lg items-center border border-red-100">
+                            <TouchableOpacity
+                                onPress={() => deleteBanner(item.id)}
+                                className="flex-1 bg-red-50 py-2 rounded-lg items-center border border-red-100"
+                            >
                                 <Text className="text-red-600 font-bold text-xs">Delete</Text>
                             </TouchableOpacity>
                         </View>

@@ -110,7 +110,8 @@ export const api = {
             const result = await dataProvider.purchase({
                 network: params.network,
                 phone: params.phone,
-                planId: params.planId
+                planId: params.planId,
+                amount: params.amount
             });
 
             // 3. Update Transaction

@@ -1,18 +1,44 @@
-import { View, Text, TouchableOpacity, ScrollView, FlatList, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, FlatList, TextInput, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
 export default function SavingsScreen() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'plans' | 'create'>('plans');
+    const [plans, setPlans] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [totalSavings, setTotalSavings] = useState(0);
 
-    // Mock active plans
-    const plans = [
-        { id: '1', title: 'New Car Fund', target: '₦2,000,000', saved: '₦450,000', progress: 0.22, color: '#0056D2' },
-        { id: '2', title: 'Rent 2026', target: '₦800,000', saved: '₦100,000', progress: 0.12, color: '#107C10' },
-    ];
+    const [newPlan, setNewPlan] = useState({ title: '', target: '', frequency: 'Monthly' });
+
+    useEffect(() => {
+        fetchSavings();
+    }, []);
+
+    const fetchSavings = async () => {
+        setLoading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // In this specific schema, we might not have a dedicated savings table, 
+            // but we can simulate/track it or check 'transactions' for savings types.
+            // For a robust app, we'd have a 'savings' table. Let's check for it.
+            const { data, error } = await supabase.from('savings_plans').select('*').eq('user_id', user.id);
+            if (data) {
+                setPlans(data);
+                const total = data.reduce((sum, p) => sum + parseFloat(p.amount_saved || 0), 0);
+                setTotalSavings(total);
+            }
+        } catch (e) {
+            console.log('Savings fetch error:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <View className="flex-1 bg-gray-50">
@@ -45,7 +71,7 @@ export default function SavingsScreen() {
                             <Ionicons name="wallet-outline" size={20} color="#BFDBFE" />
                             <Text className="text-blue-100 text-sm font-medium ml-2">Total Savings Balance</Text>
                         </View>
-                        <Text className="text-white text-4xl font-extrabold tracking-tight mb-4">₦550,000.00</Text>
+                        <Text className="text-white text-4xl font-extrabold tracking-tight mb-4">₦{totalSavings.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                         <View className="flex-row items-center bg-white/20 self-start px-3 py-1 rounded-full">
                             <Ionicons name="trending-up" size={16} color="#86EFAC" />
                             <Text className="text-green-300 text-xs font-bold ml-1">+ ₦1,250 interest earned</Text>
@@ -53,26 +79,29 @@ export default function SavingsScreen() {
                     </View>
 
                     <Text className="text-slate font-bold mb-4 text-lg">Active Plans</Text>
-                    {plans.map((plan) => (
-                        <TouchableOpacity key={plan.id} className="bg-white p-5 rounded-2xl mb-4 border border-gray-100 shadow-sm flex-row items-center">
-                            <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: plan.color + '15' }}>
-                                <Ionicons name={plan.id === '1' ? 'car' : 'home'} size={24} color={plan.color} />
-                            </View>
-                            <View className="flex-1">
-                                <View className="flex-row justify-between items-center mb-1">
-                                    <Text className="font-bold text-slate text-base">{plan.title}</Text>
-                                    <Text className="font-bold text-base" style={{ color: plan.color }}>{plan.saved}</Text>
+                    {plans.map((plan) => {
+                        const progress = parseFloat(plan.target_amount) > 0 ? parseFloat(plan.amount_saved) / parseFloat(plan.target_amount) : 0;
+                        return (
+                            <TouchableOpacity key={plan.id} className="bg-white p-5 rounded-2xl mb-4 border border-gray-100 shadow-sm flex-row items-center">
+                                <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: '#0056D215' }}>
+                                    <Ionicons name="medal" size={24} color="#0056D2" />
                                 </View>
-                                <View className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
-                                    <View className="h-full rounded-full" style={{ width: `${plan.progress * 100}%`, backgroundColor: plan.color }} />
+                                <View className="flex-1">
+                                    <View className="flex-row justify-between items-center mb-1">
+                                        <Text className="font-bold text-slate text-base">{plan.title}</Text>
+                                        <Text className="font-bold text-base text-primary">₦{parseFloat(plan.amount_saved).toLocaleString()}</Text>
+                                    </View>
+                                    <View className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                                        <View className="h-full bg-primary rounded-full" style={{ width: `${progress * 100}%` }} />
+                                    </View>
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-xs text-gray-400 font-medium">{Math.round(progress * 100)}% Achieved</Text>
+                                        <Text className="text-xs text-gray-500 font-medium">Target: ₦{parseFloat(plan.target_amount).toLocaleString()}</Text>
+                                    </View>
                                 </View>
-                                <View className="flex-row justify-between">
-                                    <Text className="text-xs text-gray-400 font-medium">{Math.round(plan.progress * 100)}% Achieved</Text>
-                                    <Text className="text-xs text-gray-500 font-medium">Target: {plan.target}</Text>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                            </TouchableOpacity>
+                        );
+                    })}
 
                     <TouchableOpacity
                         className="flex-row items-center justify-center p-4 bg-white border border-dashed border-gray-300 rounded-xl mt-4"

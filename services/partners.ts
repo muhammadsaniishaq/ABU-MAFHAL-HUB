@@ -19,7 +19,7 @@ export interface DataPlan {
 
 export interface DataProvider {
     getPlans(network: string): Promise<DataPlan[]>;
-    purchase(params: { network: string; phone: string; planId: string }): Promise<TransactionResult>;
+    purchase(params: { network: string; phone: string; planId: string; amount: number }): Promise<TransactionResult>;
 }
 
 export interface VerificationResult {
@@ -150,7 +150,7 @@ export const FlutterwaveDataProvider: DataProvider = {
         ];
         return commonPlans;
     },
-    purchase: async ({ network, phone, planId }) => {
+    purchase: async ({ network, phone, planId, amount }) => {
         const networkCode = network.toUpperCase();
         try {
             console.log(`[FLW-LIVE] Purchasing Data Plan ${planId} for ${phone} on ${networkCode}`);

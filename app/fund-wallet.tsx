@@ -1,12 +1,15 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Clipboard } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Clipboard, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../services/supabase';
 
 export default function FundWalletScreen() {
     const [method, setMethod] = useState<'transfer' | 'card'>('transfer');
     const [amount, setAmount] = useState('');
+    const [loading, setLoading] = useState(false);
+    const router = useRouter();
 
     const copyToClipboard = (text: string) => {
         Clipboard.setString(text);
@@ -15,9 +18,53 @@ export default function FundWalletScreen() {
 
     const handleCardPayment = () => {
         if (!amount) return;
-        Alert.alert("Paystack", `Initializing payment of ₦${amount}...`, [
+        const depositAmount = parseFloat(amount);
+        if (isNaN(depositAmount) || depositAmount <= 0) return;
+
+        Alert.alert("Paystack", `Initializing payment of ₦${depositAmount.toLocaleString()}...`, [
             { text: "Cancel", style: "cancel" },
-            { text: "Proceed", onPress: () => Alert.alert("Success", "Wallet funded successfully!") }
+            {
+                text: "Proceed", onPress: async () => {
+                    setLoading(true);
+                    try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) throw new Error("Not authenticated");
+
+                        // 1. Fetch current profile
+                        const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
+                        const currentBalance = parseFloat(profile?.balance?.toString() || '0');
+
+                        // 2. Record Transaction
+                        const { error: txError } = await supabase
+                            .from('transactions')
+                            .insert({
+                                user_id: user.id,
+                                type: 'deposit',
+                                amount: depositAmount,
+                                status: 'success',
+                                description: `Wallet Top-up via Card (Paystack)`,
+                                reference: `PAY-${Date.now()}`
+                            });
+
+                        if (txError) throw txError;
+
+                        // 3. Update Balance
+                        const { error: balanceError } = await supabase
+                            .from('profiles')
+                            .update({ balance: currentBalance + depositAmount })
+                            .eq('id', user.id);
+
+                        if (balanceError) throw balanceError;
+
+                        Alert.alert("Success", "Wallet funded successfully!");
+                        router.replace('/dashboard');
+                    } catch (error: any) {
+                        Alert.alert("Funding Failed", error.message);
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+            }
         ]);
     };
 
@@ -106,11 +153,11 @@ export default function FundWalletScreen() {
                         </View>
 
                         <TouchableOpacity
-                            className={`h-14 rounded-full items-center justify-center mb-8 ${amount ? 'bg-primary' : 'bg-gray-300'}`}
+                            className={`h-14 rounded-full items-center justify-center mb-8 ${amount && !loading ? 'bg-primary' : 'bg-gray-300'}`}
                             onPress={handleCardPayment}
-                            disabled={!amount}
+                            disabled={!amount || loading}
                         >
-                            <Text className="text-white font-bold text-lg">Pay with Paystack</Text>
+                            {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-lg">Pay with Paystack</Text>}
                         </TouchableOpacity>
 
                         <View className="flex-row justify-center items-center gap-2">

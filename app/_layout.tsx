@@ -49,16 +49,17 @@ export default function RootLayout() {
         const isAuthGroup = segments.includes('auth') || segments.includes('(auth)');
         const isManagementGroup = segments.includes('management-v4-core');
         const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
-        const isLandingPage = segments.length === 0 || segments[0] === 'index';
+        const isLandingPage = segments.length <= 0 || segments[0] === 'index' || !segments[0];
 
         if (session) {
-            const role = session.user?.app_metadata?.role;
-            const isAdmin = role === 'admin';
-
             if (isAuthGroup) {
-                // If logged in and in auth group, redirect to dashboard or management
-                router.replace(isAdmin ? '/management-v4-core' : '/(app)/dashboard');
-            } else if (isManagementGroup && !isAdmin) {
+                // Initial login redirect is handled by login.tsx, but this is a backup
+                // Only redirect if we are SURE about the role, otherwise wait for the app to load
+                const role = session.user?.app_metadata?.role;
+                if (role) {
+                    router.replace(role === 'admin' ? '/management-v4-core' : '/(app)/dashboard');
+                }
+            } else if (isManagementGroup) {
                 // If standard user tries to access admin, redirect to dashboard
                 router.replace('/(app)/dashboard');
             }

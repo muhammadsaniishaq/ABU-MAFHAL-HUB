@@ -8,7 +8,9 @@ import { useEffect } from 'react';
 
 export default function Dashboard() {
     const [showBalance, setShowBalance] = useState(true);
-    const [userData, setUserData] = useState<{ full_name: string } | null>(null);
+    const [userData, setUserData] = useState<{ full_name: string; balance: number } | null>(null);
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
@@ -16,15 +18,28 @@ export default function Dashboard() {
     }, []);
 
     const fetchUserData = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', user.id)
-                .single();
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('full_name, balance')
+                    .eq('id', user.id)
+                    .single();
 
-            if (data) setUserData(data);
+                if (data) setUserData(data);
+
+                const { data: txData } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (txData) setTransactions(txData);
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -82,7 +97,7 @@ export default function Dashboard() {
                     <View className="flex-row items-baseline mb-6">
                         <Text className="text-white text-3xl font-bold mr-2">₦</Text>
                         <Text className="text-white text-4xl font-bold tracking-tight">
-                            {showBalance ? "50,200.00" : "****"}
+                            {showBalance ? (userData?.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00") : "****"}
                         </Text>
                     </View>
 
@@ -127,24 +142,38 @@ export default function Dashboard() {
                         <Text className="text-primary text-sm font-medium">View All</Text>
                     </View>
 
-                    {/* Mock List */}
-                    {[1, 2, 3].map((_, i) => (
-                        <View key={i} className="flex-row justify-between items-center bg-white p-4 rounded-xl mb-3 shadow-sm border border-gray-50">
-                            <View className="flex-row items-center">
-                                <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center mr-3">
-                                    <Ionicons name="phone-portrait" size={18} color="#F37021" />
+                    {transactions.length > 0 ? (
+                        transactions.map((tx, i) => (
+                            <View key={tx.id || i} className="flex-row justify-between items-center bg-white p-4 rounded-xl mb-3 shadow-sm border border-gray-50">
+                                <View className="flex-row items-center">
+                                    <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center mr-3">
+                                        <Ionicons
+                                            name={tx.type === 'payment' ? 'flash' : tx.type === 'transfer' ? 'send' : 'wallet'}
+                                            size={18}
+                                            color="#F37021"
+                                        />
+                                    </View>
+                                    <View>
+                                        <Text className="font-bold text-gray-800">{tx.description || 'Transaction'}</Text>
+                                        <Text className="text-xs text-gray-500">{new Date(tx.created_at).toLocaleDateString()}</Text>
+                                    </View>
                                 </View>
-                                <View>
-                                    <Text className="font-bold text-gray-800">Airtime Purchase</Text>
-                                    <Text className="text-xs text-gray-500">MTN - 08030000000</Text>
+                                <View className="items-end">
+                                    <Text className={`font-bold ${tx.type === 'deposit' ? 'text-green-500' : 'text-red-500'}`}>
+                                        {tx.type === 'deposit' ? '+' : '-'}₦{parseFloat(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </Text>
+                                    <Text className={`text-[10px] ${tx.status === 'success' ? 'text-green-400' : 'text-gray-400'}`}>
+                                        {tx.status}
+                                    </Text>
                                 </View>
                             </View>
-                            <View className="items-end">
-                                <Text className="font-bold text-red-500">-₦1,000.00</Text>
-                                <Text className="text-white text-[10px] text-gray-400">Success</Text>
-                            </View>
+                        ))
+                    ) : (
+                        <View className="bg-white p-8 rounded-xl items-center border border-gray-50">
+                            <Ionicons name="receipt-outline" size={32} color="#D1D5DB" />
+                            <Text className="text-gray-400 mt-2 text-sm italic">No recent transactions</Text>
                         </View>
-                    ))}
+                    )}
 
                 </View>
 

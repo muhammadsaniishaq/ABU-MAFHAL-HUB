@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../services/supabase';
 
 export default function TransferScreen() {
     const [bank, setBank] = useState('');
@@ -10,7 +11,21 @@ export default function TransferScreen() {
     const [amount, setAmount] = useState('');
     const [accountName, setAccountName] = useState('');
     const [isLoadingName, setIsLoadingName] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userBalance, setUserBalance] = useState<number>(0);
     const router = useRouter();
+
+    useEffect(() => {
+        fetchUserBalance();
+    }, []);
+
+    const fetchUserBalance = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
+            if (data) setUserBalance(parseFloat(data.balance.toString()));
+        }
+    };
 
     const banks = [
         { id: 'gtb', name: 'GTBank', color: '#E03C31' },
@@ -37,21 +52,64 @@ export default function TransferScreen() {
         }
     }, [accountNumber, bank]);
 
-    const handleTransfer = () => {
+    const handleTransfer = async () => {
         if (!bank || !accountNumber || !amount) {
             Alert.alert("Error", "Please fill all fields");
             return;
         }
 
+        const transferAmount = parseFloat(amount);
+        if (isNaN(transferAmount) || transferAmount <= 0) {
+            Alert.alert("Error", "Invalid amount");
+            return;
+        }
+
+        if (transferAmount > userBalance) {
+            Alert.alert("Insufficient Balance", `You only have ₦${userBalance.toLocaleString()} in your wallet.`);
+            return;
+        }
+
         Alert.alert(
             "Confirm Transfer",
-            `Send ₦${amount} to ${accountName} (${bank.toUpperCase()})?`,
+            `Send ₦${transferAmount.toLocaleString()} to ${accountName} (${bank.toUpperCase()})?`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Confirm", onPress: () => {
-                        Alert.alert("Success", "Transfer Successful!");
-                        router.back();
+                    text: "Confirm", onPress: async () => {
+                        setIsSubmitting(true);
+                        try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (!user) throw new Error("Not authenticated");
+
+                            // 1. Record Transaction
+                            const { error: txError } = await supabase
+                                .from('transactions')
+                                .insert({
+                                    user_id: user.id,
+                                    type: 'transfer',
+                                    amount: transferAmount,
+                                    status: 'success',
+                                    description: `Transfer to ${accountName} (${bank.toUpperCase()})`,
+                                    reference: `TXN${Date.now()}`
+                                });
+
+                            if (txError) throw txError;
+
+                            // 2. Update Balance
+                            const { error: balanceError } = await supabase
+                                .from('profiles')
+                                .update({ balance: userBalance - transferAmount })
+                                .eq('id', user.id);
+
+                            if (balanceError) throw balanceError;
+
+                            Alert.alert("Success", "Transfer Successful!");
+                            router.replace('/dashboard');
+                        } catch (error: any) {
+                            Alert.alert("Transfer Failed", error.message || "An error occurred");
+                        } finally {
+                            setIsSubmitting(false);
+                        }
                     }
                 }
             ]
@@ -131,12 +189,16 @@ export default function TransferScreen() {
 
                 {/* Button */}
                 <TouchableOpacity
-                    className={`h-14 rounded-full items-center justify-center mb-8 ${bank && accountNumber.length === 10 && amount ? 'bg-primary' : 'bg-gray-300'
+                    className={`h-14 rounded-full items-center justify-center mb-8 ${bank && accountNumber.length === 10 && amount && !isSubmitting ? 'bg-primary' : 'bg-gray-300'
                         }`}
                     onPress={handleTransfer}
-                    disabled={!bank || accountNumber.length !== 10 || !amount}
+                    disabled={!bank || accountNumber.length !== 10 || !amount || isSubmitting}
                 >
-                    <Text className="text-white font-bold text-lg">Send Money</Text>
+                    {isSubmitting ? (
+                        <ActivityIndicator color="white" />
+                    ) : (
+                        <Text className="text-white font-bold text-lg">Send Money</Text>
+                    )}
                 </TouchableOpacity>
             </ScrollView>
         </View>

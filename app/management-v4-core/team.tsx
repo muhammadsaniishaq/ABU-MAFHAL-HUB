@@ -1,8 +1,50 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '../../services/supabase';
 
 export default function TeamChat() {
+    const [messages, setMessages] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [newMessage, setNewMessage] = useState('');
+    const [activeChannel, setActiveChannel] = useState('# general');
+
+    useEffect(() => {
+        fetchMessages();
+    }, [activeChannel]);
+
+    const fetchMessages = async () => {
+        setLoading(true);
+        try {
+            // In a real app, this would be a dedicated 'internal_comms' table
+            const { data, error } = await supabase
+                .from('audit_logs') // Using audit logs as a proxy for 'real' data if a specific table is missing
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (data) {
+                const mapped = data.map(log => ({
+                    id: log.id,
+                    sender: log.admin_id?.split('-')[0] || 'System',
+                    text: `${log.action}: ${log.target_resource}`,
+                    time: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    initials: 'SYS'
+                }));
+                setMessages(mapped.reverse());
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const sendMessage = async () => {
+        if (!newMessage.trim()) return;
+        // Logic to send message would go here
+        setNewMessage('');
+        fetchMessages();
+    };
     return (
         <View className="flex-1 bg-white flex-row">
             <Stack.Screen options={{ title: 'Team Comms' }} />
@@ -15,9 +57,13 @@ export default function TeamChat() {
                 </View>
 
                 <View className="gap-1">
-                    {['# general', '# alerts', '# engineering', '# sales', '# random'].map((c, i) => (
-                        <TouchableOpacity key={c} className={`px-4 py-2 ${i === 0 ? 'bg-white border-l-4 border-blue-500 shadow-sm' : ''}`}>
-                            <Text className={`font-bold text-xs ${i === 0 ? 'text-slate-800' : 'text-slate-400'}`}>{c}</Text>
+                    {['# general', '# alerts', '# engineering', '# sales', '# random'].map((c) => (
+                        <TouchableOpacity
+                            key={c}
+                            onPress={() => setActiveChannel(c)}
+                            className={`px-4 py-2 ${activeChannel === c ? 'bg-white border-l-4 border-blue-500 shadow-sm' : ''}`}
+                        >
+                            <Text className={`font-bold text-xs ${activeChannel === c ? 'text-slate-800' : 'text-slate-400'}`}>{c}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -38,41 +84,38 @@ export default function TeamChat() {
                 </View>
 
                 <ScrollView className="flex-1 p-4">
-                    {/* Mock Messages */}
-                    <View className="flex-row gap-3 mb-4">
-                        <View className="w-8 h-8 rounded bg-orange-100 items-center justify-center">
-                            <Text className="text-orange-600 font-bold text-xs">JD</Text>
-                        </View>
-                        <View>
-                            <View className="flex-row items-baseline gap-2">
-                                <Text className="font-bold text-slate-800 text-xs">John Doe</Text>
-                                <Text className="text-gray-300 text-[10px]">10:42 AM</Text>
+                    {loading ? (
+                        <ActivityIndicator color="#3B82F6" />
+                    ) : (
+                        messages.map((m) => (
+                            <View key={m.id} className="flex-row gap-3 mb-4">
+                                <View className="w-8 h-8 rounded bg-blue-100 items-center justify-center">
+                                    <Text className="text-blue-600 font-bold text-xs">{m.initials}</Text>
+                                </View>
+                                <View>
+                                    <View className="flex-row items-baseline gap-2">
+                                        <Text className="font-bold text-slate-800 text-xs">{m.sender}</Text>
+                                        <Text className="text-gray-300 text-[10px]">{m.time}</Text>
+                                    </View>
+                                    <Text className="text-slate-600 text-sm">{m.text}</Text>
+                                </View>
                             </View>
-                            <Text className="text-slate-600 text-sm">Deployment to production is complete. Check the logs.</Text>
-                        </View>
-                    </View>
-
-                    <View className="flex-row gap-3 mb-4">
-                        <View className="w-8 h-8 rounded bg-blue-100 items-center justify-center">
-                            <Text className="text-blue-600 font-bold text-xs">AD</Text>
-                        </View>
-                        <View>
-                            <View className="flex-row items-baseline gap-2">
-                                <Text className="font-bold text-slate-800 text-xs">Admin (You)</Text>
-                                <Text className="text-gray-300 text-[10px]">10:45 AM</Text>
-                            </View>
-                            <Text className="text-slate-600 text-sm">Great work! I'm noticing a spike in traffic on the dashboard.</Text>
-                        </View>
-                    </View>
+                        ))
+                    )}
                 </ScrollView>
 
                 <View className="p-4 border-t border-gray-100">
                     <View className="bg-gray-50 rounded-lg border border-gray-200 px-3 py-2 flex-row items-center">
                         <TextInput
-                            placeholder="Message #general"
+                            placeholder={`Message ${activeChannel}`}
                             className="flex-1 font-medium text-slate-700"
+                            value={newMessage}
+                            onChangeText={setNewMessage}
+                            onSubmitEditing={sendMessage}
                         />
-                        <Ionicons name="send" size={16} color="#94A3B8" />
+                        <TouchableOpacity onPress={sendMessage}>
+                            <Ionicons name="send" size={16} color="#3B82F6" />
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>

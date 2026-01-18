@@ -1,13 +1,55 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
 
 export default function LandingPage() {
     const router = useRouter();
+    const [userCount, setUserCount] = useState<number | null>(null);
+    const [totalProcessed, setTotalProcessed] = useState<string>('50B+'); // Fallback to marketing stat
+
+    useEffect(() => {
+        fetchRealStats();
+    }, []);
+
+    const fetchRealStats = async () => {
+        try {
+            // Fetch real user count
+            const { count, error } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true });
+
+            if (count !== null) {
+                setUserCount(count);
+            }
+
+            // Fetch total volume (sum of transaction amounts)
+            const { data: txData } = await supabase
+                .from('transactions')
+                .select('amount')
+                .eq('status', 'success');
+
+            if (txData) {
+                const total = txData.reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+                if (total > 0) {
+                    if (total >= 1000000) {
+                        setTotalProcessed(`${(total / 1000000).toFixed(1)}M+`);
+                    } else if (total >= 1000) {
+                        setTotalProcessed(`${(total / 1000).toFixed(1)}K+`);
+                    } else {
+                        setTotalProcessed(`${total.toFixed(0)}+`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('Error fetching stats:', e);
+        }
+    };
 
     const features = [
         { title: 'Core Payments', desc: 'Data, Airtime, Bills, Transfers', icon: 'flash', color: '#0056D2' },
@@ -189,11 +231,11 @@ export default function LandingPage() {
                     <Text className="text-3xl font-bold text-slate text-center mb-10">Trusted by Millions</Text>
                     <View className="flex-row justify-between mb-10">
                         <View className="items-center w-1/3">
-                            <Text className="text-3xl font-extrabold text-primary">2M+</Text>
+                            <Text className="text-3xl font-extrabold text-primary">{userCount !== null ? `${userCount}+` : '2M+'}</Text>
                             <Text className="text-gray-500 text-xs text-center font-bold mt-1">Active Users</Text>
                         </View>
                         <View className="items-center w-1/3 border-l border-r border-gray-100">
-                            <Text className="text-3xl font-extrabold text-primary">₦50B+</Text>
+                            <Text className="text-3xl font-extrabold text-primary">₦{totalProcessed}</Text>
                             <Text className="text-gray-500 text-xs text-center font-bold mt-1">Processed</Text>
                         </View>
                         <View className="items-center w-1/3">

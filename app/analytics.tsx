@@ -1,15 +1,86 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../services/supabase';
+import { useEffect, useState } from 'react';
 
 export default function AnalyticsScreen() {
-    const spendingData = [
-        { category: 'Airtime & Data', amount: '₦15,000', percent: 0.45, color: '#F37021' },
-        { category: 'Transfers', amount: '₦10,000', percent: 0.30, color: '#0056D2' },
-        { category: 'Bills', amount: '₦5,000', percent: 0.15, color: '#D97706' },
-        { category: 'Shopping', amount: '₦3,200', percent: 0.10, color: '#8B5CF6' },
-    ];
+    const [spendingData, setSpendingData] = useState<any[]>([]);
+    const [totalSpent, setTotalSpent] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [currentMonth, setCurrentMonth] = useState('');
+
+    useEffect(() => {
+        fetchSpendingData();
+    }, []);
+
+    const fetchSpendingData = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            setCurrentMonth(now.toLocaleString('default', { month: 'long' }));
+
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', user.id)
+                .neq('type', 'deposit') // Only spending
+                .gte('created_at', startOfMonth);
+
+            if (data) {
+                const categories = {
+                    'Airtime & Data': { amount: 0, color: '#F37021', icon: 'phone-portrait' },
+                    'Transfers': { amount: 0, color: '#0056D2', icon: 'send' },
+                    'Bills': { amount: 0, color: '#D97706', icon: 'flash' },
+                    'Other': { amount: 0, color: '#8B5CF6', icon: 'cart' },
+                };
+
+                let total = 0;
+                data.forEach(tx => {
+                    const amount = parseFloat(tx.amount);
+                    total += amount;
+                    if (tx.description?.toLowerCase().includes('airtime') || tx.description?.toLowerCase().includes('data')) {
+                        categories['Airtime & Data'].amount += amount;
+                    } else if (tx.type === 'transfer') {
+                        categories['Transfers'].amount += amount;
+                    } else if (tx.type === 'payment') {
+                        categories['Bills'].amount += amount;
+                    } else {
+                        categories['Other'].amount += amount;
+                    }
+                });
+
+                const formattedData = Object.keys(categories).map(key => {
+                    const item = (categories as any)[key];
+                    return {
+                        category: key,
+                        amount: `₦${item.amount.toLocaleString()}`,
+                        rawAmount: item.amount,
+                        percent: total > 0 ? item.amount / total : 0,
+                        color: item.color,
+                        icon: item.icon
+                    };
+                }).filter(item => item.rawAmount > 0);
+
+                setSpendingData(formattedData);
+                setTotalSpent(total);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-white">
+                <ActivityIndicator size="large" color="#0056D2" />
+            </View>
+        );
+    }
 
     return (
         <View className="flex-1 bg-white">
@@ -18,8 +89,8 @@ export default function AnalyticsScreen() {
 
             <ScrollView className="p-6">
                 <View className="items-center mb-8">
-                    <Text className="text-gray-500 mb-1">Total Spent (Jan)</Text>
-                    <Text className="text-slate text-3xl font-bold">₦33,200.00</Text>
+                    <Text className="text-gray-500 mb-1">Total Spent ({currentMonth})</Text>
+                    <Text className="text-slate text-3xl font-bold">₦{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                 </View>
 
                 {/* Mock Chart Visualization */}
@@ -54,7 +125,9 @@ export default function AnalyticsScreen() {
                         <Text className="text-primary font-bold text-lg">Spending Tip</Text>
                     </View>
                     <Text className="text-gray-600 leading-6">
-                        You spent 15% more on Airtime this month compared to last month. Consider getting a monthly data plan to save more.
+                        {totalSpent > 0
+                            ? `You've spent ₦${totalSpent.toLocaleString()} so far this month. Keep track of your ${spendingData[0]?.category.toLowerCase() || 'spending'} to stay within budget.`
+                            : "No spending recorded yet for this month. Your insights will appear here once you start using your wallet."}
                     </Text>
                 </View>
             </ScrollView>
