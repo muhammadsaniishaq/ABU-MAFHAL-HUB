@@ -68,7 +68,7 @@ export default function Signup() {
                         <View className="mb-6 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                className="w-14 h-14 rounded-full"
+                                className="w-12 h-12 rounded-full"
                                 resizeMode="contain"
                             />
                             <Text className="text-2xl font-bold text-slate mt-4">Create Account</Text>
