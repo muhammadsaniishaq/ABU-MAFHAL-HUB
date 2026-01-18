@@ -28,10 +28,10 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        className="w-5 h-5 rounded-full mr-2"
+                        className="w-4 h-4 rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-base font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-sm font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -61,11 +61,10 @@ export default function LandingPage() {
                         <Text className="text-white font-bold text-xl">Get Started Now</Text>
                     </TouchableOpacity>
 
-                    {/* Hero Image Mockup - Using the generated asset */}
-                    <View className="mt-12 w-full items-center">
+                    <View className="mt-8 w-full items-center">
                         <Image
                             source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.9, height: width * 0.9 }}
+                            style={{ width: width * 0.7, height: width * 0.7 }}
                             className="rounded-3xl"
                             resizeMode="contain"
                         />
