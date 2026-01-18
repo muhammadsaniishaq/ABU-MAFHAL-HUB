@@ -27,7 +27,11 @@ export default function Dashboard() {
                     .eq('id', user.id)
                     .single();
 
-                if (data) setUserData(data);
+                if (data) {
+                    setUserData(data);
+                } else if (error) {
+                    console.error('Dashboard profile fetch error:', error);
+                }
 
                 const { data: txData } = await supabase
                     .from('transactions')
@@ -83,13 +87,13 @@ export default function Dashboard() {
                     <TouchableOpacity onPress={() => router.push('/notifications')} className="p-2 bg-gray-100 rounded-full">
                         <Ionicons name="notifications-outline" size={24} color="#374151" />
                     </TouchableOpacity>
-                    {userData?.role === 'admin' && (
+                    {['admin', 'super_admin'].includes(userData?.role || '') && (
                         <TouchableOpacity
                             onPress={() => router.push('/management-v4-core')}
-                            className="bg-slate-900 px-3 py-2 rounded-lg flex-row items-center"
+                            className="bg-primary px-3 py-2 rounded-lg flex-row items-center border border-primary/20"
                         >
-                            <Ionicons name="settings-outline" size={16} color="white" />
-                            <Text className="text-white text-[10px] font-bold ml-1">Admin</Text>
+                            <Ionicons name="shield-checkmark" size={16} color="white" />
+                            <Text className="text-white text-[10px] font-bold ml-1">Console</Text>
                         </TouchableOpacity>
                     )}
                 </View>
