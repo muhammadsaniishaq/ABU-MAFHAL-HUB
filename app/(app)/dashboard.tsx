@@ -3,10 +3,30 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { supabase } from '../../services/supabase';
+import { useEffect } from 'react';
 
 export default function Dashboard() {
     const [showBalance, setShowBalance] = useState(true);
+    const [userData, setUserData] = useState<{ full_name: string } | null>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        fetchUserData();
+    }, []);
+
+    const fetchUserData = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .single();
+
+            if (data) setUserData(data);
+        }
+    };
 
     const actions = [
         { icon: 'add-circle', label: 'Top Up', color: '#107C10', route: '/fund-wallet' },
@@ -35,13 +55,13 @@ export default function Dashboard() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../../assets/images/logo-icon.png')}
-                        style={{ width: 14, height: 14 }}
+                        style={{ width: 12, height: 12 }}
                         className="rounded-full mr-2"
                         resizeMode="contain"
                     />
                     <View>
                         <Text className="text-gray-500 text-[10px] uppercase font-bold">Welcome,</Text>
-                        <Text className="text-lg font-bold text-slate">Abu Mafhal</Text>
+                        <Text className="text-lg font-bold text-slate">{userData?.full_name || 'User'}</Text>
                     </View>
                 </View>
                 <TouchableOpacity onPress={() => router.push('/notifications')} className="p-2 bg-gray-100 rounded-full">

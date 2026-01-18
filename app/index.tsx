@@ -29,7 +29,7 @@ export default function LandingPage() {
                     <Image
                         source={require('../assets/images/logo-icon.png')}
                         style={{ width: 10, height: 10 }}
-                        className="rounded-full mr-1.5"
+                        className="rounded-full mr-1"
                         resizeMode="contain"
                     />
                     <Text className="text-[8px] font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
@@ -47,7 +47,7 @@ export default function LandingPage() {
                 {/* Header Spacer */}
 
                 <View className="px-6 pt-10 items-center">
-                    <Text className="text-2xl font-extrabold text-slate text-center leading-[32px] mb-4">
+                    <Text className="text-xl font-extrabold text-slate text-center leading-[28px] mb-4">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>
                     <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
@@ -64,7 +64,7 @@ export default function LandingPage() {
                     <View className="mt-6 w-full items-center">
                         <Image
                             source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.5, height: width * 0.5 }}
+                            style={{ width: width * 0.45, height: width * 0.45 }}
                             className="rounded-xl"
                             resizeMode="contain"
                         />

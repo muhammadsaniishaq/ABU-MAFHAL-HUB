@@ -2,9 +2,28 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-na
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../../services/supabase';
+import { useEffect, useState } from 'react';
 
 export default function ProfileScreen() {
+    const [profile, setProfile] = useState<{ full_name: string; email: string; role: string; phone?: string } | null>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            if (data) setProfile(data);
+        }
+    };
 
     const handleLogout = () => {
         Alert.alert(
@@ -40,10 +59,10 @@ export default function ProfileScreen() {
 
             <View className="bg-primary pt-16 pb-8 px-6 items-center rounded-b-3xl">
                 <View className="w-24 h-24 bg-white rounded-full items-center justify-center mb-4 border-4 border-white/30">
-                    <Text className="text-3xl font-bold text-primary">AM</Text>
+                    <Text className="text-3xl font-bold text-primary">{profile?.full_name?.charAt(0) || 'U'}</Text>
                 </View>
-                <Text className="text-white text-xl font-bold">Abu Mafhal</Text>
-                <Text className="text-blue-100">0803 000 0000</Text>
+                <Text className="text-white text-xl font-bold">{profile?.full_name || 'User'}</Text>
+                <Text className="text-blue-100">{profile?.email || 'email@example.com'}</Text>
             </View>
 
             <ScrollView className="flex-1 px-6 -mt-4">
