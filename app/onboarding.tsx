@@ -17,7 +17,7 @@ export default function OnboardingScreen() {
                 <View className="w-full aspect-square items-center justify-center mb-10 overflow-hidden relative">
                     <Image
                         source={require('../assets/images/logo.png')}
-                        className="w-20 h-20 rounded-full"
+                        className="w-14 h-14 rounded-full"
                         resizeMode="contain"
                     />
                 </View>

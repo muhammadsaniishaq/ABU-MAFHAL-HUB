@@ -28,10 +28,10 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        className="w-6 h-6 rounded-full mr-2"
+                        className="w-5 h-5 rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-lg font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-base font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -47,7 +47,7 @@ export default function LandingPage() {
 
                 {/* Hero Section */}
                 <View className="px-6 pt-10 items-center">
-                    <Text className="text-4xl font-extrabold text-slate text-center leading-[48px] mb-4">
+                    <Text className="text-3xl font-extrabold text-slate text-center leading-[42px] mb-4">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>
                     <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
