@@ -117,8 +117,16 @@ export default function AdminBento() {
                             <Text className="text-slate-400 font-bold text-xs uppercase tracking-[4px]">Command Center</Text>
                             <Text className="text-3xl font-black text-white">Abu Mafhal</Text>
                         </View>
-                        <View className="w-10 h-10 rounded-full bg-slate-700 items-center justify-center border border-slate-600">
-                            <Ionicons name="person" size={20} color="white" />
+                        <View className="flex-row items-center gap-3">
+                            <TouchableOpacity
+                                onPress={() => router.replace('/(app)/dashboard')}
+                                className="w-10 h-10 rounded-full bg-slate-800 items-center justify-center border border-slate-700 shadow-sm"
+                            >
+                                <Ionicons name="log-out-outline" size={20} color="#94A3B8" />
+                            </TouchableOpacity>
+                            <View className="w-10 h-10 rounded-full bg-slate-700 items-center justify-center border border-slate-600">
+                                <Ionicons name="person" size={20} color="white" />
+                            </View>
                         </View>
                     </View>
 

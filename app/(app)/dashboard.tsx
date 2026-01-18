@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 
 export default function Dashboard() {
     const [showBalance, setShowBalance] = useState(true);
-    const [userData, setUserData] = useState<{ full_name: string; balance: number } | null>(null);
+    const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string } | null>(null);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -23,7 +23,7 @@ export default function Dashboard() {
             if (user) {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('full_name, balance')
+                    .select('full_name, balance, role')
                     .eq('id', user.id)
                     .single();
 
@@ -79,9 +79,20 @@ export default function Dashboard() {
                         <Text className="text-lg font-bold text-slate">{userData?.full_name || 'User'}</Text>
                     </View>
                 </View>
-                <TouchableOpacity onPress={() => router.push('/notifications')} className="p-2 bg-gray-100 rounded-full">
-                    <Ionicons name="notifications-outline" size={24} color="#374151" />
-                </TouchableOpacity>
+                <View className="flex-row items-center gap-2">
+                    <TouchableOpacity onPress={() => router.push('/notifications')} className="p-2 bg-gray-100 rounded-full">
+                        <Ionicons name="notifications-outline" size={24} color="#374151" />
+                    </TouchableOpacity>
+                    {userData?.role === 'admin' && (
+                        <TouchableOpacity
+                            onPress={() => router.push('/management-v4-core')}
+                            className="bg-slate-900 px-3 py-2 rounded-lg flex-row items-center"
+                        >
+                            <Ionicons name="settings-outline" size={16} color="white" />
+                            <Text className="text-white text-[10px] font-bold ml-1">Admin</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
 
             <ScrollView className="flex-1 px-6 pt-6">
