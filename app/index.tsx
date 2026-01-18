@@ -28,10 +28,10 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        className="w-8 h-8 rounded-full mr-2"
+                        className="w-6 h-6 rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-xl font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-lg font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -93,40 +93,40 @@ export default function LandingPage() {
                 {/* Our Partners */}
                 <View className="py-20 bg-white border-b border-gray-50">
                     <Text className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center mb-12">Trusted by Industry Leaders</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 30, alignItems: 'center', gap: 40 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 30, alignItems: 'center', gap: 35 }}>
 
                         {/* Mastercard */}
-                        <View className="flex-row items-center opacity-40 grayscale">
+                        <View className="flex-row items-center opacity-40 grayscale scale-75">
                             <View className="w-8 h-8 rounded-full bg-[#EB001B] z-10" />
                             <View className="w-8 h-8 rounded-full bg-[#FF5F00] -ml-5 z-0" />
                         </View>
 
                         {/* Visa */}
-                        <View className="opacity-40 grayscale">
-                            <Text className="font-black text-[#1434CB] text-2xl italic tracking-tighter">VISA</Text>
+                        <View className="opacity-40 grayscale scale-75">
+                            <Text className="font-black text-[#1434CB] text-xl italic tracking-tighter">VISA</Text>
                         </View>
 
                         {/* Verve */}
-                        <View className="opacity-40 grayscale">
-                            <Text className="font-bold text-slate-800 text-xl tracking-tight">Verve</Text>
+                        <View className="opacity-40 grayscale scale-75">
+                            <Text className="font-bold text-slate-800 text-lg tracking-tight">Verve</Text>
                         </View>
 
                         {/* Interswitch */}
-                        <View className="flex-row items-center opacity-40 grayscale">
-                            <View className="w-6 h-6 bg-slate-800 rounded-sm mx-1" />
-                            <Text className="font-bold text-slate-800 text-lg tracking-tight">Interswitch</Text>
+                        <View className="flex-row items-center opacity-40 grayscale scale-75">
+                            <View className="w-5 h-5 bg-slate-800 rounded-sm mx-1" />
+                            <Text className="font-bold text-slate-800 text-base tracking-tight">Interswitch</Text>
                         </View>
 
                         {/* NIBSS */}
-                        <View className="opacity-40 grayscale">
-                            <Text className="font-black text-slate-700 text-2xl">NIBSS</Text>
+                        <View className="opacity-40 grayscale scale-75">
+                            <Text className="font-black text-slate-700 text-xl">NIBSS</Text>
                         </View>
 
                         {/* Remita */}
-                        <View className="flex-row items-center opacity-40 grayscale">
-                            <View className="w-3 h-3 rounded-full bg-orange-500 mr-1" />
-                            <View className="w-3 h-3 rounded-full bg-slate-700 mr-2" />
-                            <Text className="font-bold text-slate-700 text-xl">Remita</Text>
+                        <View className="flex-row items-center opacity-40 grayscale scale-75">
+                            <View className="w-2.5 h-2.5 rounded-full bg-orange-500 mr-1" />
+                            <View className="w-2.5 h-2.5 rounded-full bg-slate-700 mr-2" />
+                            <Text className="font-bold text-slate-700 text-lg">Remita</Text>
                         </View>
 
                     </ScrollView>

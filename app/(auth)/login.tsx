@@ -49,7 +49,7 @@ export default function Login() {
                         <View className="mb-10 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                className="w-24 h-24 rounded-full"
+                                className="w-16 h-16 rounded-full"
                                 resizeMode="contain"
                             />
                             <Text className="text-2xl font-bold text-slate mt-4">Welcome Back</Text>
