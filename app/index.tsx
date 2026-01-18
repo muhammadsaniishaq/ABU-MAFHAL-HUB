@@ -105,9 +105,9 @@ export default function LandingPage() {
 
                     <View className="mt-6 w-full items-center">
                         <Image
-                            source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.45, height: width * 0.45 }}
-                            className="rounded-xl"
+                            source={require('../assets/images/logo.png')}
+                            style={{ width: width * 0.4, height: width * 0.4 }}
+                            className="rounded-xl opacity-80"
                             resizeMode="contain"
                         />
                     </View>

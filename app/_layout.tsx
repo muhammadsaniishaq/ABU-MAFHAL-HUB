@@ -46,7 +46,7 @@ export default function RootLayout() {
         if (!initialized || !loaded) return;
 
         const segment = segments[0];
-        const isAuthGroup = segments.includes('auth') || segments.includes('(auth)');
+        const isAuthGroup = segments.includes('(auth)');
         const isManagementGroup = segments.includes('management-v4-core');
         const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
         const isLandingPage = segments.length <= 0 || segments[0] === 'index' || !segments[0];
@@ -84,9 +84,8 @@ export default function RootLayout() {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="management-v4-core" />
-                <Stack.Screen name="auth" />
+                <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(app)" />
-                <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="auto" />
         </ThemeProvider>

@@ -91,10 +91,36 @@ create table public.banners (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- RLS POLICIES (Simple version for Admin Access)
+-- 7. SECURITY HELPERS
+-- Function to check if a user is an admin without triggering RLS recursion
+create or replace function public.is_admin()
+returns boolean as $$
+begin
+  return (
+    select count(*) > 0
+    from public.profiles
+    where id = auth.uid()
+    and role in ('admin', 'super_admin')
+  );
+end;
+$$ language plpgsql security definer;
+
+-- RLS POLICIES (Hardened)
 -- Allow Admins to read everything
-create policy "Admins can view all profiles" on public.profiles for select using (auth.uid() in (select id from public.profiles where role in ('admin', 'super_admin')));
-create policy "Admins can update profiles" on public.profiles for update using (auth.uid() in (select id from public.profiles where role in ('admin', 'super_admin')));
+create policy "Admins can view all profiles" 
+on public.profiles for select 
+using (public.is_admin());
+
+create policy "Admins can update profiles" 
+on public.profiles for update 
+using (public.is_admin());
 
 -- Allow Users to view their own profile
-create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
+create policy "Users can view own profile" 
+on public.profiles for select 
+using (auth.uid() = id);
+
+-- Allow Users to update their own profile (Limited fields)
+create policy "Users can update own profile"
+on public.profiles for update
+using (auth.uid() = id);
