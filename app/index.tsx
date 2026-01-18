@@ -28,10 +28,11 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        className="w-6 h-6 rounded-full mr-2"
+                        style={{ width: 18, height: 18 }}
+                        className="rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-base font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-sm font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -46,7 +47,7 @@ export default function LandingPage() {
                 {/* Header Spacer */}
 
                 <View className="px-6 pt-10 items-center">
-                    <Text className="text-[32px] font-extrabold text-slate text-center leading-[42px] mb-4">
+                    <Text className="text-[28px] font-extrabold text-slate text-center leading-[38px] mb-4">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>
                     <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
@@ -63,7 +64,7 @@ export default function LandingPage() {
                     <View className="mt-8 w-full items-center">
                         <Image
                             source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.8, height: width * 0.8 }}
+                            style={{ width: width * 0.7, height: width * 0.7 }}
                             className="rounded-3xl"
                             resizeMode="contain"
                         />

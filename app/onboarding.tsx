@@ -17,7 +17,8 @@ export default function OnboardingScreen() {
                 <View className="items-center justify-center mb-8">
                     <Image
                         source={require('../assets/images/logo.png')}
-                        className="w-12 h-12 rounded-full"
+                        style={{ width: 32, height: 32 }}
+                        className="rounded-full"
                         resizeMode="contain"
                     />
                 </View>
