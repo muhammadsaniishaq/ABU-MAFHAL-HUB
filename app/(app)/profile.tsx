@@ -47,22 +47,7 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView className="flex-1 px-6 -mt-4">
-                {/* Admin Access Point */}
-                <TouchableOpacity
-                    className="bg-slate-900 mb-6 p-4 rounded-2xl flex-row items-center shadow-lg shadow-slate-900/20"
-                    onPress={() => router.push('/admin')}
-                >
-                    <View className="w-10 h-10 rounded-full bg-slate-800 items-center justify-center mr-4">
-                        <Ionicons name="shield-checkmark" size={20} color="#38BDF8" />
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-white font-bold text-lg">Admin Console</Text>
-                        <Text className="text-slate-400 text-xs">Manage Users & Transactions</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#64748B" />
-                </TouchableOpacity>
-
-                <View className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-8">
+                <View className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-8 mt-4">
                     {menuItems.map((item, index) => (
                         <TouchableOpacity
                             key={index}

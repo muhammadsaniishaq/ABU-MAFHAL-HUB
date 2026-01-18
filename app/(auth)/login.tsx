@@ -46,15 +46,15 @@ export default function Login() {
                 <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
                     <View className="px-8 pt-12 pb-8 items-center">
                         {/* Logo */}
-                        <View className="mb-6 items-center">
+                        <View className="mb-4 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                style={{ width: 28, height: 28 }}
+                                style={{ width: 20, height: 20 }}
                                 className="rounded-full"
                                 resizeMode="contain"
                             />
-                            <Text className="text-lg font-bold text-slate mt-3">Welcome Back</Text>
-                            <Text className="text-gray-400 text-xs mt-1">Sign in to your account</Text>
+                            <Text className="text-base font-bold text-slate mt-2">Welcome Back</Text>
+                            <Text className="text-gray-400 text-[10px] mt-0.5">Sign in to your account</Text>
                         </View>
 
                         {/* Input Fields */}

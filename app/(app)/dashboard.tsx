@@ -35,7 +35,7 @@ export default function Dashboard() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../../assets/images/logo-icon.png')}
-                        style={{ width: 22, height: 22 }}
+                        style={{ width: 18, height: 18 }}
                         className="rounded-full mr-2"
                         resizeMode="contain"
                     />
