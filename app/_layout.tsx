@@ -21,19 +21,38 @@ export default function RootLayout() {
         // SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     });
     const [session, setSession] = useState<Session | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [initialized, setInitialized] = useState(false);
     const router = useRouter();
     const segments = useSegments();
 
+    const fetchUserRole = async (userId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .single();
+            if (data) setUserRole(data.role);
+        } catch (e) {
+            console.error('Error fetching role in layout:', e);
+        }
+    };
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
+            if (session?.user) fetchUserRole(session.user.id);
             setInitialized(true);
         });
 
-        supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
+            if (session?.user) fetchUserRole(session.user.id);
+            else setUserRole(null);
         });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -45,32 +64,30 @@ export default function RootLayout() {
     useEffect(() => {
         if (!initialized || !loaded) return;
 
-        const segment = segments[0];
         const isAuthGroup = segments.includes('(auth)');
-        const isManagementGroup = segments.includes('management-v4-core');
+        const isManagementGroup = segments.includes('management-v4-core') || segments[0] === 'management-v4-core';
         const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
-        const isLandingPage = segments.length <= 0 || segments[0] === 'index' || !segments[0];
 
         if (session) {
             if (isAuthGroup) {
-                // Initial login redirect is handled by login.tsx, but this is a backup
-                // Only redirect if we are SURE about the role, otherwise wait for the app to load
-                const role = session.user?.app_metadata?.role;
-                if (role) {
-                    router.replace(role === 'admin' ? '/management-v4-core' : '/(app)/dashboard');
+                // If logged in and in auth group, redirect to proper home
+                if (userRole) {
+                    router.replace(userRole === 'admin' || userRole === 'super_admin' ? '/management-v4-core' : '/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
-                // If standard user tries to access admin, redirect to dashboard
-                router.replace('/(app)/dashboard');
+                // Only allow admin/super_admin to management console
+                if (userRole && !['admin', 'super_admin'].includes(userRole)) {
+                    router.replace('/(app)/dashboard');
+                }
             }
         } else {
             // Guest User
             if (isManagementGroup || isAppGroup) {
-                // If NOT logged in and trying to access protected areas, redirect back to landing page
+                // Protect non-public routes
                 router.replace('/');
             }
         }
-    }, [session, initialized, segments, loaded]);
+    }, [session, userRole, initialized, segments, loaded]);
 
     if (!loaded || !initialized) {
         return (
