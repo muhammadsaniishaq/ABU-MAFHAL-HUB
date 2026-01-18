@@ -80,7 +80,7 @@ export default function BVNServicesScreen() {
                             className="bg-white p-5 rounded-2xl mb-4 flex-row items-center shadow-sm border border-gray-100"
                         >
                             <View className="w-12 h-12 rounded-full bg-blue-50 items-center justify-center mr-4">
-                                <Ionicons name="checkmark-shield" size={24} color="#0056D2" />
+                                <Ionicons name="shield-checkmark" size={24} color="#0056D2" />
                             </View>
                             <View className="flex-1">
                                 <Text className="font-bold text-slate text-base">Validate BVN</Text>

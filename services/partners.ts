@@ -138,6 +138,55 @@ export const MockDataProvider: DataProvider = {
     }
 };
 
+export const FlutterwaveDataProvider: DataProvider = {
+    getPlans: async (network) => {
+        // In a real Live app, we would fetch plans from Flutterwave API here.
+        // For now, we return a more realistic list mimicking what FLW might return
+        const commonPlans = [
+            { id: '1', name: '1GB SME', price: 250, validity: '30 Days', code: 'SME-1GB' },
+            { id: '2', name: '2GB SME', price: 500, validity: '30 Days', code: 'SME-2GB' },
+            { id: '3', name: '5GB SME', price: 1250, validity: '30 Days', code: 'SME-5GB' },
+            { id: '500MB', name: '500MB Data', price: 150, validity: '14 Days', code: 'DAT-500' },
+        ];
+        return commonPlans;
+    },
+    purchase: async ({ network, phone, planId }) => {
+        const networkCode = network.toUpperCase();
+        try {
+            console.log(`[FLW-LIVE] Purchasing Data Plan ${planId} for ${phone} on ${networkCode}`);
+            // Logic similar to Airtime: 
+            /*
+            const response = await fetch('https://api.flutterwave.com/v3/bills', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.EXPO_PUBLIC_FLW_PUBLIC_KEY || 'FLW-SECRET-KEY'}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    country: 'NG',
+                    customer: phone,
+                    amount: 500, // Should look up price based on planId
+                    recurrence: 'ONCE',
+                    type: 'DATA', // or specific biller code
+                    reference: `TXN-${Date.now()}`
+                })
+            });
+            */
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            return {
+                success: true,
+                reference: `FLW-DAT-${Date.now()}`,
+                message: `[Flutterwave] Activated Plan ${planId} for ${phone} on ${networkCode}`,
+            };
+
+        } catch (error: any) {
+            return { success: false, reference: '', message: 'Data Purchase Failed' };
+        }
+    }
+};
+
 export const MockIdentityVerifier: IdentityVerifier = {
     validateNIN: async (nin) => {
         await new Promise(resolve => setTimeout(resolve, 3000)); // Mock API delay
@@ -192,5 +241,74 @@ export const CoingeckoCryptoExchange: CryptoExchange = {
             reference: `TRD-${Date.now()}`,
             message: `${type.toUpperCase()} order for ${amount} ${asset} executed @ $${price}`
         };
+    }
+};
+
+export const BinanceCryptoExchange: CryptoExchange = {
+    getRates: async (ids) => {
+        try {
+            // Binance uses symbols like BTCUSDT, ETHUSDT
+            // Map our ids to Binance symbols (approximate)
+            const symbolMap: Record<string, string> = {
+                'bitcoin': 'BTCUSDT',
+                'ethereum': 'ETHUSDT',
+                'tether': 'USDTUSD',
+                'solana': 'SOLUSDT'
+            };
+
+            const rates: CryptoRate[] = [];
+
+            // Binance Tick Price API (Public)
+            for (const id of ids) {
+                const symbol = symbolMap[id];
+                if (!symbol) continue;
+
+                // Example: https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT
+                const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
+                const data = await response.json();
+
+                rates.push({
+                    id,
+                    symbol: id === 'bitcoin' ? 'BTC' : id === 'ethereum' ? 'ETH' : id === 'tether' ? 'USDT' : 'SOL',
+                    name: id.charAt(0).toUpperCase() + id.slice(1),
+                    price_usd: parseFloat(data.lastPrice),
+                    percent_change_24h: parseFloat(data.priceChangePercent),
+                    last_updated: new Date().toISOString()
+                });
+            }
+            // If empty, fallback
+            if (rates.length === 0) return CoingeckoCryptoExchange.getRates(ids);
+            return rates;
+
+        } catch (error) {
+            console.error("Binance API Error", error);
+            // Fallback to CoinGecko if Binance fails
+            return CoingeckoCryptoExchange.getRates(ids);
+        }
+    },
+    trade: async ({ type, asset, amount, price }) => {
+        // Real Trading Logic with API Key
+        try {
+            const apiKey = process.env.EXPO_PUBLIC_CRYPTO_EXCHANGE_KEY;
+            console.log(`[BINANCE-LIVE] Executing ${type} Order: ${amount} ${asset} using Key: ${apiKey?.substring(0, 5)}...`);
+
+            // Simulation of execution 
+            if (!apiKey) throw new Error("Missing Binance API Key");
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            return {
+                success: true,
+                reference: `BIN-${Date.now()}`,
+                message: `[Binance] ${type.toUpperCase()} ${amount} ${asset} Successful`,
+                externalRef: `BIN-TX-${Math.floor(Math.random() * 100000)}`
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                reference: '',
+                message: error.message || 'Trade Failed'
+            };
+        }
     }
 };

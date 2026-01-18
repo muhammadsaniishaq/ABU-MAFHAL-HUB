@@ -36,7 +36,7 @@ export default function LiquidityVault() {
                             {/* Fluid Mock */}
                             <LinearGradient
                                 colors={[res.color, '#0F172A']}
-                                style={{ height: res.level, width: '100%', borderRadius: 20 }}
+                                style={{ height: res.level as any, width: '100%', borderRadius: 20 }}
                                 className="absolute bottom-2 opacity-80"
                             />
 

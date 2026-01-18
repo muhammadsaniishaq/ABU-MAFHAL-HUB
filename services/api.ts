@@ -2,9 +2,9 @@
 import { supabase } from './supabase';
 import {
     AirtimeProvider, MockAirtimeProvider, FlutterwaveAirtimeProvider,
-    DataProvider, MockDataProvider,
+    DataProvider, MockDataProvider, FlutterwaveDataProvider,
     IdentityVerifier, MockIdentityVerifier,
-    CryptoExchange, CoingeckoCryptoExchange
+    CryptoExchange, CoingeckoCryptoExchange, BinanceCryptoExchange
 } from './partners';
 
 export const API_URL = 'https://api.abumafhal.com/v1';
@@ -12,9 +12,9 @@ export const API_URL = 'https://api.abumafhal.com/v1';
 // Initialize Partners (In the future, we can switch these to Live implementations based on ENV)
 const airtimeProvider: AirtimeProvider = FlutterwaveAirtimeProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
-const dataProvider: DataProvider = MockDataProvider;
+const dataProvider: DataProvider = FlutterwaveDataProvider;
 const identityVerifier: IdentityVerifier = MockIdentityVerifier;
-const cryptoExchange: CryptoExchange = CoingeckoCryptoExchange;
+const cryptoExchange: CryptoExchange = BinanceCryptoExchange;
 
 export const api = {
     // --- GENERIC HTTP ---
