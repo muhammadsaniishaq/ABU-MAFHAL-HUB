@@ -28,10 +28,11 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        className="w-4 h-4 rounded-full mr-2"
+                        style={{ width: 14, height: 14 }}
+                        className="rounded-full mr-1.5"
                         resizeMode="contain"
                     />
-                    <Text className="text-sm font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-xs font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -45,9 +46,8 @@ export default function LandingPage() {
 
                 {/* Header Spacer */}
 
-                {/* Hero Section */}
                 <View className="px-6 pt-10 items-center">
-                    <Text className="text-3xl font-extrabold text-slate text-center leading-[42px] mb-4">
+                    <Text className="text-[26px] font-extrabold text-slate text-center leading-[34px] mb-3">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>
                     <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
@@ -61,11 +61,11 @@ export default function LandingPage() {
                         <Text className="text-white font-bold text-xl">Get Started Now</Text>
                     </TouchableOpacity>
 
-                    <View className="mt-8 w-full items-center">
+                    <View className="mt-6 w-full items-center">
                         <Image
                             source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.7, height: width * 0.7 }}
-                            className="rounded-3xl"
+                            style={{ width: width * 0.6, height: width * 0.6 }}
+                            className="rounded-2xl"
                             resizeMode="contain"
                         />
                     </View>

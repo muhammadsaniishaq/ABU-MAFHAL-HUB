@@ -68,11 +68,12 @@ export default function Signup() {
                         <View className="mb-4 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                className="w-8 h-8 rounded-full"
+                                style={{ width: 24, height: 24 }}
+                                className="rounded-full"
                                 resizeMode="contain"
                             />
-                            <Text className="text-lg font-bold text-slate mt-3">Create Account</Text>
-                            <Text className="text-gray-400 text-sm mt-1">Join Abu Mafhal Hub today</Text>
+                            <Text className="text-base font-bold text-slate mt-2">Create Account</Text>
+                            <Text className="text-gray-400 text-[10px] mt-0.5">Join Abu Mafhal Hub today</Text>
                         </View>
 
                         {/* Input Fields */}
