@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../../services/supabase';
+import { Alert } from 'react-native';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -10,9 +12,26 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
-    const handleLogin = () => {
-        // Mock authentication success
-        router.replace('/dashboard');
+    const handleLogin = async () => {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+
+            if (data.user) {
+                const role = data.user.app_metadata?.role;
+                if (role === 'admin') {
+                    router.replace('/management-v4-core');
+                } else {
+                    router.replace('/(app)/dashboard');
+                }
+            }
+        } catch (error: any) {
+            Alert.alert('Login Failed', error.message || 'Please check your credentials');
+        }
     };
 
     return (

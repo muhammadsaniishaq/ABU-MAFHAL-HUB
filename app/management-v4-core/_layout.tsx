@@ -26,7 +26,7 @@ export default function AdminLayout() {
             <Stack.Screen
                 name="index"
                 options={{
-                    title: 'Admin Console',
+                    title: 'System Core',
                     headerLeft: () => (
                         <View className="ml-4 mr-4">
                             <Ionicons name="grid" size={24} color="#38BDF8" />

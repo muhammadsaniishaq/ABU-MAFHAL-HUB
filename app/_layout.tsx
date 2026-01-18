@@ -45,14 +45,29 @@ export default function RootLayout() {
     useEffect(() => {
         if (!initialized || !loaded) return;
 
-        const inAuthGroup = segments[0] === 'auth';
+        const segment = segments[0];
+        const isAuthGroup = segments.includes('auth') || segments.includes('(auth)');
+        const isManagementGroup = segments.includes('management-v4-core');
+        const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
+        const isLandingPage = segments.length === 0 || segments[0] === 'index';
 
-        if (session && inAuthGroup) {
-            // If logged in and in auth group, redirect to admin
-            router.replace('/admin');
-        } else if (!session && !inAuthGroup) {
-            // If NOT logged in and NOT in auth group (e.g. root or admin), redirect to login
-            router.replace('/auth/login');
+        if (session) {
+            const role = session.user?.app_metadata?.role;
+            const isAdmin = role === 'admin';
+
+            if (isAuthGroup) {
+                // If logged in and in auth group, redirect to dashboard or management
+                router.replace(isAdmin ? '/management-v4-core' : '/(app)/dashboard');
+            } else if (isManagementGroup && !isAdmin) {
+                // If standard user tries to access admin, redirect to dashboard
+                router.replace('/(app)/dashboard');
+            }
+        } else {
+            // Guest User
+            if (isManagementGroup || isAppGroup) {
+                // If NOT logged in and trying to access protected areas, redirect back to landing page
+                router.replace('/');
+            }
         }
     }, [session, initialized, segments, loaded]);
 
@@ -67,8 +82,9 @@ export default function RootLayout() {
     return (
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="admin" />
+                <Stack.Screen name="management-v4-core" />
                 <Stack.Screen name="auth" />
+                <Stack.Screen name="(app)" />
                 <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="auto" />
