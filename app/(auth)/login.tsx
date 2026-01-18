@@ -49,12 +49,12 @@ export default function Login() {
                         <View className="mb-4 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                style={{ width: 20, height: 20 }}
+                                style={{ width: 16, height: 16 }}
                                 className="rounded-full"
                                 resizeMode="contain"
                             />
-                            <Text className="text-base font-bold text-slate mt-2">Welcome Back</Text>
-                            <Text className="text-gray-400 text-[10px] mt-0.5">Sign in to your account</Text>
+                            <Text className="text-sm font-bold text-slate mt-2">Welcome Back</Text>
+                            <Text className="text-gray-400 text-[8px] mt-0.5">Sign in to your account</Text>
                         </View>
 
                         {/* Input Fields */}

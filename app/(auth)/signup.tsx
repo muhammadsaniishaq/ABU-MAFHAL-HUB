@@ -36,7 +36,22 @@ export default function Signup() {
             if (error) throw error;
 
             if (data.user) {
-                Alert.alert('Success', 'Account created! Please check your email for verification.');
+                // Explicitly insert into profiles table as requested by user
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert([
+                        {
+                            id: data.user.id,
+                            email: email,
+                            full_name: fullName,
+                            role: 'user',
+                            status: 'active'
+                        }
+                    ]);
+
+                if (profileError) throw profileError;
+
+                Alert.alert('Success', 'Account created successfully!');
                 router.replace('/(auth)/login');
             }
         } catch (error: any) {
@@ -68,11 +83,11 @@ export default function Signup() {
                         <View className="mb-4 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                style={{ width: 20, height: 20 }}
+                                style={{ width: 16, height: 16 }}
                                 className="rounded-full"
                                 resizeMode="contain"
                             />
-                            <Text className="text-base font-bold text-slate mt-2">Create Account</Text>
+                            <Text className="text-sm font-bold text-slate mt-2">Create Account</Text>
                             <Text className="text-gray-400 text-[10px] mt-0.5">Join Abu Mafhal Hub today</Text>
                         </View>
 

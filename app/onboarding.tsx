@@ -14,10 +14,10 @@ export default function OnboardingScreen() {
             <StatusBar style="dark" />
 
             <View className="flex-1 items-center justify-center px-6">
-                <View className="items-center justify-center mb-6">
+                <View className="items-center justify-center mb-4">
                     <Image
                         source={require('../assets/images/logo.png')}
-                        style={{ width: 24, height: 24 }}
+                        style={{ width: 18, height: 18 }}
                         className="rounded-full"
                         resizeMode="contain"
                     />
