@@ -97,10 +97,9 @@ create or replace function public.is_admin()
 returns boolean as $$
 begin
   return (
-    select count(*) > 0
-    from public.profiles
+    select (raw_app_metadata->>'role')::text in ('admin', 'super_admin')
+    from auth.users
     where id = auth.uid()
-    and role in ('admin', 'super_admin')
   );
 end;
 $$ language plpgsql security definer;

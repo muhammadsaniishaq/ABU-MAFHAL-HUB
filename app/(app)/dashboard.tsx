@@ -11,6 +11,7 @@ export default function Dashboard() {
     const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string } | null>(null);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [dbError, setDbError] = useState<boolean>(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -29,8 +30,12 @@ export default function Dashboard() {
 
                 if (data) {
                     setUserData(data);
+                    setDbError(false);
                 } else if (error) {
                     console.error('Dashboard profile fetch error:', error);
+                    if (error.message.includes('recursion') || error.code === '42P17') {
+                        setDbError(true);
+                    }
                 }
 
                 const { data: txData } = await supabase
@@ -101,7 +106,7 @@ export default function Dashboard() {
 
             <ScrollView className="flex-1 px-6 pt-6">
                 {/* Balance Card - Wealth Green */}
-                <View className="bg-success rounded-2xl p-6 mb-8 shadow-sm">
+                <View className="bg-success rounded-2xl p-6 mb-4 shadow-sm">
                     <View className="flex-row justify-between items-start mb-2">
                         <Text className="text-green-100 text-sm font-medium">Available Balance</Text>
                         <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
@@ -130,6 +135,19 @@ export default function Dashboard() {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Database Warning */}
+                {dbError && (
+                    <View className="bg-red-50 p-4 rounded-xl border border-red-100 mb-8">
+                        <View className="flex-row items-center mb-2">
+                            <Ionicons name="warning" size={20} color="#EF4444" />
+                            <Text className="text-red-700 font-bold ml-2">Database Access Limited</Text>
+                        </View>
+                        <Text className="text-red-600 text-[10px] leading-4">
+                            Infinite recursion detected in database policies. Please apply the SQL fix provided in the chat to your Supabase SQL Editor to restore full access.
+                        </Text>
+                    </View>
+                )}
 
                 {/* Quick Actions Grid */}
                 <View className="mb-8">
