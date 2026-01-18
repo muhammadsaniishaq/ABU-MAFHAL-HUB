@@ -28,11 +28,10 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        style={{ width: 14, height: 14 }}
-                        className="rounded-full mr-1.5"
+                        className="w-6 h-6 rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-xs font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-base font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -47,7 +46,7 @@ export default function LandingPage() {
                 {/* Header Spacer */}
 
                 <View className="px-6 pt-10 items-center">
-                    <Text className="text-[26px] font-extrabold text-slate text-center leading-[34px] mb-3">
+                    <Text className="text-[32px] font-extrabold text-slate text-center leading-[42px] mb-4">
                         The Super App for your <Text className="text-primary">Financial Freedom</Text>
                     </Text>
                     <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
@@ -61,11 +60,11 @@ export default function LandingPage() {
                         <Text className="text-white font-bold text-xl">Get Started Now</Text>
                     </TouchableOpacity>
 
-                    <View className="mt-6 w-full items-center">
+                    <View className="mt-8 w-full items-center">
                         <Image
                             source={{ uri: 'file:///C:/Users/pc/.gemini/antigravity/brain/e11d320b-0700-4b45-ae1e-aaddda72dab9/app_mockup_hero_1768581393363.png' }}
-                            style={{ width: width * 0.6, height: width * 0.6 }}
-                            className="rounded-2xl"
+                            style={{ width: width * 0.8, height: width * 0.8 }}
+                            className="rounded-3xl"
                             resizeMode="contain"
                         />
                     </View>
@@ -90,12 +89,12 @@ export default function LandingPage() {
                 </View>
 
                 {/* Our Partners */}
-                <View className="py-20 bg-white border-b border-gray-50">
-                    <Text className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center mb-12">Trusted by Industry Leaders</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 30, alignItems: 'center', gap: 35 }}>
+                <View className="py-12 bg-gray-50/50">
+                    <Text className="text-xs font-black text-gray-400 uppercase tracking-[4px] text-center mb-10 opacity-60">Strategic Partners</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 30, alignItems: 'center', gap: 30 }}>
 
                         {/* Mastercard */}
-                        <View className="flex-row items-center opacity-40 grayscale scale-75">
+                        <View className="flex-row items-center opacity-40 grayscale scale-[0.6]">
                             <View className="w-8 h-8 rounded-full bg-[#EB001B] z-10" />
                             <View className="w-8 h-8 rounded-full bg-[#FF5F00] -ml-5 z-0" />
                         </View>

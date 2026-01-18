@@ -65,15 +65,14 @@ export default function Signup() {
                         </TouchableOpacity>
 
                         {/* Logo */}
-                        <View className="mb-4 items-center">
+                        <View className="mb-6 items-center">
                             <Image
                                 source={require('../../assets/images/logo.png')}
-                                style={{ width: 24, height: 24 }}
-                                className="rounded-full"
+                                className="w-10 h-10 rounded-full"
                                 resizeMode="contain"
                             />
-                            <Text className="text-base font-bold text-slate mt-2">Create Account</Text>
-                            <Text className="text-gray-400 text-[10px] mt-0.5">Join Abu Mafhal Hub today</Text>
+                            <Text className="text-xl font-bold text-slate mt-4">Create Account</Text>
+                            <Text className="text-gray-400 text-sm mt-1">Join Abu Mafhal Hub today</Text>
                         </View>
 
                         {/* Input Fields */}
