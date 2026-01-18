@@ -24,20 +24,20 @@ export default function LandingPage() {
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar style="dark" />
             {/* Fixed Modern Navbar */}
-            <View className="absolute top-[40px] left-0 right-0 z-50 px-6 py-4 flex-row justify-between items-center bg-white/95 border-b border-gray-50 shadow-sm/5">
+            <View className="absolute top-0 left-0 right-0 z-50 px-6 pt-12 pb-4 flex-row justify-between items-center bg-white/90 backdrop-blur-md border-b border-gray-100/50 shadow-sm/5">
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
                         className="w-8 h-8 rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-xl font-bold text-primary">ABU MAFHAL HUB</Text>
+                    <Text className="text-xl font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
-                    onPress={() => router.push('/onboarding')}
-                    className="bg-primary/10 px-4 py-2 rounded-full"
+                    onPress={() => router.push('/(auth)/login')}
+                    className="bg-primary px-5 py-2.5 rounded-full shadow-sm shadow-primary/20"
                 >
-                    <Text className="text-primary font-bold text-sm">Sign In</Text>
+                    <Text className="text-white font-bold text-xs">Sign In</Text>
                 </TouchableOpacity>
             </View>
 
@@ -91,40 +91,39 @@ export default function LandingPage() {
                 </View>
 
                 {/* Our Partners */}
-                <View className="py-16 bg-white border-b border-gray-50">
-                    <Text className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] text-center mb-10">Trusted by Industry Leaders</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 40, alignItems: 'center' }}>
+                <View className="py-20 bg-white border-b border-gray-50">
+                    <Text className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center mb-12">Trusted by Industry Leaders</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 30, alignItems: 'center', gap: 40 }}>
 
-                        {/* Matercard Logo Sim */}
-                        <View className="mr-12 flex-row items-center opacity-80 scale-90">
+                        {/* Mastercard */}
+                        <View className="flex-row items-center opacity-40 grayscale">
                             <View className="w-8 h-8 rounded-full bg-[#EB001B] z-10" />
                             <View className="w-8 h-8 rounded-full bg-[#FF5F00] -ml-5 z-0" />
-                            <Text className="font-bold text-slate-700 ml-3 text-lg hidden">Mastercard</Text>
                         </View>
 
-                        {/* Visa Logo Sim */}
-                        <View className="mr-12 opacity-80">
-                            <Text className="font-black text-[#1434CB] text-3xl italic tracking-tighter">VISA</Text>
+                        {/* Visa */}
+                        <View className="opacity-40 grayscale">
+                            <Text className="font-black text-[#1434CB] text-2xl italic tracking-tighter">VISA</Text>
                         </View>
 
-                        {/* Verve Logo Sim */}
-                        <View className="mr-12 opacity-80">
-                            <Text className="font-bold text-slate-800 text-2xl tracking-tight">Verve</Text>
+                        {/* Verve */}
+                        <View className="opacity-40 grayscale">
+                            <Text className="font-bold text-slate-800 text-xl tracking-tight">Verve</Text>
                         </View>
 
-                        {/* Interswitch Logo Sim */}
-                        <View className="mr-12 flex-row items-center opacity-80">
-                            <View className="w-6 h-6 bg-slate-800 rounded mx-1" />
-                            <Text className="font-bold text-slate-800 text-xl tracking-tight">Interswitch</Text>
+                        {/* Interswitch */}
+                        <View className="flex-row items-center opacity-40 grayscale">
+                            <View className="w-6 h-6 bg-slate-800 rounded-sm mx-1" />
+                            <Text className="font-bold text-slate-800 text-lg tracking-tight">Interswitch</Text>
                         </View>
 
-                        {/* NIBSS Logo Sim */}
-                        <View className="mr-12 opacity-80">
+                        {/* NIBSS */}
+                        <View className="opacity-40 grayscale">
                             <Text className="font-black text-slate-700 text-2xl">NIBSS</Text>
                         </View>
 
-                        {/* Remita Logo Sim */}
-                        <View className="mr-12 flex-row items-center opacity-80">
+                        {/* Remita */}
+                        <View className="flex-row items-center opacity-40 grayscale">
                             <View className="w-3 h-3 rounded-full bg-orange-500 mr-1" />
                             <View className="w-3 h-3 rounded-full bg-slate-700 mr-2" />
                             <Text className="font-bold text-slate-700 text-xl">Remita</Text>
