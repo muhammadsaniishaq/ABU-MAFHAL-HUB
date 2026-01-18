@@ -65,14 +65,14 @@ export default function RootLayout() {
         if (!initialized || !loaded) return;
 
         const isAuthGroup = segments.includes('(auth)');
-        const isManagementGroup = segments.includes('management-v4-core') || segments[0] === 'management-v4-core';
+        const isManagementGroup = segments.includes('admin') || segments[0] === 'admin';
         const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
 
         if (session) {
             if (isAuthGroup) {
                 // If logged in and in auth group, redirect to proper home
                 if (userRole) {
-                    router.replace(userRole === 'admin' || userRole === 'super_admin' ? '/management-v4-core' : '/(app)/dashboard');
+                    router.replace(userRole === 'admin' || userRole === 'super_admin' ? '/admin' : '/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
                 // Only allow admin/super_admin to management console
@@ -100,7 +100,7 @@ export default function RootLayout() {
     return (
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="management-v4-core" />
+                <Stack.Screen name="admin" />
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(app)" />
             </Stack>

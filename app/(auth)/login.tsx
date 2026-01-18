@@ -43,7 +43,7 @@ export default function Login() {
                 const role = profile?.role || 'user';
 
                 if (role === 'admin') {
-                    router.replace('/management-v4-core');
+                    router.replace('/admin');
                 } else {
                     router.replace('/(app)/dashboard');
                 }
