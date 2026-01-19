@@ -1,13 +1,11 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')!;
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
     // Handle Paystack POST
     if (req.method !== 'POST') {
         return new Response("Method not allowed", { status: 405 });
@@ -22,26 +20,29 @@ serve(async (req) => {
 
     const body = await req.text();
 
-    // Authenticate Webhook (Basic HMAC check logic)
-    // Note: In Deno, you'd use SubtleCrypto. For manual check, we can rely on secret if we trust the environment.
-    // However, validating is critical for money.
-    // Simulating validation or using a library is recommended. 
-    // For this snippet, I will assume it is valid but highly recommend implementing the crypto check.
-
-    /* 
+    // Authenticate Webhook
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
-        "raw", encoder.encode(PAYSTACK_SECRET_KEY), 
-        { name: "HMAC", hash: "SHA-512" }, 
-        false, ["verify"]
+        "raw",
+        encoder.encode(PAYSTACK_SECRET_KEY),
+        { name: "HMAC", hash: "SHA-512" },
+        false,
+        ["sign"]
     );
-    const verified = await crypto.subtle.verify(
-        "HMAC", key, 
-        hexToUint8(signature), 
+
+    const signatureBuffer = await crypto.subtle.sign(
+        "HMAC",
+        key,
         encoder.encode(body)
     );
-    if (!verified) return new Response("Invalid Signature", { status: 401 });
-    */
+
+    const hashArray = Array.from(new Uint8Array(signatureBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    if (hashHex !== signature) {
+        console.error("Invalid Paystack signature");
+        return new Response("Invalid signature", { status: 401 });
+    }
 
     const event = JSON.parse(body);
 
