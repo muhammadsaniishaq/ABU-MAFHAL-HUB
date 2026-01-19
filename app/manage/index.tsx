@@ -1,7 +1,9 @@
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -10,14 +12,14 @@ const modules = {
     operations: [
         { title: 'Users', icon: 'people', route: '/manage/users', color: '#3B82F6' },
         { title: 'Transactions', icon: 'receipt', route: '/manage/transactions', color: '#10B981' },
-        { title: 'KYC Queue', icon: 'scan', route: '/manage/kyc', color: '#8B5CF6', badge: 8 },
-        { title: 'Help Desk', icon: 'chatbubbles', route: '/manage/tickets', color: '#EC4899', badge: 3 },
+        { title: 'KYC Queue', icon: 'scan', route: '/manage/kyc', color: '#8B5CF6', badge: 0 }, // Dynamically updated
+        { title: 'Help Desk', icon: 'chatbubbles', route: '/manage/tickets', color: '#EC4899', badge: 0 },
         { title: 'Content', icon: 'images', route: '/manage/cms', color: '#6366F1' },
         { title: 'Localization', icon: 'language', route: '/manage/localization', color: '#8B5CF6' },
     ],
     banking: [
         { title: 'Cards', icon: 'card', route: '/manage/cards', color: '#EC4899' },
-        { title: 'Lending', icon: 'cash', route: '/manage/lending', color: '#10B981', badge: 5 },
+        { title: 'Lending', icon: 'cash', route: '/manage/lending', color: '#10B981', badge: 0 },
         { title: 'Wealth', icon: 'briefcase', route: '/manage/wealth', color: '#8B5CF6' },
         { title: 'Liquidity', icon: 'water', route: '/manage/liquidity', color: '#10B981' },
         { title: 'Rates', icon: 'trending-up', route: '/manage/rates', color: '#F59E0B', stat: 'Live' },
@@ -41,7 +43,7 @@ const modules = {
         { title: 'Staff', icon: 'briefcase', route: '/manage/staff', color: '#64748B' },
         { title: 'Voice OS', icon: 'mic', route: '/manage/voice', color: '#8B5CF6', dark: true },
         { title: 'Legal', icon: 'document-text', route: '/manage/legal', color: '#64748B' },
-        { title: 'Team Chat', icon: 'people-circle', route: '/manage/team', color: '#EF4444', badge: 9 },
+        { title: 'Team Chat', icon: 'people-circle', route: '/manage/team', color: '#EF4444', badge: 0 },
         { title: 'Academy', icon: 'school', route: '/manage/academy', color: '#F59E0B' },
         { title: 'Theme', icon: 'color-palette', route: '/manage/appearance', color: '#EC4899' },
         { title: 'Automation', icon: 'flash', route: '/manage/automation', color: '#6366F1' },
@@ -66,6 +68,54 @@ const dockItems = [
 
 export default function AdminBento() {
     const router = useRouter();
+    const [counts, setCounts] = useState({
+        users: 0,
+        kyc: 0,
+        loans: 0,
+        tickets: 0,
+        chats: 0
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchCounts();
+    }, []);
+
+    const fetchCounts = async () => {
+        try {
+            const [
+                { count: userCount },
+                { count: kycCount },
+                { count: loanCount },
+                { count: ticketCount },
+                { count: chatCount }
+            ] = await Promise.all([
+                supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                supabase.from('kyc_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('loans').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+                supabase.from('ticket_messages').select('*', { count: 'exact', head: true })
+            ]);
+
+            setCounts({
+                users: userCount || 0,
+                kyc: kycCount || 0,
+                loans: loanCount || 0,
+                tickets: ticketCount || 0,
+                chats: chatCount || 0
+            });
+        } catch (error) {
+            console.error('Error fetching admin counts:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Update modules with dynamic badges
+    modules.operations[2].badge = counts.kyc;
+    modules.operations[3].badge = counts.tickets;
+    modules.banking[1].badge = counts.loans;
+    modules.internal[3].badge = counts.chats;
 
     const renderSection = (title: string, items: any[]) => (
         <View className="mb-6">
@@ -87,8 +137,8 @@ export default function AdminBento() {
                                 >
                                     <Ionicons name={item.icon as any} size={16} color={item.color} />
                                 </View>
-                                {item.badge && (
-                                    <View className="bg-red-500 rounded-full w-4 h-4 items-center justify-center border border-white">
+                                {item.badge > 0 && (
+                                    <View className="bg-red-500 rounded-full min-w-[16px] h-4 px-1 items-center justify-center border border-white">
                                         <Text className="text-white text-[8px] font-bold">{item.badge}</Text>
                                     </View>
                                 )}
@@ -130,16 +180,19 @@ export default function AdminBento() {
                         </View>
                     </View>
 
-                    {/* Search Bar */}
-                    <View className="mt-8 bg-slate-800 p-3 rounded-2xl flex-row items-center border border-slate-700">
-                        <Ionicons name="search" size={20} color="#94A3B8" />
-                        <TextInput
-                            placeholder="Search 30 Apps..."
-                            placeholderTextColor="#64748B"
-                            className="flex-1 ml-3 text-slate-200 font-medium"
-                        />
-                        <View className="bg-slate-700 px-2 py-1 rounded">
-                            <Text className="text-slate-400 text-[10px] font-bold">⌘ K</Text>
+                    {/* Quick Stats Banner */}
+                    <View className="flex-row justify-between mt-8 border-t border-slate-800 pt-6">
+                        <View>
+                            <Text className="text-slate-500 text-[10px] font-bold uppercase">System Users</Text>
+                            <Text className="text-white text-lg font-black">{counts.users}</Text>
+                        </View>
+                        <View>
+                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Uptime</Text>
+                            <Text className="text-emerald-500 text-lg font-black">99.9%</Text>
+                        </View>
+                        <View>
+                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Signals</Text>
+                            <Text className="text-white text-lg font-black">Online</Text>
                         </View>
                     </View>
                 </LinearGradient>
@@ -166,10 +219,6 @@ export default function AdminBento() {
                         <Ionicons name={item.icon as any} size={24} color={item.color} />
                     </TouchableOpacity>
                 ))}
-                <View className="w-[1px] h-8 bg-slate-700 mx-1" />
-                <TouchableOpacity onPress={() => router.push('/admin/settings')} className="w-12 h-12 items-center justify-center">
-                    <Ionicons name="grid" size={24} color="#fff" />
-                </TouchableOpacity>
             </View>
         </View>
     );

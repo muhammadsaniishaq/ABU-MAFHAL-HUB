@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Clipboard, ActivityIndicator } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -9,7 +9,24 @@ export default function FundWalletScreen() {
     const [method, setMethod] = useState<'transfer' | 'card'>('transfer');
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
+    const [virtualAccount, setVirtualAccount] = useState<any>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        fetchVirtualAccount();
+    }, []);
+
+    const fetchVirtualAccount = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase
+                .from('virtual_accounts')
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            setVirtualAccount(data);
+        }
+    };
 
     const copyToClipboard = (text: string) => {
         Clipboard.setString(text);
@@ -95,41 +112,35 @@ export default function FundWalletScreen() {
                         <View className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
                             <Text className="text-primary font-medium mb-2">Automated Bank Transfer</Text>
                             <Text className="text-gray-600 text-sm leading-5">
-                                Transfer to any of the account numbers below. Your wallet will be funded automatically instantly.
+                                Transfer to the account number below. Your wallet will be funded automatically instantly.
                             </Text>
                         </View>
 
-                        <View className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-                            <View className="flex-row justify-between items-center mb-2">
-                                <Text className="font-bold text-gray-500">Wema Bank</Text>
-                                <View className="bg-green-100 px-2 py-1 rounded">
-                                    <Text className="text-green-700 text-xs font-bold">Active</Text>
+                        {virtualAccount ? (
+                            <View className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="font-bold text-gray-500 capitalize">{virtualAccount.bank_name}</Text>
+                                    <View className="bg-green-100 px-2 py-1 rounded">
+                                        <Text className="text-green-700 text-xs font-bold">Active</Text>
+                                    </View>
                                 </View>
-                            </View>
-                            <View className="flex-row justify-between items-center">
-                                <Text className="text-2xl font-bold text-slate">803 000 0000</Text>
-                                <TouchableOpacity onPress={() => copyToClipboard('8030000000')}>
-                                    <Ionicons name="copy-outline" size={24} color="#0056D2" />
-                                </TouchableOpacity>
-                            </View>
-                            <Text className="text-gray-500 text-sm mt-1">Abu Mafhal Hub</Text>
-                        </View>
-
-                        <View className="bg-white border border-gray-200 rounded-xl p-4">
-                            <View className="flex-row justify-between items-center mb-2">
-                                <Text className="font-bold text-gray-500">Sterling Bank</Text>
-                                <View className="bg-green-100 px-2 py-1 rounded">
-                                    <Text className="text-green-700 text-xs font-bold">Active</Text>
+                                <View className="flex-row justify-between items-center">
+                                    <Text className="text-2xl font-bold text-slate-800">{virtualAccount.account_number}</Text>
+                                    <TouchableOpacity onPress={() => copyToClipboard(virtualAccount.account_number)}>
+                                        <Ionicons name="copy-outline" size={24} color="#0056D2" />
+                                    </TouchableOpacity>
                                 </View>
+                                <Text className="text-gray-500 text-sm mt-1">{virtualAccount.account_name}</Text>
                             </View>
-                            <View className="flex-row justify-between items-center">
-                                <Text className="text-2xl font-bold text-slate">803 111 2222</Text>
-                                <TouchableOpacity onPress={() => copyToClipboard('8031112222')}>
-                                    <Ionicons name="copy-outline" size={24} color="#0056D2" />
-                                </TouchableOpacity>
+                        ) : (
+                            <View className="items-center justify-center p-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                <Ionicons name="wallet-outline" size={48} color="#9CA3AF" />
+                                <Text className="text-gray-500 font-medium mt-4 text-center">No Virtual Account Assigned</Text>
+                                <Text className="text-gray-400 text-xs text-center mt-1">
+                                    Complete your KYC verification to get a dedicated account number.
+                                </Text>
                             </View>
-                            <Text className="text-gray-500 text-sm mt-1">Abu Mafhal Hub</Text>
-                        </View>
+                        )}
                     </View>
                 ) : (
                     <View>

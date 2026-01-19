@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
+import { supabase } from '../../services/supabase';
 
 const endpoints = [
     { method: 'GET', path: '/api/v1/users', desc: 'List all users' },
@@ -14,19 +15,32 @@ const endpoints = [
 export default function APISandbox() {
     const [selectedEp, setSelectedEp] = useState(endpoints[0]);
     const [response, setResponse] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-    const handleTest = () => {
-        setResponse(JSON.stringify({
-            status: "success",
-            data: {
-                count: 1240,
-                results: [
-                    { id: 1, name: "User A", balance: 5000 },
-                    { id: 2, name: "User B", balance: 1200 }
-                ]
-            },
-            timestamp: new Date().toISOString()
-        }, null, 2));
+    const handleTest = async () => {
+        setLoading(true);
+        try {
+            let data: any = null;
+            if (selectedEp.path.includes('users')) {
+                const { data: users } = await supabase.from('profiles').select('id, full_name, email, role').limit(5);
+                data = users;
+            } else if (selectedEp.path.includes('transactions')) {
+                const { data: tx } = await supabase.from('transactions').select('*').limit(5);
+                data = tx;
+            } else {
+                data = { status: "success", message: "Live connection established to neural core" };
+            }
+
+            setResponse(JSON.stringify({
+                status: "success",
+                data,
+                timestamp: new Date().toISOString()
+            }, null, 4));
+        } catch (error: any) {
+            setResponse(JSON.stringify({ status: "error", message: error.message }, null, 4));
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -68,10 +82,15 @@ export default function APISandbox() {
                     <Text className="text-white font-mono text-lg flex-1">https://api.abumafhal.com{selectedEp.path}</Text>
                     <TouchableOpacity
                         onPress={handleTest}
-                        className="bg-indigo-600 px-6 py-2 rounded-lg flex-row items-center gap-2"
+                        disabled={loading}
+                        className="bg-indigo-600 px-6 py-3 rounded-lg flex-row items-center gap-2"
                     >
-                        <Ionicons name="play" size={16} color="white" />
-                        <Text className="text-white font-bold">Send Request</Text>
+                        {loading ? <ActivityIndicator size="small" color="white" /> : (
+                            <>
+                                <Ionicons name="play" size={16} color="white" />
+                                <Text className="text-white font-bold">Send Request</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -84,7 +103,9 @@ export default function APISandbox() {
 
                 <View className="bg-slate-900 flex-1 rounded-xl p-4 border border-slate-800">
                     {response ? (
-                        <Text className="text-emerald-400 font-mono text-xs leading-5">{response}</Text>
+                        <ScrollView>
+                            <Text className="text-emerald-400 font-mono text-[10px] leading-5">{response}</Text>
+                        </ScrollView>
                     ) : (
                         <View className="flex-1 items-center justify-center">
                             <Text className="text-slate-600 text-xs">Hit "Send Request" to see API output.</Text>

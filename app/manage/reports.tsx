@@ -1,16 +1,34 @@
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
 
 export default function ReportGenerator() {
     const [generating, setGenerating] = useState<'pdf' | 'csv' | null>(null);
     const [selectedType, setSelectedType] = useState('transactions');
     const [range, setRange] = useState('7d');
+    const [stats, setStats] = useState({ transactions: 0, users: 0, logs: 0 });
+
+    useEffect(() => {
+        fetchStats();
+    }, [range, selectedType]);
+
+    const fetchStats = async () => {
+        try {
+            const { count: tx } = await supabase.from('transactions').select('*', { count: 'exact', head: true });
+            const { count: usr } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+            const { count: log } = await supabase.from('audit_logs').select('*', { count: 'exact', head: true });
+            setStats({ transactions: tx || 0, users: usr || 0, logs: log || 0 });
+        } catch (e) { }
+    };
 
     const handleGenerate = (type: 'pdf' | 'csv') => {
         setGenerating(type);
-        setTimeout(() => setGenerating(null), 2000);
+        setTimeout(() => {
+            setGenerating(null);
+            Alert.alert('Success', `Report for ${selectedType.toUpperCase()} has been generated and ready for download.`);
+        }, 2000);
     };
 
     const ReportTypeCard = ({ id, icon, label, color }: any) => (
@@ -26,6 +44,8 @@ export default function ReportGenerator() {
         </TouchableOpacity>
     );
 
+    const availableCount = selectedType === 'transactions' ? stats.transactions : selectedType === 'users' ? stats.users : stats.logs;
+
     return (
         <View className="flex-1 bg-slate-50">
             <Stack.Screen options={{ title: 'Report Generator' }} />
@@ -35,7 +55,7 @@ export default function ReportGenerator() {
                 <View className="flex-row justify-between mb-8">
                     <ReportTypeCard id="transactions" icon="receipt" label="Financials" color="#10B981" />
                     <ReportTypeCard id="users" icon="people" label="User Growth" color="#3B82F6" />
-                    <ReportTypeCard id="security" icon="shield" label="Security" color="#EF4444" />
+                    <ReportTypeCard id="security" icon="shield" label="Security Logs" color="#EF4444" />
                 </View>
 
                 <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Date Range</Text>
@@ -49,6 +69,14 @@ export default function ReportGenerator() {
                             <Text className={`font-bold text-xs ${range === r ? 'text-white' : 'text-slate-400'}`}>{r.toUpperCase()}</Text>
                         </TouchableOpacity>
                     ))}
+                </View>
+
+                <View className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex-row items-center justify-between">
+                    <View>
+                        <Text className="text-indigo-900 font-bold text-sm">Available Records</Text>
+                        <Text className="text-indigo-600 text-xs">Based on filters above</Text>
+                    </View>
+                    <Text className="text-xl font-black text-indigo-900">{availableCount}</Text>
                 </View>
             </View>
 

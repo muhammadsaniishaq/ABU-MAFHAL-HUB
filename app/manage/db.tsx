@@ -1,14 +1,48 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
 
-const tables = ['public.users', 'public.transactions', 'public.logs', 'auth.sessions', 'public.products'];
+const tables = [
+    { name: 'profiles', icon: 'people' },
+    { name: 'transactions', icon: 'receipt' },
+    { name: 'audit_logs', icon: 'list' },
+    { name: 'kyc_requests', icon: 'scan' },
+    { name: 'loans', icon: 'cash' },
+    { name: 'tickets', icon: 'chatbubbles' },
+];
 
 export default function DatabaseManager() {
-    const [selectedTable, setSelectedTable] = useState('public.users');
+    const [selectedTable, setSelectedTable] = useState('profiles');
+    const [rows, setRows] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [sqlMode, setSqlMode] = useState(false);
-    const [query, setQuery] = useState('SELECT * FROM users WHERE active = true LIMIT 10;');
+    const [query, setQuery] = useState('SELECT * FROM profiles LIMIT 10;');
+
+    useEffect(() => {
+        fetchTableData();
+    }, [selectedTable]);
+
+    const fetchTableData = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from(selectedTable)
+                .select('*')
+                .limit(20)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setRows(data || []);
+        } catch (error: any) {
+            Alert.alert('Data Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
     return (
         <View className="flex-1 bg-slate-950">
@@ -52,12 +86,12 @@ export default function DatabaseManager() {
                         <ScrollView>
                             {tables.map(table => (
                                 <TouchableOpacity
-                                    key={table}
-                                    onPress={() => setSelectedTable(table)}
-                                    className={`px-4 py-3 flex-row items-center gap-2 ${selectedTable === table ? 'bg-slate-800 border-l-2 border-emerald-500' : ''}`}
+                                    key={table.name}
+                                    onPress={() => setSelectedTable(table.name)}
+                                    className={`px-4 py-3 flex-row items-center gap-2 ${selectedTable === table.name ? 'bg-slate-800 border-l-2 border-emerald-500' : ''}`}
                                 >
-                                    <Ionicons name="grid" size={14} color={selectedTable === table ? '#10B981' : '#64748B'} />
-                                    <Text className={`text-xs font-mono ${selectedTable === table ? 'text-white font-bold' : 'text-slate-500'}`}>{table}</Text>
+                                    <Ionicons name={table.icon as any} size={14} color={selectedTable === table.name ? '#10B981' : '#64748B'} />
+                                    <Text className={`text-xs font-mono ${selectedTable === table.name ? 'text-white font-bold' : 'text-slate-500'}`}>{table.name}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -66,39 +100,43 @@ export default function DatabaseManager() {
                     {/* Content */}
                     <View className="flex-1 bg-slate-950 p-4">
                         <View className="flex-row items-center justify-between mb-6">
-                            <Text className="text-white font-bold text-lg font-mono">{selectedTable}</Text>
+                            <Text className="text-white font-bold text-lg font-mono capitalize">{selectedTable}</Text>
                             <View className="flex-row gap-2">
-                                <TouchableOpacity className="bg-slate-800 p-2 rounded-lg">
-                                    <Ionicons name="add" size={16} color="#94A3B8" />
-                                </TouchableOpacity>
-                                <TouchableOpacity className="bg-slate-800 p-2 rounded-lg">
+                                <TouchableOpacity onPress={fetchTableData} className="bg-slate-800 p-2 rounded-lg">
                                     <Ionicons name="refresh" size={16} color="#94A3B8" />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <ScrollView horizontal>
-                            <View>
-                                {/* Header Row */}
-                                <View className="flex-row border-b border-slate-800 pb-2 mb-2">
-                                    {['id', 'created_at', 'status', 'email', 'tier'].map(col => (
-                                        <Text key={col} className="w-32 text-slate-500 font-bold text-xs uppercase">{col}</Text>
-                                    ))}
-                                </View>
-                                {/* Data Rows */}
-                                {Array.from({ length: 15 }).map((_, i) => (
-                                    <View key={i} className="flex-row py-3 border-b border-slate-900 hover:bg-slate-900/50">
-                                        <Text className="w-32 text-slate-400 text-xs font-mono">us_{i + 4902}</Text>
-                                        <Text className="w-32 text-slate-400 text-xs">2026-01-17</Text>
-                                        <Text className={`w-32 text-xs font-bold ${i % 3 === 0 ? 'text-green-500' : 'text-slate-300'}`}>
-                                            {i % 3 === 0 ? 'active' : 'idle'}
-                                        </Text>
-                                        <Text className="w-32 text-slate-400 text-xs truncate">user{i}@ex.com</Text>
-                                        <Text className="w-32 text-purple-400 text-xs font-bold">PRO</Text>
-                                    </View>
-                                ))}
+                        {loading ? (
+                            <View className="flex-1 items-center justify-center">
+                                <ActivityIndicator color="#10B981" />
                             </View>
-                        </ScrollView>
+                        ) : (
+                            <ScrollView horizontal>
+                                <View>
+                                    {/* Header Row */}
+                                    <View className="flex-row border-b border-slate-800 pb-2 mb-2">
+                                        {columns.map(col => (
+                                            <Text key={col} className="w-40 text-slate-500 font-bold text-xs uppercase px-2">{col}</Text>
+                                        ))}
+                                    </View>
+                                    {/* Data Rows */}
+                                    {rows.map((row, i) => (
+                                        <View key={i} className="flex-row py-3 border-b border-slate-900">
+                                            {columns.map(col => (
+                                                <Text key={col} className="w-40 text-slate-300 text-[10px] font-mono px-2" numberOfLines={1}>
+                                                    {String(row[col])}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    ))}
+                                    {rows.length === 0 && (
+                                        <Text className="text-slate-600 italic mt-10">No data in this table</Text>
+                                    )}
+                                </View>
+                            </ScrollView>
+                        )}
                     </View>
                 </View>
             )}

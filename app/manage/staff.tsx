@@ -1,15 +1,35 @@
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-
-const staff = [
-    { name: 'Admin User', role: 'Super Admin', status: 'Online', avatar: 'AD' },
-    { name: 'Support Agent 1', role: 'Moderator', status: 'In Call', avatar: 'S1' },
-    { name: 'Dev Lead', role: 'Developer', status: 'Offline', avatar: 'DL' },
-    { name: 'Finance Mgr', role: 'Accountant', status: 'Online', avatar: 'FM' },
-];
+import { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
 
 export default function StaffManager() {
+    const [staff, setStaff] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchStaff();
+    }, []);
+
+    const fetchStaff = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .in('role', ['admin', 'super_admin'])
+                .order('full_name', { ascending: true });
+
+            if (error) throw error;
+            setStaff(data || []);
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <View className="flex-1 bg-white">
             <Stack.Screen options={{ title: 'Staff & HR' }} />
@@ -23,29 +43,37 @@ export default function StaffManager() {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView className="mb-8">
-                    {staff.map((member, i) => (
-                        <View key={i} className="flex-row items-center justify-between py-4 border-b border-gray-100">
-                            <View className="flex-row items-center gap-4">
-                                <View className="w-12 h-12 rounded-full bg-slate-100 items-center justify-center">
-                                    <Text className="font-bold text-slate-600">{member.avatar}</Text>
-                                </View>
-                                <View>
-                                    <Text className="font-bold text-slate-800 text-base">{member.name}</Text>
-                                    <View className="flex-row items-center gap-2">
-                                        <Text className="text-slate-500 text-xs">{member.role}</Text>
-                                        <View className={`px-1.5 py-0.5 rounded ${member.status === 'Online' ? 'bg-green-100' : member.status === 'Offline' ? 'bg-gray-100' : 'bg-orange-100'}`}>
-                                            <Text className={`text-[10px] font-bold ${member.status === 'Online' ? 'text-green-600' : member.status === 'Offline' ? 'text-gray-500' : 'text-orange-600'}`}>{member.status}</Text>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#0F172A" />
+                ) : (
+                    <ScrollView className="mb-8">
+                        {staff.map((member, i) => (
+                            <View key={member.id} className="flex-row items-center justify-between py-4 border-b border-gray-100">
+                                <View className="flex-row items-center gap-4">
+                                    <View className="w-12 h-12 rounded-full bg-slate-100 items-center justify-center">
+                                        <Text className="font-bold text-slate-600">
+                                            {member.full_name?.[0] || 'A'}
+                                        </Text>
+                                    </View>
+                                    <View>
+                                        <Text className="font-bold text-slate-800 text-base">{member.full_name || 'Admin'}</Text>
+                                        <View className="flex-row items-center gap-2">
+                                            <Text className="text-slate-500 text-xs capitalize">{member.role}</Text>
+                                            <View className={`px-1.5 py-0.5 rounded ${member.status === 'active' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                                <Text className={`text-[10px] font-bold ${member.status === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
+                                                    {member.status === 'active' ? 'Online' : 'Offline'}
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
                                 </View>
+                                <TouchableOpacity>
+                                    <Ionicons name="settings-outline" size={20} color="#CBD5E1" />
+                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity>
-                                <Ionicons name="settings-outline" size={20} color="#CBD5E1" />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
-                </ScrollView>
+                        ))}
+                    </ScrollView>
+                )}
 
                 <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Shift Schedule (Today)</Text>
                 <View className="flex-row gap-4">
