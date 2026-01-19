@@ -1,27 +1,22 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { decode } from 'base64-arraybuffer';
 import { supabase } from '../services/supabase';
 
 export default function KYCScreen() {
     const [tier, setTier] = useState<number>(1);
     const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState(false);
-    const [image, setImage] = useState<string | null>(null);
-    const [idNumber, setIdNumber] = useState('');
-    const [pendingRequest, setPendingRequest] = useState<any>(null);
-    const router = useRouter();
+    const [verifying, setVerifying] = useState(false);
 
-    const tiers = [
-        { level: 1, limit: '₦50,000', req: 'Email & Phone Verified' },
-        { level: 2, limit: '₦500,000', req: 'BVN / NIN' },
-        { level: 3, limit: 'Unlimited', req: 'ID Card & Utility Bill' },
-    ];
+    // Form State
+    const [idType, setIdType] = useState<'bvn' | 'nin'>('bvn');
+    const [idNumber, setIdNumber] = useState('');
+
+    const router = useRouter();
 
     useEffect(() => {
         fetchStatus();
@@ -32,7 +27,6 @@ export default function KYCScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Get Profile Tier
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('kyc_tier')
@@ -40,16 +34,6 @@ export default function KYCScreen() {
                 .single();
 
             if (profile) setTier(profile.kyc_tier);
-
-            // Check for pending requests
-            const { data: request } = await supabase
-                .from('kyc_requests')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'pending')
-                .maybeSingle(); // Use maybeSingle to avoid error if none
-
-            setPendingRequest(request);
         } catch (error) {
             console.error(error);
         } finally {
@@ -57,161 +41,164 @@ export default function KYCScreen() {
         }
     };
 
-    const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.5,
-            base64: true,
-        });
-
-        if (!result.canceled) {
-            setImage(result.assets[0].uri);
-        }
-    };
-
-    const uploadToSupabase = async (uri: string) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not authenticated");
-
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        const filePath = `${user.id}/${Date.now()}.jpg`;
-
-        const { data, error } = await supabase.storage
-            .from('kyc-documents')
-            .upload(filePath, decode(base64), { contentType: 'image/jpeg' });
-
-        if (error) throw error;
-
-        // Get public URL (or signed URL if private)
-        const { data: { publicUrl } } = supabase.storage
-            .from('kyc-documents')
-            .getPublicUrl(filePath);
-
-        return publicUrl;
-    };
-
-    const submitKYC = async () => {
-        if (!image || !idNumber) {
-            Alert.alert('Missing Information', 'Please provide both an ID number and upload a document.');
+    const handleVerify = async () => {
+        if (!idNumber || idNumber.length < 11) {
+            Alert.alert("Invalid Input", `Please enter a valid ${idType.toUpperCase()}`);
             return;
         }
 
-        setUploading(true);
+        setVerifying(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) throw new Error("Not authenticated");
 
-            const imageUrl = await uploadToSupabase(image);
-
-            const { error } = await supabase
-                .from('kyc_requests')
-                .insert({
-                    user_id: user.id,
-                    document_type: tier === 1 ? 'nin' : 'passport', // Simplification for logic
-                    document_url: imageUrl,
-                    status: 'pending' // pending review
-                });
+            // Call Edge Function
+            const { data, error } = await supabase.functions.invoke('verify-identity', {
+                body: { idType, idNumber, userId: user.id }
+            });
 
             if (error) throw error;
 
-            Alert.alert('Success', 'Your KYC request has been submitted for review.');
-            fetchStatus();
-            setImage(null);
-            setIdNumber('');
+            if (data.success) {
+                Alert.alert("Success", "Identity Verified Successfully!", [
+                    {
+                        text: "Continue", onPress: () => {
+                            fetchStatus(); // Refresh tier
+                            router.replace('/dashboard');
+                        }
+                    }
+                ]);
+            } else {
+                Alert.alert("Verification Failed", data.message || "Could not verify details. Please try again.");
+            }
+
         } catch (error: any) {
-            Alert.alert('Submission Failed', error.message);
+            Alert.alert("Error", error.message || "An unexpected error occurred.");
         } finally {
-            setUploading(false);
+            setVerifying(false);
         }
     };
 
     if (loading) {
         return (
             <View className="flex-1 items-center justify-center bg-white">
-                <ActivityIndicator color="#0056D2" />
+                <ActivityIndicator color="#0056D2" size="large" />
             </View>
         );
     }
 
     return (
-        <View className="flex-1 bg-white">
-            <Stack.Screen options={{ title: 'Identity Verification', headerTintColor: '#0056D2' }} />
-            <StatusBar style="dark" />
+        <View className="flex-1 bg-gray-50">
+            <Stack.Screen options={{ headerShown: false }} />
+            <StatusBar style="light" />
 
-            <ScrollView className="flex-1">
-                {/* Header Status */}
-                <View className="bg-blue-600 px-6 pt-6 pb-12 rounded-b-[40px] shadow-lg">
-                    <Text className="text-blue-100 font-bold text-center uppercase text-xs mb-2">Current Level</Text>
-                    <Text className="text-white font-black text-center text-4xl mb-1">Tier {tier}</Text>
-                    <Text className="text-blue-200 text-center text-sm font-medium">Limit: {tiers[tier - 1].limit}</Text>
-                </View>
+            {/* Premium Header */}
+            <LinearGradient
+                colors={['#0056D2', '#1E3A8A']} // Blue gradient
+                className="pt-16 pb-20 px-6 rounded-b-[40px] shadow-xl"
+            >
+                <TouchableOpacity onPress={() => router.back()} className="mb-6 w-10 h-10 bg-white/20 rounded-full items-center justify-center backdrop-blur-md">
+                    <Ionicons name="arrow-back" size={24} color="white" />
+                </TouchableOpacity>
 
-                <View className="px-6 -mt-8">
-                    <View className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <Text className="font-bold text-slate-800 text-lg mb-4">Required Actions</Text>
+                <Text className="text-blue-100 font-bold uppercase text-xs tracking-widest mb-2">Identity Verification</Text>
+                <Text className="text-white font-black text-3xl mb-1">Upgrade your Tier</Text>
+                <Text className="text-blue-200 text-sm">Unlock higher limits with instant verification.</Text>
+            </LinearGradient>
 
-                        {pendingRequest ? (
-                            <View className="bg-orange-50 border border-orange-100 p-4 rounded-xl flex-row items-center gap-4">
-                                <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center">
-                                    <Ionicons name="time" size={20} color="#EA580C" />
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="font-bold text-slate-800 text-sm">Verification in Progress</Text>
-                                    <Text className="text-slate-500 text-xs mt-1">Our team is reviewing your documents. This usually takes 24 hours.</Text>
-                                </View>
-                            </View>
-                        ) : tier >= 3 ? (
-                            <View className="items-center py-4">
-                                <Ionicons name="checkmark-circle" size={48} color="#107C10" />
-                                <Text className="text-green-700 font-bold text-lg mt-2">All Verified!</Text>
-                                <Text className="text-gray-500 text-center text-sm">You have reached the maximum tier.</Text>
-                            </View>
-                        ) : (
-                            <View>
-                                <Text className="text-slate-500 text-sm mb-6">Upgrade to Tier {tier + 1} to increase your transaction limits.</Text>
-
-                                <Text className="font-bold text-slate-700 mb-2">Government ID / NIN</Text>
-                                <TextInput
-                                    placeholder="Enter your BVN or NIN Number"
-                                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 h-12 mb-6 text-slate-800"
-                                    value={idNumber}
-                                    onChangeText={setIdNumber}
-                                />
-
-                                <Text className="font-bold text-slate-700 mb-2">Upload Document</Text>
-                                <TouchableOpacity
-                                    onPress={pickImage}
-                                    className="border-2 border-dashed border-gray-300 rounded-xl p-8 items-center justify-center mb-8 bg-gray-50 active:bg-gray-100"
-                                >
-                                    {image ? (
-                                        <Image source={{ uri: image }} className="w-full h-40 rounded-lg" resizeMode="cover" />
-                                    ) : (
-                                        <>
-                                            <View className="w-12 h-12 bg-blue-50 rounded-full items-center justify-center mb-2">
-                                                <Ionicons name="cloud-upload" size={24} color="#3B82F6" />
-                                            </View>
-                                            <Text className="text-slate-600 font-medium">Tap to upload ID Card</Text>
-                                            <Text className="text-slate-400 text-xs mt-1">JPG or PNG, max 5MB</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    className={`bg-blue-600 h-14 rounded-full items-center justify-center shadow-lg shadow-blue-600/30 ${uploading ? 'opacity-70' : ''}`}
-                                    onPress={submitKYC}
-                                    disabled={uploading}
-                                >
-                                    {uploading ? (
-                                        <ActivityIndicator color="white" />
-                                    ) : (
-                                        <Text className="text-white font-bold text-lg">Submit Verification</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        )}
+            <ScrollView className="flex-1 -mt-12 px-6" showsVerticalScrollIndicator={false}>
+                {/* Status Card */}
+                <View className="bg-white p-6 rounded-3xl shadow-lg shadow-blue-900/10 mb-6">
+                    <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-gray-500 font-medium text-sm">Current Status</Text>
+                        <View className={`px-3 py-1 rounded-full ${tier >= 2 ? 'bg-green-100' : 'bg-orange-100'}`}>
+                            <Text className={`text-xs font-bold ${tier >= 2 ? 'text-green-700' : 'text-orange-700'}`}>
+                                {tier >= 2 ? 'Verified' : 'Pending Upgrade'}
+                            </Text>
+                        </View>
+                    </View>
+                    <View className="flex-row items-end gap-2">
+                        <Text className="text-4xl font-black text-slate-800">Tier {tier}</Text>
+                        <Text className="text-gray-400 font-bold mb-2">/ 3</Text>
                     </View>
                 </View>
+
+                {/* Verification Form */}
+                {tier < 2 ? (
+                    <View className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-20">
+                        <Text className="font-bold text-slate-800 text-lg mb-6">Instant Verification</Text>
+
+                        {/* ID Type Selector */}
+                        <Text className="text-slate-600 font-bold mb-3 ml-1">Select ID Type</Text>
+                        <View className="flex-row gap-4 mb-6">
+                            <TouchableOpacity
+                                onPress={() => setIdType('bvn')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center justify-center ${idType === 'bvn' ? 'border-primary bg-blue-50' : 'border-gray-100 bg-white'}`}
+                            >
+                                <Ionicons name="card-outline" size={24} color={idType === 'bvn' ? '#0056D2' : '#94A3B8'} />
+                                <Text className={`font-bold mt-2 ${idType === 'bvn' ? 'text-primary' : 'text-gray-400'}`}>BVN</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setIdType('nin')}
+                                className={`flex-1 p-4 rounded-xl border-2 items-center justify-center ${idType === 'nin' ? 'border-primary bg-blue-50' : 'border-gray-100 bg-white'}`}
+                            >
+                                <Ionicons name="finger-print-outline" size={24} color={idType === 'nin' ? '#0056D2' : '#94A3B8'} />
+                                <Text className={`font-bold mt-2 ${idType === 'nin' ? 'text-primary' : 'text-gray-400'}`}>NIN</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Input Field */}
+                        <Text className="text-slate-600 font-bold mb-3 ml-1">Enter {idType.toUpperCase()} Number</Text>
+                        <View className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 mb-8">
+                            <TextInput
+                                className="text-xl font-bold text-slate-800 h-10"
+                                placeholder={`11-digit ${idType.toUpperCase()}`}
+                                placeholderTextColor="#CBD5E1"
+                                keyboardType="number-pad"
+                                maxLength={11}
+                                value={idNumber}
+                                onChangeText={setIdNumber}
+                            />
+                        </View>
+
+                        {/* Info Note */}
+                        <View className="flex-row gap-3 mb-8 bg-blue-50 p-4 rounded-xl">
+                            <Ionicons name="information-circle" size={22} color="#0056D2" />
+                            <Text className="flex-1 text-slate-600 text-xs leading-5">
+                                We will verify your name against the database. Please ensure your profile name matches your ID.
+                            </Text>
+                        </View>
+
+                        {/* Submit Button */}
+                        <TouchableOpacity
+                            className={`h-16 rounded-full items-center justify-center shadow-lg shadow-blue-600/20 mb-4 ${verifying ? 'bg-blue-400' : 'bg-primary'}`}
+                            onPress={handleVerify}
+                            disabled={verifying}
+                        >
+                            {verifying ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text className="text-white font-bold text-lg">Verify Identity</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <View className="flex-row justify-center items-center gap-2">
+                            <Ionicons name="shield-checkmark" size={14} color="#64748B" />
+                            <Text className="text-slate-500 text-xs font-bold">Secured by Flutterwave</Text>
+                        </View>
+
+                    </View>
+                ) : (
+                    <View className="items-center py-10">
+                        <View className="w-24 h-24 bg-green-100 rounded-full items-center justify-center mb-6">
+                            <Ionicons name="checkmark" size={48} color="#15803D" />
+                        </View>
+                        <Text className="text-slate-800 font-black text-2xl mb-2">Identity Verified</Text>
+                        <Text className="text-slate-500 text-center px-8">
+                            Your identity has been confirmed. You now have access to higher transaction limits.
+                        </Text>
+                    </View>
+                )}
             </ScrollView>
         </View>
     );

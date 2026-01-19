@@ -20,6 +20,7 @@ export interface FlutterwaveDVAResponse {
     };
 }
 
+
 export async function createFlutterwaveDVA(
     email: string,
     bvn: string,
@@ -40,5 +41,29 @@ export async function createFlutterwaveDVA(
         }),
     });
 
+    return await response.json();
+}
+
+export async function verifyBVN(bvn: string): Promise<any> {
+    const response = await fetch(`https://api.flutterwave.com/v3/kyc/bvns/${bvn}`, {
+        method: 'GET',
+        headers: {
+            Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+        },
+    });
+    return await response.json();
+}
+
+// Note: NIN verification logic can vary based on the specific FW endpoint version enabled
+export async function verifyNIN(nin: string): Promise<any> {
+    const response = await fetch(`https://api.flutterwave.com/v3/kyc/nin`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: nin })
+    });
     return await response.json();
 }
