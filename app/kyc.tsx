@@ -27,15 +27,21 @@ export default function KYCScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data: profile } = await supabase
+            const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('kyc_tier')
                 .eq('id', user.id)
                 .single();
 
+            if (error) {
+                console.error("Error fetching profile status:", error);
+                // If the column doesn't exist or there's an RLS issue, we stay at tier 1
+                return;
+            }
+
             if (profile) setTier(profile.kyc_tier);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch Status Catch:", error);
         } finally {
             setLoading(false);
         }
@@ -69,7 +75,9 @@ export default function KYCScreen() {
                     }
                 ]);
             } else {
-                Alert.alert("Verification Failed", data.message || "Could not verify details. Please try again.");
+                const errorMsg = data.error || data.message || "Could not verify details. Please try again.";
+                const details = data.details ? `\nDetails: ${data.details}` : '';
+                Alert.alert("Verification Failed", `${errorMsg}${details}`);
             }
 
         } catch (error: any) {
@@ -97,7 +105,16 @@ export default function KYCScreen() {
                 colors={['#0056D2', '#1E3A8A']} // Blue gradient
                 className="pt-16 pb-20 px-6 rounded-b-[40px] shadow-xl"
             >
-                <TouchableOpacity onPress={() => router.back()} className="mb-6 w-10 h-10 bg-white/20 rounded-full items-center justify-center backdrop-blur-md">
+                <TouchableOpacity 
+                    onPress={() => {
+                        if (router.canGoBack()) {
+                            router.back();
+                        } else {
+                            router.replace('/(app)/dashboard');
+                        }
+                    }} 
+                    className="mb-6 w-10 h-10 bg-white/20 rounded-full items-center justify-center backdrop-blur-md"
+                >
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
 

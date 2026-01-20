@@ -34,6 +34,12 @@ const ExpoSecureStoreAdapter = {
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
 
+// --- LOCAL TESTING TOGGLE ---
+// Set this to true to use local Edge Functions (npx supabase functions serve)
+const USE_LOCAL_FUNCTIONS = false; 
+const LOCAL_FUNCTIONS_URL = Platform.OS === 'android' ? 'http://10.0.2.2:54321/functions/v1' : 'http://localhost:54321/functions/v1';
+// ----------------------------
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: ExpoSecureStoreAdapter,
@@ -42,3 +48,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: false,
     },
 });
+
+// If local testing is enabled, override the functions URL
+if (USE_LOCAL_FUNCTIONS) {
+    (supabase as any).functions.url = LOCAL_FUNCTIONS_URL;
+}

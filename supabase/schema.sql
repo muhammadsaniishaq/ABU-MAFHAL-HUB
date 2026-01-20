@@ -11,6 +11,7 @@ create table public.profiles (
   status text default 'active', -- 'active', 'suspended', 'banned'
   balance decimal(12,2) default 0.00,
   kyc_tier integer default 1,
+  transaction_pin text,
   avatar_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -181,6 +182,7 @@ create policy "Authenticated users can view team messages"
 
 create policy "Users can insert their own team messages"
   on public.team_messages for insert
+  with check (auth.uid() = sender_id);
 
 -- 11. VIRTUAL ACCOUNTS
 create table public.virtual_accounts (

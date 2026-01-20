@@ -1,76 +1,249 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState, useEffect } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, TouchableOpacity, TextInput, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../services/supabase';
 
-export default function OTPScreen() {
-    const { phone } = useLocalSearchParams<{ phone: string }>();
-    const [code, setCode] = useState('');
-    const [timer, setTimer] = useState(60);
+const { width, height } = Dimensions.get('window');
+
+export default function OTP() {
+    const { email } = useLocalSearchParams<{ email: string }>();
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [counter, setCounter] = useState(60);
+    const [loading, setLoading] = useState(false);
+    const [resending, setResending] = useState(false);
     const router = useRouter();
+    const inputRefs = useRef<TextInput[]>([]);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setTimer((prev) => (prev > 0 ? prev - 1 : 0));
-        }, 1000);
-        return () => clearInterval(interval);
-    }, []);
+        const timer = counter > 0 && setInterval(() => setCounter(counter - 1), 1000);
+        return () => { if (timer) clearInterval(timer); };
+    }, [counter]);
 
-    const handleVerify = () => {
-        if (code.length === 6) {
-            // Mock verification success
-            router.push('/(auth)/pin-setup');
+    const handleOtpChange = (value: string, index: number) => {
+        const newOtp = [...otp];
+        newOtp[index] = value;
+        setOtp(newOtp);
+
+        if (value && index < 5) {
+            inputRefs.current[index + 1].focus();
+        }
+    };
+
+    const handleKeyPress = (e: any, index: number) => {
+        if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+            inputRefs.current[index - 1].focus();
+        }
+    };
+
+    const handleVerify = async () => {
+        const token = otp.join('');
+        if (token.length !== 6) {
+            Alert.alert('Error', 'Please enter the complete 6-digit code');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.verifyOtp({
+                email: email as string,
+                token,
+                type: 'signup'
+            });
+
+            if (error) throw error;
+
+            Alert.alert('Success', 'Email verified successfully!', [
+                { text: 'Continue', onPress: () => router.replace('/(auth)/pin-setup') }
+            ]);
+        } catch (error: any) {
+            Alert.alert('Verification Failed', error.message || 'Invalid code');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        setResending(true);
+        try {
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: email as string,
+            });
+
+            if (error) throw error;
+
+            setCounter(60);
+            Alert.alert('Success', 'A new verification code has been sent');
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setResending(false);
         }
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 bg-white"
-        >
+        <View className="flex-1 bg-white">
+            <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="dark" />
-            <View className="flex-1 px-6 pt-12">
-                <View className="mb-8">
-                    <Text className="text-primary text-2xl font-bold mb-2">Verify Phone</Text>
-                    <Text className="text-slate-600">
-                        We sent a 6-digit code to <Text className="font-bold">{phone}</Text>
-                    </Text>
-                    <TouchableOpacity onPress={() => router.back()}>
-                        <Text className="text-primary mt-1 font-medium">Change Number</Text>
-                    </TouchableOpacity>
-                </View>
+            
+            {/* Advanced Background Decorations */}
+            <View className="absolute inset-0 overflow-hidden">
+                {/* Large Gradient Blobs */}
+                <LinearGradient
+                    colors={['rgba(59, 130, 246, 0.08)', 'rgba(139, 92, 246, 0.08)']}
+                    className="absolute -top-[5%] -left-[10%] w-[90%] aspect-square rounded-full"
+                />
+                <LinearGradient
+                    colors={['rgba(236, 72, 153, 0.04)', 'transparent']}
+                    className="absolute bottom-[20%] -right-[20%] w-[80%] aspect-square rounded-full"
+                />
+                <LinearGradient
+                    colors={['rgba(16, 185, 129, 0.06)', 'rgba(59, 130, 246, 0.04)']}
+                    className="absolute bottom-[-15%] -left-[15%] w-[70%] aspect-square rounded-full"
+                    style={{ transform: [{ rotate: '-15deg' }] }}
+                />
 
-                <View className="mb-6">
-                    <TextInput
-                        className="border-b-2 border-gray-300 text-3xl font-bold text-center h-16 tracking-[10px]"
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        value={code}
-                        onChangeText={setCode}
-                        autoFocus
-                        placeholder="000000"
-                        placeholderTextColor="#E5E7EB"
-                    />
-                </View>
+                {/* Geometric Patterns */}
+                <View 
+                    style={{
+                        position: 'absolute',
+                        top: height * 0.2,
+                        right: -width * 0.2,
+                        width: width * 0.7,
+                        height: width * 0.7,
+                        borderRadius: width,
+                        borderWidth: 1.2,
+                        borderColor: 'rgba(59, 130, 246, 0.15)',
+                    }}
+                />
+                <View 
+                    style={{
+                        position: 'absolute',
+                        bottom: height * 0.2,
+                        left: -width * 0.1,
+                        width: width * 0.6,
+                        height: width * 0.6,
+                        borderRadius: width,
+                        borderWidth: 1.5,
+                        borderColor: 'rgba(16, 185, 129, 0.12)',
+                        transform: [{ scale: 1.4 }]
+                    }}
+                />
 
-                <TouchableOpacity
-                    className={`h-14 rounded-full items-center justify-center ${code.length === 6 ? 'bg-primary' : 'bg-gray-300'}`}
-                    onPress={handleVerify}
-                    disabled={code.length !== 6}
-                >
-                    <Text className="text-white font-bold text-lg">Verify</Text>
-                </TouchableOpacity>
-
-                <View className="mt-6 items-center">
-                    {timer > 0 ? (
-                        <Text className="text-gray-500">Resend code in {timer}s</Text>
-                    ) : (
-                        <TouchableOpacity onPress={() => setTimer(60)}>
-                            <Text className="text-primary font-bold">Resend Code</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                {/* Floating Bubbles */}
+                <View className="absolute top-[25%] left-[10%] w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/20" />
+                <View className="absolute top-[50%] right-[15%] w-10 h-10 rounded-full bg-purple-500/10 border border-purple-500/20" />
+                <View className="absolute bottom-[30%] left-[20%] w-8 h-8 rounded-full bg-pink-500/10 border border-pink-500/20" />
             </View>
-        </KeyboardAvoidingView>
+
+            <SafeAreaView className="flex-1">
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    className="flex-1"
+                >
+                    <View className="flex-1 px-8 py-10">
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (router.canGoBack()) {
+                                    router.back();
+                                } else {
+                                    router.replace('/(auth)/login');
+                                }
+                            }}
+                            className="mb-8 w-11 h-11 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 shadow-sm"
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#0F172A" />
+                        </TouchableOpacity>
+
+                        <View className="flex-1 justify-center">
+                            <View className="items-center mb-10">
+                                <View className="shadow-2xl shadow-blue-500/40 bg-white p-1 rounded-[32px] mb-8">
+                                    <LinearGradient
+                                        colors={['#3B82F6', '#6366F1']}
+                                        className="p-1 rounded-[30px]"
+                                    >
+                                        <View className="bg-white p-4 rounded-[28px] items-center justify-center" style={{ width: 84, height: 84 }}>
+                                            <Image 
+                                                source={require('../../assets/images/logo.png')}
+                                                style={{ width: 60, height: 60 }}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    </LinearGradient>
+                                </View>
+                                <Text className="text-3xl font-bold text-slate-900 tracking-tight">Verify Email</Text>
+                                <Text className="text-slate-500 text-center mt-3 text-base font-medium">
+                                    We've sent a 6-digit verification code to
+                                </Text>
+                                <Text className="text-blue-600 font-bold mt-1 text-base">{email}</Text>
+                            </View>
+
+                            {/* OTP Inputs */}
+                            <View className="flex-row justify-between mb-10">
+                                {otp.map((digit, index) => (
+                                    <View
+                                        key={index}
+                                        className={`w-[14%] aspect-[2/3] rounded-2xl border-2 items-center justify-center bg-slate-50 ${digit ? 'border-blue-500 shadow-md shadow-blue-500/20' : 'border-slate-100'}`}
+                                    >
+                                        <TextInput
+                                            ref={(ref) => { inputRefs.current[index] = ref as TextInput; }}
+                                            className="text-2xl font-bold text-slate-900 w-full text-center"
+                                            keyboardType="number-pad"
+                                            maxLength={1}
+                                            value={digit}
+                                            onChangeText={(value) => handleOtpChange(value, index)}
+                                            onKeyPress={(e) => handleKeyPress(e, index)}
+                                            selectionColor="#3B82F6"
+                                        />
+                                    </View>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={handleVerify}
+                                disabled={loading}
+                                activeOpacity={0.8}
+                                className="w-full mb-8"
+                            >
+                                <LinearGradient
+                                    colors={['#3B82F6', '#6366F1']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    className="h-16 rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30"
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <Text className="text-white font-bold text-lg tracking-wide">Verify Code</Text>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            <View className="items-center">
+                                <Text className="text-slate-500 font-medium mb-3">Didn't receive code?</Text>
+                                <TouchableOpacity
+                                    disabled={counter > 0 || resending}
+                                    onPress={handleResend}
+                                    className="flex-row items-center"
+                                >
+                                    <Text className={`font-bold text-base ${counter > 0 ? 'text-slate-300' : 'text-blue-600'}`}>
+                                        Resend Code
+                                    </Text>
+                                    {counter > 0 && (
+                                        <View className="ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
+                                            <Text className="text-slate-500 text-xs font-bold">{counter}s</Text>
+                                        </View>
+                                    )}
+                                    {resending && <ActivityIndicator size="small" color="#3B82F6" className="ml-2" />}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </View>
     );
 }

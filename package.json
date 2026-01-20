@@ -43,6 +43,7 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "autoprefixer": "^10.4.23",
+    "supabase": "^2.72.8",
     "typescript": "~5.9.2"
   },
   "private": true
