@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../services/supabase';
+import { supabase, forceSignOut } from '../services/supabase';
 
 export default function KYCScreen() {
     const [tier, setTier] = useState<number>(1);
@@ -94,7 +94,7 @@ export default function KYCScreen() {
                     { 
                         text: "Login", 
                         onPress: async () => {
-                            await supabase.auth.signOut();
+                            await forceSignOut();
                             router.replace('/(auth)/login');
                         }
                     }

@@ -53,3 +53,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 if (USE_LOCAL_FUNCTIONS) {
     (supabase as any).functions.url = LOCAL_FUNCTIONS_URL;
 }
+
+// Helper to forcefully clear session data (The "Nuclear Option" for stuck sessions)
+export const forceSignOut = async () => {
+    try {
+        await supabase.auth.signOut();
+    } catch (e) {
+        console.warn("Standard signOut failed, proceeding to manual wipe", e);
+    }
+    
+    // Manual Storage Wipe
+    const key = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`;
+    
+    if (Platform.OS === 'web') {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(key);
+            localStorage.removeItem('supabase.auth.token'); // Fallback legacy key
+        }
+    } else {
+        await SecureStore.deleteItemAsync(key);
+        await SecureStore.deleteItemAsync('supabase.auth.token');
+    }
+};

@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { View, ActivityIndicator } from 'react-native';
-import { supabase } from '../services/supabase';
+import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -37,9 +37,10 @@ export default function RootLayout() {
             if (error) {
                 console.error("Error fetching role:", JSON.stringify(error));
                 // If unauthorized or bad request, session is likely invalid
-                if (error.code === 'PGRST301' || error.message?.includes('JWT') || error.status === 401 || error.status === 400 || error.code === '401' || error.code === '400') {
+                const err = error as any;
+                if (err.code === 'PGRST301' || err.message?.includes('JWT') || err.status === 401 || err.status === 400 || err.code === '401' || err.code === '400') {
                     console.log("Forcing logout due to session error...");
-                    await supabase.auth.signOut();
+                    await forceSignOut();
                     setSession(null);
                 }
                 return;
