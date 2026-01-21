@@ -99,7 +99,7 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
 
                 <View className="items-center mb-8">
-                    <Text className="text-gray-400 text-xs">Version 1.0.0</Text>
+                    <Text className="text-gray-400 text-xs">Version 1.0.1</Text>
                     <Text className="text-gray-400 text-xs">Abu Mafhal Hub</Text>
                 </View>
             </ScrollView>
