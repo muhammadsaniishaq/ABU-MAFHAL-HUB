@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
             console.error("Missing fields:", { idType, idNumber, userId });
             return new Response(JSON.stringify({ success: false, error: "Missing required fields (idType, idNumber, userId)" }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400,
+                status: 200, // Return 200 to show error in UI
             });
         }
 
@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
                 details: profileError?.message || "Profile not found"
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400,
+                status: 200,
             });
         }
 
@@ -86,12 +86,16 @@ Deno.serve(async (req: Request) => {
             } else {
                 return new Response(JSON.stringify({ success: false, error: "Invalid ID Type" }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 400,
+                    status: 200,
                 });
             }
         } catch (apiError: any) {
             console.error("Flutterwave API Exception:", apiError);
-            throw new Error(`External API Error: ${apiError.message}`);
+            // Don't throw 500 here, return failure
+            return new Response(JSON.stringify({ success: false, error: `External API Error: ${apiError.message}` }), {
+                 headers: { ...corsHeaders, "Content-Type": "application/json" },
+                 status: 200,
+            });
         }
 
         // 3. Logic: Check if API call was successful
@@ -100,7 +104,7 @@ Deno.serve(async (req: Request) => {
             console.warn("Verification Failed at Provider:", { apiStatus, apiMessage });
             return new Response(JSON.stringify({ success: false, error: errorMsg }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400,
+                status: 200,
             });
         }
 

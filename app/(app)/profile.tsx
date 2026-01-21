@@ -2,8 +2,12 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-na
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { supabase } from '../../services/supabase';
+import { supabase, forceSignOut } from '../../services/supabase';
 import { useEffect, useState } from 'react';
+
+// ... (code)
+
+// ... imports ...
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<{ full_name: string; email: string; role: string; phone?: string } | null>(null);
@@ -35,13 +39,8 @@ export default function ProfileScreen() {
                     text: "Logout",
                     style: "destructive",
                     onPress: async () => {
-                        try {
-                            await supabase.auth.signOut();
-                        } catch (error) {
-                            console.error("Error signing out:", error);
-                        } finally {
-                            router.replace('/(auth)/login');
-                        }
+                        await forceSignOut();
+                        router.replace('/(auth)/login');
                     }
                 }
             ]

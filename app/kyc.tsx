@@ -35,6 +35,19 @@ export default function KYCScreen() {
 
             if (error) {
                 console.error("Error fetching profile status:", error);
+                
+                // If unauthorized or bad request, session is likely invalid
+                const err = error as any;
+                if (err.code === 'PGRST301' || err.message?.includes('JWT') || err.status === 401 || err.status === 400 || err.code === '401' || err.code === '400') {
+                    console.log("Fetch Status Error: Forcing logout...");
+                    Alert.alert("Session Expired", "Please login again.", [
+                        { text: "OK", onPress: () => {
+                             forceSignOut().then(() => router.replace('/(auth)/login'));
+                        }}
+                    ]);
+                    return;
+                }
+                
                 // If the column doesn't exist or there's an RLS issue, we stay at tier 1
                 return;
             }
