@@ -143,6 +143,42 @@ Deno.serve(async (req: Request) => {
         });
         if (logError) console.error("KYC Request Log Error:", logError);
 
+        // 6. Assign Virtual Account (PAYSTACK)
+        let virtualAccountData = null;
+        try {
+            const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+            if (authUser && authUser.email) {
+                 // Import Dynamically or ensure import at top
+                 const { createPaystackDVA } = await import('../_shared/paystack.ts');
+                 
+                 const firstName = fwFirstName || userFullName.split(' ')[0];
+                 const lastName = fwLastName || userFullName.split(' ').slice(1).join(' ');
+                 const phone = profile.phone || '08000000000'; // Fallback
+
+                 console.log(`Creating Paystack Account for ${authUser.email}...`);
+                 const paystackRes = await createPaystackDVA(authUser.email, firstName, lastName, phone);
+
+                 if (paystackRes.status && paystackRes.data) {
+                    virtualAccountData = {
+                        user_id: userId,
+                        provider: 'paystack',
+                        bank_name: paystackRes.data.bank.name,
+                        account_number: paystackRes.data.account_number,
+                        account_name: paystackRes.data.account_name,
+                        currency: paystackRes.data.currency,
+                        meta_data: paystackRes.data
+                    };
+
+                    const { error: vaError } = await supabaseAdmin.from('virtual_accounts').insert(virtualAccountData);
+                    if (vaError) console.error("VA Insert Error:", vaError);
+                 } else {
+                     console.error("Paystack Creation Failed:", paystackRes.message);
+                 }
+            }
+        } catch (vaEx) {
+            console.error("Virtual Account Config Error:", vaEx);
+        }
+
         return new Response(JSON.stringify({
             success: true,
             message: "Identity Verified Successfully!",
