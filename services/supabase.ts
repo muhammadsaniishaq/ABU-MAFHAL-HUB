@@ -19,14 +19,14 @@ const ExpoSecureStoreAdapter = {
             if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
             return Promise.resolve();
         }
-        SecureStore.setItemAsync(key, value);
+        return SecureStore.setItemAsync(key, value);
     },
     removeItem: (key: string) => {
         if (Platform.OS === 'web') {
             if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
             return Promise.resolve();
         }
-        SecureStore.deleteItemAsync(key);
+        return SecureStore.deleteItemAsync(key);
     },
 };
 

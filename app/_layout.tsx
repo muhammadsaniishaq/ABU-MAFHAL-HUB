@@ -33,6 +33,17 @@ export default function RootLayout() {
                 .select('role')
                 .eq('id', userId)
                 .single();
+            
+            if (error) {
+                console.error("Error fetching role:", error);
+                // If unauthorized or bad request, session is likely invalid
+                if (error.code === 'PGRST301' || error.message?.includes('JWT') || error.status === 401 || error.status === 400) {
+                    await supabase.auth.signOut();
+                    setSession(null);
+                }
+                return;
+            }
+
             if (data) setUserRole(data.role);
         } catch (e) {
             console.error('Error fetching role in layout:', e);
