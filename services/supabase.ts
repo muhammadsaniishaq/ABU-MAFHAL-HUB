@@ -67,8 +67,10 @@ export const forceSignOut = async () => {
     
     if (Platform.OS === 'web') {
         if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem(key);
-            localStorage.removeItem('supabase.auth.token'); // Fallback legacy key
+            localStorage.clear(); // Clear EVERYTHING to be safe
+            // Force reload to clear memory state
+            window.location.href = '/'; 
+            return;
         }
     } else {
         await SecureStore.deleteItemAsync(key);
