@@ -34,7 +34,15 @@ export default function ProfileScreen() {
                 {
                     text: "Logout",
                     style: "destructive",
-                    onPress: () => router.replace('/(auth)/login')
+                    onPress: async () => {
+                        try {
+                            await supabase.auth.signOut();
+                        } catch (error) {
+                            console.error("Error signing out:", error);
+                        } finally {
+                            router.replace('/(auth)/login');
+                        }
+                    }
                 }
             ]
         );

@@ -4,9 +4,12 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "login": "npx supabase login",
+    "deploy:functions": "npx supabase functions deploy",
     "vercel-build": "npx expo export -p web"
   },
   "dependencies": {

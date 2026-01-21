@@ -30,7 +30,9 @@ export default function Login() {
             });
 
             if (error) {
-                if (error.message.includes('Email not confirmed')) {
+                // Check for unconfirmed email error
+                if (error.message.includes('Email not confirmed') || error.message.includes('Email not verified')) {
+                    console.log("Redirecting to verification for:", email);
                     router.push({
                         pathname: '/(auth)/otp',
                         params: { email, type: 'signup' }
