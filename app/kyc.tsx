@@ -68,6 +68,21 @@ export default function KYCScreen() {
 
         setVerifying(true);
         try {
+            // 1. FRESH SESSION CHECK
+            console.log("Checking session validity before KYC...");
+            const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+            
+            if (sessionError || !sessionData.session) {
+                console.warn("Session Refresh Failed:", sessionError);
+                Alert.alert("Session Expired", "Please login again.", [
+                    { text: "Login", onPress: async () => {
+                         await forceSignOut();
+                         router.replace('/(auth)/login');
+                    }}
+                ]);
+                return;
+            }
+
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
@@ -97,11 +112,14 @@ export default function KYCScreen() {
             console.error("Verification Error:", error);
             
             // Handle Session Expiry / Unauthorized Access
+            // Since we return 200 for logic errors, any thrown FunctionsHttpError is likely 401/403/500
+            const errString = JSON.stringify(error) + error.toString();
             if (
                 error.status === 401 || 
                 error.message?.includes('Invalid Refresh Token') ||
                 error.message?.includes('JWT') ||
-                error.toString().includes('401')
+                errString.includes('401') ||
+                errString.includes('FunctionsHttpError') // Catch the Edge Function rejection
             ) {
                 Alert.alert("Session Expired", "Please login again to continue.", [
                     { 
