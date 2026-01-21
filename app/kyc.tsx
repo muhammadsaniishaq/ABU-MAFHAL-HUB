@@ -81,6 +81,27 @@ export default function KYCScreen() {
             }
 
         } catch (error: any) {
+            console.error("Verification Error:", error);
+            
+            // Handle Session Expiry / Unauthorized Access
+            if (
+                error.status === 401 || 
+                error.message?.includes('Invalid Refresh Token') ||
+                error.message?.includes('JWT') ||
+                error.toString().includes('401')
+            ) {
+                Alert.alert("Session Expired", "Please login again to continue.", [
+                    { 
+                        text: "Login", 
+                        onPress: async () => {
+                            await supabase.auth.signOut();
+                            router.replace('/(auth)/login');
+                        }
+                    }
+                ]);
+                return;
+            }
+
             Alert.alert("Error", error.message || "An unexpected error occurred.");
         } finally {
             setVerifying(false);

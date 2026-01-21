@@ -35,9 +35,10 @@ export default function RootLayout() {
                 .single();
             
             if (error) {
-                console.error("Error fetching role:", error);
+                console.error("Error fetching role:", JSON.stringify(error));
                 // If unauthorized or bad request, session is likely invalid
-                if (error.code === 'PGRST301' || error.message?.includes('JWT') || error.status === 401 || error.status === 400) {
+                if (error.code === 'PGRST301' || error.message?.includes('JWT') || error.status === 401 || error.status === 400 || error.code === '401' || error.code === '400') {
+                    console.log("Forcing logout due to session error...");
                     await supabase.auth.signOut();
                     setSession(null);
                 }
