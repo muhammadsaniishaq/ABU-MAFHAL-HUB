@@ -118,6 +118,7 @@ export default function KYCScreen() {
                 error.status === 401 || 
                 error.message?.includes('Invalid Refresh Token') ||
                 error.message?.includes('JWT') ||
+                error.message?.includes('Not authenticated') || 
                 errString.includes('401') ||
                 errString.includes('FunctionsHttpError') // Catch the Edge Function rejection
             ) {
