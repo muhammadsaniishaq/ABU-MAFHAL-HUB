@@ -74,12 +74,18 @@ export default function KYCScreen() {
             
             if (sessionError || !sessionData.session) {
                 console.warn("Session Refresh Failed:", sessionError);
-                Alert.alert("Session Expired", "Please login again.", [
-                    { text: "Login", onPress: async () => {
-                         await forceSignOut();
-                         router.replace('/(auth)/login');
-                    }}
-                ]);
+                
+                if (Platform.OS === 'web') {
+                    window.alert("Session Expired. Redirecting to Login...");
+                    await forceSignOut(); // This will reload the page
+                } else {
+                    Alert.alert("Session Expired", "Please login again.", [
+                        { text: "Login", onPress: async () => {
+                             await forceSignOut();
+                             router.replace('/(auth)/login');
+                        }}
+                    ]);
+                }
                 return;
             }
 
