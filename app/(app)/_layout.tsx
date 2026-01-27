@@ -1,6 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { useState } from 'react';
 import SecurityModal from '../../components/SecurityModal';
 
@@ -32,8 +32,8 @@ export default function AppLayout() {
                     elevation: 5,
                     backgroundColor: '#ffffff',
                     borderRadius: 25,
-                    height: 70,
-                    paddingBottom: 10,
+                    height: 80,
+                    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
                     paddingTop: 10,
                     borderTopWidth: 0,
                     shadowColor: '#000',
