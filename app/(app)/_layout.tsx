@@ -15,8 +15,6 @@ export default function AppLayout() {
                 onClose={() => router.replace('/')}
                 onSuccess={() => setIsVerified(true)}
                 title="Welcome Back"
-                description="Please verify your identity to continue."
-                requiredFor="login"
             />
         );
     }
@@ -27,9 +25,21 @@ export default function AppLayout() {
                 tabBarActiveTintColor: '#0056D2',
                 tabBarInactiveTintColor: '#9ca3af',
                 tabBarStyle: {
-                    height: 60,
-                    paddingBottom: 8,
-                    paddingTop: 8,
+                    position: 'absolute',
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                    elevation: 5,
+                    backgroundColor: '#ffffff',
+                    borderRadius: 25,
+                    height: 70,
+                    paddingBottom: 10,
+                    paddingTop: 10,
+                    borderTopWidth: 0,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 10,
                 },
             }}
         >

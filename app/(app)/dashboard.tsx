@@ -105,7 +105,7 @@ export default function Dashboard() {
                 </View>
             </View>
 
-            <ScrollView className="flex-1 px-6 pt-6">
+            <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                 {/* Balance Card - Wealth Green */}
                 <View className="bg-success rounded-2xl p-6 mb-4 shadow-sm">
                     <View className="flex-row justify-between items-start mb-2">
@@ -245,7 +245,7 @@ export default function Dashboard() {
             {/* COTEX AI FAB */}
             <TouchableOpacity 
                 onPress={() => router.push('/ai-chat')}
-                className="absolute bottom-6 right-6 w-16 h-16 bg-indigo-600 rounded-full items-center justify-center shadow-lg shadow-indigo-500/50 z-50 border-4 border-white"
+                className="absolute bottom-28 right-6 w-16 h-16 bg-indigo-600 rounded-full items-center justify-center shadow-lg shadow-indigo-500/50 z-50 border-4 border-white"
             >
                 <Ionicons name="sparkles" size={28} color="white" />
                 <View className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white" />
