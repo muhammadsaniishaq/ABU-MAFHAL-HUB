@@ -1,10 +1,11 @@
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, SafeAreaView, ActivityIndicator, Image, Dimensions } from 'react-native';
-import { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView, Image, Dimensions, Vibration } from 'react-native';
+import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import * as SecureStore from 'expo-secure-store';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,47 +15,69 @@ export default function PinSetupScreen() {
     const [step, setStep] = useState<'create' | 'confirm'>('create');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const inputRef = useRef<TextInput>(null);
+
+    const handlePress = (key: string) => {
+        Vibration.vibrate(10);
+        const currentPin = step === 'create' ? pin : confirmPin;
+        const setCurrent = step === 'create' ? setPin : setConfirmPin;
+
+        if (key === 'back') {
+            setCurrent(prev => prev.slice(0, -1));
+            return;
+        }
+
+        if (currentPin.length < 4) {
+             setCurrent(prev => prev + key);
+        }
+    };
 
     const handleNext = async () => {
+        // Validation Logic
         if (step === 'create') {
             if (pin.length === 4) {
                 setStep('confirm');
-                setConfirmPin('');
             }
         } else {
-            if (confirmPin === pin) {
-                setLoading(true);
-                try {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) throw new Error("User not found");
+             // Confirm Step
+             if (confirmPin === pin) {
+                 setLoading(true);
+                 try {
+                     const { data: { user } } = await supabase.auth.getUser();
+                     if (!user) throw new Error("User not found");
 
-                    const { error } = await supabase
-                        .from('profiles')
-                        .update({ transaction_pin: pin })
-                        .eq('id', user.id);
+                     // Save to SecureStore
+                     await SecureStore.setItemAsync('user_transaction_pin', pin);
 
-                    if (error) throw error;
-
-                    Alert.alert("Success", "Security PIN created successfully!", [
-                        { text: "Continue", onPress: () => router.replace('/(app)/dashboard') }
-                    ]);
-                } catch (error: any) {
-                    Alert.alert("Error", error.message || "Failed to save PIN");
-                } finally {
-                    setLoading(false);
-                }
-            } else {
-                Alert.alert("Error", "PINs do not match", [
-                    { text: "Try Again", onPress: () => {
-                        setStep('create');
-                        setPin('');
-                        setConfirmPin('');
-                        inputRef.current?.focus();
-                    }}
-                ]);
-            }
+                     // Success Animation/Alert
+                     Vibration.vibrate(50);
+                     router.replace('/(app)/dashboard');
+                 } catch (error: any) {
+                     alert(error.message);
+                 } finally {
+                     setLoading(false);
+                 }
+             } else {
+                 // Mismatch
+                 Vibration.vibrate([50, 50, 50]);
+                 alert("PINs do not match. Please try again.");
+                 setConfirmPin('');
+                 setStep('create'); // Reset to start for safety
+                 setPin('');
+             }
         }
+    };
+
+    const renderDot = (index: number) => {
+        const currentLength = step === 'create' ? pin.length : confirmPin.length;
+        const filled = index < currentLength;
+        return (
+            <View 
+                key={index} 
+                className={`w-6 h-6 rounded-full mx-2 border-2 ${
+                    filled ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-blue-200'
+                }`} 
+            />
+        );
     };
 
     return (
@@ -62,137 +85,105 @@ export default function PinSetupScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="dark" />
             
-            {/* Advanced Background Decorations */}
-            <View className="absolute inset-0 overflow-hidden">
-                {/* Large Gradient Blobs */}
+            {/* Colorful Mesh Gradient Background */}
+            <View className="absolute inset-0 overflow-hidden pointer-events-none bg-[#F8FAFC]">
+                {/* Top Right - Purple/Pink Glow */}
                 <LinearGradient
-                    colors={['rgba(236, 72, 153, 0.04)', 'rgba(59, 130, 246, 0.06)']}
-                    className="absolute -top-[10%] -left-[10%] w-[100%] aspect-square rounded-full"
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
+                    colors={['rgba(168, 85, 247, 0.15)', 'rgba(168, 85, 247, 0)']}
+                    className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full blur-[80px]"
                 />
+                
+                {/* Bottom Left - Cyan/Teal Glow */}
                 <LinearGradient
-                    colors={['rgba(59, 130, 246, 0.05)', 'transparent']}
-                    className="absolute top-[30%] -right-[20%] w-[80%] aspect-square rounded-full"
-                />
-                <LinearGradient
-                    colors={['rgba(16, 185, 129, 0.05)', 'rgba(139, 92, 246, 0.03)']}
-                    className="absolute bottom-[-5%] right-[-5%] w-[70%] aspect-square rounded-full"
+                    colors={['rgba(6, 182, 212, 0.15)', 'rgba(6, 182, 212, 0)']}
+                    className="absolute -bottom-32 -left-32 w-[600px] h-[600px] rounded-full blur-[80px]"
                 />
 
-                {/* Geometric Patterns */}
-                <View 
-                    style={{
-                        position: 'absolute',
-                        top: height * 0.1,
-                        right: -width * 0.15,
-                        width: width * 0.75,
-                        height: width * 0.75,
-                        borderRadius: width,
-                        borderWidth: 1.5,
-                        borderColor: 'rgba(59, 130, 246, 0.12)',
-                        transform: [{ scale: 1.1 }]
-                    }}
+                {/* Center - Primary Blue Subtle */}
+                <LinearGradient
+                    colors={['rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0)']}
+                    className="absolute top-1/2 left-1/2 -ml-[300px] -mt-[300px] w-[600px] h-[600px] rounded-full blur-[100px]"
                 />
-
-                {/* Floating Bubbles */}
-                <View className="absolute top-[20%] right-[10%] w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20" />
-                <View className="absolute bottom-[35%] left-[15%] w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/20" />
-                <View className="absolute top-[50%] left-[5%] w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20" />
             </View>
 
             <SafeAreaView className="flex-1">
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    className="flex-1"
-                >
-                    <View className="flex-1 px-8 py-12 items-center justify-center">
-                        <View className="mb-12 items-center">
-                            <View className="shadow-2xl shadow-blue-500/40 bg-white p-1 rounded-[32px] mb-10">
-                                <LinearGradient
-                                    colors={['#3B82F6', '#6366F1']}
-                                    className="p-1 rounded-[30px]"
-                                >
-                                    <View className="bg-white p-5 rounded-[28px] items-center justify-center" style={{ width: 90, height: 90 }}>
-                                        <Image 
-                                            source={require('../../assets/images/logo.png')}
-                                            style={{ width: 64, height: 64 }}
-                                            resizeMode="contain"
-                                        />
-                                    </View>
-                                </LinearGradient>
-                            </View>
-                            <Text className="text-3xl font-bold text-slate-900 mb-3 tracking-tight text-center">
-                                {step === 'create' ? 'Secure Your Hub' : 'Confirm Security PIN'}
-                            </Text>
-                            <Text className="text-slate-500 text-center text-base font-medium leading-6 px-4">
-                                {step === 'create'
-                                    ? 'Create a 4-digit PIN to authorize your transactions safely.'
-                                    : 'Please re-enter your 4-digit PIN to confirm.'}
-                            </Text>
-                        </View>
-
-                        <View className="mb-12 w-full items-center">
-                            <View className="flex-row gap-8">
-                                {[...Array(4)].map((_, i) => (
-                                    <View
-                                        key={i}
-                                        className={`w-5 h-5 rounded-full border-2 ${
-                                            (step === 'create' ? pin.length : confirmPin.length) > i
-                                                ? 'bg-blue-600 border-blue-500 shadow-md shadow-blue-500/30'
-                                                : 'bg-slate-50 border-slate-200'
-                                        }`}
-                                    />
-                                ))}
-                            </View>
-
-                            <TextInput
-                                ref={inputRef}
-                                className="w-full h-full absolute opacity-0"
-                                keyboardType="number-pad"
-                                maxLength={4}
-                                value={step === 'create' ? pin : confirmPin}
-                                onChangeText={step === 'create' ? setPin : setConfirmPin}
-                                autoFocus
+                <View className="flex-1 px-8 py-6 justify-between">
+                    
+                    {/* Header Section (Top) */}
+                    <View className="items-center mt-12">
+                         <View className="w-24 h-24 bg-white/80 rounded-[32px] items-center justify-center mb-8 border border-white backdrop-blur-md shadow-sm shadow-sky-100">
+                           <Image 
+                                source={require('../../assets/images/logo.png')}
+                                className="w-12 h-12"
+                                resizeMode="contain"
                             />
                         </View>
+                        <Text className="text-3xl font-bold text-slate-800 mb-3 tracking-tight">
+                            {step === 'create' ? 'Create PIN' : 'Confirm PIN'}
+                        </Text>
+                        <Text className="text-slate-500 text-base font-medium tracking-wide">
+                            {step === 'create' ? 'Secure your account' : 'Verify your identity'}
+                        </Text>
 
-                        <TouchableOpacity
-                            onPress={handleNext}
-                            disabled={((step === 'create' ? pin.length : confirmPin.length) !== 4) || loading}
-                            activeOpacity={0.8}
-                            className="w-full"
-                        >
-                            <LinearGradient
-                                colors={((step === 'create' ? pin.length : confirmPin.length) === 4) 
-                                    ? ['#3B82F6', '#6366F1'] 
-                                    : ['#E2E8F0', '#E2E8F0']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                className="h-16 rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30"
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text className={`font-bold text-lg tracking-wide ${((step === 'create' ? pin.length : confirmPin.length) === 4) ? 'text-white' : 'text-slate-400'}`}>
-                                        {step === 'create' ? 'Set PIN' : 'Complete Setup'}
-                                    </Text>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setPin('');
-                                setConfirmPin('');
-                                setStep('create');
-                            }}
-                            className="mt-10"
-                        >
-                            <Text className="text-slate-400 text-sm font-bold">Start over</Text>
-                        </TouchableOpacity>
+                        {/* Modern Dots */}
+                        <View className="flex-row gap-6 mt-12">
+                            {[0, 1, 2, 3].map((idx) => {
+                                const currentLength = step === 'create' ? pin.length : confirmPin.length;
+                                const filled = idx < currentLength;
+                                return (
+                                    <View 
+                                        key={idx} 
+                                        className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                                            filled 
+                                            ? 'bg-sky-500 shadow-lg shadow-sky-200 scale-110' 
+                                            : 'bg-slate-200 border border-slate-300'
+                                        }`} 
+                                    />
+                                );
+                            })}
+                        </View>
                     </View>
-                </KeyboardAvoidingView>
+
+                    {/* Premium Glass Keypad (Bottom) */}
+                    <View className="w-full max-w-[340px] self-center mb-8">
+                         <View className="gap-y-6">
+                            {[
+                                [1, 2, 3],
+                                [4, 5, 6],
+                                [7, 8, 9]
+                            ].map((row, rIdx) => (
+                                <View key={rIdx} className="flex-row justify-between px-2">
+                                    {row.map(num => (
+                                        <TouchableOpacity
+                                            key={num}
+                                            onPress={() => handlePress(num.toString())}
+                                            className="w-[85px] h-[85px] rounded-[32px] bg-white items-center justify-center border border-white shadow-sm active:bg-slate-50 active:scale-95 transition-all"
+                                        >
+                                            <Text className="text-3xl font-semibold text-slate-700">{num}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ))}
+                            
+                            <View className="flex-row justify-between items-center px-2">
+                                <View className="w-[85px] h-[85px]" /> 
+                                <TouchableOpacity
+                                    onPress={() => handlePress('0')}
+                                    className="w-[85px] h-[85px] rounded-[32px] bg-white items-center justify-center border border-white shadow-sm active:bg-slate-50 active:scale-95 transition-all"
+                                >
+                                    <Text className="text-3xl font-semibold text-slate-700">0</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => handlePress('back')}
+                                    className="w-[85px] h-[85px] rounded-[32px] items-center justify-center active:bg-slate-100/50 active:scale-95 transition-all"
+                                >
+                                    <Ionicons name="backspace-outline" size={32} color="#94A3B8" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+
+                </View>
             </SafeAreaView>
         </View>
     );

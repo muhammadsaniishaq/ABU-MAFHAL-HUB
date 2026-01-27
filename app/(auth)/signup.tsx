@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, KeyboardAvoidingView, Platform, Image, ScrollView, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Image, ScrollView, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';

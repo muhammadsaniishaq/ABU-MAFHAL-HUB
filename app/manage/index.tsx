@@ -15,6 +15,8 @@ const modules = {
         { title: 'KYC Queue', icon: 'scan', route: '/manage/kyc', color: '#8B5CF6', badge: 0 }, // Dynamically updated
         { title: 'Help Desk', icon: 'chatbubbles', route: '/manage/tickets', color: '#EC4899', badge: 0 },
         { title: 'Content', icon: 'images', route: '/manage/cms', color: '#6366F1' },
+        { title: 'Data Plans', icon: 'wifi', route: '/manage/data-plans', color: '#0EA5E9' },
+        { title: 'Airtime', icon: 'call', route: '/manage/airtime', color: '#10B981' },
         { title: 'Localization', icon: 'language', route: '/manage/localization', color: '#8B5CF6' },
     ],
     banking: [
@@ -27,7 +29,7 @@ const modules = {
     finance: [
         { title: 'Risk', icon: 'alert-circle', route: '/manage/risk', color: '#EF4444' },
         { title: 'Analytics', icon: 'bar-chart', route: '/manage/reports', color: '#F59E0B' },
-        { title: 'Marketing', icon: 'megaphone', route: '/manage/marketing', color: '#F472B6' },
+        { title: 'Comms Center', icon: 'megaphone', route: '/manage/communications', color: '#F472B6' },
         { title: 'Cortex AI', icon: 'sparkles', route: '/manage/ai', color: '#818CF8', dark: true },
     ],
     technical: [
@@ -58,6 +60,13 @@ const modules = {
         { title: 'PANIC ROOM', icon: 'warning', route: '/manage/panic', color: '#EF4444', dark: true },
     ]
 };
+
+const QUICK_ACTIONS = [
+    { id: 'user', label: 'Add User', icon: 'person-add', color: '#3B82F6', route: '/manage/users/add' },
+    { id: 'money', label: 'Send Cash', icon: 'cash', color: '#10B981', route: '/manage/transfers/new' },
+    { id: 'broadcast', label: 'Broadcast', icon: 'megaphone', color: '#F59E0B', route: '/manage/communications' },
+    { id: 'logs', label: 'View Logs', icon: 'list', color: '#6366F1', route: '/manage/logs' },
+];
 
 const dockItems = [
     { icon: 'stats-chart', route: '/manage/reports', color: '#3B82F6' },
@@ -122,30 +131,33 @@ export default function AdminBento() {
             <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mb-3 ml-2">{title}</Text>
             <View className="flex-row flex-wrap justify-between gap-y-3">
                 {items.map((item, i) => {
-                    const bgClass = item.dark ? 'bg-slate-900 border-slate-800' : 'bg-white border-white';
-                    const textColor = item.dark ? 'text-white' : 'text-slate-700';
-
+                    // Modern Glass Style
+                    const bgClass = 'bg-slate-800/60 border-white/5';  
+                    
                     return (
                         <TouchableOpacity
                             key={i}
                             onPress={() => router.push(item.route as any)}
-                            className={`w-[31%] h-28 ${bgClass} rounded-2xl p-3 justify-between shadow-sm border active:scale-95 transition-transform`}
+                            className={`w-[31%] h-28 ${bgClass} rounded-2xl p-3 justify-between shadow-sm border active:scale-95 transition-transform overflow-hidden`}
                         >
+                            {/* Gradient Glare Effect */}
+                            <View className="absolute -top-10 -right-10 w-20 h-20 bg-white/5 rounded-full blur-xl" />
+                            
                             <View className="flex-row justify-between items-start">
-                                <View className={`w-8 h-8 rounded-full items-center justify-center ${item.dark ? 'bg-slate-800' : ''}`}
-                                    style={{ backgroundColor: item.dark ? undefined : item.color + '20' }}
+                                <View className={`w-8 h-8 rounded-full items-center justify-center bg-slate-700/50`}
+                                    style={{ backgroundColor: item.color + '15' }}
                                 >
                                     <Ionicons name={item.icon as any} size={16} color={item.color} />
                                 </View>
                                 {item.badge > 0 && (
-                                    <View className="bg-red-500 rounded-full min-w-[16px] h-4 px-1 items-center justify-center border border-white">
+                                    <View className="bg-red-500 rounded-full min-w-[16px] h-4 px-1 items-center justify-center border border-slate-900">
                                         <Text className="text-white text-[8px] font-bold">{item.badge}</Text>
                                     </View>
                                 )}
                             </View>
                             <View>
-                                {item.stat && <Text className="text-emerald-500 text-[8px] font-bold mb-0.5">{item.stat}</Text>}
-                                <Text className={`font-bold text-xs ${textColor}`} numberOfLines={1}>{item.title}</Text>
+                                {item.stat && <Text className="text-emerald-400 text-[8px] font-bold mb-0.5">{item.stat}</Text>}
+                                <Text className="font-bold text-xs text-slate-100" numberOfLines={1}>{item.title}</Text>
                             </View>
                         </TouchableOpacity>
                     );
@@ -158,44 +170,109 @@ export default function AdminBento() {
         <View className="flex-1 bg-slate-50">
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
                 {/* Header */}
-                <LinearGradient
-                    colors={['#0F172A', '#1E293B']}
-                    className="p-6 pb-8 rounded-b-[40px] shadow-xl mb-6 bg-slate-900"
-                >
-                    <View className="flex-row justify-between items-center mt-4">
-                        <View>
-                            <Text className="text-slate-400 font-bold text-xs uppercase tracking-[4px]">Command Center</Text>
-                            <Text className="text-3xl font-black text-white">Abu Mafhal</Text>
-                        </View>
-                        <View className="flex-row items-center gap-3">
-                            <TouchableOpacity
-                                onPress={() => router.replace('/(app)/dashboard')}
-                                className="w-10 h-10 rounded-full bg-slate-800 items-center justify-center border border-slate-700 shadow-sm"
-                            >
-                                <Ionicons name="log-out-outline" size={20} color="#94A3B8" />
-                            </TouchableOpacity>
-                            <View className="w-10 h-10 rounded-full bg-slate-700 items-center justify-center border border-slate-600">
-                                <Ionicons name="person" size={20} color="white" />
+                {/* Header - Modernized & Decorated */}
+                <View className="mb-6 rounded-b-[40px] overflow-hidden shadow-2xl">
+                    <LinearGradient
+                        colors={['#0F172A', '#1E293B', '#1e1b4b']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        className="p-6 pb-8"
+                    >
+                        {/* Decorative Background Elements */}
+                        <View className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-32 translate-x-16" />
+                        <View className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl translate-y-24 -translate-x-12" />
+
+                        {/* Top Bar: Brand & Profile */}
+                        <View className="flex-row justify-between items-start mt-8 mb-8">
+                            <View>
+                                <View className="flex-row items-center gap-2 mb-2">
+                                    <View className="flex-row items-center bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30 mr-2">
+                                        <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5" />
+                                        <Text className="text-emerald-400 text-[10px] font-bold tracking-wider uppercase">System Stable</Text>
+                                    </View>
+                                    <View className="bg-white/10 px-2 py-0.5 rounded-full border border-white/5">
+                                        <Text className="text-white text-[10px] font-bold">
+                                            {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Text className="text-slate-200 font-medium text-sm mb-0.5">Good Evening, Admin</Text>
+                                <Text className="text-3xl font-black text-white tracking-tight">Abu Mafhal<Text className="text-indigo-400">.</Text></Text>
+                            </View>
+
+                            <View className="flex-row items-center gap-3">
+                                <TouchableOpacity 
+                                    className="w-10 h-10 rounded-full bg-white/5 border border-white/10 items-center justify-center active:bg-white/10 relative"
+                                >
+                                    <Ionicons name="notifications-outline" size={20} color="#fff" />
+                                    <View className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-red-500 border border-slate-900" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => router.replace('/(app)/dashboard')}
+                                    className="w-10 h-10 rounded-full bg-white/5 border border-white/10 items-center justify-center active:bg-white/10"
+                                >
+                                    <Ionicons name="log-out-outline" size={20} color="#94A3B8" />
+                                </TouchableOpacity>
+                                
+                                <View className="w-10 h-10 rounded-full bg-indigo-600 items-center justify-center border-2 border-indigo-400 shadow-lg shadow-indigo-500/30">
+                                    <Text className="font-bold text-white">AD</Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
 
-                    {/* Quick Stats Banner */}
-                    <View className="flex-row justify-between mt-8 border-t border-slate-800 pt-6">
-                        <View>
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase">System Users</Text>
-                            <Text className="text-white text-lg font-black">{counts.users}</Text>
+                        {/* Global Search Bar */}
+                        <View className="flex-row items-center bg-white/10 rounded-xl px-4 py-3 mb-6 border border-white/5 backdrop-blur-sm">
+                            <Ionicons name="search" size={20} color="#CBD5E1" />
+                            <TextInput 
+                                placeholder="Search users, transactions, logs..." 
+                                placeholderTextColor="#94A3B8"
+                                className="flex-1 ml-3 text-white font-medium"
+                                // Note: Logic would be connected here
+                            />
+                            <View className="bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                                <Text className="text-white/50 text-[10px] font-bold">⌘K</Text>
+                            </View>
                         </View>
-                        <View>
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Uptime</Text>
-                            <Text className="text-emerald-500 text-lg font-black">99.9%</Text>
+
+                        {/* Quick Stats Ribbon */}
+                        <View className="flex-row justify-between border-t border-white/10 pt-6">
+                            <View>
+                                <Text className="text-indigo-200 text-[10px] font-bold uppercase mb-1">Total Users</Text>
+                                <Text className="text-white text-xl font-black">{counts.users.toLocaleString()}</Text>
+                            </View>
+                            <View>
+                                <Text className="text-indigo-200 text-[10px] font-bold uppercase mb-1">Pending KYC</Text>
+                                <Text className="text-amber-400 text-xl font-black">{counts.kyc}</Text>
+                            </View>
+                            <View>
+                                <Text className="text-indigo-200 text-[10px] font-bold uppercase mb-1">Tickets</Text>
+                                <Text className="text-indigo-300 text-xl font-black">{counts.tickets}</Text>
+                            </View>
+                            <View>
+                                <Text className="text-indigo-200 text-[10px] font-bold uppercase mb-1">Server</Text>
+                                <Text className="text-emerald-400 text-xl font-black">99%</Text>
+                            </View>
                         </View>
-                        <View>
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Signals</Text>
-                            <Text className="text-white text-lg font-black">Online</Text>
-                        </View>
-                    </View>
-                </LinearGradient>
+                    </LinearGradient>
+                </View>
+
+                {/* Quick Actions Grid */}
+                <View className="px-6 mb-6">
+                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3">Quick Actions</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="gap-3 overflow-visible">
+                        {QUICK_ACTIONS.map((action, i) => (
+                            <TouchableOpacity key={i} className="items-center mr-4">
+                                <View className="w-14 h-14 rounded-2xl items-center justify-center mb-2 border border-slate-700 bg-slate-800/80 shadow-lg active:bg-slate-700"
+                                     style={{ borderColor: action.color }}
+                                >
+                                    <Ionicons name={action.icon as any} size={24} color={action.color} />
+                                </View>
+                                <Text className="text-slate-300 text-[10px] font-bold">{action.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
 
                 {/* Categories */}
                 <View className="px-4">

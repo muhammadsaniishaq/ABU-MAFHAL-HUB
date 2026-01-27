@@ -1,37 +1,56 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { createPaystackDVA } from "../_shared/paystack.ts";
+// Removed std/http/server.ts import
+import { createClient } from "@supabase/supabase-js";
 import { createFlutterwaveDVA } from "../_shared/flutterwave.ts";
+
+interface VirtualAccountData {
+    user_id: string;
+    provider: string;
+    bank_name: string;
+    account_number: string;
+    account_name: string;
+    currency: string;
+    metadata: Record<string, unknown> | null;
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+    // 1. Log Request for Debugging
+    console.log("Assign-DVA Invoked");
+    
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
     try {
-        const { record, old_record } = await req.json();
+        const payload = await req.json();
+        console.log("Payload:", JSON.stringify(payload));
+        
+        const { record, old_record: _old_record } = payload;
 
-        // Only proceed if status changed to 'approved'
-        if (record.status !== 'approved' || (old_record && old_record.status === 'approved')) {
+        // Validation: Ensure we have a record
+        if (!record) {
+             console.error("No record found in payload");
+             return new Response(JSON.stringify({ error: "Missing record" }), { status: 400 });
+        }
+
+        // Logic: specific to 'approved' status
+        if (record.status !== 'approved') {
+            console.log(`Status is '${record.status}', skipping DVA creation.`);
             return new Response(JSON.stringify({ message: "Not an approval event" }), {
                 headers: { "Content-Type": "application/json" },
-                status: 200, // Not an error, just ignore
+                status: 200, 
             });
         }
 
         const userId = record.user_id;
-        const documentType = record.document_type;
-        // In a real app, you might extract BVN/NIN from the document or input
-        // For this demo, we assume we might need to fetch profile or use a placeholder if not stored directly.
+        console.log(`Processing DVA for User ID: ${userId}`);
 
         // Initialize Supabase Admin Client
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-        // 1. Fetch User Profile
+        // 2. Fetch User Profile
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('*')
@@ -39,80 +58,98 @@ serve(async (req) => {
             .single();
 
         if (profileError || !profile) {
+            console.error("Profile Fetch Error:", profileError);
             throw new Error("Profile not found");
         }
 
-        // 2. Check if already has virtual account
+        // 3. Check if already has virtual account (Idempotency)
         const { data: existingAccount } = await supabaseAdmin
             .from('virtual_accounts')
-            .select('id')
+            .select('id, account_number')
             .eq('user_id', userId)
             .maybeSingle();
 
         if (existingAccount) {
+            console.log(`User already has DVA: ${existingAccount.account_number}`);
             return new Response(JSON.stringify({ message: "User already has a virtual account" }), {
                 headers: { "Content-Type": "application/json" },
                 status: 200,
             });
         }
 
-        // 3. Create Virtual Account (Default to Paystack for this logic, user can switch to FW if they want)
-        // You can use a config to decide which provider to use.
-        // For flexibility, let's try Flutterwave if they provided BVN (simulated check) or Paystack otherwise.
-
-        let virtualAccountData: any = null;
-        let provider = '';
-
-        // NOTE: This logic assumes we have user's phone number. If not in profile, this might fail for Paystack.
-        // Ideally, `profiles` should have phone numbers.
-        const userPhone = profile.phone || '08000000000'; // Fallback
+        // 4. Prepare Flutterwave Data
         const userEmail = profile.email;
         const userName = profile.full_name || 'Valued User';
         const splitName = userName.split(' ');
         const firstName = splitName[0];
         const lastName = splitName.slice(1).join(' ') || firstName;
+        const userPhone = profile.phone || '08000000000'; 
+        const userBVN = profile.bvn;
 
-        try {
-            console.log(`Creating Paystack DVA for ${userEmail}`);
-            const paystackRes = await createPaystackDVA(userEmail, firstName, lastName, userPhone);
-
-            if (paystackRes.status && paystackRes.data) {
-                provider = 'paystack';
-                virtualAccountData = {
-                    user_id: userId,
-                    provider: 'paystack',
-                    bank_name: paystackRes.data.bank.name,
-                    account_number: paystackRes.data.account_number,
-                    account_name: paystackRes.data.account_name,
-                    currency: paystackRes.data.currency,
-                    meta_data: paystackRes.data
-                };
-            } else {
-                throw new Error(paystackRes.message || "Paystack creation failed");
-            }
-
-        } catch (e) {
-            console.error("Paystack failed, trying Flutterwave...", e);
-            // Fallback or Alternative Logic here
-            throw e; // Rethrow for now to see logs in Dashboard
+        if (!userBVN) {
+            console.error("User does not have a BVN in profile, cannot create DVA.");
+            // We can't throw error to retry indefinitely if data is missing.
+            // Just log error and exit.
+            return new Response(JSON.stringify({ error: "User missing BVN" }), { status: 400 });
         }
 
-        // 4. Save to DB
+        console.log(`Creating Flutterwave DVA for ${userEmail} (${firstName} ${lastName})`);
+
+        let virtualAccountData: VirtualAccountData | null = null;
+        let providerError = null;
+
+        try {
+            const tx_ref = `dva_assign_${userId}_${Date.now()}`;
+            const flwRes = await createFlutterwaveDVA(userEmail, userBVN, 'Wallet Funding', firstName, lastName, userPhone, tx_ref);
+            
+            if (flwRes.status === 'success' && flwRes.data) {
+                console.log("Flutterwave DVA Created Successfully");
+                virtualAccountData = {
+                    user_id: userId,
+                    provider: 'flutterwave',
+                    bank_name: flwRes.data.bank_name,
+                    account_number: flwRes.data.account_number,
+                    account_name: userName, // Use our profile name or flwRes.data.note if needed
+                    currency: 'NGN', 
+                    metadata: flwRes.data
+                };
+            } else {
+                console.error("Flutterwave Response Invalid:", flwRes);
+                throw new Error(flwRes.message || "Flutterwave creation failed");
+            }
+        } catch (e) {
+            console.error("Flutterwave Attempt Failed:", e);
+            providerError = e;
+        }
+
+        // 5. Save to DB
         if (virtualAccountData) {
             const { error: insertError } = await supabaseAdmin
                 .from('virtual_accounts')
                 .insert(virtualAccountData);
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                console.error("DB Insert Error:", insertError);
+                throw insertError;
+            }
+            console.log("DVA Saved to Database");
+        } else {
+            // failed to create
+            throw providerError || new Error("Failed to generate virtual account");
         }
 
-        return new Response(JSON.stringify({ message: `Virtual Account Assigned (${provider})` }), {
+        return new Response(JSON.stringify({ 
+            message: `Virtual Account Assigned Successfully`,
+            account: virtualAccountData
+        }), {
             headers: { "Content-Type": "application/json" },
             status: 200,
         });
 
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error("Assign-DVA Final Error:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        return new Response(JSON.stringify({ error: errorMessage }), {
             headers: { "Content-Type": "application/json" },
             status: 500,
         });

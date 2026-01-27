@@ -2,9 +2,25 @@ import { Stack } from 'expo-router';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import SecurityModal from '../../components/SecurityModal';
 
 export default function AdminLayout() {
     const router = useRouter();
+    const [isAuthorized, setIsAuthorized] = useState(false);
+
+    if (!isAuthorized) {
+        return (
+            <SecurityModal
+                visible={true}
+                onClose={() => router.replace('/(app)/dashboard')}
+                onSuccess={() => setIsAuthorized(true)}
+                title="Admin Access"
+                description="Biometric authentication required."
+                requiredFor="admin"
+            />
+        );
+    }
 
     return (
         <Stack
@@ -26,12 +42,7 @@ export default function AdminLayout() {
             <Stack.Screen
                 name="index"
                 options={{
-                    title: 'System Core',
-                    headerLeft: () => (
-                        <View className="ml-4 mr-4">
-                            <Ionicons name="grid" size={24} color="#38BDF8" />
-                        </View>
-                    )
+                    headerShown: false,
                 }}
             />
             <Stack.Screen name="users" options={{ title: 'User Management' }} />

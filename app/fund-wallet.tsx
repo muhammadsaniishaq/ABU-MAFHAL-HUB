@@ -5,11 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../services/supabase';
 
+import { api } from '../services/api';
+
 export default function FundWalletScreen() {
     const [method, setMethod] = useState<'transfer' | 'card'>('transfer');
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
     const [virtualAccount, setVirtualAccount] = useState<any>(null);
+    const [generating, setGenerating] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -21,10 +24,42 @@ export default function FundWalletScreen() {
         if (user) {
             const { data } = await supabase
                 .from('virtual_accounts')
-                .select('*')
+                .select('id, user_id, provider, bank_name, account_number, account_name, currency')
                 .eq('user_id', user.id)
                 .maybeSingle();
             setVirtualAccount(data);
+        }
+    };
+
+    const handleGenerateAccount = async () => {
+        setGenerating(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            
+            const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name, kyc_tier').eq('id', user.id).single();
+            
+            if (profileError || !profile) {
+                Alert.alert("Error", "Could not fetch user profile details.");
+                return;
+            }
+
+            if (profile.kyc_tier < 2) {
+                Alert.alert("Upgrade Required", "Please complete Tier 2 (Identity) Verification to get an account number.", [
+                    { text: "Go to KYC", onPress: () => router.push('/kyc') },
+                    { text: "Cancel", style: "cancel" }
+                ]);
+                return;
+            }
+
+            await api.virtualAccount.generate(user.id, profile.full_name);
+            await fetchVirtualAccount(); // Refresh
+            Alert.alert("Success", "Virtual Account Generated Successfully!");
+
+        } catch (e: any) {
+            Alert.alert("Error", e.message);
+        } finally {
+            setGenerating(false);
         }
     };
 
@@ -136,9 +171,22 @@ export default function FundWalletScreen() {
                             <View className="items-center justify-center p-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                                 <Ionicons name="wallet-outline" size={48} color="#9CA3AF" />
                                 <Text className="text-gray-500 font-medium mt-4 text-center">No Virtual Account Assigned</Text>
-                                <Text className="text-gray-400 text-xs text-center mt-1">
-                                    Complete your KYC verification to get a dedicated account number.
+                                <Text className="text-gray-400 text-xs text-center mt-1 mb-6">
+                                    Get your dedicated account number to receive bank transfers instantly.
                                 </Text>
+                                
+                                <TouchableOpacity 
+                                    onPress={handleGenerateAccount} 
+                                    disabled={generating}
+                                    className="bg-primary px-6 py-3 rounded-full flex-row items-center"
+                                >
+                                    {generating ? <ActivityIndicator color="white" size="small" /> : (
+                                        <>
+                                            <Ionicons name="add-circle" size={20} color="white" />
+                                            <Text className="text-white font-bold ml-2">Generate Account</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
                             </View>
                         )}
                     </View>

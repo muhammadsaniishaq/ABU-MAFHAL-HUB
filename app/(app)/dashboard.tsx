@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -240,6 +241,15 @@ export default function Dashboard() {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* COTEX AI FAB */}
+            <TouchableOpacity 
+                onPress={() => router.push('/ai-chat')}
+                className="absolute bottom-6 right-6 w-16 h-16 bg-indigo-600 rounded-full items-center justify-center shadow-lg shadow-indigo-500/50 z-50 border-4 border-white"
+            >
+                <Ionicons name="sparkles" size={28} color="white" />
+                <View className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white" />
+            </TouchableOpacity>
 
             <StatusBar style="dark" />
         </SafeAreaView >

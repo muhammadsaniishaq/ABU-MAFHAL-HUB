@@ -14,12 +14,12 @@ export interface PaystackDVAResponse {
         account_number: string;
         assigned: boolean;
         currency: string;
-        metadata: any;
+        metadata: Record<string, unknown> | null;
         active: boolean;
         id: number;
         created_at: string;
         updated_at: string;
-    };
+    } | null;
 }
 
 export async function createPaystackDVA(
@@ -28,49 +28,57 @@ export async function createPaystackDVA(
     lastName: string,
     phone: string
 ): Promise<PaystackDVAResponse> {
-    // 1. Create or Get Customer
-    const customerResponse = await fetch('https://api.paystack.co/customer', {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            email,
-            first_name: firstName,
-            last_name: lastName,
-            phone,
-        }),
-    });
+    try {
+        // 1. Create or Get Customer
+        const customerResponse = await fetch('https://api.paystack.co/customer', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                first_name: firstName,
+                last_name: lastName,
+                phone,
+            }),
+        });
 
-    const customerData = await customerResponse.json();
-
-    if (!customerData.status) {
-        // If customer already exists, we might get a status=false but still need their code.
-        // In a real app, we'd handle "Customer already exists" by fetching them.
-        // For now, let's assume valid or throw.
-        // Paystack often returns the customer code even on duplicate error, or we can fetch by email.
-        console.error('Paystack User Create Error:', customerData);
-
-        // Fallback: Fetch user by email if they exist
-        if (customerData.message === 'Customer already exists') {
-            // Proceed to fetch logic if needed, or assume we can create DVA directly with just customer code if we had it.
-            // Actually, to create a DVA, we need the customer_code.
-            // Let's fetch the customer to get the code.
-            const fetchCustomer = await fetch(`https://api.paystack.co/customer/${email}`, {
-                headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
-            });
-            const existingCustomer = await fetchCustomer.json();
-            if (existingCustomer.status) {
-                return assignDVA(existingCustomer.data.customer_code);
-            }
+        if (!customerResponse.ok) {
+            const errorText = await customerResponse.text();
+            throw new Error(`Paystack Customer API Error (${customerResponse.status}): ${errorText}`);
         }
 
-        throw new Error(`Paystack Customer Error: ${customerData.message}`);
-    }
+        const customerData = await customerResponse.json();
 
-    const customerCode = customerData.data.customer_code;
-    return assignDVA(customerCode);
+        if (!customerData.status) {
+            console.error('Paystack User Create Error:', customerData);
+
+            // Fallback: Fetch user by email if they exist
+            if (customerData.message === 'Customer already exists') {
+                const fetchCustomer = await fetch(`https://api.paystack.co/customer/${email}`, {
+                    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` }
+                });
+                const existingCustomer = await fetchCustomer.json();
+                if (existingCustomer.status) {
+                    return await assignDVA(existingCustomer.data.customer_code);
+                }
+            }
+
+            throw new Error(`Paystack Customer Error: ${customerData.message}`);
+        }
+
+        const customerCode = customerData.data.customer_code;
+        return await assignDVA(customerCode);
+    } catch (error: unknown) {
+        console.error("CreatePaystackDVA Wrapper Error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to communicate with Paystack";
+        return {
+             status: false,
+             message: errorMessage,
+             data: null
+        };
+    }
 }
 
 async function assignDVA(customerCode: string): Promise<PaystackDVAResponse> {
@@ -82,9 +90,35 @@ async function assignDVA(customerCode: string): Promise<PaystackDVAResponse> {
         },
         body: JSON.stringify({
             customer: customerCode,
-            preferred_bank: 'wema-bank', // You can make this dynamic
+             // Removed preferred_bank to allow Paystack to assign any available bank
+             // preferred_bank: 'wema-bank', 
         }),
     });
 
+    return await response.json();
+}
+
+export interface PaystackBVNResponse {
+    status: boolean;
+    message: string;
+    data: {
+        first_name: string;
+        last_name: string;
+        dob: string;
+        formatted_dob: string;
+        mobile: string;
+        bvn: string;
+        [key: string]: unknown;
+    } | null;
+}
+
+export async function resolveBVN(bvn: string): Promise<PaystackBVNResponse> {
+    const response = await fetch(`https://api.paystack.co/bank/resolve_bvn/${bvn}`, {
+        method: 'GET',
+        headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+        },
+    });
     return await response.json();
 }

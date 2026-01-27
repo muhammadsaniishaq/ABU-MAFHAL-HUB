@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -86,7 +87,6 @@ export default function OTP() {
 
     return (
         <View className="flex-1 bg-white">
-            <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="dark" />
             
             {/* Advanced Background Decorations */}

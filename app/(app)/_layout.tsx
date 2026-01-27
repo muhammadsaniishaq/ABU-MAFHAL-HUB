@@ -1,8 +1,25 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
+import { useState } from 'react';
+import SecurityModal from '../../components/SecurityModal';
 
 export default function AppLayout() {
+    const router = useRouter();
+    const [isVerified, setIsVerified] = useState(false);
+
+    if (!isVerified) {
+        return (
+            <SecurityModal
+                visible={true}
+                onClose={() => router.replace('/')}
+                onSuccess={() => setIsVerified(true)}
+                title="Welcome Back"
+                description="Please verify your identity to continue."
+                requiredFor="login"
+            />
+        );
+    }
     return (
         <Tabs
             screenOptions={{

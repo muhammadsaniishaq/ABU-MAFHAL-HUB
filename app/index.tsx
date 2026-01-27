@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Dimensions, ActivityIndicator, Linking, ImageBackground } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -12,9 +13,29 @@ export default function LandingPage() {
     const router = useRouter();
     const [userCount, setUserCount] = useState<number | null>(null);
     const [totalProcessed, setTotalProcessed] = useState<string>('50B+'); // Fallback to marketing stat
+    const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+
+    const heroFeatures = [
+        { text: "Financial Freedom", image: require('../assets/images/hero_finance.png') },
+        { text: "Data & Airtime", image: require('../assets/images/hero_data.png') },
+        { text: "Crypto Trading", image: require('../assets/images/hero_crypto.png') },
+        { text: "Bill Payments", image: require('../assets/images/hero_bills.png') },
+        { text: "Secure Savings", image: require('../assets/images/hero_savings.png') }
+    ];
 
     useEffect(() => {
+        // Auto-login check
+        supabase.auth.getSession().then(({ data }) => {
+            if (data.session) router.replace('/(app)/dashboard');
+        });
+
         fetchRealStats();
+
+        const interval = setInterval(() => {
+            setCurrentFeatureIndex((prev) => (prev + 1) % heroFeatures.length);
+        }, 3000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const fetchRealStats = async () => {
@@ -70,11 +91,11 @@ export default function LandingPage() {
                 <View className="flex-row items-center">
                     <Image
                         source={require('../assets/images/logo-icon.png')}
-                        style={{ width: 10, height: 10 }}
-                        className="rounded-full mr-1"
+                        style={{ width: 32, height: 32 }}
+                        className="rounded-full mr-2"
                         resizeMode="contain"
                     />
-                    <Text className="text-[8px] font-bold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
+                    <Text className="text-sm font-extrabold text-slate-900 tracking-tight">ABU MAFHAL HUB</Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => router.push('/(auth)/login')}
@@ -88,29 +109,30 @@ export default function LandingPage() {
 
                 {/* Header Spacer */}
 
-                <View className="px-6 pt-10 items-center">
-                    <View className="bg-primary/10 px-3 py-1 rounded-full mb-4">
-                        <Text className="text-primary text-[8px] font-bold uppercase tracking-[2px]">Build v1.0.12 - Secure</Text>
+                <View className="px-6 pt-10 pb-10 items-center">
+                    <View className="bg-primary/10 px-3 py-1 rounded-full mb-6 border border-primary/20">
+                        <Text className="text-primary text-[10px] font-bold uppercase tracking-[2px]">Build v1.0.12 - Secure</Text>
                     </View>
-                    <Text className="text-xl font-extrabold text-slate text-center leading-[28px] mb-4">
-                        The Super App for your <Text className="text-primary">Financial Freedom</Text>
+                    <Text className="text-3xl font-black text-slate-900 text-center leading-[36px] mb-4">
+                        The Super App for your <Text className="text-primary">{heroFeatures[currentFeatureIndex].text}</Text>
                     </Text>
-                    <Text className="text-gray-500 text-center text-lg leading-7 mb-10 px-2">
+                    <Text className="text-slate-500 text-center text-lg leading-7 mb-10 px-4 font-medium">
                         Experience the next level of banking, investing, and identity services all in one place.
                     </Text>
 
                     <TouchableOpacity
                         onPress={() => router.push('/onboarding')}
-                        className="bg-primary w-full h-16 rounded-2xl items-center justify-center shadow-lg shadow-primary/30"
+                        className="bg-primary w-full h-16 rounded-2xl items-center justify-center shadow-lg shadow-blue-500/40 mb-10"
                     >
-                        <Text className="text-white font-bold text-xl">Get Started Now</Text>
+                        <Text className="text-white font-bold text-xl tracking-wide">Get Started Now</Text>
                     </TouchableOpacity>
 
-                    <View className="mt-6 w-full items-center">
+                    <View className="w-full items-center">
+                         {/* Optional soft glow behind image if desired, but kept simple for white bg consistency */}
                         <Image
-                            source={require('../assets/images/logo.png')}
-                            style={{ width: width * 0.4, height: width * 0.4 }}
-                            className="rounded-xl opacity-80"
+                            source={heroFeatures[currentFeatureIndex].image}
+                            style={{ width: width * 0.9, height: width * 0.9 }}
+                            className="rounded-xl"
                             resizeMode="contain"
                         />
                     </View>
@@ -296,21 +318,44 @@ export default function LandingPage() {
                 </View>
 
                 {/* Footer */}
-                <View className="bg-slate-900 px-6 py-16 items-center border-t border-slate-800">
-                    <Text className="text-white text-2xl font-bold mb-6">ABU MAFHAL HUB</Text>
-                    <View className="flex-row gap-8 mb-10">
-                        <TouchableOpacity className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
-                            <Ionicons name="logo-twitter" size={20} color="#CBD5E1" />
-                        </TouchableOpacity>
-                        <TouchableOpacity className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
-                            <Ionicons name="logo-facebook" size={20} color="#CBD5E1" />
-                        </TouchableOpacity>
-                        <TouchableOpacity className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
-                            <Ionicons name="logo-instagram" size={20} color="#CBD5E1" />
-                        </TouchableOpacity>
+                <View className="bg-slate-900 px-6 py-16 border-t border-slate-800">
+                    <View className="items-center mb-10">
+                        <Text className="text-white text-2xl font-bold mb-6">ABU MAFHAL HUB</Text>
+                        
+                        {/* Contact Info */}
+                        <View className="items-center gap-2 mb-8">
+                            <Text className="text-slate-400 text-sm text-center">123 Goni Aji street Gashua, Yobe State</Text>
+                            <Text className="text-slate-400 text-sm text-center">admin@abumafhal.com.ng</Text>
+                        </View>
+
+                        {/* Social Media Icons */}
+                        <View className="flex-row flex-wrap justify-center gap-4 mb-6 max-w-sm">
+                            <TouchableOpacity onPress={() => Linking.openURL('https://facebook.com/abumafhal')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="logo-facebook" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://www.tiktok.com/@abumafhal0')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="logo-tiktok" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://x.com/abumafhal0')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="logo-twitter" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://www.linkedin.com/in/abumafhal')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="logo-linkedin" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://instagram.com/abumafhal')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="logo-instagram" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://www.threads.net/@abumafhal')} className="w-10 h-10 bg-slate-800 rounded-full items-center justify-center">
+                                <Ionicons name="at" size={20} color="#CBD5E1" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => Linking.openURL('https://wa.me/2348145853539')} className="w-10 h-10 bg-green-900/50 rounded-full items-center justify-center border border-green-800">
+                                <Ionicons name="logo-whatsapp" size={20} color="#4ADE80" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
+
                     <Text className="text-slate-400 text-sm mb-2 text-center">© 2026 Abu Mafhal Hub. All rights reserved.</Text>
-                    <Text className="text-slate-500 text-xs text-center border-t border-slate-800 pt-4 w-full">Licensed by Central Bank of Nigeria (CBN). NIP: 10223 / RC: 889102</Text>
+                    <Text className="text-slate-500 text-xs text-center border-t border-slate-800 pt-4 w-full">Licensed by RC: 8979939</Text>
                 </View>
 
             </ScrollView>

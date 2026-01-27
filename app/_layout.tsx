@@ -5,7 +5,22 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
-import { View, ActivityIndicator } from 'react-native';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
+import { View, ActivityIndicator, LogBox } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+
+// Configure Reanimated Logger to be less chatty about render phase value access
+configureReanimatedLogger({
+    strict: false,
+    level: ReanimatedLogLevel.warn,
+});
+
+// Suppress other noisy warnings
+LogBox.ignoreLogs([
+    'SafeAreaView has been deprecated',
+    '[Reanimated] Reading from `value`',
+]);
 import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
 
@@ -13,7 +28,11 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import '../global.css';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+try {
+    SplashScreen.preventAutoHideAsync();
+} catch (e) {
+    console.warn("SplashScreen preventAutoHideAsync failed:", e);
+}
 
 export default function RootLayout() {
     const colorScheme = useColorScheme();
@@ -35,20 +54,22 @@ export default function RootLayout() {
                 .single();
             
             if (error) {
-                console.error("Error fetching role:", JSON.stringify(error));
                 // If unauthorized or bad request, session is likely invalid
                 const err = error as any;
                 if (err.code === 'PGRST301' || err.message?.includes('JWT') || err.status === 401 || err.status === 400 || err.code === '401' || err.code === '400') {
                     console.log("Forcing logout due to session error...");
                     await forceSignOut();
                     setSession(null);
+                } else {
+                    // Downgrade to warn for other errors (likely network)
+                    console.warn("Error fetching role (likely network/offline):", error.message);
                 }
                 return;
             }
 
             if (data) setUserRole(data.role);
         } catch (e) {
-            console.error('Error fetching role in layout:', e);
+            console.warn('Error fetching role in layout:', e);
         }
     };
 
@@ -83,8 +104,12 @@ export default function RootLayout() {
 
         if (session) {
             if (isAuthGroup) {
-                // If logged in and in auth group, redirect to proper home
-                if (userRole) {
+                // Determine current screen
+                const currentScreen = segments[segments.length - 1];
+                const allowedAuthScreens = ['otp', 'pin-setup'];
+
+                // Only redirect if NOT on an allowed auth screen (like OTP or Setup)
+                if (userRole && !allowedAuthScreens.includes(currentScreen)) {
                     router.replace(['admin', 'super_admin'].includes(userRole) ? '/manage' : '/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
@@ -111,13 +136,17 @@ export default function RootLayout() {
     }
 
     return (
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="manage" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(app)" />
-            </Stack>
-            <StatusBar style="auto" />
-        </ThemeProvider>
+        <SafeAreaProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="manage" />
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(app)" />
+                    <Stack.Screen name="education" options={{ headerShown: false }} />
+                    <Stack.Screen name="crypto" options={{ headerShown: false }} />
+                </Stack>
+                <StatusBar style="auto" />
+            </ThemeProvider>
+        </SafeAreaProvider>
     );
 }

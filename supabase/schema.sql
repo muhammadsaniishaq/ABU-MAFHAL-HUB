@@ -84,27 +84,40 @@ create table public.audit_logs (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 6. CMS / BANNERS
-create table public.banners (
-  id uuid default uuid_generate_v4() primary key,
-  title text not null,
-  image_url text not null,
-  is_active boolean default true,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
 -- 7. SECURITY HELPERS
 -- Function to check if a user is an admin without triggering RLS recursion
 create or replace function public.is_admin()
 returns boolean as $$
 begin
   return (
-    select (raw_app_metadata->>'role')::text in ('admin', 'super_admin')
+    select (raw_app_meta_data->>'role')::text in ('admin', 'super_admin')
     from auth.users
     where id = auth.uid()
   );
 end;
 $$ language plpgsql security definer;
+
+-- Function to safely deduct balance
+create or replace function public.deduct_balance(user_id uuid, amount decimal)
+returns decimal as $$
+declare
+  current_bal decimal;
+  new_bal decimal;
+begin
+  select balance into current_bal from public.profiles where id = user_id for update;
+  
+  if current_bal < amount then
+    raise exception 'Insufficient balance';
+  end if;
+  
+  new_bal := current_bal - amount;
+  
+  update public.profiles set balance = new_bal where id = user_id;
+  
+  return new_bal;
+end;
+$$ language plpgsql security definer;
+
 
 -- RLS POLICIES (Hardened)
 -- Allow Admins to read everything
@@ -193,7 +206,7 @@ create table public.virtual_accounts (
   account_number text not null,
   account_name text not null,
   currency text default 'NGN',
-  meta_data jsonb, -- Store full provider response
+  metadata jsonb, -- Store full provider response
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -202,6 +215,10 @@ alter table public.virtual_accounts enable row level security;
 create policy "Users can view own virtual account"
   on public.virtual_accounts for select
   using (auth.uid() = user_id);
+
+create policy "Users can create own virtual account"
+  on public.virtual_accounts for insert
+  with check (auth.uid() = user_id);
 
 create policy "Admins can view all virtual accounts"
   on public.virtual_accounts for select
@@ -224,3 +241,25 @@ alter table public.payment_events enable row level security;
 create policy "Admins can view payment events"
   on public.payment_events for select
   using (public.is_admin());
+
+-- 13. DATA PLANS (Dynamic Pricing)
+create table public.data_plans (
+  id uuid default uuid_generate_v4() primary key,
+  network text not null, -- 'mtn', 'glo', 'airtel', '9mobile'
+  plan_id text not null, -- Provider's Plan ID (e.g., '1000')
+  name text not null, -- e.g., '1GB - 30 Days'
+  cost_price decimal(12,2) not null,
+  selling_price decimal(12,2) not null,
+  profit decimal(12,2) generated always as (selling_price - cost_price) stored,
+  validity text,
+  volume text,
+  is_active boolean default true,
+  icon_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.data_plans enable row level security;
+
+create policy "Admins can manage data plans" on public.data_plans for all using (public.is_admin());
+create policy "Users can view active data plans" on public.data_plans for select using (is_active = true);
