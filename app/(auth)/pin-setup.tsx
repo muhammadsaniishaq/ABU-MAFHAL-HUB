@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, SafeAreaView, Image, Dimensions, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Dimensions, Vibration } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

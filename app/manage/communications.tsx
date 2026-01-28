@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator,
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { BlurView } from 'expo-blur';
 
@@ -44,6 +44,33 @@ export default function CommunicationManager() {
     const [aiGenerating, setAiGenerating] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
 
+    useEffect(() => {
+        fetchHistory();
+    }, []);
+
+    const fetchHistory = async () => {
+        const { data } = await supabase
+            .from('communication_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+        
+        if (data) {
+            // Map DB structure to UI structure
+            const mapped = data.map(log => ({
+                id: log.id,
+                type: log.channel,
+                recipient: log.recipient,
+                subject: log.subject,
+                body: log.content,
+                status: log.status, // e.g. 'sent'
+                priority: log.metadata?.priority === true, // Check metadata
+                timestamp: new Date(log.created_at)
+            }));
+            setHistory(mapped);
+        }
+    };
+
     // Enhanced State
     const [isScheduled, setIsScheduled] = useState(false);
     const [isHighPriority, setIsHighPriority] = useState(false);
@@ -68,44 +95,89 @@ export default function CommunicationManager() {
             const payload: any = {
                 type: activeTab,
                 recipient_mode: recipientMode,
-                recipient: recipientInput, // Email, Phone, or User ID
+                recipient: recipientInput,
                 subject: activeTab === 'email' ? subject : undefined,
-                body: activeTab === 'email' ? generateHtmlEmail(body, subject) : body, // WRAP IN HTML for Email
+                body: activeTab === 'email' ? generateHtmlEmail(body, subject) : body,
                 priority: isHighPriority ? 'high' : 'normal',
-                scheduled_for: isScheduled ? new Date(Date.now() + 86400000).toISOString() : undefined // Mock +24h
+                scheduled_for: isScheduled ? new Date(Date.now() + 86400000).toISOString() : undefined 
             };
 
-            console.log("Sending Payload:", payload);
+            // 2. PRIMARY: Direct DB Insert for Push (Reliable for Expo Go / Realtime)
+            if (activeTab === 'push' && !isScheduled) {
+                let targetUserIds: string[] = [];
 
-            // 2. Real API Call (Supabase Function)
-            // Note:User needs to deploy 'send-communication' function on Supabase
-            const { data, error } = await supabase.functions.invoke('send-communication', {
-                body: payload
-            });
+                if (recipientMode === 'single') {
+                    // Try to resolve email/phone to ID if needed, or assume input IS the ID
+                    if (recipientInput.includes('@')) {
+                         const { data: users } = await supabase.from('profiles').select('id').eq('email', recipientInput).single();
+                         if (users) targetUserIds = [users.id];
+                    } else if (/^\d+$/.test(recipientInput) || recipientInput.startsWith('+')) {
+                        // Looks like a phone number?
+                        const { data: users } = await supabase.from('profiles').select('id').eq('phone', recipientInput).single();
+                         if (users) targetUserIds = [users.id];
+                    } else if (recipientInput.length === 36) {
+                        // Assume it's a UUID
+                        targetUserIds = [recipientInput];
+                    } else {
+                        // Fallback or error - prevent inserting garbage that crashes UUID type
+                        console.warn("Invalid recipient format ignored:", recipientInput);
+                    }
+                } else if (recipientMode === 'all') {
+                    // Fetch ALL user IDs (LIMIT to 500 for safety in this demo)
+                    const { data: users } = await supabase.from('profiles').select('id').limit(500);
+                     if (users) targetUserIds = users.map(u => u.id);
+                } else if (recipientMode === 'admins') {
+                    const { data: users } = await supabase.from('profiles').select('id').in('role', ['admin', 'super_admin']);
+                    if (users) targetUserIds = users.map(u => u.id);
+                }
 
-            if (error) {
-                // If function doesn't exist yet (common in dev), fallback to database logging
-                console.warn("Edge Function failed (likely not deployed), logging to DB instead:", JSON.stringify(error, null, 2));
-                if (error instanceof Error) console.warn("Error message:", error.message);
-                
-                // Fallback: Insert into 'communication_logs' table in Supabase
-                const { error: dbError } = await supabase.from('communication_logs').insert({
-                    channel: activeTab,
-                    recipient: recipientMode === 'single' ? recipientInput : recipientMode,
-                    subject: subject,
-                    content: body, // Store raw body for DB
-                    status: isScheduled ? 'scheduled' : 'sent',
-                    metadata: { priority: isHighPriority, formatted_html: payload.body }
-                });
+                if (targetUserIds.length > 0) {
+                     const notificationsToInsert = targetUserIds.map(id => ({
+                        user_id: id,
+                        title: subject || 'New Message',
+                        body: body,
+                        data: { priority: isHighPriority ? 'high' : 'normal' },
+                        created_at: new Date().toISOString()
+                     }));
 
-                if (dbError) throw dbError;
+                     const { error: pushError } = await supabase.from('notifications').insert(notificationsToInsert);
+                     if (pushError) console.error("Direct Push Insert Error:", pushError);
+                     else {
+                         console.log(`Directly inserted ${notificationsToInsert.length} notifications.`);
+                         
+                         // Fix: Log to communication_logs MANUALLY since we bypassed the Edge Function
+                         await supabase.from('communication_logs').insert({
+                            channel: 'push',
+                            recipient: recipientMode === 'single' ? recipientInput : recipientMode,
+                            subject: subject,
+                            content: body,
+                            status: 'sent',
+                            metadata: { priority: isHighPriority }
+                        });
+                     }
+                }
             }
 
-            // 3. Local Simulation for Push (Modified for Expo Go Compatibility)
-            if (activeTab === 'push' && !isScheduled) {
-                // NOTE: Expo Go SDK 53 removed remote notifications support.
-                // We use a simple Alert instead of crashing.
-                Alert.alert("📲 Live Push Notification", isHighPriority ? `🚨 ${subject || 'Alert'}\n${body}` : body);
+
+            // 3. Fallback/Secondary: Edge Function Call (Good for Emails/SMS/Remote Push)
+            // We still call this because it handles Email/SMS sending via 3rd party APIs
+            if (activeTab !== 'push' || isScheduled) { // Skip for immediate push since we did it above
+                const { data, error } = await supabase.functions.invoke('send-communication', {
+                    body: payload
+                });
+
+                if (error) {
+                    console.warn("Edge Function failed, logging to DB...", error);
+                    // Log to communication_logs so history is preserved
+                     await supabase.from('communication_logs').insert({
+                        channel: activeTab,
+                        recipient: recipientMode === 'single' ? recipientInput : recipientMode,
+                        subject: subject,
+                        content: body,
+                        status: isScheduled ? 'scheduled' : 'sent',
+                        metadata: { priority: isHighPriority, formatted_html: payload.body }
+                    });
+                }
             }
 
             // 4. Update UI History
@@ -285,7 +357,7 @@ export default function CommunicationManager() {
                 </View>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 200 }}>
                 {renderTabs()}
                 
                 {renderRecipientSelector()}

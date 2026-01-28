@@ -9,13 +9,13 @@ export default function SupportScreen() {
         let url = '';
         switch (type) {
             case 'whatsapp':
-                url = 'whatsapp://send?phone=2348000000000';
+                url = 'whatsapp://send?phone=2348145853539';
                 break;
             case 'email':
-                url = 'mailto:support@abumafhalhub.com';
+                url = 'mailto:admin@abumafhal.com.ng';
                 break;
             case 'phone':
-                url = 'tel:+2348000000000';
+                url = 'tel:+2348145853539';
                 break;
         }
         Linking.openURL(url).catch(() => {

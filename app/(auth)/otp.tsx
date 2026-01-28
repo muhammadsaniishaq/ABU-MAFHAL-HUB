@@ -10,16 +10,23 @@ import { supabase } from '../../services/supabase';
 const { width, height } = Dimensions.get('window');
 
 export default function OTP() {
-    const { email } = useLocalSearchParams<{ email: string }>();
-    const [otp, setOtp] = useState(['', '', '', '', '', '']);
-    const [counter, setCounter] = useState(60);
+    const { email, tempFullName, tempUsername, tempPhone, tempCustomId, tempReferralCode } = useLocalSearchParams<{ 
+        email: string, 
+        tempFullName?: string,
+        tempUsername?: string,
+        tempPhone?: string,
+        tempCustomId?: string,
+        tempReferralCode?: string
+    }>();
+    const router = useRouter();
+    const [otp, setOtp] = useState<string[]>(new Array(6).fill(''));
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
-    const router = useRouter();
-    const inputRefs = useRef<TextInput[]>([]);
+    const [counter, setCounter] = useState(60);
+    const inputRefs = useRef<Array<TextInput | null>>([]);
 
     useEffect(() => {
-        const timer = counter > 0 && setInterval(() => setCounter(counter - 1), 1000);
+        const timer = counter > 0 && setInterval(() => setCounter(c => c - 1), 1000);
         return () => { if (timer) clearInterval(timer); };
     }, [counter]);
 
@@ -29,13 +36,13 @@ export default function OTP() {
         setOtp(newOtp);
 
         if (value && index < 5) {
-            inputRefs.current[index + 1].focus();
+            inputRefs.current[index + 1]?.focus();
         }
     };
 
     const handleKeyPress = (e: any, index: number) => {
         if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
-            inputRefs.current[index - 1].focus();
+            inputRefs.current[index - 1]?.focus();
         }
     };
 
@@ -55,6 +62,48 @@ export default function OTP() {
             });
 
             if (error) throw error;
+
+            // Automation: Send Welcome Notification & Email
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                 // Hard Guard: Insert Profile HERE after verification
+                 if (tempFullName) {
+                     const { error: profileError } = await supabase.from('profiles').insert({
+                         id: user.id,
+                         full_name: tempFullName,
+                         username: tempUsername,
+                         phone: tempPhone,
+                         email: email,
+                         custom_id: tempCustomId,
+                         referral_code: tempReferralCode || null,
+                         role: 'user', // Default role
+                         balance: 0
+                     });
+                     
+                     if (profileError) {
+                         console.error("Profile Creation Failed:", profileError);
+                         Alert.alert("Notice", "Account verified but profile setup failed. Please contact support.");
+                     }
+                 }
+
+                await supabase.from('notifications').insert({
+                    user_id: user.id,
+                    title: "Welcome to Abu Mafhal Hub! 🎉",
+                    body: "Your account is verified. Fund your wallet to start trading.",
+                    data: { priority: 'normal', type: 'welcome' }
+                });
+
+                // Automation: Send Welcome Email
+                await supabase.functions.invoke('send-communication', {
+                    body: {
+                        type: 'email',
+                        recipient_mode: 'single',
+                        recipient: email, // Use the email from params
+                        subject: "Welcome to Abu Mafhal Hub! 🚀",
+                        body: `<h3>Welcome to the Family!</h3><p>Your account has been successfully verified.</p><p><b>Next Steps:</b></p><ul><li>Fund your wallet</li><li>Explore our services</li><li>Start trading</li></ul><p>We are glad to have you!</p>`
+                    }
+                });
+            }
 
             Alert.alert('Success', 'Email verified successfully!', [
                 { text: 'Continue', onPress: () => router.replace('/(auth)/pin-setup') }

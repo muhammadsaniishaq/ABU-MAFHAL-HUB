@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, KeyboardAvoidingView, Platform, Image, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Image, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
@@ -43,6 +44,32 @@ export default function Login() {
             }
 
             if (data.user) {
+                // Automation: IP Tracking & Login Alert
+                let ip = "Unknown IP";
+                try {
+                    const res = await fetch('https://api.ipify.org?format=json');
+                    const json = await res.json();
+                    ip = json.ip;
+                } catch (e) { console.log("Failed to fetch IP", e); }
+
+                await supabase.from('notifications').insert({
+                    user_id: data.user.id,
+                    title: "New Login Detected 🔐",
+                    body: `New login from IP: ${ip} on ${Platform.OS.toUpperCase()}.`,
+                    data: { priority: 'high', type: 'security', ip }
+                });
+
+                // Automation: Send Login Email
+                await supabase.functions.invoke('send-communication', {
+                    body: {
+                        type: 'email',
+                        recipient_mode: 'single',
+                        recipient: email, // Use state email
+                        subject: "🔐 Security Alert: New Login Detected",
+                        body: `<h3>New Login Detected</h3><p>We noticed a new login to your account.</p><p><b>Device:</b> ${Platform.OS.toUpperCase()}</p><p><b>IP Address:</b> ${ip}</p><p><b>Time:</b> ${new Date().toLocaleString()}</p><p>If this was you, you can ignore this email.</p>`
+                    }
+                });
+
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('role')

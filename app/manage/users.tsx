@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { Stack, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import SecurityModal from '../../components/SecurityModal';
@@ -11,6 +12,8 @@ import { BlurView } from 'expo-blur';
 interface UserProfile {
     id: string;
     full_name: string;
+    username?: string; // New
+    custom_id?: string; // New
     email: string;
     role: string;
     status: string;
@@ -22,6 +25,14 @@ interface UserProfile {
     transfer_limit?: number;
     admin_notes?: string;
     account_number?: string;
+    // Extended Details
+    gender?: string;
+    dob?: string;
+    address?: string;
+    state?: string;
+    next_of_kin_name?: string;
+    next_of_kin_phone?: string;
+    avatar_url?: string;
 }
 
 interface Transaction {
@@ -42,6 +53,7 @@ interface LoginLog {
 }
 
 export default function UserManagement() {
+    const router = useRouter();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -63,7 +75,18 @@ export default function UserManagement() {
 
     // Edit Profile Loading
     const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({ full_name: '', phone: '', email: '' });
+    const [editForm, setEditForm] = useState({ 
+        full_name: '', 
+        phone: '', 
+        email: '',
+        username: '',
+        gender: '',
+        dob: '',
+        address: '',
+        state: '',
+        next_of_kin_name: '',
+        next_of_kin_phone: ''
+    });
 
     // Notification Input
     const [notifyMessage, setNotifyMessage] = useState('');
@@ -79,7 +102,20 @@ export default function UserManagement() {
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
-    const [newUserForm, setNewUserForm] = useState({ fullName: '', email: '', phone: '', password: 'Password123!', role: 'user' });
+    const [newUserForm, setNewUserForm] = useState({ 
+        fullName: '', 
+        email: '', 
+        phone: '', 
+        password: 'Password123!', 
+        role: 'user',
+        username: '',
+        gender: '',
+        dob: '',
+        address: '',
+        state: '',
+        next_of_kin_name: '',
+        next_of_kin_phone: ''
+    });
     const [creatingUser, setCreatingUser] = useState(false);
 
     // AI & Polish
@@ -104,6 +140,12 @@ export default function UserManagement() {
         else newSet.add(id);
         setSelectedIds(newSet);
         if (newSet.size === 0) setIsSelectionMode(false);
+    };
+
+    const copyToClipboard = async (text: string, label: string) => {
+        if (!text) return;
+        await Clipboard.setStringAsync(text);
+        Alert.alert("Copied", `${label} copied to clipboard.`);
     };
 
     const handleLongPress = (id: string) => {
@@ -152,7 +194,14 @@ export default function UserManagement() {
             setEditForm({
                 full_name: selectedUser.full_name || '',
                 phone: selectedUser.phone || '',
-                email: selectedUser.email || ''
+                email: selectedUser.email || '',
+                username: selectedUser.username || '',
+                gender: selectedUser.gender || '',
+                dob: selectedUser.dob || '',
+                address: selectedUser.address || '',
+                state: selectedUser.state || '',
+                next_of_kin_name: selectedUser.next_of_kin_name || '',
+                next_of_kin_phone: selectedUser.next_of_kin_phone || ''
             });
             setLimitInput(selectedUser.transfer_limit?.toString() || '');
             setAdminNotes(selectedUser.admin_notes || '');
@@ -276,8 +325,13 @@ export default function UserManagement() {
                 const { error } = await supabase.from('profiles').update({
                     full_name: editForm.full_name,
                     phone: editForm.phone,
-                    // Email might be locked by Auth, but let's try updating profile
-                    // email: editForm.email 
+                    username: editForm.username,
+                    gender: editForm.gender,
+                    dob: editForm.dob,
+                    address: editForm.address,
+                    state: editForm.state,
+                    next_of_kin_name: editForm.next_of_kin_name,
+                    next_of_kin_phone: editForm.next_of_kin_phone 
                 }).eq('id', selectedUser.id);
                 
                 if (error) throw error;
@@ -362,22 +416,33 @@ export default function UserManagement() {
             Alert.alert("User Created", `Successfully created account for ${newUserForm.fullName}. Creds sent to email.`);
             
             // 2. Add to local list (Mock)
+            // 2. Add to local list (Mock) - In real app, we'd insert into DB
             const mockUser: UserProfile = {
                 id: `new-${Date.now()}`,
                 full_name: newUserForm.fullName,
                 email: newUserForm.email,
                 phone: newUserForm.phone,
                 role: newUserForm.role,
+                username: newUserForm.username,
                 status: 'active',
                 balance: 0,
                 created_at: new Date().toISOString(),
-                kyc_verified: false
+                kyc_verified: false,
+                gender: newUserForm.gender,
+                dob: newUserForm.dob,
+                address: newUserForm.address,
+                state: newUserForm.state,
+                next_of_kin_name: newUserForm.next_of_kin_name,
+                next_of_kin_phone: newUserForm.next_of_kin_phone
             };
             setUsers([mockUser, ...users]);
 
             // 3. Reset
             setShowCreateUser(false);
-            setNewUserForm({ fullName: '', email: '', phone: '', password: 'Password123!', role: 'user' });
+            setNewUserForm({ 
+                fullName: '', email: '', phone: '', password: 'Password123!', role: 'user',
+                username: '', gender: '', dob: '', address: '', state: '', next_of_kin_name: '', next_of_kin_phone: ''
+            });
 
         } catch (e: any) {
             Alert.alert("Creation Failed", e.message);
@@ -552,13 +617,17 @@ Metadata:
                                 <Ionicons name="share-outline" size={20} color="#475569" />
                             </TouchableOpacity>
 
-                            <View className="w-20 h-20 bg-indigo-100 rounded-full items-center justify-center mb-3">
-                                <Text className="text-3xl font-bold text-indigo-600">
-                                    {selectedUser?.full_name?.charAt(0).toUpperCase()}
-                                </Text>
+                            <View className="w-24 h-24 bg-indigo-100 rounded-full items-center justify-center mb-3 overflow-hidden border-4 border-white shadow-sm">
+                                {selectedUser?.avatar_url ? (
+                                    <Image source={{ uri: selectedUser.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                                ) : (
+                                    <Text className="text-3xl font-bold text-indigo-600">
+                                        {selectedUser?.full_name?.charAt(0).toUpperCase()}
+                                    </Text>
+                                )}
                                 {selectedUser?.kyc_verified && (
-                                    <View className="absolute bottom-0 right-0 bg-blue-500 border-2 border-white rounded-full p-1">
-                                        <Ionicons name="checkmark" size={10} color="white" />
+                                    <View className="absolute bottom-1 right-1 bg-blue-500 border-2 border-white rounded-full p-0.5">
+                                        <Ionicons name="checkmark" size={12} color="white" />
                                     </View>
                                 )}
                             </View>
@@ -580,31 +649,118 @@ Metadata:
                                             className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800"
                                         />
                                     </View>
+                                    <View className="flex-row gap-2">
+                                         <View className="flex-1">
+                                            <Text className="text-xs text-slate-400 mb-1 ml-1">Username</Text>
+                                            <TextInput 
+                                                value={editForm.username}
+                                                onChangeText={(t) => setEditForm({...editForm, username: t})}
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800"
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-xs text-slate-400 mb-1 ml-1">Phone</Text>
+                                            <TextInput 
+                                                value={editForm.phone}
+                                                onChangeText={(t) => setEditForm({...editForm, phone: t})}
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+                                    </View>
+                                    
+                                     {/* Extended Fields */}
+                                    <View className="flex-row gap-2">
+                                        <View className="flex-1">
+                                            <Text className="text-xs text-slate-400 mb-1 ml-1">Gender</Text>
+                                            <TextInput 
+                                                value={editForm.gender}
+                                                onChangeText={(t) => setEditForm({...editForm, gender: t})}
+                                                placeholder="M/F"
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-xs text-slate-400 mb-1 ml-1">DOB</Text>
+                                            <TextInput 
+                                                value={editForm.dob}
+                                                onChangeText={(t) => setEditForm({...editForm, dob: t})}
+                                                placeholder="YYYY-MM-DD"
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                            />
+                                        </View>
+                                    </View>
                                     <View>
-                                        <Text className="text-xs text-slate-400 mb-1 ml-1">Phone Number</Text>
+                                        <Text className="text-xs text-slate-400 mb-1 ml-1">Address</Text>
                                         <TextInput 
-                                            value={editForm.phone}
-                                            onChangeText={(t) => setEditForm({...editForm, phone: t})}
+                                            value={editForm.address}
+                                            onChangeText={(t) => setEditForm({...editForm, address: t})}
                                             className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
-                                            keyboardType="phone-pad"
                                         />
                                     </View>
-                                    <TouchableOpacity onPress={saveProfileChanges} className="bg-indigo-600 py-3 rounded-xl items-center mt-2">
+                                     <View className="flex-row gap-2">
+                                        <View className="flex-1">
+                                             <Text className="text-xs text-slate-400 mb-1 ml-1">State</Text>
+                                            <TextInput 
+                                                value={editForm.state}
+                                                onChangeText={(t) => setEditForm({...editForm, state: t})}
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                            />
+                                        </View>
+                                     </View>
+
+                                    <Text className="text-xs font-bold text-slate-400 uppercase mt-2 mb-1">Next of Kin</Text>
+                                    <View className="flex-row gap-2">
+                                        <View className="flex-1">
+                                            <TextInput 
+                                                value={editForm.next_of_kin_name}
+                                                onChangeText={(t) => setEditForm({...editForm, next_of_kin_name: t})}
+                                                placeholder="Name"
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <TextInput 
+                                                value={editForm.next_of_kin_phone}
+                                                onChangeText={(t) => setEditForm({...editForm, next_of_kin_phone: t})}
+                                                placeholder="Phone"
+                                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium text-slate-800"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <TouchableOpacity onPress={saveProfileChanges} className="bg-indigo-600 py-3 rounded-xl items-center mt-4 shadow-lg shadow-indigo-200">
                                         <Text className="text-white font-bold">Save Changes</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : (
                                 <>
-                                    <Text className="text-xl font-bold text-slate-900 text-center flex-row items-center">
-                                        {selectedUser?.full_name}
-                                        {selectedUser?.kyc_verified && <Ionicons name="checkmark-circle" size={18} color="#3B82F6" style={{ marginLeft: 4 }} />}
-                                    </Text>
-                                    <Text className="text-slate-500 font-medium text-sm">{selectedUser?.email}</Text>
-                                    <Text className="text-slate-400 text-xs mt-1">{selectedUser?.phone || 'No Phone'}</Text>
-                                     <View className={`mt-2 px-3 py-1 rounded-full ${selectedUser?.status === 'active' ? 'bg-green-100' : 'bg-red-100'}`}>
-                                        <Text className={`text-[10px] font-bold uppercase ${selectedUser?.status === 'active' ? 'text-green-700' : 'text-red-700'}`}>
-                                            {selectedUser?.status}
+                                    <View className="items-center">
+                                        <Text className="text-xl font-bold text-slate-900 text-center flex-row items-center">
+                                            {selectedUser?.full_name}
+                                            {selectedUser?.kyc_verified && <Ionicons name="checkmark-circle" size={18} color="#3B82F6" style={{ marginLeft: 4 }} />}
                                         </Text>
+                                        <Text className="text-indigo-600 font-bold text-sm">@{selectedUser?.username || 'username'}</Text>
+                                        
+                                        <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.id || '', 'User ID')} className="bg-slate-100 px-3 py-1 rounded-full mt-2 mb-1 flex-row items-center gap-2">
+                                            <Text className="text-xs text-slate-500 font-mono font-bold tracking-widest">ID: {selectedUser?.custom_id || selectedUser?.id.substring(0,8)}...</Text>
+                                            <Ionicons name="copy-outline" size={12} color="#64748B" />
+                                        </TouchableOpacity>
+                                        
+                                        <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.email || '', 'Email')}>
+                                            <Text className="text-slate-500 font-medium text-sm underlineDecorationLine">{selectedUser?.email}</Text>
+                                        </TouchableOpacity>
+                                        
+                                        <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.phone || '', 'Phone')}>
+                                            <Text className="text-slate-400 text-xs mt-0.5">{selectedUser?.phone || 'No Phone'}</Text>
+                                        </TouchableOpacity>
+                                        
+                                        <View className={`mt-2 px-3 py-1 rounded-full ${selectedUser?.status === 'active' ? 'bg-green-100' : 'bg-red-100'}`}>
+                                            <Text className={`text-[10px] font-bold uppercase ${selectedUser?.status === 'active' ? 'text-green-700' : 'text-red-700'}`}>
+                                                {selectedUser?.status}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </>
                             )}
@@ -879,9 +1035,25 @@ Metadata:
                             )}
                         </View>
 
+                        {/* Extended Personal Details */}
+                        <View className="bg-slate-50 rounded-xl p-4 space-y-3 mb-6">
+                            <Text className="text-slate-900 font-bold text-base mb-2">Personal & Contact</Text>
+                            <DetailRow label="Gender" value={selectedUser?.gender} capitalize />
+                            <DetailRow label="Date of Birth" value={selectedUser?.dob} />
+                            <DetailRow label="Address" value={selectedUser?.address} />
+                            <DetailRow label="State/LGA" value={selectedUser?.state} />
+                        </View>
+
+                        {/* Next of Kin */}
+                        <View className="bg-slate-50 rounded-xl p-4 space-y-3 mb-6">
+                            <Text className="text-slate-900 font-bold text-base mb-2">Next of Kin</Text>
+                            <DetailRow label="Name" value={selectedUser?.next_of_kin_name} />
+                            <DetailRow label="Phone" value={selectedUser?.next_of_kin_phone} />
+                        </View>
+
                         {/* System Metadata */}
                         <View className="bg-slate-50 rounded-xl p-4 space-y-3">
-                            <DetailRow label="User ID" value={selectedUser?.id} />
+                            <DetailRow label="System Database ID" value={selectedUser?.id} />
                             <DetailRow label="Role" value={selectedUser?.role} capitalize />
                             <DetailRow label="Joined" value={new Date(selectedUser?.created_at || '').toLocaleDateString()} />
                             <DetailRow label="Last Login" value={selectedUser?.last_login ? new Date(selectedUser?.last_login).toLocaleString() : 'Never'} />
@@ -914,79 +1086,113 @@ Metadata:
         </Modal>
     );
 
-    const renderCreateUserModal = () => (
+     const renderCreateUserModal = () => (
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
             <BlurView intensity={90} tint="dark" className="flex-1 justify-center px-4">
-                 <View className="bg-white rounded-3xl overflow-hidden p-6 shadow-2xl">
-                    <View className="flex-row justify-between items-center mb-6">
+                 <View className="bg-white rounded-3xl overflow-hidden shadow-2xl h-[85%]">
+                    <View className="p-6 border-b border-slate-100 flex-row justify-between items-center bg-slate-50/50">
                         <Text className="text-2xl font-black text-slate-800">Create User</Text>
                         <TouchableOpacity onPress={() => setShowCreateUser(false)} className="bg-slate-100 p-2 rounded-full">
                             <Ionicons name="close" size={24} color="#64748B" />
                         </TouchableOpacity>
                     </View>
 
-                    <View className="space-y-4">
-                        <View>
-                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Full Name</Text>
-                            <TextInput 
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
-                                placeholder="e.g. John Doe"
-                                value={newUserForm.fullName}
-                                onChangeText={t => setNewUserForm({...newUserForm, fullName: t})}
-                            />
-                        </View>
-                        <View>
-                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Email Address</Text>
-                            <TextInput 
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
-                                placeholder="john@example.com"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={newUserForm.email}
-                                onChangeText={t => setNewUserForm({...newUserForm, email: t})}
-                            />
-                        </View>
-                         <View>
-                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Phone (Optional)</Text>
-                            <TextInput 
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
-                                placeholder="+234..."
-                                keyboardType="phone-pad"
-                                value={newUserForm.phone}
-                                onChangeText={t => setNewUserForm({...newUserForm, phone: t})}
-                            />
-                        </View>
-                        <View>
-                            <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Initial Password</Text>
-                             <TextInput 
-                                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
-                                value={newUserForm.password}
-                                onChangeText={t => setNewUserForm({...newUserForm, password: t})}
-                            />
-                             <Text className="text-[10px] text-slate-400 mt-1 ml-1">User will be asked to change this on login.</Text>
-                        </View>
-                        
-                         <View className="flex-row items-center justify-between mt-2 mb-2">
-                             <Text className="font-bold text-slate-600">Admin Privileges?</Text>
-                             <Switch 
-                                value={newUserForm.role === 'admin'}
-                                onValueChange={(val) => setNewUserForm({...newUserForm, role: val ? 'admin' : 'user'})}
-                                trackColor={{ false: "#E2E8F0", true: "#FBBF24" }}
-                             />
-                        </View>
+                    <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+                        <View className="space-y-4">
+                            <View>
+                                <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Full Name</Text>
+                                <TextInput 
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                    placeholder="e.g. John Doe"
+                                    value={newUserForm.fullName}
+                                    onChangeText={t => setNewUserForm({...newUserForm, fullName: t})}
+                                />
+                            </View>
+                             <View>
+                                <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Username</Text>
+                                <TextInput 
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                    placeholder="e.g. johndoe123"
+                                    value={newUserForm.username}
+                                    onChangeText={t => setNewUserForm({...newUserForm, username: t})}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                            <View>
+                                <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Email Address</Text>
+                                <TextInput 
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                    placeholder="john@example.com"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    value={newUserForm.email}
+                                    onChangeText={t => setNewUserForm({...newUserForm, email: t})}
+                                />
+                            </View>
+                             <View>
+                                <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Phone (Optional)</Text>
+                                <TextInput 
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                    placeholder="+234..."
+                                    keyboardType="phone-pad"
+                                    value={newUserForm.phone}
+                                    onChangeText={t => setNewUserForm({...newUserForm, phone: t})}
+                                />
+                            </View>
+                            
+                             <View className="flex-row gap-2">
+                                <View className="flex-1">
+                                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Gender</Text>
+                                    <TextInput 
+                                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                        placeholder="M/F"
+                                        value={newUserForm.gender}
+                                        onChangeText={t => setNewUserForm({...newUserForm, gender: t})}
+                                    />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">DOB</Text>
+                                    <TextInput 
+                                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                        placeholder="YYYY-MM-DD"
+                                        value={newUserForm.dob}
+                                        onChangeText={t => setNewUserForm({...newUserForm, dob: t})}
+                                    />
+                                </View>
+                            </View>
 
-                        <TouchableOpacity 
-                            onPress={handleCreateUser}
-                            disabled={creatingUser}
-                            className={`py-4 rounded-xl items-center mt-4 shadow-lg shadow-indigo-200 ${creatingUser ? 'bg-indigo-400' : 'bg-indigo-600'}`}
-                        >
-                            {creatingUser ? (
-                                <ActivityIndicator color="white" />
-                            ) : (
-                                <Text className="text-white font-bold text-lg">Create Account</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
+                            <View>
+                                <Text className="text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Initial Password</Text>
+                                 <TextInput 
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold"
+                                    value={newUserForm.password}
+                                    onChangeText={t => setNewUserForm({...newUserForm, password: t})}
+                                />
+                                 <Text className="text-[10px] text-slate-400 mt-1 ml-1">User will be asked to change this on login.</Text>
+                            </View>
+                            
+                             <View className="flex-row items-center justify-between mt-2 mb-2">
+                                 <Text className="font-bold text-slate-600">Admin Privileges?</Text>
+                                 <Switch 
+                                    value={newUserForm.role === 'admin'}
+                                    onValueChange={(val) => setNewUserForm({...newUserForm, role: val ? 'admin' : 'user'})}
+                                    trackColor={{ false: "#E2E8F0", true: "#FBBF24" }}
+                                 />
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={handleCreateUser}
+                                disabled={creatingUser}
+                                className={`py-4 rounded-xl items-center mt-4 shadow-lg shadow-indigo-200 ${creatingUser ? 'bg-indigo-400' : 'bg-indigo-600'}`}
+                            >
+                                {creatingUser ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text className="text-white font-bold text-lg">Create Account</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
                  </View>
             </BlurView>
         </Modal>
@@ -1024,6 +1230,13 @@ Metadata:
                             <View className="w-10 h-10 bg-indigo-300/30 rounded-full items-center justify-center border-2 border-indigo-200/50">
                                 <Ionicons name="person" size={20} color="white" />
                             </View>
+                            {/* Referral Settings Button */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/manage/referral-settings')}
+                                className="w-10 h-10 bg-indigo-400/20 rounded-full items-center justify-center border border-indigo-300/30"
+                            >
+                                <Ionicons name="settings-outline" size={20} color="white" />
+                            </TouchableOpacity>
                         </View>
                     </View>
 
@@ -1139,14 +1352,18 @@ Metadata:
                         )}
 
                         <View className="flex-row items-center gap-3 flex-1">
-                            <View className={`w-12 h-12 rounded-full items-center justify-center ${
+                            <View className={`w-12 h-12 rounded-full items-center justify-center overflow-hidden ${
                                 item.role === 'admin' ? 'bg-amber-100' : 'bg-slate-100'
                             }`}>
-                                <Text className={`font-bold text-lg ${
-                                    item.role === 'admin' ? 'text-amber-600' : 'text-slate-600'
-                                }`}>
-                                    {item.full_name?.charAt(0).toUpperCase() || 'U'}
-                                </Text>
+                                {item.avatar_url ? (
+                                    <Image source={{ uri: item.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                                ) : (
+                                    <Text className={`font-bold text-lg ${
+                                        item.role === 'admin' ? 'text-amber-600' : 'text-slate-600'
+                                    }`}>
+                                        {item.full_name?.charAt(0).toUpperCase() || 'U'}
+                                    </Text>
+                                )}
                             </View>
                             <View className="flex-1">
                                 <Text className="font-bold text-slate-800 text-base" numberOfLines={1}>{item.full_name || 'Unknown User'}</Text>

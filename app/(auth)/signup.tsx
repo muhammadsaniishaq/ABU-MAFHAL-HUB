@@ -11,28 +11,36 @@ const { width, height } = Dimensions.get('window');
 
 export default function Signup() {
     const [fullName, setFullName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     const handleSignup = async () => {
-        if (!email || !password || !fullName || !phone) {
+        if (!email || !password || !fullName || !phone || !username) {
             Alert.alert('Error', 'Please fill in all fields');
             return;
         }
+
+        const customId = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // Generate ID
 
         setLoading(true);
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
+                // data passed in options is for metadata, not params
                 options: {
                     data: {
                         full_name: fullName,
+                        username: username,
                         phone: phone,
+                        custom_id: customId,
+                        referral_code: referralCode
                     },
                 },
             });
@@ -40,9 +48,19 @@ export default function Signup() {
             if (error) throw error;
 
             if (data.user) {
+                // Hard Guard: Pass data to OTP screen instead of inserting here
                 router.push({
                     pathname: '/(auth)/otp',
-                    params: { email, type: 'signup' }
+                    params: { 
+                        email, 
+                        type: 'signup',
+                        // Pass profile data to be saved AFTER verification
+                        tempFullName: fullName,
+                        tempUsername: username,
+                        tempPhone: phone,
+                        tempCustomId: customId,
+                        tempReferralCode: referralCode || ''
+                    }
                 });
             }
         } catch (error: any) {
@@ -168,6 +186,22 @@ export default function Signup() {
                                 </View>
 
                                 <View>
+                                    <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Username</Text>
+                                    <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
+                                        <Ionicons name="at-outline" size={20} color="#94A3B8" />
+                                        <TextInput
+                                            className="flex-1 ml-3 text-slate-900 font-semibold"
+                                            placeholder="Choose a username"
+                                            placeholderTextColor="#94A3B8"
+                                            value={username}
+                                            onChangeText={setUsername}
+                                            autoCapitalize="none"
+                                            selectionColor="#3B82F6"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View>
                                     <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Email Address</Text>
                                     <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
                                         <Ionicons name="mail-outline" size={20} color="#94A3B8" />
@@ -216,6 +250,23 @@ export default function Signup() {
                                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                                             <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#94A3B8" />
                                         </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Referral Code (Optional) */}
+                                <View>
+                                    <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Referral Code (Optional)</Text>
+                                    <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
+                                        <Ionicons name="gift-outline" size={20} color="#94A3B8" />
+                                        <TextInput
+                                            className="flex-1 ml-3 text-slate-900 font-semibold"
+                                            placeholder="e.g. johndoe123"
+                                            placeholderTextColor="#94A3B8"
+                                            value={referralCode}
+                                            onChangeText={setReferralCode}
+                                            autoCapitalize="none"
+                                            selectionColor="#3B82F6"
+                                        />
                                     </View>
                                 </View>
                             </View>

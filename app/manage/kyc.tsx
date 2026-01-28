@@ -1,4 +1,5 @@
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState, useEffect } from 'react';

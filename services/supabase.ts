@@ -60,7 +60,7 @@ export const forceSignOut = async () => {
     if (Platform.OS === 'web') {
         if (typeof localStorage !== 'undefined') {
             localStorage.clear();
-            window.location.href = '/'; 
+            // window.location.href = '/'; // Disable full reload, let Router handle it
         }
     }
 };

@@ -28,11 +28,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import '../global.css';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-try {
-    SplashScreen.preventAutoHideAsync();
-} catch (e) {
-    console.warn("SplashScreen preventAutoHideAsync failed:", e);
-}
+SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
 
 export default function RootLayout() {
     const colorScheme = useColorScheme();

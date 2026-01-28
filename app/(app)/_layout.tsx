@@ -3,10 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Platform } from 'react-native';
 import { useState } from 'react';
 import SecurityModal from '../../components/SecurityModal';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 export default function AppLayout() {
     const router = useRouter();
     const [isVerified, setIsVerified] = useState(false);
+    usePushNotifications(); // Register for push notifications
+
 
     if (!isVerified) {
         return (
@@ -77,6 +80,12 @@ export default function AppLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="person" size={size} color={color} />
                     ),
+                }}
+            />
+            <Tabs.Screen
+                name="referrals"
+                options={{
+                    href: null,
                 }}
             />
         </Tabs>
