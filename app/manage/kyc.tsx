@@ -10,6 +10,7 @@ export default function KYCQueue() {
     const [loading, setLoading] = useState(true);
     const [approvedToday, setApprovedToday] = useState(0);
     const [viewingDoc, setViewingDoc] = useState<string | null>(null);
+    const [loadingImage, setLoadingImage] = useState(false);
 
     useEffect(() => {
         fetchKYC();
@@ -55,21 +56,85 @@ export default function KYCQueue() {
 
             // 2. If Approved, Upgrade User Tier
             if (status === 'approved') {
-                const newTier = request.document_type === 'passport' ? 3 : 2; // Simple logic: Passport = Tier 3, NIN = Tier 2
-
-                const { error: profileError } = await supabase
-                    .from('profiles')
-                    .update({ kyc_tier: newTier })
-                    .eq('id', request.user_id);
-
-                if (profileError) {
-                    Alert.alert('Warning', 'Request approved but failed to upgrade user tier: ' + profileError.message);
+                let newTier = request.profiles?.kyc_tier || 1;
+                
+                // Logic based on document type
+                switch (request.document_type) {
+                    case 'bvn':
+                    case 'nin':
+                        if (newTier < 2) newTier = 2;
+                        break;
+                    case 'utility_bill':
+                        if (newTier < 3) newTier = 3;
+                        break;
+                    case 'liveness':
+                        if (newTier < 4) newTier = 4;
+                        break;
+                    default:
+                        // Fallback or unknown
+                        break;
                 }
+
+                // Only update if tier increases
+                if (newTier > (request.profiles?.kyc_tier || 0)) {
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .update({ kyc_tier: newTier })
+                        .eq('id', request.user_id);
+
+                    if (profileError) {
+                        Alert.alert('Warning', 'Request approved but failed to upgrade user tier: ' + profileError.message);
+                    } else {
+                        // Send Notification (Optional but good UX)
+                         await supabase.from('notifications').insert({
+                            user_id: request.user_id,
+                            title: "KYC Approved! 🎉",
+                            body: `Your ${request.document_type?.toUpperCase().replace('_', ' ')} verification has been approved. You are now Tier ${newTier}.`,
+                            data: { type: 'kyc_approved' }
+                        });
+                    }
+                }
+            } else {
+                 // REJECTED Notification
+                 await supabase.from('notifications').insert({
+                    user_id: request.user_id,
+                    title: "KYC Update",
+                    body: `Your ${request.document_type?.toUpperCase().replace('_', ' ')} verification was declined. Please try again with clear details.`,
+                    data: { type: 'kyc_rejected' }
+                });
             }
 
             fetchKYC();
         } catch (error: any) {
             Alert.alert('Error', error.message);
+        }
+    };
+
+    const openDocument = async (path: string) => {
+        if (!path) return;
+        setLoadingImage(true);
+        setViewingDoc(null); // Reset
+        try {
+            // Create Signed URL for security
+            const { data, error } = await supabase.storage.from('kyc-documents').createSignedUrl(path, 60 * 60); // 1 hour
+            if (error) throw error;
+            if (data?.signedUrl) {
+                setViewingDoc(data.signedUrl);
+            }
+        } catch (e: any) {
+            Alert.alert("Error loading image", e.message);
+        } finally {
+            setLoadingImage(false);
+        }
+    };
+
+    const getTierLabel = (type: string) => {
+        switch(type) {
+            case 'bvn': return 'Tier 2 (Identity)';
+            case 'nin': return 'Tier 2 (Identity)';
+            case 'utility_bill': return 'Tier 3 (Address)';
+            case 'liveness': return 'Tier 4 (Liveness)';
+            default: return 'Request';
         }
     };
 
@@ -126,15 +191,29 @@ export default function KYCQueue() {
                                 </View>
                             </View>
 
-                            <View className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4 flex-row items-center justify-between">
-                                <View className="flex-row items-center gap-2">
-                                    <Ionicons name="document-text" size={16} color="#64748B" />
-                                    <Text className="text-xs font-bold text-slate-700 uppercase">{item.document_type}</Text>
+                            <View className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+                                <View className="flex-row items-center justify-between mb-2">
+                                    <View className="flex-row items-center gap-2">
+                                        <Ionicons name="document-text" size={16} color="#64748B" />
+                                        <Text className="text-xs font-bold text-slate-700 uppercase">{item.document_type}</Text>
+                                    </View>
+                                    <Text className="text-xs text-blue-600 font-medium">{getTierLabel(item.document_type)}</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setViewingDoc(item.document_url)} className="flex-row items-center gap-1">
-                                    <Text className="text-blue-600 text-xs font-bold">View Document</Text>
-                                    <Ionicons name="arrow-forward" size={12} color="#2563EB" />
-                                </TouchableOpacity>
+                                
+                                {item.document_number && (
+                                    <Text className="text-slate-800 font-mono text-sm bg-white p-2 border border-slate-100 rounded mb-2">{item.document_number}</Text>
+                                )}
+                                
+                                {item.notes && (
+                                     <Text className="text-slate-500 text-xs italic mb-2">{item.notes}</Text>
+                                )}
+
+                                {item.document_url && (
+                                    <TouchableOpacity onPress={() => openDocument(item.document_url)} className="flex-row items-center gap-1 bg-white p-2 rounded border border-blue-100 self-start">
+                                        <Ionicons name="eye" size={14} color="#2563EB" />
+                                        <Text className="text-blue-600 text-xs font-bold">View User Upload</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
 
                             {item.status === 'pending' && (
@@ -149,7 +228,7 @@ export default function KYCQueue() {
                                         onPress={() => handleAction(item, 'approved')}
                                         className="flex-1 h-10 bg-slate-900 rounded-xl items-center justify-center shadow-lg shadow-slate-900/20"
                                     >
-                                        <Text className="text-white font-bold">Approve & Upgrade</Text>
+                                        <Text className="text-white font-bold">Approve</Text>
                                     </TouchableOpacity>
                                 </View>
                             )}
@@ -164,8 +243,8 @@ export default function KYCQueue() {
             )}
 
             {/* Document Viewer Modal */}
-            <Modal visible={!!viewingDoc} transparent={true} animationType="fade">
-                <View className="flex-1 bg-black/90 justify-center items-center relative">
+            <Modal visible={!!viewingDoc || loadingImage} transparent={true} animationType="fade">
+                <View className="flex-1 bg-black/95 justify-center items-center relative">
                     <TouchableOpacity
                         onPress={() => setViewingDoc(null)}
                         className="absolute top-12 right-6 z-10 w-10 h-10 bg-white/20 rounded-full items-center justify-center"
@@ -173,7 +252,9 @@ export default function KYCQueue() {
                         <Ionicons name="close" size={24} color="white" />
                     </TouchableOpacity>
 
-                    {viewingDoc && (
+                    {loadingImage && <ActivityIndicator size="large" color="white" />}
+
+                    {viewingDoc && !loadingImage && (
                         <Image
                             source={{ uri: viewingDoc }}
                             className="w-full h-full"

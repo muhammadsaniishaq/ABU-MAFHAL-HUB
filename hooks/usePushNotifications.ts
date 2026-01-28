@@ -16,18 +16,21 @@ export function usePushNotifications() {
 
     const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
-    // 1. Setup Notifications Module (Safe for Expo Go now)
+    // 1. Setup Notifications Module (Conditioned for Expo Go)
     try {
-        Notifications = require('expo-notifications');
-        
-        // Configure Handler immediately
-        Notifications.setNotificationHandler({
-            handleNotification: async () => ({
-                shouldShowAlert: true,
-                shouldPlaySound: true,
-                shouldSetBadge: false,
-            }),
-        });
+        // Expo Go SDK 53 crashes if we even require 'expo-notifications' due to auto-registration side effects
+        if (!isExpoGo) {
+            Notifications = require('expo-notifications');
+            
+            // Configure Handler immediately
+            Notifications.setNotificationHandler({
+                handleNotification: async () => ({
+                    shouldShowAlert: true,
+                    shouldPlaySound: true,
+                    shouldSetBadge: false,
+                }),
+            });
+        }
     } catch (e) {
         console.error("Failed to load expo-notifications module:", e);
     }
