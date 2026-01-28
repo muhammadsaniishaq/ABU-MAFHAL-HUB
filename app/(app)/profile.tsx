@@ -52,7 +52,14 @@ export default function ProfileScreen() {
 
     const performLogout = async () => {
         await forceSignOut();
-        // Router redirect handled by _layout listener
+        
+        // Explicitly navigate for Web/Native to ensure we don't get stuck on a protected screen
+        // while the auth state propagates
+        if (Platform.OS === 'web') {
+            window.location.href = '/'; // Hard reload is safest for clearing state on Web
+        } else {
+            router.replace('/');
+        }
     };
 
     const menuItems = [
