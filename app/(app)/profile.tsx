@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -33,21 +33,26 @@ export default function ProfileScreen() {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            "Logout",
-            "Are you sure you want to logout?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Logout",
-                    style: "destructive",
-                    onPress: async () => {
-                        await forceSignOut();
-                        // router.replace('/(auth)/login'); // Let _layout.tsx handle the redirect state change
-                    }
-                }
-            ]
-        );
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm("Are you sure you want to logout?");
+            if (confirmed) {
+                performLogout();
+            }
+        } else {
+            Alert.alert(
+                "Logout",
+                "Are you sure you want to logout?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Logout", style: "destructive", onPress: performLogout }
+                ]
+            );
+        }
+    };
+
+    const performLogout = async () => {
+        await forceSignOut();
+        // Router redirect handled by _layout listener
     };
 
     const menuItems = [
@@ -70,7 +75,7 @@ export default function ProfileScreen() {
 
             <LinearGradient
                 colors={['#4f46e5', '#3730a3']}
-                className="pt-16 pb-10 px-6 items-center rounded-b-[40px] shadow-lg"
+                className="pt-16 pb-10 px-6 items-center rounded-b-[40px] shadow-lg z-10"
             >
                  <View className="w-24 h-24 bg-white/20 rounded-full items-center justify-center mb-4 border-2 border-white/30 backdrop-blur-md overflow-hidden">
                     {profile?.avatar_url ? (
@@ -86,8 +91,8 @@ export default function ProfileScreen() {
                  </View>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-6 -mt-6">
-                <View className="bg-white rounded-3xl p-2 shadow-sm border border-slate-100 mb-8 overflow-hidden">
+            <ScrollView className="flex-1 px-6 -mt-6" contentContainerStyle={{ paddingBottom: 100 }}>
+                <View className="bg-white rounded-3xl p-2 shadow-sm border border-slate-100 mb-8 overflow-hidden z-20">
                     {menuItems.map((item, index) => (
                         <TouchableOpacity
                             key={index}
@@ -104,8 +109,9 @@ export default function ProfileScreen() {
                 </View>
 
                 <TouchableOpacity
-                    className="flex-row items-center justify-center bg-red-50 p-4 rounded-2xl mb-12 border border-red-100 active:bg-red-100"
+                    className="flex-row items-center justify-center bg-red-50 p-4 rounded-2xl mb-12 border border-red-100 active:bg-red-100 z-50 shadow-sm"
                     onPress={handleLogout}
+                     style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}}
                 >
                     <Ionicons name="log-out-outline" size={20} color="#ef4444" />
                     <Text className="text-red-500 font-bold ml-2 text-base">Logout</Text>
