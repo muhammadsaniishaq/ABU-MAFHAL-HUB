@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +29,8 @@ serve(async (req) => {
     // Check availability in profiles table (admin access)
     // Prepare Query
     console.log(`Checking ${table}.${field} for value: ${value}`);
-    let query = supabaseClient
+    // deno-lint-ignore no-explicit-any
+    let query: any = (supabaseClient as any)
       .from(table)
       .select(field)
       .eq(field, value);
@@ -56,7 +57,7 @@ serve(async (req) => {
     // Suggest usernames if taken and checking username (only for profiles)
     let suggestions: string[] = [];
     if (!isAvailable && field === 'username' && table === 'profiles') {
-       const base = value.replace(/[0-9]/g, '');
+       const _base = value.replace(/[0-9]/g, '');
        const suffix = Math.floor(Math.random() * 1000);
        const year = new Date().getFullYear();
        suggestions = [
@@ -71,8 +72,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     );
   }

@@ -606,7 +606,7 @@ export default function KYCScreen() {
                     className="pt-16 pb-12 px-6 rounded-b-[40px]"
                 >
                     <View className="flex-row items-center justify-between mb-8">
-                        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/20 backdrop-blur-md">
+                        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/20 backdrop-blur-md">
                             <Ionicons name="arrow-back" size={24} color="white" />
                         </TouchableOpacity>
                         <View className="bg-white/10 px-4 py-1.5 rounded-full border border-white/20 backdrop-blur-md flex-row items-center gap-2">
