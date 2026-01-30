@@ -270,7 +270,7 @@ export default function KYCScreen() {
             // Load Logo
             const asset = Asset.fromModule(require('../assets/images/logo.png'));
             await asset.downloadAsync();
-            const logoBase64 = await new FileSystem.File(asset.localUri || '').base64();
+            const logoBase64 = await FileSystem.readAsStringAsync(asset.localUri || '', { encoding: FileSystem.EncodingType.Base64 });
             const logoSrc = `data:image/png;base64,${logoBase64}`;
 
             const html = `

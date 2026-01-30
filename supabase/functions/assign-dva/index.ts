@@ -84,7 +84,13 @@ Deno.serve(async (req) => {
         const firstName = splitName[0];
         const lastName = splitName.slice(1).join(' ') || firstName;
         const userPhone = profile.phone || '08000000000'; 
-        const userBVN = profile.bvn;
+        let userBVN = profile.bvn;
+
+        // Fallback: If profile has no BVN, check if the approved request provides it
+        if (!userBVN && record.document_type === 'bvn' && record.document_number) {
+            console.log("Using BVN from current approved request:", record.document_number);
+            userBVN = record.document_number;
+        }
 
         if (!userBVN) {
             console.error("User does not have a BVN in profile, cannot create DVA.");
@@ -96,7 +102,7 @@ Deno.serve(async (req) => {
         console.log(`Creating Flutterwave DVA for ${userEmail} (${firstName} ${lastName})`);
 
         let virtualAccountData: VirtualAccountData | null = null;
-        let providerError = null;
+        let providerError: unknown = null;
 
         try {
             const tx_ref = `dva_assign_${userId}_${Date.now()}`;
