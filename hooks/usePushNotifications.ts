@@ -154,8 +154,8 @@ export function usePushNotifications() {
     return () => {
         isMounted = false;
         if (Notifications && !isExpoGo) {
-            Notifications.removeNotificationSubscription(notificationListener.current);
-            Notifications.removeNotificationSubscription(responseListener.current);
+            notificationListener.current && notificationListener.current.remove();
+            responseListener.current && responseListener.current.remove();
         }
         if (cleanupRealtime) cleanupRealtime();
     };

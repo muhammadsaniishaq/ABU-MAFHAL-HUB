@@ -74,6 +74,14 @@ export default function RootLayout() {
             setSession(session);
             if (session?.user) fetchUserRole(session.user.id);
             setInitialized(true);
+        }).catch(async (error) => {
+            console.log("Session init error:", error.message);
+            // If refresh token is invalid, clear session
+            if (error.message?.includes('Refresh Token')) {
+                await forceSignOut();
+                setSession(null);
+            }
+            setInitialized(true);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

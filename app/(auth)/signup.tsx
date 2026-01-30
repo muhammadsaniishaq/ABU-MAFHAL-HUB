@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Image, ScrollView, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,12 +18,124 @@ export default function Signup() {
     const [referralCode, setReferralCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // Validation States
+    const [checkingUsername, setCheckingUsername] = useState(false);
+    const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+    const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+
+    const [checkingEmail, setCheckingEmail] = useState(false);
+    const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+
+    const [checkingPhone, setCheckingPhone] = useState(false);
+    const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
+
     const router = useRouter();
+
+    // Real-time Username Check
+    useEffect(() => {
+        const checkUsername = async () => {
+            if (username.length < 3) {
+                setUsernameAvailable(null);
+                setUsernameSuggestions([]);
+                return;
+            }
+            setCheckingUsername(true);
+            try {
+                const { data, error } = await supabase.functions.invoke('check-availability', {
+                    body: { field: 'username', value: username }
+                });
+
+                if (error) throw error;
+
+                if (data.available) {
+                    setUsernameAvailable(true);
+                    setUsernameSuggestions([]);
+                } else {
+                    setUsernameAvailable(false);
+                    setUsernameSuggestions(data.suggestions || []);
+                }
+            } catch (error) {
+                console.log('Username check error', error);
+                // Fallback or ignore error
+            } finally {
+                setCheckingUsername(false);
+            }
+        };
+        const timer = setTimeout(checkUsername, 600);
+        return () => clearTimeout(timer);
+    }, [username]);
+
+    // Real-time Email Check
+    useEffect(() => {
+        const checkEmail = async () => {
+             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email || !emailRegex.test(email)) {
+                setEmailAvailable(null);
+                return;
+            }
+            setCheckingEmail(true);
+            try {
+                const { data, error } = await supabase.functions.invoke('check-availability', {
+                    body: { field: 'email', value: email }
+                });
+
+                if (error) throw error;
+                
+                setEmailAvailable(data.available);
+            } catch (error) {
+                console.log('Email check error', error);
+            } finally {
+                setCheckingEmail(false);
+            }
+        };
+        const timer = setTimeout(checkEmail, 600);
+        return () => clearTimeout(timer);
+    }, [email]);
+
+     // Real-time Phone Check
+    useEffect(() => {
+        const checkPhone = async () => {
+            if (phone.length < 10) {
+                setPhoneAvailable(null);
+                return;
+            }
+            setCheckingPhone(true);
+            try {
+                const { data, error } = await supabase.functions.invoke('check-availability', {
+                    body: { field: 'phone', value: phone }
+                });
+
+                if (error) throw error;
+
+                setPhoneAvailable(data.available);
+            } catch (error) {
+                console.log('Phone check error', error);
+            } finally {
+                setCheckingPhone(false);
+            }
+        };
+        const timer = setTimeout(checkPhone, 600);
+        return () => clearTimeout(timer);
+    }, [phone]);
 
     const handleSignup = async () => {
         if (!email || !password || !fullName || !phone || !username) {
             Alert.alert('Error', 'Please fill in all fields');
             return;
+        }
+
+        if (usernameAvailable === false) {
+            Alert.alert('Username Taken', 'Please choose a different username');
+            return;
+        }
+        if (emailAvailable === false) {
+             Alert.alert('Email Exists', 'This email is already registered. Please login.');
+             return;
+        }
+        if (phoneAvailable === false) {
+             Alert.alert('Phone Used', 'This phone number is already linked to an account.');
+             return;
         }
 
         const customId = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // Generate ID
@@ -187,7 +299,7 @@ export default function Signup() {
 
                                 <View>
                                     <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Username</Text>
-                                    <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
+                                    <View className={`flex-row items-center bg-slate-50 border rounded-2xl px-4 h-14 shadow-sm shadow-slate-100 ${usernameAvailable === false ? 'border-red-300 bg-red-50' : usernameAvailable === true ? 'border-green-300 bg-green-50' : 'border-slate-100'}`}>
                                         <Ionicons name="at-outline" size={20} color="#94A3B8" />
                                         <TextInput
                                             className="flex-1 ml-3 text-slate-900 font-semibold"
@@ -198,12 +310,35 @@ export default function Signup() {
                                             autoCapitalize="none"
                                             selectionColor="#3B82F6"
                                         />
+                                        {checkingUsername ? (
+                                            <ActivityIndicator size="small" color="#3B82F6" />
+                                        ) : usernameAvailable === true ? (
+                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                        ) : usernameAvailable === false ? (
+                                            <Ionicons name="close-circle" size={20} color="#EF4444" />
+                                        ) : null}
                                     </View>
+                                    {usernameAvailable === false && (
+                                        <View className="mt-2">
+                                            <Text className="text-red-500 text-xs ml-1 mb-1">Username is taken. Try these:</Text>
+                                            <View className="flex-row flex-wrap gap-2">
+                                                {usernameSuggestions.map((suggestion, index) => (
+                                                    <TouchableOpacity 
+                                                        key={index}
+                                                        onPress={() => setUsername(suggestion)}
+                                                        className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100"
+                                                    >
+                                                        <Text className="text-blue-600 text-xs font-bold">{suggestion}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    )}
                                 </View>
 
                                 <View>
                                     <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Email Address</Text>
-                                    <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
+                                    <View className={`flex-row items-center bg-slate-50 border rounded-2xl px-4 h-14 shadow-sm shadow-slate-100 ${emailAvailable === false ? 'border-red-300 bg-red-50' : emailAvailable === true ? 'border-green-300 bg-green-50' : 'border-slate-100'}`}>
                                         <Ionicons name="mail-outline" size={20} color="#94A3B8" />
                                         <TextInput
                                             className="flex-1 ml-3 text-slate-900 font-semibold"
@@ -215,12 +350,22 @@ export default function Signup() {
                                             keyboardType="email-address"
                                             selectionColor="#3B82F6"
                                         />
+                                        {checkingEmail ? (
+                                            <ActivityIndicator size="small" color="#3B82F6" />
+                                        ) : emailAvailable === true ? (
+                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                        ) : emailAvailable === false ? (
+                                            <Ionicons name="close-circle" size={20} color="#EF4444" />
+                                        ) : null}
                                     </View>
+                                    {emailAvailable === false && (
+                                         <Text className="text-red-500 text-xs ml-1 mt-1">Email already registered</Text>
+                                    )}
                                 </View>
 
                                 <View>
                                     <Text className="text-slate-600 font-bold text-sm mb-1.5 ml-1">Phone Number</Text>
-                                    <View className="flex-row items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 h-14 shadow-sm shadow-slate-100">
+                                    <View className={`flex-row items-center bg-slate-50 border rounded-2xl px-4 h-14 shadow-sm shadow-slate-100 ${phoneAvailable === false ? 'border-red-300 bg-red-50' : phoneAvailable === true ? 'border-green-300 bg-green-50' : 'border-slate-100'}`}>
                                         <Ionicons name="call-outline" size={20} color="#94A3B8" />
                                         <TextInput
                                             className="flex-1 ml-3 text-slate-900 font-semibold"
@@ -231,7 +376,17 @@ export default function Signup() {
                                             keyboardType="phone-pad"
                                             selectionColor="#3B82F6"
                                         />
+                                         {checkingPhone ? (
+                                            <ActivityIndicator size="small" color="#3B82F6" />
+                                        ) : phoneAvailable === true ? (
+                                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                                        ) : phoneAvailable === false ? (
+                                            <Ionicons name="close-circle" size={20} color="#EF4444" />
+                                        ) : null}
                                     </View>
+                                    {phoneAvailable === false && (
+                                         <Text className="text-red-500 text-xs ml-1 mt-1">Phone number already in use</Text>
+                                    )}
                                 </View>
 
                                 <View>
