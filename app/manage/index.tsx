@@ -38,6 +38,7 @@ const modules = {
         { title: 'API', icon: 'code-working', route: '/manage/api', color: '#6366F1' },
         { title: 'Cinema', icon: 'videocam', route: '/manage/cinema', color: '#EF4444', dark: true },
         { title: 'Terminal', icon: 'terminal', route: '/manage/terminal', color: '#22C55E' },
+        { title: 'Features', icon: 'toggle', route: '/manage/features', color: '#F97316' }, // Added Feature Flags
         { title: 'App Store', icon: 'logo-apple', route: '/manage/stores', color: '#000000', badge: 1 },
         { title: 'Files', icon: 'folder', route: '/manage/files', color: '#0EA5E9' },
     ],

@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
-import { useEffect } from 'react';
+import { useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 export default function Dashboard() {
     const [showBalance, setShowBalance] = useState(true);
@@ -14,10 +15,74 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [dbError, setDbError] = useState<boolean>(false);
     const router = useRouter();
+    const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
 
-    useEffect(() => {
-        fetchUserData();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchUserData();
+            fetchFeatureFlags();
+        }, [])
+    );
+
+    const fetchFeatureFlags = async () => {
+        console.log("Fetching feature flags...");
+        const { data, error } = await supabase.from('feature_flags').select('feature_key, is_enabled, maintenance_message');
+        
+        if (error) console.error("Error fetching flags:", error);
+        
+        if (data) {
+             console.log("Raw Flags Data:", JSON.stringify(data, null, 2));
+             const flags = data.reduce((acc: any, curr: any) => {
+                 acc[curr.feature_key] = curr;
+                 return acc;
+             }, {});
+             setFeatureFlags(flags);
+             console.log("Processed Flags Map:", JSON.stringify(flags, null, 2));
+        }
+    };
+
+    const handleActionPress = (action: any) => {
+        // Map routes/labels to feature keys
+        const featureMap: Record<string, string> = {
+            '/fund-wallet': 'wallet_deposit_card', // Primary funding check
+            '/transfer': 'feature_transfer',
+            '/airtime': 'feature_airtime',
+            '/data': 'feature_data',
+            '/education': 'feature_education',
+            '/bills': 'feature_bills',
+            '/virtual-cards': 'feature_cards',
+            '/savings': 'feature_savings',
+            '/loans': 'feature_loans',
+            '/crypto': 'feature_crypto',
+            '/analytics': 'feature_analytics',
+            '/rewards': 'feature_rewards',
+            '/qr-pay': 'feature_qr',
+            '/investments': 'feature_invest',
+            '/insurance': 'feature_insurance',
+            '/bvn-services': 'feature_bvn',
+            '/nin-services': 'feature_nin'
+        };
+
+        const featureKey = featureMap[action.route];
+        
+        console.log(`Checking Action: ${action.label} | Route: ${action.route} | Key: ${featureKey}`);
+        
+        if (featureKey) {
+            const flag = featureFlags[featureKey];
+            console.log(`Flag Status for ${featureKey}:`, flag);
+            
+            // If feature is controlled and disabled
+            if (flag && !flag.is_enabled) {
+                console.log(`BLOCKED: ${featureKey} is disabled.`);
+                alert(flag.maintenance_message || "This feature is currently under maintenance.");
+                return;
+            }
+        } else {
+            console.log(`No feature key mapped for ${action.route}`);
+        }
+
+        if (action.route) router.push(action.route as any);
+    };
 
     const fetchUserData = async () => {
         try {
@@ -158,7 +223,7 @@ export default function Dashboard() {
                             <TouchableOpacity
                                 key={index}
                                 className="w-[23%] items-center"
-                                onPress={() => action.route && router.push(action.route as any)}
+                                onPress={() => handleActionPress(action)}
                             >
                                 <View className={`w-12 h-12 rounded-2xl items-center justify-center mb-2 bg-white shadow-sm border border-gray-100`}>
                                     <Ionicons name={action.icon as any} size={24} color={action.color} />
@@ -219,7 +284,7 @@ export default function Dashboard() {
                     </View>
                     <View className="flex-row gap-3">
                         <TouchableOpacity
-                            onPress={() => router.push('/bvn-services')}
+                            onPress={() => handleActionPress({ route: '/bvn-services', label: 'BVN Services' })}
                             className="flex-1 bg-blue-50 p-3 rounded-xl border border-blue-100 flex-row items-center"
                         >
                             <Ionicons name="finger-print" size={20} color="#0056D2" />
@@ -229,7 +294,7 @@ export default function Dashboard() {
                             </View>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => router.push('/nin-services')}
+                            onPress={() => handleActionPress({ route: '/nin-services', label: 'NIN Services' })}
                             className="flex-1 bg-green-50 p-3 rounded-xl border border-green-100 flex-row items-center"
                         >
                             <Ionicons name="person-add" size={20} color="#15803D" />

@@ -142,7 +142,7 @@ serve(async (req) => {
                         ${bodyContent.replace(/\n/g, '<br/>')}
                       </div>
                       <div style="margin-top:45px;text-align:center;">
-                        <a href="https://abumafhal.com" style="display:inline-block;padding:14px 35px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(79, 70, 229, 0.4);transition:all 0.3s ease;">Open App</a>
+                        <a href="https://abumafhal.com.ng" style="display:inline-block;padding:14px 35px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(79, 70, 229, 0.4);transition:all 0.3s ease;">Open App</a>
                       </div>
                     </td>
                   </tr>

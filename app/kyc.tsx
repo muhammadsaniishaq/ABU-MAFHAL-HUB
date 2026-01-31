@@ -10,7 +10,8 @@ import { supabase } from '../services/supabase';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
+import { ActionSheetIOS, Share as RNShare } from 'react-native'; // Ensure no conflict, but using FileSystem here.
+import * as FileSystem from 'expo-file-system/legacy';
 
 type ValidDocType = 'bvn' | 'nin' | 'voters_card' | 'drivers_license' | 'utility_bill' | 'bank_statement' | 'liveness';
 
@@ -270,7 +271,7 @@ export default function KYCScreen() {
             // Load Logo
             const asset = Asset.fromModule(require('../assets/images/logo.png'));
             await asset.downloadAsync();
-            const logoBase64 = await FileSystem.readAsStringAsync(asset.localUri || '', { encoding: FileSystem.EncodingType.Base64 });
+            const logoBase64 = await FileSystem.readAsStringAsync(asset.localUri || '', { encoding: 'base64' });
             const logoSrc = `data:image/png;base64,${logoBase64}`;
 
             const html = `
@@ -565,7 +566,7 @@ export default function KYCScreen() {
                                     
                                     <!-- QR Code Top -->
                                     <div class="qr-area">
-                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://abumafhal.com/verify/' + (userData?.id || 'demo'))}" class="qr-img" />
+                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://abumafhal.com.ng/verify/' + (userData?.id || 'demo'))}" class="qr-img" />
                                         <div class="qr-id">ID: ${userData?.id?.split('-')[0].toUpperCase()}</div>
                                     </div>
 

@@ -153,7 +153,7 @@ export const ClubKonnectProvider: AirtimeProvider & DataProvider & EducationProv
             ExamType: examType,
             PhoneNo: params.phone || '08000000000',
             RequestID: requestID,
-            CallBackURL: 'https://abumafhal.com/api/callback/clubkonnect'
+            CallBackURL: 'https://abumafhal.com.ng/api/callback/clubkonnect'
         });
 
         if (params.profileId && (examType.includes('jamb') || examType.includes('utme'))) {

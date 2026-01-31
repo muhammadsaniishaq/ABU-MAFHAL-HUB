@@ -20,7 +20,8 @@ Deno.serve(async (req) => {
             throw new Error("Missing Internal Configuration: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
         }
 
-        const { userId } = await req.json();
+        const { userId, bvn } = await req.json();
+        const safeBvn = bvn ? String(bvn).trim() : undefined;
 
         if (!userId) {
             throw new Error("Missing User ID");
@@ -57,6 +58,22 @@ Deno.serve(async (req) => {
         // 3. New Requirement: BVN Check for Flutterwave + Smart Retrieval
         let userBVN = profile.bvn;
 
+        // If BVN is provided explicitly in request (from frontend fallback), use it and save it
+        if (safeBvn && safeBvn.length >= 10) {
+            console.log("BVN provided in request. Updating profile...");
+            const { error: updateError } = await supabaseAdmin
+                .from('profiles')
+                .update({ bvn: safeBvn })
+                .eq('id', userId);
+            
+            if (updateError) {
+                 console.error("Failed to update profile with BVN (likely duplicate?):", updateError);
+                 // CRITICAL FIX: Even if update fails, we MUST use the provided BVN for this session
+                 // so we don't return "BVN Required" again.
+            }
+            userBVN = safeBvn;
+        }
+
         if (!userBVN) {
              console.log("BVN missing in profile, searching kyc_requests...");
              // Check if they have a 'bvn' record in kyc_requests (even if pending/approved)
@@ -64,7 +81,7 @@ Deno.serve(async (req) => {
              // Let's filter by document_type='bvn'
              const { data: kycs } = await supabaseAdmin
                 .from('kyc_requests')
-                .select('admin_note, status')
+                .select('admin_note, status, document_number, document_type')
                 .eq('user_id', userId)
                 .eq('document_type', 'bvn')
                 .order('created_at', { ascending: false })
@@ -72,17 +89,21 @@ Deno.serve(async (req) => {
 
              if (kycs && kycs.length > 0) {
                  const bestKyc = kycs[0];
-                 // Often the BVN is stored in 'admin_note' or we don't have it explicitly if we didn't save it in a column.
-                 // In our verify-identity logic, we logged: `Verified Identity via API. ID: ${idNumber}...` in admin_note.
-                 // We can try to extract it from admin_note using regex if we are desperate.
-                 // Regex: ID: (\d{11})
-                 const match = bestKyc.admin_note?.match(/ID:\s*(\d{11})/);
-                 if (match && match[1]) {
-                     userBVN = match[1];
-                     console.log("Details found in KYC logs. Auto-repairing profile...");
-                     
-                     // Auto-Repair Profile
+                 
+                 // 1. Check direct document_number (Best Source)
+                 if (bestKyc.document_number && bestKyc.document_number.length >= 10) {
+                     userBVN = bestKyc.document_number;
+                     console.log("BVN found in kyc_requests document_number. Auto-repairing profile...");
                      await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                 }
+                 // 2. Fallback: Parse admin_note
+                 else {
+                     const match = bestKyc.admin_note?.match(/ID:\s*(\d{11})/);
+                     if (match && match[1]) {
+                         userBVN = match[1];
+                         console.log("BVN found in KYC logs (admin_note). Auto-repairing profile...");
+                         await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                     }
                  }
              }
 

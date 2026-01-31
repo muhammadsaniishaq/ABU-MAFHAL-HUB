@@ -263,7 +263,7 @@ export const api = {
 
     // --- VIRTUAL ACCOUNTS ---
     virtualAccount: {
-        generate: async (userId: string, userName: string) => {
+        generate: async (userId: string, userName: string, bvn?: string) => {
             // 1. Check existing
             const { data: existing } = await supabase
                 .from('virtual_accounts')
@@ -275,7 +275,7 @@ export const api = {
 
             // 2. Call Edge Function to create real Paystack Account
             const { data: newAccount, error } = await supabase.functions.invoke('create-virtual-account', {
-                body: { userId }
+                body: { userId, bvn }
             });
 
             if (error) throw new Error(`Virtual Account Generation Failed: ${error.message}`);
