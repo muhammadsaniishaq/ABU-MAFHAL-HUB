@@ -346,7 +346,8 @@ export default function DataScreen() {
                         >
                             <Image 
                                 source={NETWORK_LOGOS[net.id]} 
-                                className="w-10 h-10 rounded-full" 
+                                style={{ width: 40, height: 40 }}
+                                className="rounded-full" 
                                 resizeMode="contain" 
                             />
                             <Text className={`text-xs font-bold mt-2 ${network === net.id ? 'text-blue-600' : 'text-gray-500'}`}>

@@ -262,7 +262,8 @@ export default function AirtimeScreen() {
                         >
                             <Image 
                                 source={NETWORK_LOGOS[net.id]} 
-                                className="w-10 h-10 mb-2 rounded-full" 
+                                style={{ width: 40, height: 40 }}
+                                className="mb-2 rounded-full" 
                                 resizeMode="contain" 
                             />
                             {network === net.id && (
