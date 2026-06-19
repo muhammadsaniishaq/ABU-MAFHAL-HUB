@@ -1,8 +1,11 @@
 {
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ]
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/((?!_expo/.*).*)",
+      "destination": "/index.html"
+    }
+  ]
 }
