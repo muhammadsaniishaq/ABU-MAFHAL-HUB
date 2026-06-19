@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global CSS Custom Properties (Design Tokens) ─────────────────────────── */
+:root {
+  /* Brand */
+  --color-primary:    #0056D2;
+  --color-success:    #107C10;
+  --color-warning:    #F37021;
+  --color-danger:     #DC2626;
+  --color-slate:      #2C3E50;
+  --color-gold:       #C5A059;
+  --color-aijalon:    #8B5E3C;
+
+  /* Backgrounds */
+  --color-background: #F2F2F2;
+  --color-card:       #FFFFFF;
+  --color-input:      #F8FAFC;
+
+  /* Text */
+  --color-text-primary:   #1E293B;
+  --color-text-secondary: #64748B;
+  --color-text-muted:     #94A3B8;
+
+  /* Spacing */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-2xl:  24px;
+  --radius-3xl:  32px;
+  --radius-full: 9999px;
+}
+
+/* ── Base Layer ───────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ── Component Layer ─────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Card Styles ── */
+  .card {
+    @apply bg-white rounded-3xl shadow-sm border border-slate-100;
+  }
+  .card-elevated {
+    @apply bg-white rounded-3xl border border-white/50;
+  }
+
+  /* ── Button Styles ── */
+  .btn {
+    @apply h-14 rounded-2xl items-center justify-center flex-row;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600;
+  }
+  .btn-success {
+    @apply btn bg-success-600;
+  }
+  .btn-outline {
+    @apply btn border border-slate-200 bg-white;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent;
+  }
+  .btn-text-primary {
+    @apply text-white font-bold text-base;
+  }
+  .btn-text-outline {
+    @apply text-slate font-bold text-base;
+  }
+
+  /* ── Input Styles ── */
+  .input {
+    @apply bg-white h-14 rounded-2xl px-5 border border-slate-200 text-slate font-medium text-base;
+  }
+  .input-focused {
+    @apply input border-primary-600;
+  }
+
+  /* ── Badge / Tag ── */
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-bold;
+  }
+  .badge-success {
+    @apply badge bg-success-100 text-success-700;
+  }
+  .badge-warning {
+    @apply badge bg-warning-50 text-warning-700;
+  }
+  .badge-danger {
+    @apply badge bg-danger-50 text-danger-600;
+  }
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700;
+  }
+  .badge-muted {
+    @apply badge bg-slate-100 text-slate-500;
+  }
+
+  /* ── Label ── */
+  .label {
+    @apply text-slate-400 text-xs font-bold uppercase tracking-widest mb-2;
+  }
+
+  /* ── Section Header ── */
+  .section-title {
+    @apply text-slate-900 font-bold text-xl mb-1;
+  }
+  .section-subtitle {
+    @apply text-slate-400 text-sm;
+  }
+
+  /* ── List Item Row ── */
+  .list-item {
+    @apply flex-row items-center justify-between py-4 border-b border-slate-50;
+  }
+  .list-item-last {
+    @apply flex-row items-center justify-between py-4;
+  }
+
+  /* ── Screen Container ── */
+  .screen {
+    @apply flex-1 bg-background;
+  }
+  .screen-dark {
+    @apply flex-1 bg-slate-950;
+  }
+
+  /* ── Avatar ── */
+  .avatar-sm  { @apply w-8  h-8  rounded-full bg-slate-100 items-center justify-center; }
+  .avatar-md  { @apply w-10 h-10 rounded-full bg-slate-100 items-center justify-center; }
+  .avatar-lg  { @apply w-14 h-14 rounded-full bg-slate-100 items-center justify-center; }
+  .avatar-xl  { @apply w-20 h-20 rounded-full bg-slate-100 items-center justify-center; }
+
+  /* ── Icon Container ── */
+  .icon-box-sm { @apply w-10 h-10 rounded-2xl items-center justify-center; }
+  .icon-box-md { @apply w-12 h-12 rounded-2xl items-center justify-center; }
+  .icon-box-lg { @apply w-14 h-14 rounded-2xl items-center justify-center; }
+
+  /* ── Divider ── */
+  .divider {
+    @apply h-px bg-slate-100 my-4;
+  }
+
+  /* ── Pill / Chip ── */
+  .chip {
+    @apply flex-row items-center px-3 py-1.5 rounded-full border border-slate-200 bg-white;
+  }
+  .chip-active {
+    @apply flex-row items-center px-3 py-1.5 rounded-full bg-slate-900;
+  }
+
+  /* ── Info Banner ── */
+  .info-banner {
+    @apply bg-amber-50 border border-amber-100 rounded-2xl p-4 flex-row items-start;
+  }
+  .info-banner-blue {
+    @apply bg-blue-50 border border-blue-100 rounded-2xl p-4 flex-row items-start;
+  }
+  .info-banner-success {
+    @apply bg-success-50 border border-success-100 rounded-2xl p-4 flex-row items-start;
+  }
+  .info-banner-danger {
+    @apply bg-danger-50 border border-danger-50 rounded-2xl p-4 flex-row items-start;
+  }
+
+  /* ── Powered Badge ── */
+  .powered-badge {
+    @apply flex-row items-center bg-white px-3 py-1.5 rounded-full border border-slate-100;
+  }
+
+  /* ── Tab Bar ── */
+  .tab-bar {
+    @apply flex-row bg-white rounded-2xl p-1.5 border border-slate-100 shadow-sm;
+  }
+  .tab-item {
+    @apply flex-1 flex-row items-center justify-center h-11 rounded-xl gap-1.5;
+  }
+  .tab-item-active {
+    @apply tab-item bg-slate-900;
+  }
+
+  /* ── Transaction Status Dots ── */
+  .status-dot-success { @apply w-2 h-2 rounded-full bg-success-600; }
+  .status-dot-pending { @apply w-2 h-2 rounded-full bg-warning-600; }
+  .status-dot-failed  { @apply w-2 h-2 rounded-full bg-danger-600; }
+  .status-dot-active  { @apply w-2 h-2 rounded-full bg-green-400; }
+}
+
+/* ── Utility Layer ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Text helpers */
+  .text-display   { font-size: 36px; font-weight: 900; letter-spacing: -0.5px; }
+  .text-heading   { font-size: 24px; font-weight: 800; }
+  .text-subheading { font-size: 18px; font-weight: 700; }
+  .text-label-xs  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+
+  /* Truncate helpers */
+  .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+  /* Blur glass effect */
+  .glass {
+    background-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  .glass-dark {
+    background-color: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
