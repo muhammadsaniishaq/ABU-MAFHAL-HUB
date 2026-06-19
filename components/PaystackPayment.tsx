@@ -25,7 +25,7 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
       <html lang="en">
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <style>
             body { background-color: #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
             #status { margin-bottom: 20px; font-size: 16px; color: #333; text-align: center; padding: 20px; }
@@ -109,6 +109,7 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
                     ref={webViewRef}
                     originWhitelist={['*']}
                     source={{ html: paystackHtml, baseUrl: 'https://standard.paystack.co' }}
+                    scalesPageToFit={false}
                     onMessage={handleMessage}
                     startInLoadingState={true}
                     javaScriptEnabled={true}
