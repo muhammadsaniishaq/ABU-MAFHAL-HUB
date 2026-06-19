@@ -3,12 +3,27 @@ import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase, forceSignOut } from '../../services/supabase';
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 
 export default function ProfileScreen() {
-    const [profile, setProfile] = useState<{ full_name: string; email: string; username?: string; custom_id?: string; avatar_url?: string; kyc_tier?: number } | null>(null);
+    const [profile, setProfile] = useState<{ 
+        full_name: string; 
+        email: string; 
+        phone?: string; 
+        username?: string; 
+        custom_id?: string; 
+        avatar_url?: string; 
+        kyc_tier?: number; 
+        balance?: number; 
+        created_at?: string;
+    } | null>(null);
     const [kycStatus, setKycStatus] = useState<'pending' | 'approved' | 'none'>('none');
+    const [txCount, setTxCount] = useState<number>(0);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
     const router = useRouter();
 
     useFocusEffect(
@@ -22,17 +37,22 @@ export default function ProfileScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 // Fetch Profile
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', user.id)
                     .single();
-                if (data) setProfile(data);
+                if (error) throw error;
+                if (data) {
+                    setProfile(data);
+                    // Fetch Transaction count for current month
+                    await fetchTransactionCount(user.id);
+                }
 
                 // Check for Pending KYC
                 const { data: requests } = await supabase
                     .from('kyc_requests')
-                    .select('id')
+                    .select('id, status')
                     .eq('user_id', user.id)
                     .eq('status', 'pending')
                     .limit(1);
@@ -40,11 +60,94 @@ export default function ProfileScreen() {
                 if (requests && requests.length > 0) {
                     setKycStatus('pending');
                 } else {
-                    setKycStatus('approved'); // Default to approved (meaning no pending request)
+                    setKycStatus('approved');
                 }
             }
         } catch (e) {
             console.log("Error fetching profile", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchTransactionCount = async (userId: string) => {
+        try {
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const { count, error } = await supabase
+                .from('transactions')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('status', 'success')
+                .gte('created_at', startOfMonth);
+            if (error) throw error;
+            setTxCount(count || 0);
+        } catch (e) {
+            console.log("Error fetching transaction count:", e);
+        }
+    };
+
+    const pickImage = async () => {
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (permissionResult.granted === false) {
+                Alert.alert("Permission Denied", "You need to allow access to your photos to upload an avatar.");
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets[0].base64) {
+                await uploadImage(result.assets[0]);
+            }
+        } catch (error: any) {
+            Alert.alert("Error", "Could not pick image: " + error.message);
+        }
+    };
+
+    const uploadImage = async (image: ImagePicker.ImagePickerAsset) => {
+        try {
+            setUploading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            if (!image.base64) throw new Error('No image data');
+
+            const fileName = `${user.id}/${Date.now()}.jpg`;
+            const { data, error } = await supabase
+                .storage
+                .from('avatars')
+                .upload(fileName, decode(image.base64), {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase
+                .storage
+                .from('avatars')
+                .getPublicUrl(fileName);
+
+            // Update profile with new avatar URL
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+            
+            setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+            Alert.alert("Success", "Profile photo updated successfully!");
+        } catch (error: any) {
+            Alert.alert("Upload Failed", error.message);
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -68,111 +171,455 @@ export default function ProfileScreen() {
 
     const performLogout = async () => {
         await forceSignOut();
-        
-        // Explicitly navigate for Web/Native to ensure we don't get stuck on a protected screen
-        // while the auth state propagates
         if (Platform.OS === 'web') {
-            window.location.href = '/'; // Hard reload is safest for clearing state on Web
+            window.location.href = '/';
         } else {
             router.replace('/');
         }
     };
 
-    const menuItems = [
-        { icon: 'person-outline', label: 'Edit Profile', route: '/edit-profile' },
-        { icon: 'sparkles-outline', label: 'Cotex AI Assistant', route: '/ai-chat' },
-        { icon: 'lock-closed-outline', label: 'Security', route: '/security' },
-        { icon: 'card-outline', label: 'Saved Cards', route: '/saved-cards' },
-        { icon: 'people-outline', label: 'Beneficiaries', route: '/beneficiaries' },
-        { icon: 'gift-outline', label: 'Refer & Earn', route: '/referrals' },
-        { icon: 'notifications-outline', label: 'Notifications', route: '/notifications' },
-        { icon: 'headset-outline', label: 'Support & Help', route: '/support' },
-        { icon: 'shield-checkmark-outline', label: 'KYC Verification', route: '/kyc', isKyc: true },
-        { icon: 'document-lock-outline', label: 'Privacy Policy', route: '/privacy' },
-        { icon: 'document-text-outline', label: 'Terms & Conditions', route: '/terms' },
-    ];
+    const formatCurrency = (val?: number | string) => {
+        if (val === undefined || val === null) return ['0', '00'];
+        const num = typeof val === 'string' ? parseFloat(val) : val;
+        if (isNaN(num)) return ['0', '00'];
+        const formatted = num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return formatted.split('.');
+    };
+
+    const getMemberSince = (createdAtString?: string) => {
+        if (!createdAtString) return 'May 2024';
+        const date = new Date(createdAtString);
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    };
+
+    const getTierLabel = (tier?: number) => {
+        switch (tier) {
+            case 1:
+                return 'Standard';
+            case 2:
+                return 'Silver';
+            case 3:
+                return 'Gold';
+            case 4:
+                return 'Premium';
+            default:
+                return 'Standard';
+        }
+    };
+
+    const handleLanguageSelect = () => {
+        Alert.alert(
+            "Select Language",
+            "Choose your preferred language",
+            [
+                { text: "English", onPress: () => console.log("Language set to English") },
+                { text: "Hausa", onPress: () => console.log("Language set to Hausa") },
+                { text: "Cancel", style: "cancel" }
+            ]
+        );
+    };
+
+    const handleThemeSelect = () => {
+        Alert.alert(
+            "Select Theme",
+            "Choose app appearance",
+            [
+                { text: "System Default", onPress: () => console.log("Theme set to System") },
+                { text: "Light Mode", onPress: () => console.log("Theme set to Light") },
+                { text: "Dark Mode", onPress: () => console.log("Theme set to Dark") },
+                { text: "Cancel", style: "cancel" }
+            ]
+        );
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 items-center justify-center bg-slate-950">
+                <ActivityIndicator size="large" color="#f5a623" />
+            </View>
+        );
+    }
+
+    const [balanceWhole, balanceDecimal] = formatCurrency(profile?.balance);
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View className="flex-1 bg-[#f8f9fc]">
             <Stack.Screen options={{ headerShown: false }} />
+            <StatusBar style="light" />
 
-            <LinearGradient
-                colors={['#4f46e5', '#3730a3']}
-                className="pt-16 pb-10 px-6 items-center rounded-b-[40px] shadow-lg z-10"
-            >
-                 <View className="w-24 h-24 bg-white/20 rounded-full items-center justify-center mb-4 border-2 border-white/30 backdrop-blur-md overflow-hidden relative">
-                    {profile?.avatar_url ? (
-                        <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
-                    ) : (
-                         <Text className="text-4xl font-bold text-white">{profile?.full_name?.charAt(0) || 'U'}</Text>
-                    )}
-                    {/* Tier Badge inside Avatar */}
-                    <View className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full items-center justify-center border border-white">
-                        <Text className="text-white text-[10px] font-bold">{profile?.kyc_tier || 1}</Text>
+            <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 160 }}>
+                
+                {/* 1. CURVED HEADER GRADIENT */}
+                <LinearGradient
+                    colors={['#051124', '#0d2345']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    className="pt-16 pb-24 px-6 rounded-b-[40px] shadow-xl relative"
+                >
+                    {/* Top Row: Logo & Action Icons */}
+                    <View className="flex-row items-center justify-between mb-8">
+                        <View className="flex-row items-center gap-2">
+                            <Image 
+                                source={require('../../assets/images/logo-icon.png')} 
+                                className="w-8 h-8"
+                                resizeMode="contain"
+                            />
+                            <View className="flex-col leading-none">
+                                <Text className="text-white font-black text-sm tracking-wider leading-4">MAFHAL</Text>
+                                <Text className="text-[#f5a623] font-bold text-[10px] tracking-widest leading-3">HUB</Text>
+                            </View>
+                        </View>
+
+                        <View className="flex-row items-center gap-4">
+                            {/* Notification Bell */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/notifications')} 
+                                className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/10 relative"
+                            >
+                                <Ionicons name="notifications" size={20} color="white" />
+                                <View className="absolute -top-1 -right-1 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#051124]">
+                                    <Text className="text-white text-[9px] font-black">3</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Settings Cog */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/edit-profile')} 
+                                className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/10"
+                            >
+                                <Ionicons name="settings" size={20} color="white" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Profile Information Row */}
+                    <View className="flex-row items-center">
+                        {/* Avatar Picker Container */}
+                        <View className="relative">
+                            <View className="w-20 h-20 bg-white/10 rounded-full items-center justify-center border-2 border-white/20 overflow-hidden">
+                                {profile?.avatar_url ? (
+                                    <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
+                                ) : (
+                                    <LinearGradient
+                                        colors={['#4f46e5', '#818cf8']}
+                                        className="w-full h-full items-center justify-center"
+                                    >
+                                        <Text className="text-3xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
+                                    </LinearGradient>
+                                )}
+                            </View>
+                            {/* Tappable Camera Icon Overlay */}
+                            <TouchableOpacity 
+                                onPress={pickImage} 
+                                disabled={uploading}
+                                className="absolute bottom-0 right-0 bg-white w-7 h-7 rounded-full items-center justify-center border border-slate-200 shadow-md"
+                            >
+                                {uploading ? (
+                                    <ActivityIndicator size="small" color="#051124" />
+                                ) : (
+                                    <Ionicons name="camera" size={14} color="#0d2345" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Name & Subtitle Details */}
+                        <View className="ml-4 flex-1">
+                            <Text className="text-white text-xl font-extrabold tracking-tight leading-7" numberOfLines={1}>
+                                {profile?.full_name || 'User'}
+                            </Text>
+                            <Text className="text-slate-300 text-sm font-semibold mb-2">
+                                {profile?.phone || profile?.email || 'No Contact'}
+                            </Text>
+                            
+                            {/* Verification Pill */}
+                            <View className="flex-row">
+                                {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
+                                    <View className="bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                                        <Text className="text-emerald-400 text-[10px] font-black uppercase tracking-wider">Verified Account</Text>
+                                    </View>
+                                ) : kycStatus === 'pending' ? (
+                                    <View className="bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="time" size={12} color="#f59e0b" />
+                                        <Text className="text-amber-400 text-[10px] font-black uppercase tracking-wider">Pending Review</Text>
+                                    </View>
+                                ) : (
+                                    <View className="bg-slate-500/10 px-3 py-1 rounded-full border border-slate-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="alert-circle" size={12} color="#94a3b8" />
+                                        <Text className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Unverified</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                </LinearGradient>
+
+                {/* 2. FLOATING STATS CARD */}
+                <View className="bg-white mx-6 rounded-[28px] p-5 -mt-14 shadow-xl shadow-slate-100 border border-slate-100/80 flex-row justify-between items-center z-20">
+                    {/* Wallet Balance */}
+                    <View className="flex-1 items-center">
+                        <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mb-2">
+                            <Ionicons name="wallet" size={18} color="#2563eb" />
+                        </View>
+                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Wallet Balance</Text>
+                        <Text className="text-[13px] text-slate-800 font-black text-center">
+                            ₦{balanceWhole}
+                            <Text className="text-[9px] text-slate-400 font-bold">.{balanceDecimal}</Text>
+                        </Text>
+                    </View>
+
+                    <View className="w-[1px] h-10 bg-slate-100" />
+
+                    {/* Total Transactions */}
+                    <View className="flex-1 items-center">
+                        <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mb-2">
+                            <Ionicons name="stats-chart" size={16} color="#10b981" />
+                        </View>
+                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Total Transactions</Text>
+                        <Text className="text-[13px] text-slate-800 font-black text-center">{txCount}</Text>
+                        <Text className="text-[8px] text-slate-400 font-bold mt-0.5">This Month</Text>
+                    </View>
+
+                    <View className="w-[1px] h-10 bg-slate-100" />
+
+                    {/* Member Since */}
+                    <View className="flex-1 items-center">
+                        <View className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center mb-2">
+                            <Ionicons name="calendar" size={16} color="#8b5cf6" />
+                        </View>
+                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Member Since</Text>
+                        <Text className="text-[13px] text-slate-800 font-black text-center">{getMemberSince(profile?.created_at)}</Text>
+                    </View>
+
+                    <View className="w-[1px] h-10 bg-slate-100" />
+
+                    {/* Account Tier */}
+                    <View className="flex-1 items-center">
+                        <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center mb-2">
+                            <Ionicons name="medal" size={16} color="#f59e0b" />
+                        </View>
+                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Account Tier</Text>
+                        <Text className="text-[13px] text-amber-600 font-black text-center">{getTierLabel(profile?.kyc_tier)}</Text>
                     </View>
                 </View>
-                <Text className="text-white text-2xl font-bold mb-1">{profile?.full_name || 'User'}</Text>
-                 <Text className="text-indigo-200 font-medium text-sm mb-1">@{profile?.username || 'username'}</Text>
-                 
-                 <View className="flex-row gap-2 mt-2">
-                    <View className="bg-white/10 px-3 py-1 rounded-full border border-white/20">
-                        <Text className="text-white text-xs font-bold tracking-widest">ID: {profile?.custom_id || 'Generating...'}</Text>
-                    </View>
-                    {kycStatus === 'pending' && (
-                        <View className="bg-orange-500/20 px-3 py-1 rounded-full border border-orange-400">
-                            <Text className="text-orange-300 text-xs font-bold tracking-widest">PENDING REVIEW</Text>
-                        </View>
-                    )}
-                 </View>
-            </LinearGradient>
 
-            <ScrollView className="flex-1 px-6 -mt-6" contentContainerStyle={{ paddingBottom: 100 }}>
-                <View className="bg-white rounded-3xl p-2 shadow-sm border border-slate-100 mb-8 overflow-hidden z-20">
-                    {menuItems.map((item: any, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            className={`flex-row items-center py-4 px-4 ${index !== menuItems.length - 1 ? 'border-b border-slate-50' : ''}`}
-                            onPress={() => item.route && router.push(item.route as any)}
-                        >
-                            <View className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${index === 0 ? 'bg-indigo-100' : 'bg-slate-50'}`}>
-                                <Ionicons name={item.icon as any} size={20} color={index === 0 ? '#4f46e5' : '#64748b'} />
-                            </View>
-                            <Text className={`flex-1 font-semibold text-[15px] ${index === 0 ? 'text-indigo-600' : 'text-slate-700'}`}>{item.label}</Text>
-                            
-                            {/* Alert/Status Logic */}
-                            {item.isKyc && (
-                                <View className="mr-2">
-                                    {kycStatus === 'pending' ? (
-                                        <View className="bg-orange-100 px-2 py-1 rounded-md">
-                                            <Text className="text-orange-600 text-[10px] font-bold uppercase">Pending</Text>
+                {/* 3. GROUPED LIST GROUPS */}
+                <View className="mt-8 px-6 gap-y-6">
+                    
+                    {/* ACCOUNT SECTION */}
+                    <View>
+                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Account</Text>
+                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                            {/* Personal Info */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/edit-profile')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
+                                    <Ionicons name="person" size={18} color="#2563eb" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Personal Information</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">View and update your personal details</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Bank Accounts */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/beneficiaries')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mr-4">
+                                    <Ionicons name="business" size={18} color="#10b981" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Bank Accounts</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Manage your linked bank accounts</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Security */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/security')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
+                                    <Ionicons name="shield-checkmark" size={18} color="#6366f1" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Security</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Password, PIN and security settings</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Verification */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/kyc')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mr-4">
+                                    <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Verification</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">KYC verification and account status</Text>
+                                </View>
+                                <View className="flex-row items-center mr-2">
+                                    {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
+                                        <View className="bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+                                            <Text className="text-emerald-600 text-[9px] font-black uppercase">Verified</Text>
+                                        </View>
+                                    ) : kycStatus === 'pending' ? (
+                                        <View className="bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100">
+                                            <Text className="text-amber-600 text-[9px] font-black uppercase">Pending</Text>
                                         </View>
                                     ) : (
-                                        <View className="bg-green-100 px-2 py-1 rounded-md">
-                                            <Text className="text-green-600 text-[10px] font-bold uppercase">Tier {profile?.kyc_tier || 1}</Text>
+                                        <View className="bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
+                                            <Text className="text-slate-500 text-[9px] font-black uppercase">Unverified</Text>
                                         </View>
                                     )}
                                 </View>
-                            )}
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
-                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                        </TouchableOpacity>
-                    ))}
+                    {/* PREFERENCES SECTION */}
+                    <View>
+                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Preferences</Text>
+                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                            {/* Notification Settings */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/notifications')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center mr-4">
+                                    <Ionicons name="notifications" size={18} color="#8b5cf6" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Notification Settings</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Manage your notification preferences</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Language */}
+                            <TouchableOpacity 
+                                onPress={handleLanguageSelect} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
+                                    <Ionicons name="globe" size={18} color="#3b82f6" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Language</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Choose your preferred language</Text>
+                                </View>
+                                <Text className="text-slate-400 text-xs font-bold mr-1">English</Text>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Theme */}
+                            <TouchableOpacity 
+                                onPress={handleThemeSelect} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
+                                    <Ionicons name="moon" size={18} color="#4f46e5" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Theme</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Choose app appearance</Text>
+                                </View>
+                                <Text className="text-slate-400 text-xs font-bold mr-1">System</Text>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* SUPPORT & ABOUT SECTION */}
+                    <View>
+                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Support & About</Text>
+                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                            {/* Help Center */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/support')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
+                                    <Ionicons name="headset" size={18} color="#2563eb" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Help Center</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Get help and support</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* About Mafhal Hub */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/onboarding')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
+                                    <Ionicons name="information-circle" size={18} color="#6366f1" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">About Mafhal Hub</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Learn more about us</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Terms & Conditions */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/terms')} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
+                                    <Ionicons name="document-text" size={18} color="#3b82f6" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-slate-800">Terms & Conditions</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Read our terms and conditions</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Log Out */}
+                            <TouchableOpacity 
+                                onPress={handleLogout} 
+                                activeOpacity={0.6}
+                                className="flex-row items-center py-4 px-4"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-red-50 items-center justify-center mr-4">
+                                    <Ionicons name="log-out" size={18} color="#ef4444" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="font-extrabold text-sm text-red-500">Log Out</Text>
+                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Sign out from your account</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
                 </View>
 
-                <TouchableOpacity
-                    className="flex-row items-center justify-center bg-red-50 p-4 rounded-2xl mb-12 border border-red-100 active:bg-red-100 z-50 shadow-sm"
-                    onPress={handleLogout}
-                     style={Platform.OS === 'web' ? { cursor: 'pointer' } as any : {}}
-                >
-                    <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-                    <Text className="text-red-500 font-bold ml-2 text-base">Logout</Text>
-                </TouchableOpacity>
-
-                <View className="items-center mb-8">
-                    <Text className="text-slate-400 text-xs font-medium">Version 1.0.1 • Abu Mafhal Hub</Text>
-                </View>
             </ScrollView>
-            <StatusBar style="light" />
         </View>
     );
 }
