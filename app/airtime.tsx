@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Modal, FlatList, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Modal, FlatList, Switch, StyleSheet, LayoutAnimation } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,10 +18,10 @@ const NETWORK_LOGOS: Record<string, any> = {
 };
 
 const NETWORKS_DATA = [
-    { id: 'mtn', name: 'MTN', color: '#FFCC00', prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'glo', name: 'Glo', color: '#0F6A37', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
-    { id: 'airtel', name: 'Airtel', color: '#FF0000', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
-    { id: '9mobile', name: '9mobile', color: '#006B3E', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
+    { id: 'mtn', name: 'MTN', color: '#FFCC00', cashback: '2% Off', discountRate: 0.02, prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
+    { id: 'glo', name: 'Glo', color: '#0F6A37', cashback: '3% Off', discountRate: 0.03, prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
+    { id: 'airtel', name: 'Airtel', color: '#FF0000', cashback: '2% Off', discountRate: 0.02, prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
+    { id: '9mobile', name: '9mobile', color: '#006B3E', cashback: '3% Off', discountRate: 0.03, prefixes: ['0809', '0818', '0817', '0909', '0908'] },
 ];
 
 export default function AirtimeScreen() {
@@ -40,6 +40,13 @@ export default function AirtimeScreen() {
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [savingBen, setSavingBen] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
+
+    // Advanced Fintech features states
+    const [topupMode, setTopupMode] = useState<'direct' | 'pin'>('direct');
+    const [scheduleEnabled, setScheduleEnabled] = useState(false);
+    const [scheduleFrequency, setScheduleFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+    const [showUssdGuide, setShowUssdGuide] = useState(false);
+    const [beneficiarySearch, setBeneficiarySearch] = useState('');
     
     const router = useRouter();
 
@@ -259,32 +266,65 @@ export default function AirtimeScreen() {
 
                 {/* Network Section */}
                 <Text className="text-gray-800 font-bold text-lg mb-4">Select Network</Text>
-                <View className="flex-row justify-between mb-8">
+                <View style={s.networksContainer}>
                     {NETWORKS_DATA.map((net) => (
                         <TouchableOpacity
                             key={net.id}
-                            className={`w-[22%] aspect-square rounded-2xl items-center justify-center border-2 bg-white shadow-sm ${
-                                network === net.id ? 'border-blue-600 bg-blue-50' : 'border-transparent'
-                            }`}
-                            onPress={() => setNetwork(net.id)}
+                            style={[
+                                s.networkCard,
+                                network === net.id && s.networkCardSelected,
+                                network === net.id && { borderColor: net.color }
+                            ]}
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setNetwork(net.id);
+                            }}
                             activeOpacity={0.7}
                         >
                             <Image 
                                 source={NETWORK_LOGOS[net.id]} 
-                                style={{ width: 40, height: 40 }}
-                                className="mb-2 rounded-full" 
+                                style={s.networkLogo} 
                                 resizeMode="contain" 
                             />
                             {network === net.id && (
-                                <View className="absolute top-1 right-1 bg-blue-600 rounded-full p-0.5">
-                                    <Ionicons name="checkmark" size={10} color="white" />
+                                <View style={[s.checkmarkBubble, { backgroundColor: net.color }]}>
+                                    <Ionicons name="checkmark" size={9} color="white" />
                                 </View>
                             )}
-                            <Text className={`font-medium text-xs ${network === net.id ? 'text-blue-700' : 'text-gray-500'}`}>
+                            <Text style={[s.networkName, network === net.id && s.networkNameSelected, network === net.id && { color: net.color }]}>
                                 {net.name}
                             </Text>
+                            <View style={[s.cashbackBadge, { backgroundColor: net.color + '15' }]}>
+                                <Text style={[s.cashbackText, { color: net.color }]}>{net.cashback}</Text>
+                            </View>
                         </TouchableOpacity>
                     ))}
+                </View>
+
+                {/* Top-up Mode (Direct vs PIN) */}
+                <View style={s.modeSelectorContainer}>
+                    <TouchableOpacity 
+                        style={[s.modeButton, topupMode === 'direct' && s.modeButtonActive]}
+                        onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setTopupMode('direct');
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="flash-outline" size={14} color={topupMode === 'direct' ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                        <Text style={[s.modeButtonText, topupMode === 'direct' && s.modeButtonTextActive]}>Direct Recharge</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[s.modeButton, topupMode === 'pin' && s.modeButtonActive]}
+                        onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setTopupMode('pin');
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="card-outline" size={14} color={topupMode === 'pin' ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                        <Text style={[s.modeButtonText, topupMode === 'pin' && s.modeButtonTextActive]}>Buy PIN / Voucher</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Phone Input */}
@@ -376,6 +416,137 @@ export default function AirtimeScreen() {
                     ))}
                 </View>
 
+                {/* Real-time Savings Estimator Card */}
+                {network && amount && Number(amount) > 0 && (
+                    <View style={s.estimatorContainer}>
+                        <View style={s.estimatorHeader}>
+                            <Ionicons name="sparkles" size={15} color="#d97706" style={{ marginRight: 6 }} />
+                            <Text style={s.estimatorTitle}>Real-Time Savings Estimator</Text>
+                        </View>
+                        <View style={s.estimatorDivider} />
+                        <View style={s.estimatorRow}>
+                            <Text style={s.estimatorLabel}>Original Price:</Text>
+                            <Text style={s.estimatorValue}>₦{Number(amount).toLocaleString()}</Text>
+                        </View>
+                        <View style={s.estimatorRow}>
+                            <Text style={s.estimatorLabel}>Cashback Discount ({NETWORKS_DATA.find(n => n.id === network)?.cashback}):</Text>
+                            <Text style={[s.estimatorValue, { color: '#16a34a' }]}>-₦{(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}</Text>
+                        </View>
+                        <View style={s.estimatorRow}>
+                            <Text style={s.estimatorLabelTotal}>You Pay:</Text>
+                            <Text style={s.estimatorValueTotal}>₦{(Number(amount) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}</Text>
+                        </View>
+                        <View style={[s.estimatorBadge, { backgroundColor: '#fef3c7' }]}>
+                            <Text style={s.estimatorBadgeText}>🎉 Saved ₦{(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()} with {NETWORKS_DATA.find(n => n.id === network)?.name} Smart Top-up!</Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Auto-Refill Schedule Planner */}
+                <View style={s.scheduleContainer}>
+                    <TouchableOpacity 
+                        onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setScheduleEnabled(!scheduleEnabled);
+                        }}
+                        style={s.scheduleHeader}
+                        activeOpacity={0.8}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="time-outline" size={18} color="#2563eb" style={{ marginRight: 8 }} />
+                            <View>
+                                <Text style={s.scheduleHeaderTitle}>Auto-Refill Schedule Planner 🕒</Text>
+                                <Text style={s.scheduleHeaderSub}>{scheduleEnabled ? 'Enabled - Recurrence active' : 'Disabled - Top-up once'}</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            trackColor={{ false: "#E2E8F0", true: "#bfdbfe" }}
+                            thumbColor={scheduleEnabled ? "#2563eb" : "#f4f3f4"}
+                            onValueChange={(val) => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setScheduleEnabled(val);
+                            }}
+                            value={scheduleEnabled}
+                        />
+                    </TouchableOpacity>
+
+                    {scheduleEnabled && (
+                        <View style={s.scheduleContent}>
+                            <Text style={s.scheduleLabel}>Select Recurrence Frequency:</Text>
+                            <View style={s.freqButtons}>
+                                {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
+                                    <TouchableOpacity
+                                        key={freq}
+                                        onPress={() => setScheduleFrequency(freq)}
+                                        style={[s.freqButton, scheduleFrequency === freq && s.freqButtonActive]}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[s.freqButtonText, scheduleFrequency === freq && s.freqButtonTextActive]}>
+                                            {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            <Text style={s.scheduleHint}>
+                                {scheduleFrequency === 'daily' && '🚀 We will recharge this line every day at 8:00 AM.'}
+                                {scheduleFrequency === 'weekly' && '📅 We will recharge this line every Monday morning at 8:00 AM.'}
+                                {scheduleFrequency === 'monthly' && '📆 We will recharge this line on the 1st of every month at 8:00 AM.'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* USSD shortcut codes collapsible guide */}
+                <View style={s.ussdContainer}>
+                    <TouchableOpacity 
+                        onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setShowUssdGuide(!showUssdGuide);
+                        }}
+                        style={s.ussdHeader}
+                        activeOpacity={0.8}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="information-circle-outline" size={18} color="#0d9488" style={{ marginRight: 8 }} />
+                            <Text style={s.ussdHeaderTitle}>Airtime USSD & Quick Guide 📲</Text>
+                        </View>
+                        <Ionicons 
+                            name={showUssdGuide ? "chevron-up" : "chevron-down"} 
+                            size={16} 
+                            color="#64748b" 
+                        />
+                    </TouchableOpacity>
+
+                    {showUssdGuide && (
+                        <View style={s.ussdContent}>
+                            <Text style={s.ussdText}>
+                                Quickly check your balance and perform other operations using these official network codes:
+                            </Text>
+                            <View style={s.ussdGrid}>
+                                <View style={s.ussdRow}>
+                                    <Text style={s.ussdNetwork}>MTN</Text>
+                                    <Text style={s.ussdCode}>*310# (Check Balance)</Text>
+                                </View>
+                                <View style={s.ussdRow}>
+                                    <Text style={s.ussdNetwork}>Airtel</Text>
+                                    <Text style={s.ussdCode}>*310# (Check Balance)</Text>
+                                </View>
+                                <View style={s.ussdRow}>
+                                    <Text style={s.ussdNetwork}>Glo</Text>
+                                    <Text style={s.ussdCode}>*310# (Check Balance)</Text>
+                                </View>
+                                <View style={s.ussdRow}>
+                                    <Text style={s.ussdNetwork}>9mobile</Text>
+                                    <Text style={s.ussdCode}>*232# (Check Balance)</Text>
+                                </View>
+                            </View>
+                            <Text style={[s.ussdText, { fontStyle: 'italic', marginTop: 8, color: '#0d9488' }]}>
+                                Dial the code directly on your mobile dialer to query.
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
                 {/* Purchase Button - Modern Gradient */}
                 <TouchableOpacity
                     onPress={handlePurchase}
@@ -429,11 +600,12 @@ export default function AirtimeScreen() {
                 network={network}
                 details={[
                     { label: 'Transaction Type', value: 'Airtime Top-up' },
+                    { label: 'Recharge Type', value: topupMode === 'direct' ? 'Direct Recharge (Pinless)' : 'PIN Voucher (Recharge Code)' },
                     { label: 'Network', value: NETWORKS_DATA.find(n => n.id === network)?.name || network },
                     { label: 'Phone Number', value: phoneNumber },
                     { label: 'Original Amount', value: `₦${Number(amount).toLocaleString()}`, isAmount: true },
-                    { label: 'Discount (2%)', value: `-₦${(Number(amount) * 0.02).toLocaleString()}`, isDiscount: true },
-                    { label: 'Total To Pay', value: `₦${(Number(amount) * 0.98).toLocaleString()}`, isTotal: true },
+                    { label: `Discount (${((NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02) * 100).toFixed(0)}%)`, value: `-₦${(Number(amount) * (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02)).toLocaleString()}`, isDiscount: true },
+                    { label: 'Total To Pay', value: `₦${(Number(amount) * (1 - (NETWORKS_DATA.find(n => n.id === network)?.discountRate || 0.02))).toLocaleString()}`, isTotal: true },
                 ]}
             />
             
@@ -451,12 +623,20 @@ export default function AirtimeScreen() {
     );
 
     function BeneficiaryModal() {
+        const filteredBens = beneficiaries.filter(b => 
+            (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) ||
+            (b.account_number || '').includes(beneficiarySearch)
+        );
+
         return (
             <Modal
                 animationType="slide"
                 transparent={true}
                 visible={showBeneficiaryModal}
-                onRequestClose={() => setShowBeneficiaryModal(false)}
+                onRequestClose={() => {
+                    setBeneficiarySearch('');
+                    setShowBeneficiaryModal(false);
+                }}
             >
                 <View className="flex-1 justify-end bg-black/50">
                     <View 
@@ -465,13 +645,24 @@ export default function AirtimeScreen() {
                     >
                         <View className="flex-row justify-between items-center mb-4">
                             <Text className="text-xl font-bold text-gray-800">Select Beneficiary</Text>
-                            <TouchableOpacity onPress={() => setShowBeneficiaryModal(false)}>
+                            <TouchableOpacity onPress={() => {
+                                setBeneficiarySearch('');
+                                setShowBeneficiaryModal(false);
+                            }}>
                                 <Ionicons name="close-circle" size={28} color="#9CA3AF" />
                             </TouchableOpacity>
                         </View>
+
+                        <TextInput
+                            style={s.modalSearchInput}
+                            placeholder="Search beneficiary by name or number..."
+                            placeholderTextColor="#94a3b8"
+                            value={beneficiarySearch}
+                            onChangeText={setBeneficiarySearch}
+                        />
                         
                         <FlatList
-                            data={beneficiaries}
+                            data={filteredBens}
                             keyExtractor={item => item.id}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
@@ -479,6 +670,7 @@ export default function AirtimeScreen() {
                                     onPress={() => {
                                         setPhoneNumber(item.account_number); // Using account_number as phone
                                         detectNetwork(item.account_number);
+                                        setBeneficiarySearch('');
                                         setShowBeneficiaryModal(false);
                                     }}
                                 >
@@ -503,3 +695,286 @@ export default function AirtimeScreen() {
         );
     }
 }
+
+const s = StyleSheet.create({
+  networksContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    width: '100%',
+  },
+  networkCard: {
+    width: '22%',
+    paddingVertical: 12,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+  },
+  networkCardSelected: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  networkLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginBottom: 4,
+  },
+  networkName: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  networkNameSelected: {
+    color: '#2563eb',
+  },
+  cashbackBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  cashbackText: {
+    fontSize: 7.5,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  checkmarkBubble: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    width: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Mode Selector (Segmented Control)
+  modeSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 24,
+    width: '100%',
+  },
+  modeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modeButtonActive: {
+    backgroundColor: '#0056D2',
+  },
+  modeButtonText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  modeButtonTextActive: {
+    color: '#ffffff',
+  },
+  // Estimator Card
+  estimatorContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 24,
+    width: '100%',
+  },
+  estimatorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  estimatorTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  estimatorDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  estimatorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  estimatorLabel: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  estimatorValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0d1b3e',
+  },
+  estimatorLabelTotal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  estimatorValueTotal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2563eb',
+  },
+  estimatorBadge: {
+    marginTop: 10,
+    padding: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  estimatorBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#b45309',
+  },
+  // Auto-Refill Card
+  scheduleContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 24,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  scheduleHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  scheduleHeaderSub: {
+    fontSize: 10.5,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  scheduleContent: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: '#fafbfc',
+  },
+  scheduleLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 10,
+  },
+  freqButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  freqButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  freqButtonActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  freqButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  freqButtonTextActive: {
+    color: '#2563eb',
+  },
+  scheduleHint: {
+    fontSize: 10,
+    color: '#2563eb',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  // USSD Card
+  ussdContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 24,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  ussdHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f0fdfa',
+  },
+  ussdHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f766e',
+  },
+  ussdContent: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#ccfbf1',
+  },
+  ussdText: {
+    fontSize: 10.5,
+    color: '#475569',
+    lineHeight: 14,
+  },
+  ussdGrid: {
+    marginTop: 8,
+  },
+  ussdRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  ussdNetwork: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  ussdCode: {
+    fontSize: 10.5,
+    color: '#475569',
+  },
+  // Beneficiary Modal Search
+  modalSearchInput: {
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    marginBottom: 16,
+  },
+});
