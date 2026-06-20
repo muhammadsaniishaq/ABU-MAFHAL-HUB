@@ -1,14 +1,35 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, LayoutAnimation, Modal, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform, LayoutAnimation, Modal, FlatList, StyleSheet, Linking } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { api } from '../services/api';
 import { supabase } from '../services/supabase';
 import { DataPlan } from '../services/partners';
 import SecurityModal from '../components/SecurityModal';
 import TransactionConfirmationModal from '../components/TransactionConfirmationModal';
+
+const parseVolumeToGB = (volume: any, name: string): number => {
+    const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();
+    
+    // Check for GB first
+    const gbMatch = text.match(/(\d+(\.\d+)?)\s*(gb|gig|g)/i);
+    if (gbMatch) {
+        return parseFloat(gbMatch[1]);
+    }
+    
+    // Check for MB
+    const mbMatch = text.match(/(\d+)\s*(mb|meg|m)/i);
+    if (mbMatch) {
+        return parseFloat(mbMatch[1]) / 1024;
+    }
+    
+    // Default fallback if we can't parse it
+    return 0;
+};
 
 // Network Logos
 const NETWORK_LOGOS: Record<string, any> = {
@@ -75,6 +96,17 @@ export default function DataScreen() {
     const [favorites, setFavorites] = useState<string[]>([]);
     const [beneficiarySearch, setBeneficiarySearch] = useState('');
     
+    // Premium features states
+    const [autoRenew, setAutoRenew] = useState(false);
+    const [isGift, setIsGift] = useState(false);
+    const [recipientName, setRecipientName] = useState('');
+    const [showEstimator, setShowEstimator] = useState(false);
+    const [socialHours, setSocialHours] = useState(0);
+    const [streamingHours, setStreamingHours] = useState(0);
+    const [browsingHours, setBrowsingHours] = useState(0);
+    const [minVolumeFilter, setMinVolumeFilter] = useState<number | null>(null);
+    const [showUssdGuide, setShowUssdGuide] = useState(false);
+    
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
 
@@ -83,7 +115,19 @@ export default function DataScreen() {
         fetchUserData();
         fetchBeneficiaries();
         fetchLastTransaction();
+        loadFavorites();
     }, []);
+
+    const loadFavorites = async () => {
+        try {
+            const saved = await AsyncStorage.getItem('data_favorites');
+            if (saved) {
+                setFavorites(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error("Failed to load favorites", e);
+        }
+    };
 
     const fetchLastTransaction = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -152,6 +196,14 @@ export default function DataScreen() {
             return false;
         }
 
+        // Min Volume Filter (from Data Usage Estimator)
+        if (minVolumeFilter !== null) {
+            const gb = parseVolumeToGB(p.volume, p.originalName || p.name);
+            if (gb < minVolumeFilter) {
+                return false;
+            }
+        }
+
         // Duration Filter
         if (planFilter === 'All') return true;
         if (planFilter === 'Favorites') return favorites.includes(p.id);
@@ -204,8 +256,14 @@ export default function DataScreen() {
         }
     };
 
-    const toggleFavorite = (planId: string) => {
-        setFavorites(prev => prev.includes(planId) ? prev.filter(id => id !== planId) : [...prev, planId]);
+    const toggleFavorite = async (planId: string) => {
+        try {
+            const updated = favorites.includes(planId) ? favorites.filter(id => id !== planId) : [...favorites, planId];
+            setFavorites(updated);
+            await AsyncStorage.setItem('data_favorites', JSON.stringify(updated));
+        } catch (e) {
+            console.error("Failed to save favorites", e);
+        }
     };
 
     const fetchPlans = async (netId: string) => {
@@ -278,12 +336,16 @@ export default function DataScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
+            const planNameString = selectedPlan.name + 
+                (autoRenew ? ' [Auto-Renew]' : '') + 
+                (isGift ? ` (Gift to ${recipientName || 'Someone'})` : '');
+
             const result = await api.data.purchase(user.id, {
                 network,
                 phone: phoneNumber,
                 planId: selectedPlan.id,
                 amount: selectedPlan.price,
-                planName: selectedPlan.name
+                planName: planNameString
             });
 
             if (result.success) {
@@ -445,6 +507,219 @@ export default function DataScreen() {
                             </TouchableOpacity>
                         )}
                     </View>
+
+                    {/* USSD Check Codes Collapsible Card */}
+                    <View style={s.ussdContainer}>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowUssdGuide(!showUssdGuide);
+                            }}
+                            style={s.ussdHeader}
+                            activeOpacity={0.8}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="help-circle-outline" size={16} color="#d97706" style={{ marginRight: 6 }} />
+                                <Text style={s.ussdHeaderTitle}>USSD Balance Check Codes</Text>
+                            </View>
+                            <Ionicons 
+                                name={showUssdGuide ? "chevron-up" : "chevron-down"} 
+                                size={16} 
+                                color="#64748b" 
+                            />
+                        </TouchableOpacity>
+
+                        {showUssdGuide && (
+                            <View style={s.ussdContent}>
+                                {[
+                                    { net: 'MTN', code: '*323#', legacy: '*312*4#' },
+                                    { net: 'Airtel', code: '*323#', legacy: '*140#' },
+                                    { net: 'Glo', code: '*323#', legacy: '*127*0#' },
+                                    { net: '9mobile', code: '*323#', legacy: '*228#' }
+                                ].map((item, index) => (
+                                    <View key={index} style={s.ussdRow}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.ussdNetName}>{item.net}</Text>
+                                            <Text style={s.ussdSubText}>Unified: {item.code} | Legacy: {item.legacy}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            <TouchableOpacity 
+                                                style={s.ussdActionBtn} 
+                                                onPress={async () => {
+                                                    await Clipboard.setStringAsync(item.code);
+                                                    Alert.alert("Copied", `${item.code} copied to clipboard!`);
+                                                }}
+                                            >
+                                                <Ionicons name="copy-outline" size={13} color="#0d1b3e" />
+                                                <Text style={s.ussdActionText}>Copy</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity 
+                                                style={[s.ussdActionBtn, { backgroundColor: '#eff6ff' }]} 
+                                                onPress={() => Linking.openURL(`tel:${encodeURIComponent(item.code)}`)}
+                                            >
+                                                <Ionicons name="call-outline" size={13} color="#2563eb" />
+                                                <Text style={[s.ussdActionText, { color: '#2563eb' }]}>Dial</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Data Usage Estimator Collapsible Card */}
+                    <View style={s.estimatorContainer}>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowEstimator(!showEstimator);
+                            }}
+                            style={s.estimatorHeader}
+                            activeOpacity={0.8}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="calculator-outline" size={16} color="#2563eb" style={{ marginRight: 6 }} />
+                                <Text style={s.estimatorHeaderTitle}>Data Usage Estimator & Recommendations</Text>
+                            </View>
+                            <Ionicons 
+                                name={showEstimator ? "chevron-up" : "chevron-down"} 
+                                size={16} 
+                                color="#64748b" 
+                            />
+                        </TouchableOpacity>
+
+                        {showEstimator && (
+                            <View style={s.estimatorContent}>
+                                <Text style={s.estimatorIntro}>
+                                    Adjust your daily usage estimation below to find the best data bundle.
+                                </Text>
+
+                                {/* Social Slider Row */}
+                                <View style={s.estimatorRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.estimatorLabel}>Social & Chatting</Text>
+                                        <Text style={s.estimatorSubLabel}>WhatsApp, IG, TikTok, FB (~150MB/hr)</Text>
+                                    </View>
+                                    <View style={s.counterGroup}>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setSocialHours(h => Math.max(0, h - 1))}
+                                        >
+                                            <Ionicons name="remove" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                        <Text style={s.counterValue}>{socialHours}h</Text>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setSocialHours(h => Math.min(24, h + 1))}
+                                        >
+                                            <Ionicons name="add" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Video Streaming Row */}
+                                <View style={s.estimatorRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.estimatorLabel}>Video Streaming</Text>
+                                        <Text style={s.estimatorSubLabel}>YouTube, Netflix, HD Video (~600MB/hr)</Text>
+                                    </View>
+                                    <View style={s.counterGroup}>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setStreamingHours(h => Math.max(0, h - 1))}
+                                        >
+                                            <Ionicons name="remove" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                        <Text style={s.counterValue}>{streamingHours}h</Text>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setStreamingHours(h => Math.min(24, h + 1))}
+                                        >
+                                            <Ionicons name="add" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Web Browsing Row */}
+                                <View style={s.estimatorRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.estimatorLabel}>Web & Emails</Text>
+                                        <Text style={s.estimatorSubLabel}>Browsing, reading, downloading (~80MB/hr)</Text>
+                                    </View>
+                                    <View style={s.counterGroup}>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setBrowsingHours(h => Math.max(0, h - 1))}
+                                        >
+                                            <Ionicons name="remove" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                        <Text style={s.counterValue}>{browsingHours}h</Text>
+                                        <TouchableOpacity 
+                                            style={s.counterBtn}
+                                            onPress={() => setBrowsingHours(h => Math.min(24, h + 1))}
+                                        >
+                                            <Ionicons name="add" size={14} color="#0d1b3e" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Calculation Results */}
+                                {(() => {
+                                    const hourlyGB = (socialHours * 0.15) + (streamingHours * 0.60) + (browsingHours * 0.08);
+                                    const weeklyGB = Math.round(hourlyGB * 7 * 10) / 10;
+                                    const monthlyGB = Math.round(hourlyGB * 30 * 10) / 10;
+
+                                    return (
+                                        <View style={s.estimatorResultsCard}>
+                                            <View style={s.resultBox}>
+                                                <Text style={s.resultVal}>{weeklyGB} GB</Text>
+                                                <Text style={s.resultLbl}>Weekly Est.</Text>
+                                            </View>
+                                            <View style={[s.resultBox, { borderLeftWidth: 1, borderLeftColor: '#e2e8f0' }]}>
+                                                <Text style={[s.resultVal, { color: '#2563eb' }]}>{monthlyGB} GB</Text>
+                                                <Text style={s.resultLbl}>Monthly Est.</Text>
+                                            </View>
+                                            
+                                            {monthlyGB > 0 && (
+                                                <TouchableOpacity 
+                                                    style={s.recommendBtn}
+                                                    onPress={() => {
+                                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                                        setMinVolumeFilter(monthlyGB);
+                                                        setShowEstimator(false); // Collapse
+                                                    }}
+                                                >
+                                                    <Ionicons name="sparkles" size={12} color="white" style={{ marginRight: 4 }} />
+                                                    <Text style={s.recommendBtnText}>Recommend</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    );
+                                })()}
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Recommendation Banner */}
+                    {minVolumeFilter !== null && (
+                        <View style={s.recommendationBanner}>
+                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="sparkles" size={16} color="#d97706" style={{ marginRight: 6 }} />
+                                <Text style={s.recommendationBannerText}>
+                                    Showing plans with at least <Text style={{ fontWeight: '800' }}>{minVolumeFilter} GB</Text>
+                                </Text>
+                            </View>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                    setMinVolumeFilter(null);
+                                }}
+                                style={s.recommendationBannerClose}
+                            >
+                                <Text style={s.recommendationBannerCloseText}>Clear</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {/* Data Plans Grid */}
                     {loadingPlans ? (
@@ -628,6 +903,61 @@ export default function DataScreen() {
                             )}
                         </View>
                     )}
+
+                    {/* Auto-Renew and Gifting Options */}
+                    {selectedPlan && (
+                        <View style={s.optionsContainer}>
+                            <View style={s.optionRow}>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="repeat" size={16} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                        <Text style={s.optionTitle}>Auto-Renew Bundle</Text>
+                                    </View>
+                                    <Text style={s.optionDesc}>Automatically renews this data plan upon expiry</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => setAutoRenew(!autoRenew)}
+                                    style={[s.customSwitch, autoRenew ? s.customSwitchOn : s.customSwitchOff]}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.customSwitchThumb, autoRenew ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={[s.optionRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12, marginTop: 12 }]}>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="gift-outline" size={16} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                        <Text style={s.optionTitle}>Send as a Gift</Text>
+                                    </View>
+                                    <Text style={s.optionDesc}>Mark this purchase as a gift for someone else</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                        setIsGift(!isGift);
+                                        if (isGift) setRecipientName('');
+                                    }}
+                                    style={[s.customSwitch, isGift ? s.customSwitchOn : s.customSwitchOff]}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.customSwitchThumb, isGift ? s.customSwitchThumbOn : s.customSwitchThumbOff]} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {isGift && (
+                                <View style={s.giftInputContainer}>
+                                    <TextInput 
+                                        style={s.giftInput}
+                                        placeholder="Enter Recipient's Name (e.g. Sani Sadiq)"
+                                        placeholderTextColor="#94a3b8"
+                                        value={recipientName}
+                                        onChangeText={setRecipientName}
+                                    />
+                                </View>
+                            )}
+                        </View>
+                    )}
                 </ScrollView>
 
                 {/* Bottom Floating Button */}
@@ -677,6 +1007,8 @@ export default function DataScreen() {
                     { label: 'Phone Number', value: phoneNumber },
                     { label: 'Data Plan', value: selectedPlan?.name || '-' },
                     { label: 'Validity', value: selectedPlan?.validity || '-' },
+                    ...(autoRenew ? [{ label: 'Auto-Renew', value: 'Enabled (Every ' + (selectedPlan?.validity || 'month') + ')' }] : []),
+                    ...(isGift ? [{ label: 'Gifting To', value: recipientName || 'Anonymous' }] : []),
                     { label: 'Original Price', value: `₦${selectedPlan?.price?.toLocaleString() || '0'}`, isAmount: true },
                     { label: 'Total To Pay', value: `₦${selectedPlan?.price?.toLocaleString() || '0'}`, isTotal: true },
                 ]}
@@ -1166,5 +1498,289 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  // USSD Codes styles
+  ussdContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  ussdHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#fffdf9',
+  },
+  ussdHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#78350f',
+  },
+  ussdContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#fef3c7',
+    backgroundColor: '#ffffff',
+  },
+  ussdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  ussdNetName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  ussdSubText: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  ussdActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+  },
+  ussdActionText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0d1b3e',
+    marginLeft: 3,
+  },
+
+  // Estimator styles
+  estimatorContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  estimatorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#f8fafc',
+  },
+  estimatorHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1e3a8a',
+  },
+  estimatorContent: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  estimatorIntro: {
+    fontSize: 11,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  estimatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  estimatorLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  estimatorSubLabel: {
+    fontSize: 9.5,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  counterGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    padding: 2,
+  },
+  counterBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  counterValue: {
+    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0d1b3e',
+    textAlign: 'center',
+    minWidth: 32,
+  },
+  estimatorResultsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  resultBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultVal: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0d1b3e',
+  },
+  resultLbl: {
+    fontSize: 9,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  recommendBtn: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  recommendBtnText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // Recommendation Banner styles
+  recommendationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  recommendationBannerText: {
+    color: '#78350f',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  recommendationBannerClose: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  recommendationBannerCloseText: {
+    color: '#b45309',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // Options switch styles
+  optionsContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  optionTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  optionDesc: {
+    fontSize: 10.5,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  customSwitch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  customSwitchOn: {
+    backgroundColor: '#2563eb',
+  },
+  customSwitchOff: {
+    backgroundColor: '#cbd5e1',
+  },
+  customSwitchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  customSwitchThumbOn: {
+    alignSelf: 'flex-end',
+  },
+  customSwitchThumbOff: {
+    alignSelf: 'flex-start',
+  },
+  giftInputContainer: {
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    justifyContent: 'center',
+  },
+  giftInput: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0d1b3e',
   },
 });

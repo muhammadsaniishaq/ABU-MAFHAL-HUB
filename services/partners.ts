@@ -19,6 +19,8 @@ export interface DataPlan {
     code: string; // Network specific code
     icon?: string;
     originalName?: string; // For filtering when name is cleaned
+    volume?: string;
+    network?: string;
 }
 
 export interface DataProvider {
