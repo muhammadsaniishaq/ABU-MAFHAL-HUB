@@ -370,7 +370,10 @@ export default function DataScreen() {
                     )}
 
                     {/* Network Selection */}
-                    <Text style={s.sectionTitle}>Select Network</Text>
+                    <View style={s.sectionHeader}>
+                        <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                        <Text style={s.sectionTitle}>Select Network</Text>
+                    </View>
                     <View style={s.networksRow}>
                         {NETWORKS_DATA.map((net) => {
                             const isSelected = network === net.id;
@@ -389,7 +392,7 @@ export default function DataScreen() {
                                     <View style={s.networkLogoWrapper}>
                                         <Image 
                                             source={NETWORK_LOGOS[net.id]} 
-                                            style={s.networkLogo}
+                                            style={s.networkLogo as any}
                                             resizeMode="contain" 
                                         />
                                     </View>
@@ -407,11 +410,14 @@ export default function DataScreen() {
                     </View>
 
                     {/* Phone Number Input */}
-                    <Text style={s.sectionTitle}>Phone Number</Text>
+                    <View style={s.sectionHeader}>
+                        <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                        <Text style={s.sectionTitle}>Phone Number</Text>
+                    </View>
                     <View style={[s.inputBoxContainer, phoneNumber.length > 0 && s.inputBoxFocused]}>
                         <View style={s.inputBoxLogoWrapper}>
                             {network ? (
-                                <Image source={NETWORK_LOGOS[network]} style={s.inputBoxLogo} resizeMode="cover" />
+                                <Image source={NETWORK_LOGOS[network]} style={s.inputBoxLogo as any} resizeMode="cover" />
                             ) : (
                                 <Ionicons name="call-outline" size={18} color="#94a3b8" />
                             )}
@@ -480,7 +486,10 @@ export default function DataScreen() {
                                         )}
                                     </View>
 
-                                    <Text style={s.sectionTitle}>Filter Plans</Text>
+                                    <View style={s.sectionHeader}>
+                                        <Ionicons name="funnel-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                        <Text style={s.sectionTitle}>Filter Plans</Text>
+                                    </View>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 8 }}>
                                         {[
                                             { name: 'All', icon: 'grid-outline' },
@@ -515,7 +524,12 @@ export default function DataScreen() {
                                 </View>
                             )}
                             
-                            {plans.length > 0 && <Text style={s.sectionTitle}>Available Plans</Text>}
+                            {plans.length > 0 && (
+                                <View style={s.sectionHeader}>
+                                    <Ionicons name="flash-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                    <Text style={s.sectionTitle}>Available Plans</Text>
+                                </View>
+                            )}
                             
                             {!network ? (
                                  <View style={{
@@ -832,26 +846,31 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
+  },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0d1b3e',
-    marginBottom: 12,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   networksRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
     width: '100%',
   },
   networkCard: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '22%',
-    aspectRatio: 0.95,
-    borderRadius: 18,
+    aspectRatio: 1.0,
+    borderRadius: 14,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -869,9 +888,9 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   networkLogoWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -889,9 +908,9 @@ const s = StyleSheet.create({
     height: '80%',
   },
   networkName: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 4,
     color: '#64748b',
   },
   networkNameSelected: {
@@ -909,10 +928,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 18,
+    borderRadius: 14,
     paddingHorizontal: 16,
-    height: 56,
-    marginBottom: 24,
+    height: 50,
+    marginBottom: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     shadowColor: '#0a1633',
@@ -960,9 +979,9 @@ const s = StyleSheet.create({
     padding: 4,
   },
   filterPill: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     marginRight: 8,
     borderWidth: 1.5,
     borderColor: '#cbd5e1',
@@ -973,7 +992,7 @@ const s = StyleSheet.create({
     borderColor: '#0d1b3e',
   },
   filterPillText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#475569',
   },
@@ -985,14 +1004,14 @@ const s = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: 16,
+    marginTop: 10,
   },
   planCardWrapper: {
     width: '48.5%',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   planCard: {
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
@@ -1011,8 +1030,8 @@ const s = StyleSheet.create({
     elevation: 5,
   },
   planCardGradient: {
-    padding: 14,
-    minHeight: 110,
+    padding: 10,
+    minHeight: 90,
     justifyContent: 'space-between',
   },
   planValidityContainer: {
@@ -1020,19 +1039,19 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   validityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 6,
     backgroundColor: '#f1f5f9',
   },
   validityBadgeSelected: {
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   validityText: {
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '800',
     color: '#475569',
   },
@@ -1040,18 +1059,18 @@ const s = StyleSheet.create({
     color: '#ffffff',
   },
   planName: {
-    fontSize: 13.5,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0d1b3e',
-    lineHeight: 18,
-    marginBottom: 6,
+    lineHeight: 15,
+    marginBottom: 4,
     flexWrap: 'wrap',
   },
   planNameSelected: {
     color: '#ffffff',
   },
   planPrice: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
     color: '#2563eb',
   },
@@ -1063,14 +1082,14 @@ const s = StyleSheet.create({
     top: 0,
     right: 0,
     backgroundColor: '#f97316',
-    borderBottomLeftRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderBottomLeftRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     zIndex: 10,
   },
   bestValueText: {
     color: '#ffffff',
-    fontSize: 7.5,
+    fontSize: 6.5,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
