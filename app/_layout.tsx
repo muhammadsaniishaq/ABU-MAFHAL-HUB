@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 import { View, ActivityIndicator, LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // Configure Reanimated Logger to be less chatty about render phase value access
@@ -20,6 +21,7 @@ configureReanimatedLogger({
 LogBox.ignoreLogs([
     'SafeAreaView has been deprecated',
     '[Reanimated] Reading from `value`',
+    'setLayoutAnimationEnabledExperimental is currently a no-op',
 ]);
 import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -43,6 +45,12 @@ export default function RootLayout() {
 
     const fetchUserRole = async (userId: string) => {
         try {
+            // Load from cache first if state not set, keeping screen immediately interactive
+            const cachedRole = await AsyncStorage.getItem(`user_role_${userId}`);
+            if (cachedRole && !userRole) {
+                setUserRole(cachedRole);
+            }
+
             const { data, error } = await supabase
                 .from('profiles')
                 .select('role')
@@ -54,27 +62,36 @@ export default function RootLayout() {
                 if (err.code === 'PGRST116') {
                     // No profile exists yet: default to 'user' role cleanly
                     setUserRole('user');
+                    await AsyncStorage.setItem(`user_role_${userId}`, 'user');
                 } else if (err.code === 'PGRST301' || err.message?.includes('JWT') || err.status === 401 || err.status === 400 || err.code === '401' || err.code === '400') {
                     console.log("Forcing logout due to session error...");
                     await forceSignOut();
                     setSession(null);
                 } else {
-                    // Downgrade to warn for other errors (likely network)
-                    console.warn("Error fetching role (likely network/offline):", error.message);
+                    // Downgrade to console.log to avoid yellow screen warnings when network is offline
+                    console.log("Network info - Using offline cache. Role fetch status:", error.message);
                 }
                 return;
             }
 
-            if (data) setUserRole(data.role);
+            if (data) {
+                setUserRole(data.role);
+                await AsyncStorage.setItem(`user_role_${userId}`, data.role);
+            }
         } catch (e) {
-            console.warn('Error fetching role in layout:', e);
+            console.log('Error fetching role in layout:', e);
         }
     };
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
             setSession(session);
-            if (session?.user) fetchUserRole(session.user.id);
+            if (session?.user) {
+                // Restore role from local cache immediately
+                const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                if (cached) setUserRole(cached);
+                fetchUserRole(session.user.id);
+            }
             setInitialized(true);
         }).catch(async (error) => {
             console.log("Session init error:", error.message);
@@ -86,10 +103,15 @@ export default function RootLayout() {
             setInitialized(true);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setSession(session);
-            if (session?.user) fetchUserRole(session.user.id);
-            else setUserRole(null);
+            if (session?.user) {
+                const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                if (cached) setUserRole(cached);
+                fetchUserRole(session.user.id);
+            } else {
+                setUserRole(null);
+            }
         });
 
         return () => subscription.unsubscribe();
