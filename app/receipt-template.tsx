@@ -33,10 +33,14 @@ export default function ReceiptTemplateScreen() {
           
           <View style={s.receiptMetaBox}>
             <View style={s.metaBoxHeader}>
-              <Text style={s.metaBoxHeaderText}>Receipt for #{ref || 'N/A'}</Text>
+              <Text style={s.metaBoxHeaderText} numberOfLines={1} ellipsizeMode="tail">
+                Receipt for #{ref || 'N/A'}
+              </Text>
             </View>
             <View style={s.metaBoxBody}>
-              <Text style={s.metaBoxDateText}>Transaction Date: {date || 'N/A'}</Text>
+              <Text style={s.metaBoxDateText} numberOfLines={1} ellipsizeMode="tail">
+                Transaction Date: {date || 'N/A'}
+              </Text>
             </View>
           </View>
         </View>
@@ -44,8 +48,12 @@ export default function ReceiptTemplateScreen() {
         {/* Recipient Section */}
         <View style={s.recipientSection}>
           <Text style={s.recipientLabel}>RECIPIENT:</Text>
-          <Text style={s.recipientName}>{recipient || 'Mafhal User'}</Text>
-          <Text style={s.recipientEmail}>{email || '-'}</Text>
+          <Text style={s.recipientName} numberOfLines={2} ellipsizeMode="tail">
+            {recipient || 'Mafhal User'}
+          </Text>
+          <Text style={s.recipientEmail} numberOfLines={1} ellipsizeMode="middle">
+            {email || '-'}
+          </Text>
           <Text style={s.recipientAddress}>Instant Wallet Transfer Account</Text>
         </View>
 
@@ -53,22 +61,34 @@ export default function ReceiptTemplateScreen() {
         <View style={s.tableContainer}>
           {/* Table Header */}
           <View style={s.tableHeader}>
-            <Text style={[s.thText, { flex: 3 }]}>PRODUCT / SERVICE</Text>
-            <Text style={[s.thText, { flex: 4 }]}>DESCRIPTION</Text>
-            <Text style={[s.thText, { flex: 1, textAlign: 'center' }]}>QTY.</Text>
-            <Text style={[s.thText, { flex: 2, textAlign: 'right' }]}>COST</Text>
-            <Text style={[s.thText, { flex: 2, textAlign: 'right' }]}>TOTAL</Text>
+            <View style={{ flex: 3 }}><Text style={s.thText}>PRODUCT / SERVICE</Text></View>
+            <View style={{ flex: 4 }}><Text style={s.thText}>DESCRIPTION</Text></View>
+            <View style={{ flex: 1.5, alignItems: 'center' }}><Text style={s.thText}>QTY.</Text></View>
+            <View style={{ flex: 2.5, alignItems: 'flex-end' }}><Text style={s.thText}>COST</Text></View>
+            <View style={{ flex: 2.5, alignItems: 'flex-end' }}><Text style={s.thText}>TOTAL</Text></View>
           </View>
           
           {/* Table Row */}
           <View style={s.tableRow}>
-            <Text style={[s.tdText, s.fontBold, { flex: 3 }]}>Wallet Transfer</Text>
-            <Text style={[s.tdText, { flex: 4, fontSize: 11, color: '#475569', lineHeight: 15 }]}>
-              Instant secure peer-to-peer wallet transfer to {recipient || 'Mafhal User'}. Sender: {sender || 'Mafhal User'}.
-            </Text>
-            <Text style={[s.tdText, { flex: 1, textAlign: 'center' }]}>1</Text>
-            <Text style={[s.tdText, { flex: 2, textAlign: 'right' }]}>₦{formattedAmount}</Text>
-            <Text style={[s.tdText, s.fontBold, { flex: 2, textAlign: 'right' }]}>₦{formattedAmount}</Text>
+            <View style={{ flex: 3, paddingRight: 4 }}>
+              <Text style={[s.tdText, s.fontBold]} numberOfLines={2} ellipsizeMode="tail">
+                Wallet Transfer
+              </Text>
+            </View>
+            <View style={{ flex: 4, paddingRight: 4 }}>
+              <Text style={[s.tdText, { fontSize: 11, color: '#475569', lineHeight: 15 }]}>
+                Instant secure peer-to-peer wallet transfer to {recipient || 'Mafhal User'}. Sender: {sender || 'Mafhal User'}.
+              </Text>
+            </View>
+            <View style={{ flex: 1.5, alignItems: 'center' }}>
+              <Text style={s.tdText}>1</Text>
+            </View>
+            <View style={{ flex: 2.5, alignItems: 'flex-end' }}>
+              <Text style={s.tdText} numberOfLines={1} ellipsizeMode="tail">₦{formattedAmount}</Text>
+            </View>
+            <View style={{ flex: 2.5, alignItems: 'flex-end' }}>
+              <Text style={[s.tdText, s.fontBold]} numberOfLines={1} ellipsizeMode="tail">₦{formattedAmount}</Text>
+            </View>
           </View>
         </View>
 
@@ -83,19 +103,27 @@ export default function ReceiptTemplateScreen() {
             
             <View style={s.totalsRow}>
               <Text style={s.totalsLabel}>Subtotal</Text>
-              <Text style={s.totalsValue}>₦{formattedAmount}</Text>
+              <View style={s.totalsValueContainer}>
+                <Text style={s.totalsValue} numberOfLines={1} ellipsizeMode="tail">₦{formattedAmount}</Text>
+              </View>
             </View>
             
             <View style={s.totalsRow}>
               <Text style={s.totalsLabel}>Fee (0%)</Text>
-              <Text style={s.totalsValue}>₦0.00</Text>
+              <View style={s.totalsValueContainer}>
+                <Text style={s.totalsValue}>₦0.00</Text>
+              </View>
             </View>
             
             <View style={s.divider} />
             
             <View style={[s.totalsRow, { marginTop: 6 }]}>
               <Text style={[s.totalsLabel, s.fontBold, { fontSize: 14, color: '#0f172a' }]}>Total</Text>
-              <Text style={[s.totalsValue, s.fontBold, { fontSize: 14, color: '#0f172a' }]}>₦{formattedAmount}</Text>
+              <View style={s.totalsValueContainer}>
+                <Text style={[s.totalsValue, s.fontBold, { fontSize: 14, color: '#0f172a' }]} numberOfLines={1} ellipsizeMode="tail">
+                  ₦{formattedAmount}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -154,9 +182,12 @@ const s = StyleSheet.create({
     alignItems: 'flex-start',
     width: '100%',
     marginBottom: 32,
+    flexWrap: 'wrap',
+    gap: 16,
   },
   brandDetails: {
     flex: 1,
+    minWidth: 220,
   },
   logoContainer: {
     width: 48,
@@ -187,7 +218,8 @@ const s = StyleSheet.create({
     color: '#64748b',
   },
   receiptMetaBox: {
-    width: 240,
+    width: '100%',
+    maxWidth: 240,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 4,
@@ -229,11 +261,13 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
     marginBottom: 4,
+    flexWrap: 'wrap',
   },
   recipientEmail: {
     fontSize: 12,
     color: '#475569',
     marginBottom: 2,
+    flexWrap: 'wrap',
   },
   recipientAddress: {
     fontSize: 12,
@@ -242,12 +276,14 @@ const s = StyleSheet.create({
   tableContainer: {
     width: '100%',
     marginBottom: 32,
+    overflow: 'hidden',
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#7cae12', // Solid lime green matching Jobber
     paddingVertical: 8,
     paddingHorizontal: 12,
+    alignItems: 'center',
   },
   thText: {
     fontSize: 11,
@@ -267,6 +303,7 @@ const s = StyleSheet.create({
   tdText: {
     fontSize: 12,
     color: '#0f172a',
+    flexWrap: 'wrap',
   },
   fontBold: {
     fontWeight: '700',
@@ -277,9 +314,12 @@ const s = StyleSheet.create({
     alignItems: 'flex-start',
     width: '100%',
     marginBottom: 48,
+    flexWrap: 'wrap',
+    gap: 20,
   },
   thanksContainer: {
     flex: 1,
+    minWidth: 200,
   },
   thanksText: {
     fontSize: 13,
@@ -287,7 +327,8 @@ const s = StyleSheet.create({
     fontStyle: 'italic',
   },
   totalsContainer: {
-    width: 240,
+    width: '100%',
+    maxWidth: 240,
   },
   receiptForPaymentTitle: {
     fontSize: 15,
@@ -298,16 +339,23 @@ const s = StyleSheet.create({
   totalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 6,
   },
   totalsLabel: {
     fontSize: 12,
     color: '#64748b',
   },
+  totalsValueContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+    marginLeft: 12,
+  },
   totalsValue: {
     fontSize: 12,
     color: '#0f172a',
     fontWeight: '700',
+    textAlign: 'right',
   },
   divider: {
     height: 1,
