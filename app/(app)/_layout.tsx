@@ -1,23 +1,73 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Platform, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { useState } from 'react';
+import { View, Platform, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SecurityModal from '../../components/SecurityModal';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
+
+const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 export default function AppLayout() {
     const router = useRouter();
     const [isVerified, setIsVerified] = useState(false);
+    const [loadingVerification, setLoadingVerification] = useState(true);
     usePushNotifications(); // Register for push notifications
+
+    useEffect(() => {
+        const checkInactivityLock = async () => {
+            try {
+                const lastVerificationStr = await AsyncStorage.getItem('last_security_verification_time');
+                if (lastVerificationStr) {
+                    const lastVerificationTime = parseInt(lastVerificationStr, 10);
+                    const now = Date.now();
+                    if (now - lastVerificationTime < LOCK_TIMEOUT) {
+                        setIsVerified(true);
+                        // Refresh timestamp to extend active session
+                        await AsyncStorage.setItem('last_security_verification_time', String(now));
+                        setLoadingVerification(false);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error("Error checking verification timeout:", e);
+            }
+            setLoadingVerification(false);
+        };
+        checkInactivityLock();
+    }, []);
+
+    useEffect(() => {
+        if (isVerified) {
+            AsyncStorage.setItem('last_security_verification_time', String(Date.now())).catch(err => console.log(err));
+        }
+    }, [isVerified]);
+
+    const handleVerificationSuccess = async () => {
+        try {
+            await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+        } catch (e) {
+            console.error("Failed to save verification time:", e);
+        }
+        setIsVerified(true);
+    };
+
+    if (loadingVerification) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0d1b3e', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#ffffff" />
+            </View>
+        );
+    }
 
     if (!isVerified) {
         return (
             <SecurityModal
                 visible={true}
                 onClose={() => router.replace('/')}
-                onSuccess={() => setIsVerified(true)}
+                onSuccess={handleVerificationSuccess}
                 title="Welcome Back"
             />
         );
