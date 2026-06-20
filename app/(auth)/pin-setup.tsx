@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image, Dimensions, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
@@ -108,7 +108,10 @@ export default function PinSetupScreen() {
             </View>
 
             <SafeAreaView className="flex-1">
-                <View className="flex-1 px-8 py-6 justify-between">
+                <View 
+                    className="flex-1 px-8 py-6 justify-between"
+                    style={Platform.OS === 'web' && { alignSelf: 'center', width: '100%', maxWidth: 420 }}
+                >
                     
                     {/* Header Section (Top) */}
                     <View className="items-center mt-12">

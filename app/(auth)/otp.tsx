@@ -192,6 +192,7 @@ export default function OTP() {
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     className="flex-1"
+                    style={Platform.OS === 'web' && { alignSelf: 'center', width: '100%', maxWidth: 420 }}
                 >
                     <View className="flex-1 px-8 py-10">
                         <TouchableOpacity

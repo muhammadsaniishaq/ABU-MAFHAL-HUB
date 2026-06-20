@@ -235,42 +235,47 @@ export default function Login() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* RESPONSIVE BODY SECTION - ALWAYS SIDE-BY-SIDE */}
-                        <View style={[s.bodyRow, { marginBottom: spacing.bodyMargin, gap: bodyGap }]}>
+                        {/* RESPONSIVE BODY SECTION */}
+                        <View style={[
+                            isSmall ? s.bodyColumn : s.bodyRow, 
+                            { marginBottom: spacing.bodyMargin, gap: isSmall ? 0 : bodyGap }
+                        ]}>
                             
                             {/* LEFT SIDE: HERO PRESENTATION */}
-                            <View style={s.heroLeft}>
-                                <View style={s.welcomeTextContainer}>
-                                    <Text style={[s.welcomeMain, { fontSize: 36 * scale }]}>Welcome</Text>
-                                    <Text style={[s.welcomeHighlight, { fontSize: 36 * scale }]}>Back!</Text>
-                                    <View style={[s.yellowUnderline, { width: 56 * scale, marginTop: 4 * scale }]} />
-                                </View>
+                            {!isSmall && (
+                                <View style={s.heroLeft}>
+                                    <View style={s.welcomeTextContainer}>
+                                        <Text style={[s.welcomeMain, { fontSize: 36 * scale }]}>Welcome</Text>
+                                        <Text style={[s.welcomeHighlight, { fontSize: 36 * scale }]}>Back!</Text>
+                                        <View style={[s.yellowUnderline, { width: 56 * scale, marginTop: 4 * scale }]} />
+                                    </View>
 
-                                <Text style={[s.heroSubtext, { fontSize: 13 * scale, marginTop: 12 * scale, marginBottom: 12 * scale }]}>
-                                    Sign in to your account and explore a world of seamless payments.
-                                </Text>
+                                    <Text style={[s.heroSubtext, { fontSize: 13 * scale, marginTop: 12 * scale, marginBottom: 12 * scale }]}>
+                                        Sign in to your account and explore a world of seamless payments.
+                                    </Text>
 
-                                <View style={s.podiumWrapper}>
-                                    <Image
-                                        source={require('../../assets/images/ceo.jpg')}
-                                        style={s.podiumImage}
-                                        resizeMode="cover"
-                                    />
-                                    {/* Bottom Blur/Fade-out for the image */}
-                                    <LinearGradient
-                                        colors={['rgba(248, 250, 252, 0)', 'rgba(248, 250, 252, 0.8)', 'rgba(248, 250, 252, 1)']}
-                                        style={s.bottomBlur}
-                                        pointerEvents="none"
-                                    />
+                                    <View style={s.podiumWrapper}>
+                                        <Image
+                                            source={require('../../assets/images/ceo.jpg')}
+                                            style={s.podiumImage}
+                                            resizeMode="cover"
+                                        />
+                                        {/* Bottom Blur/Fade-out for the image */}
+                                        <LinearGradient
+                                            colors={['rgba(248, 250, 252, 0)', 'rgba(248, 250, 252, 0.8)', 'rgba(248, 250, 252, 1)']}
+                                            style={s.bottomBlur}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+                            )}
 
                             {/* RIGHT SIDE: LOGIN CARD */}
-                            <View style={s.cardRight}>
+                            <View style={isSmall ? s.cardCenter : s.cardRight}>
                                 <View style={[
                                     s.loginCard,
                                     {
-                                        marginTop: 80 * scale,
+                                        marginTop: isSmall ? 40 * scale : 80 * scale,
                                         paddingTop: spacing.cardPaddingTop,
                                         paddingBottom: spacing.cardPaddingBottom,
                                         paddingHorizontal: spacing.cardPaddingHorizontal,
@@ -448,21 +453,24 @@ export default function Login() {
                         <View style={[
                             s.securityPartnersCard, 
                             { 
+                                flexDirection: isSmall ? 'column' : 'row',
+                                alignItems: 'center',
+                                gap: isSmall ? 16 : 0,
                                 marginBottom: spacing.partnersMargin, 
                                 paddingVertical: spacing.partnersPadding 
                             }
                         ]}>
-                            <View style={s.securityFooterLeft}>
+                            <View style={[s.securityFooterLeft, isSmall && { justifyContent: 'center', width: '100%' }]}>
                                 <View style={[s.securityFooterIconCircle, { width: 26 * scale, height: 26 * scale, borderRadius: 13 * scale, marginRight: 10 * scale }]}>
                                     <Ionicons name="lock-closed-outline" size={14 * scale} color="#334155" />
                                 </View>
-                                <Text style={[s.securityFooterText, { fontSize: 10 * scale, lineHeight: 14 * scale }]}>
+                                <Text style={[s.securityFooterText, { fontSize: 10 * scale, lineHeight: 14 * scale, textAlign: isSmall ? 'center' : 'left' }]}>
                                     Your security is our priority.{"\n"}All transactions are protected{"\n"}with advanced encryption.
                                 </Text>
                             </View>
-
+ 
                             {/* Real Partner Logos */}
-                            <View style={s.partnersRow}>
+                            <View style={[s.partnersRow, isSmall && { justifyContent: 'center', width: '100%', marginTop: 8 }]}>
                                 <Image source={require('../../assets/images/mtn.png')} style={[s.partnerLogo, { width: 36 * scale, height: 20 * scale }]} resizeMode="contain" />
                                 <Image source={require('../../assets/images/airtel.png')} style={[s.partnerLogo, { width: 44 * scale, height: 20 * scale }]} resizeMode="contain" />
                                 <Image source={require('../../assets/images/glo.png')} style={[s.partnerLogo, { width: 28 * scale, height: 28 * scale }]} resizeMode="contain" />

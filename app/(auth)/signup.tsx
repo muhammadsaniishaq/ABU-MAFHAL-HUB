@@ -264,41 +264,46 @@ export default function Signup() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* RESPONSIVE BODY SECTION - ALWAYS SIDE-BY-SIDE */}
-                        <View style={[s.bodyRow, { marginBottom: spacing.bodyMargin, gap: bodyGap }]}>
+                        {/* RESPONSIVE BODY SECTION */}
+                        <View style={[
+                            isSmall ? s.bodyColumn : s.bodyRow, 
+                            { marginBottom: spacing.bodyMargin, gap: isSmall ? 0 : bodyGap }
+                        ]}>
                             
                             {/* LEFT SIDE: HERO PRESENTATION */}
-                            <View style={s.heroLeft}>
-                                <View style={s.welcomeTextContainer}>
-                                    <Text style={[s.welcomeMain, { fontSize: 36 * scale }]}>Create</Text>
-                                    <Text style={[s.welcomeHighlight, { fontSize: 36 * scale }]}>Account</Text>
-                                    <View style={[s.yellowUnderline, { width: 56 * scale, marginTop: 4 * scale }]} />
-                                </View>
+                            {!isSmall && (
+                                <View style={s.heroLeft}>
+                                    <View style={s.welcomeTextContainer}>
+                                        <Text style={[s.welcomeMain, { fontSize: 36 * scale }]}>Create</Text>
+                                        <Text style={[s.welcomeHighlight, { fontSize: 36 * scale }]}>Account</Text>
+                                        <View style={[s.yellowUnderline, { width: 56 * scale, marginTop: 4 * scale }]} />
+                                    </View>
 
-                                <Text style={[s.heroSubtext, { fontSize: 13 * scale, marginTop: 12 * scale, marginBottom: 12 * scale }]}>
-                                    Join the future of finance today.
-                                </Text>
+                                    <Text style={[s.heroSubtext, { fontSize: 13 * scale, marginTop: 12 * scale, marginBottom: 12 * scale }]}>
+                                        Join the future of finance today.
+                                    </Text>
 
-                                <View style={s.podiumWrapper}>
-                                    <Image
-                                        source={require('../../assets/images/ceo.jpg')}
-                                        style={s.podiumImage}
-                                        resizeMode="cover"
-                                    />
-                                    <LinearGradient
-                                        colors={['rgba(248, 250, 252, 0)', 'rgba(248, 250, 252, 0.8)', 'rgba(248, 250, 252, 1)']}
-                                        style={s.bottomBlur}
-                                        pointerEvents="none"
-                                    />
+                                    <View style={s.podiumWrapper}>
+                                        <Image
+                                            source={require('../../assets/images/ceo.jpg')}
+                                            style={s.podiumImage}
+                                            resizeMode="cover"
+                                        />
+                                        <LinearGradient
+                                            colors={['rgba(248, 250, 252, 0)', 'rgba(248, 250, 252, 0.8)', 'rgba(248, 250, 252, 1)']}
+                                            style={s.bottomBlur}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+                            )}
 
                             {/* RIGHT SIDE: SIGNUP CARD */}
-                            <View style={s.cardRight}>
+                            <View style={isSmall ? s.cardCenter : s.cardRight}>
                                 <View style={[
                                     s.loginCard,
                                     {
-                                        marginTop: 80 * scale,
+                                        marginTop: isSmall ? 40 * scale : 80 * scale,
                                         paddingTop: spacing.cardPaddingTop,
                                         paddingBottom: spacing.cardPaddingBottom,
                                         paddingHorizontal: spacing.cardPaddingHorizontal,
