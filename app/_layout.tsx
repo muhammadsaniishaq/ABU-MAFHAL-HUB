@@ -146,7 +146,7 @@ export default function RootLayout() {
 
                 // Only redirect if NOT on an allowed auth screen (like OTP or Setup)
                 if (userRole && !allowedAuthScreens.includes(currentScreen)) {
-                    router.replace(['admin', 'super_admin'].includes(userRole) ? '/manage' : '/(app)/dashboard');
+                    router.replace('/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
                 // Only allow admin/super_admin to management console

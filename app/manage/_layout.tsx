@@ -1,13 +1,69 @@
 import { Stack } from 'expo-router';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { View, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SecurityModal from '../../components/SecurityModal';
+import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminLayout() {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [checkingRole, setCheckingRole] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const checkAdminRole = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    router.replace('/');
+                    return;
+                }
+                
+                // Load from cache first
+                const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
+                if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
+                    setIsAdmin(true);
+                    setCheckingRole(false);
+                    return;
+                }
+
+                // Query db
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                const role = profile?.role || 'user';
+                if (['admin', 'super_admin'].includes(role)) {
+                    setIsAdmin(true);
+                } else {
+                    router.replace('/(app)/dashboard');
+                }
+            } catch (e) {
+                console.error("Admin verification error:", e);
+                router.replace('/(app)/dashboard');
+            } finally {
+                setCheckingRole(false);
+            }
+        };
+        checkAdminRole();
+    }, []);
+
+    if (checkingRole) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#ffffff" />
+            </View>
+        );
+    }
+
+    if (!isAdmin) {
+        return null;
+    }
 
     if (!isAuthorized) {
         return (

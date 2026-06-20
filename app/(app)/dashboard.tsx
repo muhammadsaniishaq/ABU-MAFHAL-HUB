@@ -284,14 +284,23 @@ export default function Dashboard() {
               })()}
             </View>
 
-            <TouchableOpacity 
-              onPress={() => ['admin', 'super_admin'].includes(userData?.role || '') && router.push('/manage')}
-              style={s.consoleBtn}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="grid" size={12} color={T.white} style={{ marginRight: 4 }} />
-              <Text style={s.consoleBtnTxt}>Dashboard</Text>
-            </TouchableOpacity>
+            {['admin', 'super_admin'].includes(userData?.role || '') && (
+              <TouchableOpacity 
+                onPress={() => router.push('/manage')}
+                style={s.adminConsoleBtn}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#f5a623', '#d4890e']}
+                  style={s.adminConsoleBtnGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="shield-checkmark" size={12} color="#0d1b3e" style={{ marginRight: 4 }} />
+                  <Text style={s.adminConsoleBtnTxt}>Admin Console</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </LinearGradient>
 
@@ -1110,5 +1119,25 @@ const s = StyleSheet.create({
     fontSize: 9.5,
     color: T.textSub,
     marginTop: 1.5,
+  },
+  adminConsoleBtn: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  adminConsoleBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  adminConsoleBtnTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0d1b3e',
   },
 });

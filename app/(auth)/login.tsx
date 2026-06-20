@@ -110,10 +110,7 @@ export default function Login() {
                     .eq('id', data.user.id)
                     .single();
 
-                const role = profile?.role || 'user';
-                if (role === 'admin' || role === 'super_admin') {
-                    router.replace('/manage');
-                } else if (redirectTo) {
+                if (redirectTo) {
                     router.replace(redirectTo as any);
                 } else {
                     router.replace('/(app)/dashboard');
