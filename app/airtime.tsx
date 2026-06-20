@@ -47,6 +47,8 @@ export default function AirtimeScreen() {
     const [scheduleFrequency, setScheduleFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
     const [showUssdGuide, setShowUssdGuide] = useState(false);
     const [beneficiarySearch, setBeneficiarySearch] = useState('');
+    const [phoneFocused, setPhoneFocused] = useState(false);
+    const [amountFocused, setAmountFocused] = useState(false);
     
     const router = useRouter();
 
@@ -190,7 +192,7 @@ export default function AirtimeScreen() {
             className="flex-1 bg-gray-50"
             style={isWeb && { backgroundColor: '#f4f6fb' }}
         >
-            <Stack.Screen options={{ title: 'Buy Airtime', headerTintColor: '#0056D2', headerStyle: { backgroundColor: '#fff' }, headerShadowVisible: false }} />
+            <Stack.Screen options={{ title: 'Buy Airtime', headerTintColor: '#0d1b3e', headerStyle: { backgroundColor: '#fff' }, headerShadowVisible: false }} />
             <StatusBar style="dark" />
 
             <ScrollView 
@@ -204,17 +206,17 @@ export default function AirtimeScreen() {
                 {/* Balance Display - Modern Gradient */}
                 {balance !== null && (
                     <LinearGradient
-                        colors={['#2563EB', '#1D4ED8']}
+                        colors={['#0d1b3e', '#142258']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        className="mb-6 rounded-3xl p-5 flex-row justify-between items-center shadow-lg shadow-blue-300"
+                        style={s.balanceCardGradient}
                     >
                         <View>
-                            <Text className="text-blue-200 text-xs font-semibold mb-1 uppercase tracking-wider">Total Balance</Text>
-                            <Text className="text-white text-3xl font-extrabold">₦{balance.toLocaleString()}</Text>
+                            <Text style={s.balanceLabel}>Total Balance</Text>
+                            <Text style={s.balanceAmount}>₦{balance.toLocaleString()}</Text>
                         </View>
-                        <View className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
-                            <Ionicons name="wallet-outline" size={28} color="white" />
+                        <View style={s.balanceIconContainer}>
+                            <Ionicons name="wallet-outline" size={24} color="#f5a623" />
                         </View>
                     </LinearGradient>
                 )}
@@ -328,17 +330,21 @@ export default function AirtimeScreen() {
                 </View>
 
                 {/* Phone Input */}
-                <Text className="text-gray-800 font-bold text-lg mb-3">Phone Number</Text>
-                <View className={`flex-row items-center border-2 rounded-2xl px-4 h-16 bg-white mb-8 ${phoneNumber.length >= 10 ? 'border-green-500' : 'border-gray-200 focus:border-blue-500'}`}>
-                    <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3 overflow-hidden">
+                <Text style={s.inputLabel}>Phone Number</Text>
+                <View style={[
+                    s.inputContainer,
+                    phoneFocused && s.inputContainerFocused,
+                    phoneNumber.length >= 10 && s.inputContainerSuccess
+                ]}>
+                    <View style={s.inputIconWrapper}>
                         {network ? (
-                            <Image source={NETWORK_LOGOS[network]} className="w-full h-full" resizeMode="cover" />
+                            <Image source={NETWORK_LOGOS[network]} style={s.inputNetworkLogo} resizeMode="cover" />
                         ) : (
-                             <Ionicons name="call" size={18} color="#9CA3AF" />
+                             <Ionicons name="call" size={18} color="#64748b" />
                         )}
                     </View>
                     <TextInput
-                        className="flex-1 text-xl font-semibold text-gray-800"
+                        style={s.phoneTextInput}
                         keyboardType="phone-pad"
                         value={phoneNumber}
                         onChangeText={handlePhoneChange}
@@ -346,22 +352,24 @@ export default function AirtimeScreen() {
                         placeholderTextColor="#94a3b8"
                         maxLength={11}
                         editable={!loading}
+                        onFocus={() => setPhoneFocused(true)}
+                        onBlur={() => setPhoneFocused(false)}
                     />
                     {userPhone && phoneNumber !== userPhone && (
                         <TouchableOpacity 
                             onPress={() => {
                                 handlePhoneChange(userPhone);
                             }}
-                            className="mr-2 px-3 py-1.5 bg-blue-100 rounded-lg"
+                            style={s.meButton}
                         >
-                            <Text className="text-blue-700 font-bold text-xs">ME</Text>
+                            <Text style={s.meButtonText}>ME</Text>
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity 
                         onPress={() => setShowBeneficiaryModal(true)}
-                        className="w-10 h-10 items-center justify-center bg-gray-50 rounded-full"
+                        style={s.beneficiarySelectButton}
                     >
-                        <Ionicons name="people" size={20} color="#0056D2" />
+                        <Ionicons name="people" size={20} color="#0d1b3e" />
                     </TouchableOpacity>
                 </View>
 
@@ -388,32 +396,48 @@ export default function AirtimeScreen() {
                 )}
 
                 {/* Amount Input */}
-                <Text className="text-gray-800 font-bold text-lg mb-3">Amount</Text>
-                <View className="flex-row items-center border-2 border-gray-200 rounded-2xl px-4 h-16 bg-white mb-4 focus:border-blue-500">
-                    <Text className="text-gray-400 text-2xl font-bold mr-2">₦</Text>
+                <Text style={s.inputLabel}>Amount</Text>
+                <View style={[
+                    s.inputContainer,
+                    amountFocused && s.inputContainerFocused,
+                    Number(amount) > 0 && s.inputContainerSuccess
+                ]}>
+                    <Text style={s.currencySymbol}>₦</Text>
                     <TextInput
-                        className="flex-1 text-3xl font-bold text-gray-800"
+                        style={s.amountTextInput}
                         keyboardType="number-pad"
                         value={amount}
                         onChangeText={handleAmountChange}
                         placeholder="0.00"
                         placeholderTextColor="#cbd5e1"
                         editable={!loading}
+                        onFocus={() => setAmountFocused(true)}
+                        onBlur={() => setAmountFocused(false)}
                     />
                 </View>
 
                 {/* Features: Amount Presets Grid */}
-                <Text className="text-gray-500 font-medium mb-3 text-sm ml-1">Quick Select Amount</Text>
-                <View className="flex-row flex-wrap justify-between mb-8">
-                    {presets.map((val) => (
-                        <TouchableOpacity
-                            key={val}
-                            onPress={() => setAmount(val.toString())}
-                            className="bg-white border border-gray-100 rounded-xl w-[31%] py-4 mb-3 shadow-sm active:bg-blue-50 items-center"
-                        >
-                            <Text className="text-blue-600 font-bold text-lg">₦{val}</Text>
-                        </TouchableOpacity>
-                    ))}
+                <Text style={s.presetsLabel}>Quick Select Amount</Text>
+                <View style={s.presetsGrid}>
+                    {presets.map((val) => {
+                        const isSelected = amount === val.toString();
+                        return (
+                            <TouchableOpacity
+                                key={val}
+                                onPress={() => setAmount(val.toString())}
+                                style={[
+                                    s.presetCard,
+                                    isSelected && s.presetCardActive
+                                ]}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[
+                                    s.presetText,
+                                    isSelected && s.presetTextActive
+                                ]}>₦{val}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
                 {/* Real-time Savings Estimator Card */}
@@ -552,37 +576,40 @@ export default function AirtimeScreen() {
                     onPress={handlePurchase}
                     disabled={!network || !amount || phoneNumber.length < 10 || loading}
                     activeOpacity={0.8}
-                    className="shadow-xl shadow-blue-200"
+                    style={s.purchaseButtonWrapper}
                 >
                     <LinearGradient
                         colors={ (!network || !amount || phoneNumber.length < 10 || loading) 
-                             ? ['#E2E8F0', '#CBD5E1'] // Disabled Gray
-                             : ['#2563EB', '#1D4ED8'] // Active Blue
+                             ? ['#e2e8f0', '#cbd5e1'] // Disabled Gray
+                             : ['#0d1b3e', '#142258', '#f5a623'] // Premium Brand Gradient
                         }
-                        className="h-16 rounded-2xl items-center justify-center flex-row"
+                        style={s.purchaseButtonGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                     >
                         {loading ? (
                             <ActivityIndicator color="white" size="small" />
                         ) : (
-                            <>
-                                <Text className={`font-bold text-xl mr-2 ${(!network || !amount || phoneNumber.length < 10) ? 'text-gray-400' : 'text-white'}`}>
+                             <>
+                                <Text style={[
+                                    s.purchaseButtonText,
+                                    (!network || !amount || phoneNumber.length < 10) && s.purchaseButtonTextDisabled
+                                ]}>
                                     Pay securely
                                 </Text>
                                 <Ionicons 
                                     name="lock-closed" 
                                     size={18} 
-                                    color={(!network || !amount || phoneNumber.length < 10) ? '#94A3B8' : 'white'} 
+                                    color={(!network || !amount || phoneNumber.length < 10) ? '#94a3b8' : 'white'} 
                                 />
                             </>
                         )}
                     </LinearGradient>
                 </TouchableOpacity>
 
-                <View className="items-center mt-6 flex-row justify-center space-x-1">
-                    <Ionicons name="shield-checkmark" size={14} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs">Secured by Flutterwave & Paystack</Text>
+                <View style={s.securityFooter}>
+                    <Ionicons name="shield-checkmark" size={14} color="#9ca3af" style={{ marginRight: 4 }} />
+                    <Text style={s.securityFooterText}>Secured by Flutterwave & Paystack</Text>
                 </View>
 
             </ScrollView>
@@ -714,8 +741,8 @@ const s = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   networkCardSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: 'rgba(13, 27, 62, 0.04)',
+    borderColor: '#0d1b3e',
   },
   networkLogo: {
     width: 36,
@@ -729,7 +756,7 @@ const s = StyleSheet.create({
     color: '#64748b',
   },
   networkNameSelected: {
-    color: '#2563eb',
+    color: '#0d1b3e',
   },
   cashbackBadge: {
     paddingHorizontal: 5,
@@ -771,7 +798,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
   },
   modeButtonActive: {
-    backgroundColor: '#0056D2',
+    backgroundColor: '#0d1b3e',
   },
   modeButtonText: {
     fontSize: 12.5,
@@ -828,7 +855,7 @@ const s = StyleSheet.create({
   estimatorValueTotal: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#2563eb',
+    color: '#0d1b3e',
   },
   estimatorBadge: {
     marginTop: 10,
@@ -895,8 +922,8 @@ const s = StyleSheet.create({
     marginHorizontal: 4,
   },
   freqButtonActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: 'rgba(245, 166, 35, 0.08)',
+    borderColor: '#0d1b3e',
   },
   freqButtonText: {
     fontSize: 11,
@@ -904,11 +931,11 @@ const s = StyleSheet.create({
     color: '#475569',
   },
   freqButtonTextActive: {
-    color: '#2563eb',
+    color: '#0d1b3e',
   },
   scheduleHint: {
     fontSize: 10,
-    color: '#2563eb',
+    color: '#0d1b3e',
     fontStyle: 'italic',
     textAlign: 'center',
   },
@@ -976,5 +1003,190 @@ const s = StyleSheet.create({
     color: '#0f172a',
     backgroundColor: '#f8fafc',
     marginBottom: 16,
+  },
+  // New Modern Styles
+  balanceCardGradient: {
+    marginBottom: 24,
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#0a1633',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  balanceLabel: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  balanceAmount: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  balanceIconContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0d1b3e',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    height: 64,
+    backgroundColor: '#ffffff',
+    marginBottom: 24,
+  },
+  inputContainerFocused: {
+    borderColor: '#0d1b3e',
+  },
+  inputContainerSuccess: {
+    borderColor: '#16a34a',
+  },
+  inputIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  inputNetworkLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  phoneTextInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0d1b3e',
+  },
+  meButton: {
+    marginRight: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(13, 27, 62, 0.08)',
+    borderRadius: 8,
+  },
+  meButtonText: {
+    color: '#0d1b3e',
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  beneficiarySelectButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 20,
+  },
+  currencySymbol: {
+    color: '#94a3b8',
+    fontSize: 24,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  amountTextInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  presetsLabel: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  presetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  presetCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    width: '31%',
+    paddingVertical: 14,
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  presetCardActive: {
+    backgroundColor: '#0d1b3e',
+    borderColor: '#0d1b3e',
+  },
+  presetText: {
+    color: '#0d1b3e',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  presetTextActive: {
+    color: '#ffffff',
+  },
+  purchaseButtonWrapper: {
+    width: '100%',
+    shadowColor: '#f5a623',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  purchaseButtonGradient: {
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  purchaseButtonText: {
+    fontWeight: '700',
+    fontSize: 18,
+    color: '#ffffff',
+    marginRight: 8,
+  },
+  purchaseButtonTextDisabled: {
+    color: '#94a3b8',
+  },
+  securityFooter: {
+    alignItems: 'center',
+    marginTop: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  securityFooterText: {
+    color: '#94a3b8',
+    fontSize: 12,
   },
 });

@@ -99,11 +99,11 @@ export const api = {
                 .from('transactions')
                 .update({
                     status: 'success',
-                    reference: result.data.orderid || result.requestId // ClubKonnect returns 'orderid'
+                    reference: result.data?.orderid || result.requestId // ClubKonnect returns 'orderid'
                 })
                 .eq('id', txn.id);
 
-            return { success: true, reference: result.data.orderid };
+            return { success: true, reference: result.data?.orderid || result.requestId };
         }
     },
 
@@ -147,11 +147,11 @@ export const api = {
                 .from('transactions')
                 .update({
                     status: 'success',
-                    reference: result.data.orderid || result.requestId
+                    reference: result.data?.orderid || result.requestId
                 })
                 .eq('id', txn.id);
 
-            return { success: true, reference: result.data.orderid };
+            return { success: true, reference: result.data?.orderid || result.requestId };
         }
     },
 
