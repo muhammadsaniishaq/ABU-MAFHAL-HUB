@@ -175,15 +175,24 @@ export default function AirtimeScreen() {
         }
     };
 
+    const isWeb = Platform.OS === 'web';
+
     return (
         <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             className="flex-1 bg-gray-50"
+            style={isWeb && { backgroundColor: '#f4f6fb' }}
         >
             <Stack.Screen options={{ title: 'Buy Airtime', headerTintColor: '#0056D2', headerStyle: { backgroundColor: '#fff' }, headerShadowVisible: false }} />
             <StatusBar style="dark" />
 
-            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 40, paddingTop: 100 }}>
+            <ScrollView 
+                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                contentContainerStyle={[
+                    { padding: 24, paddingBottom: 40, paddingTop: 100 },
+                    isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
+                ]}
+            >
                 
                 {/* Balance Display - Modern Gradient */}
                 {balance !== null && (
@@ -450,7 +459,10 @@ export default function AirtimeScreen() {
                 onRequestClose={() => setShowBeneficiaryModal(false)}
             >
                 <View className="flex-1 justify-end bg-black/50">
-                    <View className="bg-white rounded-t-3xl h-[60%] p-5">
+                    <View 
+                        className="bg-white rounded-t-3xl h-[60%] p-5"
+                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+                    >
                         <View className="flex-row justify-between items-center mb-4">
                             <Text className="text-xl font-bold text-gray-800">Select Beneficiary</Text>
                             <TouchableOpacity onPress={() => setShowBeneficiaryModal(false)}>

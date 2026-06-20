@@ -229,7 +229,7 @@ export default function Signup() {
                             }
                         ]} 
                         showsVerticalScrollIndicator={false}
-                        scrollEnabled={height < 900}
+                        scrollEnabled={true}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* TOP BRAND NAVIGATION ROW */}

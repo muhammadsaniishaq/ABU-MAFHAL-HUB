@@ -84,19 +84,27 @@ export default function RootLayout() {
     };
 
     useEffect(() => {
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            setSession(session);
-            if (session?.user) {
-                // Restore role from local cache immediately
-                const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
-                if (cached) setUserRole(cached);
-                fetchUserRole(session.user.id);
+        supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+            if (error) {
+                console.log("Session init error returned:", error.message);
+                if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Refresh token')) {
+                    await forceSignOut();
+                }
+                setSession(null);
+            } else {
+                setSession(session);
+                if (session?.user) {
+                    // Restore role from local cache immediately
+                    const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                    if (cached) setUserRole(cached);
+                    await fetchUserRole(session.user.id);
+                }
             }
             setInitialized(true);
         }).catch(async (error) => {
-            console.log("Session init error:", error.message);
+            console.log("Session init error thrown:", error?.message || error);
             // If refresh token is invalid, clear session
-            if (error.message?.includes('Refresh Token')) {
+            if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token') || error?.message?.includes('Refresh token')) {
                 await forceSignOut();
                 setSession(null);
             }

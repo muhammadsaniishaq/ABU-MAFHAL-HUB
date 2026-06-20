@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +14,7 @@ export default function TransferScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userBalance, setUserBalance] = useState<number>(0);
     const router = useRouter();
+    const isWeb = Platform.OS === 'web';
 
     useEffect(() => {
         fetchUserBalance();
@@ -117,11 +118,17 @@ export default function TransferScreen() {
     };
 
     return (
-        <View className="flex-1 bg-white">
+        <View className="flex-1 bg-white" style={isWeb && { backgroundColor: '#f4f6fb' }}>
             <Stack.Screen options={{ title: 'Transfer', headerTintColor: '#0056D2' }} />
             <StatusBar style="dark" />
 
-            <ScrollView className="p-6">
+            <ScrollView 
+                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                contentContainerStyle={[
+                    { padding: 24 },
+                    isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
+                ]}
+            >
                 <Text className="text-slate font-bold mb-4">Select Bank</Text>
                 <View className="flex-row flex-wrap justify-between gap-y-4 mb-6">
                     {banks.map((b) => (

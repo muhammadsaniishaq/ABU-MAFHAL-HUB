@@ -208,7 +208,7 @@ export default function Login() {
                             }
                         ]} 
                         showsVerticalScrollIndicator={false}
-                        scrollEnabled={height < 700}
+                        scrollEnabled={true}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* TOP BRAND NAVIGATION ROW */}

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, Modal, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image, Modal, Linking, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -30,6 +30,7 @@ export default function EducationScreen() {
     const [tickerIndex, setTickerIndex] = useState(0);
     const [promoCode, setPromoCode] = useState('');
     const [showHelp, setShowHelp] = useState(false);
+    const isWeb = Platform.OS === 'web';
     
     // JAMB Specific State
     const [profileId, setProfileId] = useState('');
@@ -217,11 +218,15 @@ export default function EducationScreen() {
     };
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View className="flex-1 bg-slate-50" style={isWeb && { backgroundColor: '#f4f6fb' }}>
             <StatusBar style="light" />
 
             {/* Modern Header */}
-            <LinearGradient colors={['#0f172a', '#334155']} className="pt-14 pb-8 px-6 rounded-b-[40px] z-50 shadow-2xl shadow-slate-900/40">
+            <LinearGradient 
+                colors={['#0f172a', '#334155']} 
+                className="pt-14 pb-8 px-6 rounded-b-[40px] z-50 shadow-2xl shadow-slate-900/40"
+                style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }}
+            >
                 <View className="flex-row items-center justify-between mb-6">
                     <TouchableOpacity onPress={() => navigation?.goBack?.()} className="bg-white/10 p-3 rounded-full backdrop-blur-md border border-white/5">
                         <Ionicons name="arrow-back" size={24} color="white" />
@@ -244,7 +249,13 @@ export default function EducationScreen() {
                 </View>
             </LinearGradient>
 
-            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 120 }}>
+            <ScrollView 
+                style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
+                contentContainerStyle={[
+                    { padding: 24, paddingBottom: 120 },
+                    isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
+                ]}
+            >
                 {/* Exam Grid */}
                 <View className="flex-row items-center justify-between mb-4 ml-1">
                     <Text className="text-slate-800 font-black text-lg">Select Provider</Text>
@@ -463,7 +474,10 @@ export default function EducationScreen() {
             {/* Help Modal */}
              <Modal visible={showHelp} transparent animationType="fade" onRequestClose={() => setShowHelp(false)}>
                 <BlurView intensity={40} tint="dark" className="flex-1 items-center justify-center p-6">
-                    <View className="bg-white w-full rounded-[32px] p-8 shadow-2xl">
+                    <View 
+                        className="bg-white w-full rounded-[32px] p-8 shadow-2xl"
+                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }}
+                    >
                         <View className="w-16 h-16 bg-indigo-50 rounded-full items-center justify-center self-center mb-6">
                             <Ionicons name="information" size={32} color="#4F46E5" />
                         </View>
