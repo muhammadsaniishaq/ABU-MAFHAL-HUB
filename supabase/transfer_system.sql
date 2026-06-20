@@ -5,9 +5,10 @@ declare
   recipient_id uuid;
   recipient_name text;
   recipient_email text;
+  recipient_avatar text;
   result jsonb;
 begin
-  select id, full_name, email into recipient_id, recipient_name, recipient_email
+  select id, full_name, email, avatar_url into recipient_id, recipient_name, recipient_email, recipient_avatar
   from public.profiles
   where email = lower(trim(email_query));
 
@@ -18,7 +19,8 @@ begin
   result := jsonb_build_object(
     'id', recipient_id,
     'full_name', recipient_name,
-    'email', recipient_email
+    'email', recipient_email,
+    'avatar_url', recipient_avatar
   );
   
   return result;

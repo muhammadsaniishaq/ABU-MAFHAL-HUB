@@ -1,5 +1,5 @@
-import { View, Text, Image, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
@@ -17,140 +17,168 @@ export default function FlyerTemplateScreen() {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}&color=0d1b3e`;
 
     return (
-        <LinearGradient 
-            colors={['#060d21', '#0d1b3e']} 
-            style={s.container}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-        >
+        <View style={[s.pageWrapper, Platform.OS === 'web' && s.webPageWrapper]}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
             
-            {/* Top Logo Branded Section */}
-            <View style={s.brandSection}>
-                <Image 
-                    source={require('../assets/images/logo.png')} 
-                    style={s.logo} 
-                    resizeMode="contain" 
-                />
-                <Text style={s.brandName}>MAFHAL HUB</Text>
-                <Text style={s.brandTagline}>INSTANT QR PAYMENT</Text>
-            </View>
-
-            {/* Main Flyer Card */}
-            <View style={s.card}>
-                {/* Avatar Badge */}
-                <View style={s.avatarWrapper}>
-                    <Text style={s.avatarText}>{name ? (name as string)[0].toUpperCase() : 'U'}</Text>
-                </View>
-
-                <Text style={s.userName}>{name || 'Valued Customer'}</Text>
-                <Text style={s.userEmail}>{email || 'user@mafhalhub.com'}</Text>
-
-                {/* QR Code */}
-                <View style={s.qrWrapper}>
+            <LinearGradient 
+                colors={['#060d21', '#0d1b3e']} 
+                style={[s.container, Platform.OS === 'web' && s.webContainer]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+            >
+                {/* Top Logo Branded Section */}
+                <View style={s.brandSection}>
                     <Image 
-                        source={{ uri: qrUrl }} 
-                        style={s.qrImage}
-                        resizeMode="contain"
+                        source={require('../assets/images/logo.png')} 
+                        style={s.logo} 
+                        resizeMode="contain" 
                     />
+                    <Text style={s.brandName}>MAFHAL HUB</Text>
+                    <Text style={s.brandTagline}>INSTANT QR PAYMENT</Text>
                 </View>
 
-                {/* Scan Frame Accent decoration */}
-                <Text style={s.scanInstructions}>Scan this code to pay instantly</Text>
-            </View>
+                {/* Main Flyer Card */}
+                <View style={s.card}>
+                    {/* Avatar Badge */}
+                    <View style={s.avatarWrapper}>
+                        <Text style={s.avatarText}>{name ? (name as string)[0].toUpperCase() : 'U'}</Text>
+                    </View>
 
-            {/* Bottom Footer Section */}
-            <View style={s.footerSection}>
-                <Text style={s.footerSecurity}>🔒 SECURED BY SUPABASE & PAYSTACK</Text>
-            </View>
-        </LinearGradient>
+                    <Text style={s.userName} numberOfLines={1}>{name || 'Valued Customer'}</Text>
+                    <Text style={s.userEmail} numberOfLines={1}>{email || 'user@mafhalhub.com'}</Text>
+
+                    {/* QR Code */}
+                    <View style={s.qrWrapper}>
+                        <Image 
+                            source={{ uri: qrUrl }} 
+                            style={s.qrImage}
+                            resizeMode="contain"
+                        />
+                    </View>
+
+                    {/* Scan Frame Accent decoration */}
+                    <Text style={s.scanInstructions}>Scan this code to pay instantly</Text>
+                </View>
+
+                {/* Bottom Footer Section */}
+                <View style={s.footerSection}>
+                    <Text style={s.footerSecurity}>🔒 SECURED BY SUPABASE & PAYSTACK</Text>
+                </View>
+            </LinearGradient>
+        </View>
     );
 }
 
-// Import Stack dynamically from expo-router to handle header options
-import { Stack } from 'expo-router';
-
 const s = StyleSheet.create({
+  pageWrapper: {
+    flex: 1,
+    backgroundColor: '#060d21',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  webPageWrapper: {
+    minHeight: '100vh' as any,
+    padding: 16,
+  },
   container: {
-    width: 600,
-    height: 800,
+    flex: 1,
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: 620,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 50,
-    paddingHorizontal: 40,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
     alignSelf: 'center',
+    borderRadius: 24,
+    backgroundColor: 'rgba(6, 13, 33, 0.95)',
+  },
+  webContainer: {
+    flex: undefined as any,
+    maxHeight: undefined as any,
+    minHeight: 520,
+    paddingVertical: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   brandSection: {
     alignItems: 'center',
+    marginTop: 10,
   },
   logo: {
-    width: 60,
-    height: 60,
-    marginBottom: 10,
+    width: 50,
+    height: 50,
+    marginBottom: 6,
   },
   brandName: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 2,
   },
   brandTagline: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     color: '#f5a623',
     letterSpacing: 3,
-    marginTop: 4,
+    marginTop: 2,
   },
   card: {
     width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 36,
+    borderRadius: 28,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.15)',
-    padding: 30,
+    padding: 24,
     alignItems: 'center',
   },
   avatarWrapper: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: '900',
     color: '#0d1b3e',
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffffff',
     textAlign: 'center',
   },
   userEmail: {
-    fontSize: 13,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: '700',
-    marginTop: 4,
-    marginBottom: 24,
+    marginTop: 2,
+    marginBottom: 16,
     textAlign: 'center',
   },
   qrWrapper: {
-    padding: 16,
+    padding: 12,
     backgroundColor: '#ffffff',
-    borderRadius: 28,
-    marginBottom: 20,
+    borderRadius: 20,
+    marginBottom: 16,
   },
   qrImage: {
-    width: 200,
-    height: 200,
+    width: 170,
+    height: 170,
   },
   scanInstructions: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#f5a623',
     textTransform: 'uppercase',
@@ -158,9 +186,10 @@ const s = StyleSheet.create({
   },
   footerSection: {
     alignItems: 'center',
+    marginBottom: 10,
   },
   footerSecurity: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.3)',
     letterSpacing: 1,

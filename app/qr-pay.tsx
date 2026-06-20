@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, Alert, Modal, TextInput, Share, Vibration, Image, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, Alert, Modal, TextInput, Share, Vibration, Image, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +10,8 @@ import { BlurView } from 'expo-blur';
 import SecurityModal from '../components/SecurityModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from 'expo-image-picker';
+import { useIsFocused } from '@react-navigation/native';
 
 const T = {
   navy:    '#0d1b3e',
@@ -25,10 +27,12 @@ const T = {
 
 export default function QRPayScreen() {
     const router = useRouter();
+    const isFocused = useIsFocused();
     const [activeTab, setActiveTab] = useState<'scan' | 'mycode'>('scan');
     const [permission, requestPermission] = useCameraPermissions();
     const [torchEnabled, setTorchEnabled] = useState(false);
     const [scanned, setScanned] = useState(false);
+    const [cameraActive, setCameraActive] = useState(false);
     
     // User data
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -46,6 +50,10 @@ export default function QRPayScreen() {
     const [manualInput, setManualInput] = useState('');
     const [isVerifyingManual, setIsVerifyingManual] = useState(false);
     
+    // Gallery Upload states
+    const [isReadingGallery, setIsReadingGallery] = useState(false);
+    const [isSharingReceipt, setIsSharingReceipt] = useState(false);
+    
     // Form Inputs
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
@@ -58,7 +66,7 @@ export default function QRPayScreen() {
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'scan' && permission?.granted && !scanned) {
+        if (activeTab === 'scan' && permission?.granted && isFocused && !scanned) {
             // Laser line looping animation
             scanLineAnim.setValue(0);
             Animated.loop(
@@ -78,7 +86,7 @@ export default function QRPayScreen() {
         } else {
             scanLineAnim.stopAnimation();
         }
-    }, [activeTab, permission, scanned]);
+    }, [activeTab, permission, isFocused, scanned]);
 
     const loadUserProfile = async () => {
         try {
@@ -91,7 +99,7 @@ export default function QRPayScreen() {
                     .single();
                 if (profile) {
                     setCurrentUser(profile);
-                    setUserBalance(parseFloat(profile.balance || '0'));
+                    setUserBalance(parseFloat(profile.balance?.toString() || '0'));
                 }
             }
         } catch (e) {
@@ -154,9 +162,67 @@ export default function QRPayScreen() {
         }
     };
 
+    const handleUploadFromGallery = async () => {
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert("Permission Denied", "We need access to your gallery to upload QR images.");
+                return;
+            }
+
+            const pickerResult = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 1,
+            });
+
+            if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
+                return;
+            }
+
+            const selectedImage = pickerResult.assets[0];
+            setIsReadingGallery(true);
+
+            // Create form data to send to the qrserver decoding API
+            const formData = new FormData();
+            
+            if (Platform.OS === 'web') {
+                const response = await fetch(selectedImage.uri);
+                const blob = await response.blob();
+                formData.append('file', blob, 'qr.png');
+            } else {
+                formData.append('file', {
+                    uri: selectedImage.uri,
+                    name: 'qr.png',
+                    type: 'image/png',
+                } as any);
+            }
+
+            const response = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+            setIsReadingGallery(false);
+
+            const qrText = result[0]?.symbol[0]?.data;
+            if (qrText) {
+                onBarcodeScanned({ data: qrText });
+            } else {
+                Alert.alert("Scan Failed", "No valid QR code was detected in the selected image. Please make sure it is clear.");
+            }
+        } catch (e: any) {
+            setIsReadingGallery(false);
+            console.error("Gallery scan error:", e);
+            Alert.alert("Scan Error", "Failed to scan QR code from gallery. Check your network connection.");
+        }
+    };
+
     const onBarcodeScanned = async ({ data }: { data: string }) => {
         if (scanned || confirmModalVisible || successModalVisible) return;
         setScanned(true);
+        setCameraActive(false);
         Vibration.vibrate(100);
         
         try {
@@ -180,7 +246,7 @@ export default function QRPayScreen() {
                 }
             }
 
-            let query = supabase.from('profiles').select('id, full_name, email');
+            let query = supabase.from('profiles').select('id, full_name, email, avatar_url');
             if (userId) {
                 query = query.eq('id', userId);
             } else if (email) {
@@ -211,7 +277,8 @@ export default function QRPayScreen() {
             setScannedUser({
                 userId: recipient.id,
                 name: recipient.full_name,
-                email: recipient.email
+                email: recipient.email,
+                avatarUrl: recipient.avatar_url
             });
             setConfirmModalVisible(true);
         } catch (err: any) {
@@ -229,7 +296,6 @@ export default function QRPayScreen() {
         
         setIsVerifyingManual(true);
         try {
-            // Call Supabase RPC find_profile_by_email to safely query recipient bypassing RLS constraints
             const { data: recipient, error } = await supabase.rpc('find_profile_by_email', {
                 email_query: manualInput.trim().toLowerCase()
             });
@@ -249,7 +315,8 @@ export default function QRPayScreen() {
             setScannedUser({
                 userId: recipient.id,
                 name: recipient.full_name,
-                email: recipient.email
+                email: recipient.email,
+                avatarUrl: recipient.avatar_url
             });
             setManualInputVisible(false);
             setManualInput('');
@@ -286,7 +353,6 @@ export default function QRPayScreen() {
             const senderId = currentUser.id;
             const recipientId = scannedUser.userId;
 
-            // Call Supabase RPC execute_wallet_transfer to perform the double-entry transaction atomically on the backend
             const { data, error } = await supabase.rpc('execute_wallet_transfer', {
                 sender_id: senderId,
                 target_id: recipientId,
@@ -315,8 +381,80 @@ export default function QRPayScreen() {
         setAmount('');
         setDescription('');
         setScanned(false);
+        setCameraActive(false);
         setScannedUser(null);
-        router.replace('/(app)/dashboard');
+    };
+
+    const handleShareReceipt = async () => {
+        if (!scannedUser || !amount || isSharingReceipt) return;
+        
+        setIsSharingReceipt(true);
+        const transferAmt = parseFloat(amount);
+        const dateStr = new Date().toLocaleDateString('en-NG', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        const reference = 'QR-' + Math.floor(Date.now() / 1000);
+        
+        // 1. Construct the receipt template URL
+        const domain = Platform.OS === 'web' ? window.location.origin : 'https://abumafhal.com.ng';
+        const receiptUrl = `${domain}/receipt-template?amount=${transferAmt}&sender=${encodeURIComponent(currentUser?.full_name || 'Mafhal User')}&recipient=${encodeURIComponent(scannedUser.name)}&email=${encodeURIComponent(scannedUser.email)}&ref=${reference}&date=${encodeURIComponent(dateStr)}`;
+        
+        // 2. Fetch the screenshot image generated by thum.io
+        const thumIoUrl = `https://image.thum.io/get/width/600/crop/800/maxAge/12/${receiptUrl}`;
+
+        try {
+            if (Platform.OS === 'web') {
+                // On Web, trigger a download of the receipt PNG image
+                const response = await fetch(thumIoUrl);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = `mafhal_receipt_${reference}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(blobUrl);
+            } else {
+                // On Mobile (Android/iOS), download the receipt image to Cache, then share as a real image file!
+                const fileUri = `${FileSystem.cacheDirectory}mafhal_receipt_${reference}.png`;
+                const { uri } = await FileSystem.downloadAsync(thumIoUrl, fileUri);
+
+                // Share the downloaded receipt image file
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'image/png',
+                    dialogTitle: `Mafhal Hub Receipt - Ref: ${reference}`,
+                });
+            }
+        } catch (error: any) {
+            console.error("Receipt share error:", error);
+            // Fallback to text sharing if file sharing/download fails
+            try {
+                const receiptText = `*MAFHAL HUB - TRANSACTION RECEIPT*\n\n` +
+                    `👤 *Sender*: ${currentUser?.full_name || 'Mafhal User'}\n` +
+                    `👤 *Recipient*: ${scannedUser.name}\n` +
+                    `📧 *Email*: ${scannedUser.email}\n` +
+                    `💵 *Amount*: ₦${transferAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}\n` +
+                    `📅 *Date*: ${dateStr}\n` +
+                    `📌 *Ref*: ${reference}\n` +
+                    `⚡ *Status*: SUCCESSFUL\n\n` +
+                    `Secured by Mafhal Hub Transfer System.`;
+                
+                await Share.share({
+                    title: `Transaction Receipt`,
+                    message: receiptText,
+                });
+            } catch (fallbackError: any) {
+                Alert.alert("Share Error", fallbackError.message);
+            }
+        } finally {
+            setIsSharingReceipt(false);
+        }
     };
 
     if (!permission) {
@@ -349,20 +487,23 @@ export default function QRPayScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
                   <Ionicons name="arrow-back" size={20} color="white" />
                 </TouchableOpacity>
-                <Text style={s.headerTitle}>QR Payment</Text>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={s.headerTitle}>QR Payment</Text>
+                  <Text style={s.headerBalance}>₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                </View>
                 <View style={{ width: 32 }} />
               </View>
 
               {/* Tab Switcher */}
               <View style={s.tabContainer}>
                 <TouchableOpacity
-                    onPress={() => setActiveTab('scan')}
+                    onPress={() => { setActiveTab('scan'); setCameraActive(false); }}
                     style={[s.tabItem, activeTab === 'scan' && s.tabItemActive]}
                 >
                     <Text style={[s.tabText, activeTab === 'scan' && s.tabTextActive]}>Scan Code</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    onPress={() => setActiveTab('mycode')}
+                    onPress={() => { setActiveTab('mycode'); setCameraActive(false); }}
                     style={[s.tabItem, activeTab === 'mycode' && s.tabItemActive]}
                 >
                     <Text style={[s.tabText, activeTab === 'mycode' && s.tabTextActive]}>My QR Code</Text>
@@ -372,8 +513,100 @@ export default function QRPayScreen() {
 
             {activeTab === 'scan' ? (
                 <View style={{ flex: 1, marginTop: -16 }}>
-                    {!permission.granted ? (
+                    {!cameraActive ? (
+                        <ScrollView contentContainerStyle={s.scanDashboardContainer} className="flex-1 px-6 pt-8 pb-12">
+                            {/* Glassmorphic card for QR options */}
+                            <LinearGradient
+                                colors={['#102258', '#0b163a']}
+                                style={s.dashboardCard}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={s.dashboardCardHeader}>
+                                    <View style={s.dashboardIconWrapper}>
+                                        <Ionicons name="qr-code-outline" size={28} color="#f5a623" />
+                                    </View>
+                                    <Text style={s.dashboardCardTitle}>Instant QR Transfer</Text>
+                                    <Text style={s.dashboardCardSub}>Select how you want to initiate your payment.</Text>
+                                </View>
+
+                                {/* Option 1: Scan with Camera */}
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        if (!permission?.granted) {
+                                            const res = await requestPermission();
+                                            if (res.granted) {
+                                                setCameraActive(true);
+                                            }
+                                        } else {
+                                            setCameraActive(true);
+                                        }
+                                    }}
+                                    style={s.dashboardOptionBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={s.optionIconWrapper}>
+                                        <Ionicons name="camera" size={22} color="white" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={s.optionTitle}>Scan QR Code</Text>
+                                        <Text style={s.optionSub}>Use camera to scan recipient's code</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+                                </TouchableOpacity>
+
+                                {/* Option 2: Upload from Gallery */}
+                                <TouchableOpacity 
+                                    onPress={handleUploadFromGallery}
+                                    style={s.dashboardOptionBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.optionIconWrapper, { backgroundColor: '#10b981' }]}>
+                                        <Ionicons name="image" size={22} color="white" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={s.optionTitle}>Upload from Gallery</Text>
+                                        <Text style={s.optionSub}>Select a QR image from your photos</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+                                </TouchableOpacity>
+
+                                {/* Option 3: Pay via Email */}
+                                <TouchableOpacity 
+                                    onPress={() => setManualInputVisible(true)}
+                                    style={s.dashboardOptionBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[s.optionIconWrapper, { backgroundColor: '#4f46e5' }]}>
+                                        <Ionicons name="mail" size={22} color="white" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={s.optionTitle}>Pay via Email</Text>
+                                        <Text style={s.optionSub}>Type registered email manually</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+                                </TouchableOpacity>
+                            </LinearGradient>
+
+                            {/* Info Section */}
+                            <View className="mt-8 bg-white p-5 rounded-2xl border border-slate-100 flex-row items-start">
+                                <Ionicons name="shield-checkmark" size={20} color="#0056D2" style={{ marginTop: 2, marginRight: 10 }} />
+                                <View className="flex-1">
+                                    <Text className="text-slate-800 font-bold text-sm mb-1">Secure Payments</Text>
+                                    <Text className="text-slate-400 text-xs font-semibold leading-relaxed">
+                                        All transactions are fully encrypted. Funds are transferred instantly to the recipient's wallet balance.
+                                    </Text>
+                                </View>
+                            </View>
+                        </ScrollView>
+                    ) : !permission?.granted ? (
                         <View style={s.permissionCard}>
+                            <TouchableOpacity 
+                                onPress={() => setCameraActive(false)}
+                                style={{ position: 'absolute', top: 20, right: 20 }}
+                            >
+                                <Ionicons name="close" size={24} color="#0d1b3e" />
+                            </TouchableOpacity>
                             <View style={s.permissionIconWrapper}>
                                 <Ionicons name="camera-outline" size={48} color="#0056D2" />
                             </View>
@@ -391,23 +624,11 @@ export default function QRPayScreen() {
                                     <Text style={s.grantBtnText}>Grant Permission</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
-
-                            <TouchableOpacity 
-                                onPress={() => setManualInputVisible(true)}
-                                className="mt-5"
-                                activeOpacity={0.7}
-                            >
-                                <Text style={s.manualLinkText}>Or Enter Email Manually</Text>
-                            </TouchableOpacity>
                         </View>
                     ) : (
                         <View className="flex-1 bg-black relative">
-                            {scanned ? (
-                                <View className="flex-1 items-center justify-center bg-black/80">
-                                    <ActivityIndicator size="large" color="#f5a623" />
-                                    <Text className="text-white font-bold mt-4">Processing scan...</Text>
-                                </View>
-                            ) : (
+                            {/* Render Camera ONLY when screen is focused to release GPU/camera hardware and prevent lag */}
+                            {isFocused && !scanned ? (
                                 <CameraView
                                     style={StyleSheet.absoluteFillObject}
                                     facing="back"
@@ -417,12 +638,27 @@ export default function QRPayScreen() {
                                         barcodeTypes: ["qr"],
                                     }}
                                 />
+                            ) : (
+                                <View className="flex-1 items-center justify-center bg-black/95">
+                                    <ActivityIndicator size="large" color="#f5a623" />
+                                    <Text className="text-white font-bold mt-4">Processing scan...</Text>
+                                </View>
                             )}
 
                             {/* Viewfinder overlay */}
                             {!scanned && (
                                 <View style={s.overlayContainer}>
-                                    <View style={s.overlayTop} />
+                                    {/* Top Overlay Section with back button inside camera */}
+                                    <View style={s.overlayTop}>
+                                        <TouchableOpacity 
+                                            onPress={() => setCameraActive(false)}
+                                            style={s.floatingBackBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Ionicons name="close" size={24} color="white" />
+                                        </TouchableOpacity>
+                                        <Text style={s.cameraTitleText}>QR Scanner</Text>
+                                    </View>
                                     <View style={s.overlayMiddle}>
                                         <View style={s.overlaySide} />
                                         <View style={s.scanWindow}>
@@ -438,14 +674,23 @@ export default function QRPayScreen() {
                                     <View style={s.overlayBottom}>
                                         <Text style={s.overlayText}>Align the QR code within the frame to pay</Text>
                                         
-                                        <View className="flex-row gap-4 px-6 justify-center w-full">
+                                        <View style={s.buttonRow}>
                                             <TouchableOpacity 
                                                 onPress={() => setTorchEnabled(!torchEnabled)}
                                                 style={s.torchBtn}
                                                 activeOpacity={0.8}
                                             >
-                                                <Ionicons name={torchEnabled ? "flash" : "flash-off"} size={16} color="white" />
-                                                <Text style={s.torchBtnText}>{torchEnabled ? "Flash On" : "Flash Off"}</Text>
+                                                <Ionicons name={torchEnabled ? "flash" : "flash-off"} size={14} color="white" />
+                                                <Text style={s.torchBtnText}>{torchEnabled ? "Flash" : "Flash"}</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity 
+                                                onPress={handleUploadFromGallery}
+                                                style={s.torchBtn}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Ionicons name="image-outline" size={14} color="white" />
+                                                <Text style={s.torchBtnText}>Gallery</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity 
@@ -453,8 +698,8 @@ export default function QRPayScreen() {
                                                 style={s.torchBtn}
                                                 activeOpacity={0.8}
                                             >
-                                                <Ionicons name="create-outline" size={16} color="white" />
-                                                <Text style={s.torchBtnText}>Enter Email</Text>
+                                                <Ionicons name="create-outline" size={14} color="white" />
+                                                <Text style={s.torchBtnText}>Email</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -472,7 +717,6 @@ export default function QRPayScreen() {
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                         >
-                            {/* Watermark Logo */}
                             <View style={s.myCodeWatermark}>
                                 <Image source={require('../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.05 }} resizeMode="contain" />
                             </View>
@@ -516,69 +760,101 @@ export default function QRPayScreen() {
             )}
 
             {/* CONFIRM / AMOUNT INPUT MODAL */}
-            <Modal visible={confirmModalVisible} transparent animationType="slide">
-                <View className="flex-1 justify-end bg-black/60">
-                    <View className="bg-white rounded-t-[36px] p-6 pb-10">
-                        {/* Drag Handle */}
-                        <View className="w-10 h-1 bg-slate-200 rounded-full self-center mb-6" />
+            <Modal visible={confirmModalVisible} transparent animationType="slide" onRequestClose={() => { setConfirmModalVisible(false); setScanned(false); }}>
+                <View style={s.modalOverlay}>
+                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+                    
+                    <KeyboardAvoidingView 
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ width: '100%', alignItems: 'center' }}
+                    >
+                        <LinearGradient
+                            colors={['#102258', '#0b163a']}
+                            style={s.decoratedModalCard}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <View style={s.modalPill} />
+                            
+                            <Text style={s.decoratedModalTitle}>Send Wallet Transfer</Text>
 
-                        <Text className="text-center font-black text-slate-800 text-lg mb-6">Send Money via QR</Text>
+                            {scannedUser && (
+                                <View style={s.recipientBadge}>
+                                    <LinearGradient 
+                                        colors={['#f5a623', '#d4890e']}
+                                        style={s.recipientAvatarRing}
+                                    >
+                                        <View style={s.recipientAvatarInner}>
+                                            {scannedUser.avatarUrl ? (
+                                                <Image 
+                                                    source={{ uri: scannedUser.avatarUrl }} 
+                                                    style={{ width: '100%', height: '100%', borderRadius: 20 }}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <Text style={s.recipientAvatarText}>
+                                                    {scannedUser.name ? scannedUser.name[0].toUpperCase() : 'U'}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </LinearGradient>
+                                    <View style={{ marginLeft: 12, flex: 1 }}>
+                                        <Text style={s.recipientNameText} numberOfLines={1}>{scannedUser.name}</Text>
+                                        <Text style={s.recipientEmailText} numberOfLines={1}>{scannedUser.email}</Text>
+                                    </View>
+                                </View>
+                            )}
 
-                        {scannedUser && (
-                            <View className="flex-row items-center bg-[#f4f6fb] p-4 rounded-2xl mb-6 border border-gray-100">
-                                <View className="w-12 h-12 rounded-full bg-blue-100 items-center justify-center mr-4">
-                                    <Text className="font-black text-blue-700 text-lg">{scannedUser.name[0]}</Text>
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="font-black text-slate-800 text-base">{scannedUser.name}</Text>
-                                    <Text className="text-slate-400 text-xs font-semibold">{scannedUser.email}</Text>
-                                </View>
+                            {/* Amount */}
+                            <Text style={s.inputLabelDecorated}>Amount to Send</Text>
+                            <View style={s.inputContainerDecorated}>
+                                <Text style={s.currencySymbol}>₦</Text>
+                                <TextInput
+                                    style={s.amountInputDecorated}
+                                    keyboardType="number-pad"
+                                    value={amount}
+                                    onChangeText={setAmount}
+                                    placeholder="0.00"
+                                    placeholderTextColor="rgba(255,255,255,0.2)"
+                                    autoFocus
+                                />
                             </View>
-                        )}
+                            
+                            <View style={s.balanceWrapper}>
+                                <Ionicons name="wallet-outline" size={14} color="#f5a623" />
+                                <Text style={s.balanceTextDecorated}>
+                                    Available: <Text style={{ color: 'white', fontWeight: '900' }}>₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                </Text>
+                            </View>
 
-                        {/* Amount */}
-                        <Text className="text-slate font-black text-xs uppercase tracking-wider mb-2">Amount to Send</Text>
-                        <View className="flex-row items-center border border-slate-200 rounded-2xl px-4 h-16 bg-slate-50 mb-2">
-                            <Text className="text-slate-500 text-xl font-bold mr-2">₦</Text>
-                            <TextInput
-                                className="flex-1 text-2xl font-black text-slate-800"
-                                keyboardType="number-pad"
-                                value={amount}
-                                onChangeText={setAmount}
-                                placeholder="0.00"
-                                placeholderTextColor="#cbd5e1"
-                            />
-                        </View>
-                        <Text className="text-slate-400 text-xs font-semibold mb-6">
-                            Available Balance: <Text className="text-[#0056D2] font-black">₦{userBalance.toLocaleString()}</Text>
-                        </Text>
-
-                        {/* Description */}
-                        <Text className="text-slate font-black text-xs uppercase tracking-wider mb-2">Note (Optional)</Text>
-                        <TextInput
-                            className="border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 bg-slate-50 mb-8 font-semibold"
-                            value={description}
-                            onChangeText={setDescription}
-                            placeholder="Add a payment note"
-                            placeholderTextColor="#cbd5e1"
-                        />
-
-                        {/* Action buttons */}
-                        <View className="flex-row gap-4">
-                            <TouchableOpacity 
-                                onPress={() => { setConfirmModalVisible(false); setScanned(false); }}
-                                className="flex-1 h-14 bg-slate-100 rounded-2xl items-center justify-center border border-slate-200"
-                            >
-                                <Text className="text-slate-600 font-bold text-base">Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                onPress={handleConfirmTransfer}
-                                className="flex-1 h-14 bg-[#0056D2] rounded-2xl items-center justify-center shadow-lg"
-                            >
-                                <Text className="text-white font-bold text-base">Continue</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                            {/* Action buttons */}
+                            <View style={s.btnRowDecorated}>
+                                <TouchableOpacity 
+                                    onPress={() => { setConfirmModalVisible(false); setScanned(false); setCameraActive(false); }}
+                                    style={s.cancelBtnDecorated}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={s.cancelBtnTextDecorated}>Cancel</Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity 
+                                    onPress={handleConfirmTransfer}
+                                    style={s.sendBtnDecorated}
+                                    activeOpacity={0.9}
+                                >
+                                    <LinearGradient 
+                                        colors={['#f5a623', '#d4890e']}
+                                        style={s.sendBtnGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                    >
+                                        <Text style={s.sendBtnText}>Send Money</Text>
+                                        <Ionicons name="paper-plane" size={14} color={T.navy} style={{ marginLeft: 6 }} />
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        </LinearGradient>
+                    </KeyboardAvoidingView>
                 </View>
             </Modal>
 
@@ -658,10 +934,9 @@ export default function QRPayScreen() {
             />
 
             {/* TRANSACTION SUCCESS MODAL */}
-            <Modal visible={successModalVisible} transparent animationType="fade">
+            <Modal visible={successModalVisible} transparent animationType="fade" onRequestClose={handleSuccessDone}>
                 <View className="flex-1 bg-black/60 items-center justify-center p-6">
                     <View className="bg-white rounded-[32px] p-6 items-center w-full max-w-[340px] shadow-2xl relative overflow-hidden">
-                        {/* Decorative background shapes */}
                         <View className="absolute -top-10 -left-10 w-24 h-24 bg-green-50 rounded-full" />
                         
                         <View className="w-20 h-20 bg-emerald-100 rounded-full items-center justify-center mb-6 shadow-inner mt-4">
@@ -687,22 +962,43 @@ export default function QRPayScreen() {
                             </View>
                         </View>
 
-                        <TouchableOpacity 
-                            onPress={handleSuccessDone}
-                            className="w-full bg-[#107C10] h-14 rounded-2xl items-center justify-center shadow-lg active:bg-green-700"
-                        >
-                            <Text className="text-white font-bold text-base">Done</Text>
-                        </TouchableOpacity>
+                        {/* Action buttons */}
+                        <View className="w-full gap-3">
+                            <TouchableOpacity 
+                                onPress={handleShareReceipt}
+                                disabled={isSharingReceipt}
+                                className="w-full bg-slate-100 h-14 rounded-2xl items-center justify-center border border-slate-200 flex-row gap-2"
+                                activeOpacity={0.8}
+                            >
+                                {isSharingReceipt ? (
+                                    <ActivityIndicator size="small" color="#475569" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="share-social" size={18} color="#475569" />
+                                        <Text className="text-slate-700 font-bold text-base">Share Receipt</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={handleSuccessDone}
+                                className="w-full bg-[#107C10] h-14 rounded-2xl items-center justify-center shadow-lg active:bg-green-700"
+                            >
+                                <Text className="text-white font-bold text-base">Done</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* Global Loader overlay for submissions */}
-            {isSubmitting && (
+            {/* Global Loader overlay for submissions, loading states, and gallery scanning */}
+            {(isSubmitting || isReadingGallery) && (
                 <View className="absolute inset-0 bg-black/60 items-center justify-center z-50">
                     <View className="bg-white p-6 rounded-2xl flex-row items-center gap-4 border border-gray-100 shadow-xl">
                         <ActivityIndicator size="small" color="#0056D2" />
-                        <Text className="text-slate-800 font-bold">Executing transaction...</Text>
+                        <Text className="text-slate-800 font-bold">
+                            {isReadingGallery ? "Scanning gallery image..." : "Executing transaction..."}
+                        </Text>
                     </View>
                 </View>
             )}
@@ -1048,6 +1344,19 @@ const s = StyleSheet.create({
   overlayTop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
+    position: 'relative',
+  },
+  floatingBackBtn: {
+    position: 'absolute',
+    top: 24,
+    left: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
   },
   overlayMiddle: {
     flexDirection: 'row',
@@ -1074,23 +1383,30 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    width: '100%',
   },
   torchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   torchBtnText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
-    marginLeft: 6,
+    marginLeft: 4,
   },
   // Corners
   corner: {
@@ -1139,5 +1455,237 @@ const s = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 4,
     elevation: 2,
+  },
+  scanDashboardContainer: {
+    paddingBottom: 40,
+  },
+  dashboardCard: {
+    borderRadius: 24,
+    padding: 24,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#0d1b3e',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  dashboardCardHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingBottom: 20,
+  },
+  dashboardIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  dashboardCardTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: 'white',
+    letterSpacing: -0.3,
+  },
+  dashboardCardSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  dashboardOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginBottom: 12,
+  },
+  optionIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#0056D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: 'white',
+  },
+  optionSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  cameraTitleText: {
+    position: 'absolute',
+    top: 32,
+    left: 80,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  headerBalance: {
+    color: '#f5a623',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  decoratedModalCard: {
+    width: '90%',
+    maxWidth: 340,
+    backgroundColor: '#0d1b3e',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+    alignItems: 'stretch',
+  },
+  decoratedModalTitle: {
+    color: 'white',
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  recipientBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 20,
+  },
+  recipientAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientAvatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#0d1b3e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientAvatarText: {
+    color: '#f5a623',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  recipientNameText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  recipientEmailText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  inputLabelDecorated: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  inputContainerDecorated: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginBottom: 8,
+  },
+  currencySymbol: {
+    color: '#f5a623',
+    fontSize: 20,
+    fontWeight: '900',
+    marginRight: 8,
+  },
+  amountInputDecorated: {
+    flex: 1,
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  balanceWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    marginLeft: 2,
+  },
+  balanceTextDecorated: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  btnRowDecorated: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelBtnDecorated: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnTextDecorated: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sendBtnDecorated: {
+    flex: 1.5,
+    height: 48,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  sendBtnGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnText: {
+    color: '#0d1b3e',
+    fontSize: 13,
+    fontWeight: '900',
   }
 });
