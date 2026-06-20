@@ -564,11 +564,11 @@ export default function DataScreen() {
                                                 <Text style={s.ussdActionText}>Copy</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity 
-                                                style={[s.ussdActionBtn, { backgroundColor: '#eff6ff' }]} 
+                                                style={[s.ussdActionBtn, { backgroundColor: '#f4f6fb' }]} 
                                                 onPress={() => Linking.openURL(`tel:${encodeURIComponent(item.code)}`)}
                                             >
-                                                <Ionicons name="call-outline" size={13} color="#2563eb" />
-                                                <Text style={[s.ussdActionText, { color: '#2563eb' }]}>Dial</Text>
+                                                <Ionicons name="call-outline" size={13} color="#0d1b3e" />
+                                                <Text style={[s.ussdActionText, { color: '#0d1b3e' }]}>Dial</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -588,7 +588,7 @@ export default function DataScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="calculator-outline" size={16} color="#2563eb" style={{ marginRight: 6 }} />
+                                <Ionicons name="calculator-outline" size={16} color="#0d1b3e" style={{ marginRight: 6 }} />
                                 <Text style={s.estimatorHeaderTitle}>Data Usage Estimator & Recommendations</Text>
                             </View>
                             <Ionicons 
@@ -686,7 +686,7 @@ export default function DataScreen() {
                                                 <Text style={s.resultLbl}>Weekly Est.</Text>
                                             </View>
                                             <View style={[s.resultBox, { borderLeftWidth: 1, borderLeftColor: '#e2e8f0' }]}>
-                                                <Text style={[s.resultVal, { color: '#2563eb' }]}>{monthlyGB} GB</Text>
+                                                <Text style={[s.resultVal, { color: '#0d1b3e' }]}>{monthlyGB} GB</Text>
                                                 <Text style={s.resultLbl}>Monthly Est.</Text>
                                             </View>
                                             
@@ -932,8 +932,8 @@ export default function DataScreen() {
                             ratingBg = '#dcfce7';
                         } else if (costPerGB < 400) {
                             rating = 'Highly Cost-Efficient ⭐';
-                            ratingColor = '#1e3a8a';
-                            ratingBg = '#dbeafe';
+                            ratingColor = '#0d1b3e';
+                            ratingBg = '#f4f6fb';
                         } else if (costPerGB < 600) {
                             rating = 'Good Value 👍';
                             ratingColor = '#854d0e';
@@ -943,7 +943,7 @@ export default function DataScreen() {
                         return (
                             <View style={s.efficiencyContainer}>
                                 <View style={s.efficiencyLeft}>
-                                    <Ionicons name="stats-chart" size={15} color="#2563eb" style={{ marginRight: 6 }} />
+                                    <Ionicons name="stats-chart" size={15} color="#0d1b3e" style={{ marginRight: 6 }} />
                                     <Text style={s.efficiencyTitle}>Plan Cost-Efficiency</Text>
                                 </View>
                                 <View style={{ alignItems: 'flex-end' }}>
@@ -1209,10 +1209,10 @@ export default function DataScreen() {
                                     }}
                                 >
                                     <LinearGradient
-                                        colors={['#eff6ff', '#dbeafe']}
+                                        colors={['#f4f6fb', '#e2e8f0']}
                                         style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
                                     >
-                                        <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
+                                        <Text style={{ color: '#0d1b3e', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
                                     </LinearGradient>
                                     <View style={{ flex: 1 }}>
                                         <Text className="font-bold text-gray-800" numberOfLines={1}>{item.name}</Text>
@@ -1470,7 +1470,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   planCardSelected: {
-    borderColor: '#0d1b3e',
+    borderColor: '#f5a623',
     borderWidth: 2,
     shadowOpacity: 0.12,
     shadowRadius: 14,
@@ -1519,7 +1519,7 @@ const s = StyleSheet.create({
   planPrice: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#2563eb',
+    color: '#0d1b3e',
   },
   planPriceSelected: {
     color: '#f5a623',
@@ -1590,11 +1590,11 @@ const s = StyleSheet.create({
     width: '100%',
   },
   purchaseBtn: {
-    height: 52,
+    height: 50,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2563eb',
+    shadowColor: '#0d1b3e',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
@@ -1862,7 +1862,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   customSwitchOn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0d1b3e',
   },
   customSwitchOff: {
     backgroundColor: '#cbd5e1',
@@ -1947,7 +1947,7 @@ const s = StyleSheet.create({
   efficiencyText: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#2563eb',
+    color: '#0d1b3e',
   },
   efficiencyRatingBadge: {
     paddingHorizontal: 6,

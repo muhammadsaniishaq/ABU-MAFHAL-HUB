@@ -86,6 +86,10 @@ Deno.serve(async (req) => {
         
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+        // Fetch Markup Configs
+        const { data: configs } = await supabaseAdmin.from('data_configs').select('*');
+        const configMap = new Map(configs?.map((c: any) => [c.network.toLowerCase(), c]) || []);
+
         const networksData = data.MOBILE_NETWORK;
         let totalInserted = 0;
 
@@ -155,12 +159,16 @@ Deno.serve(async (req) => {
                     // Debugging removed for production
 
 
-                    const { data: existing } = await supabaseAdmin.from('data_plans').select('selling_price').eq('plan_id', planId).single();
-                    
-                    let finalSellingPrice = costPrice + 50; // Default Markup
-                    if (existing) {
-                        finalSellingPrice = existing.selling_price;
+                    const config = configMap.get(networkName);
+                    let finalSellingPrice = costPrice + 50.00; // Default Markup
+                    if (config) {
+                        if (config.markup_type === 'percentage') {
+                            finalSellingPrice = costPrice * (1 + (parseFloat(config.markup_value) / 100));
+                        } else {
+                            finalSellingPrice = costPrice + parseFloat(config.markup_value);
+                        }
                     }
+                    finalSellingPrice = Math.round(finalSellingPrice);
                     
                     const { error: upsertError } = await supabaseAdmin.from('data_plans').upsert({
                             network: networkName,
