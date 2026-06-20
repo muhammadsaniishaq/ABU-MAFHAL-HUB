@@ -251,13 +251,13 @@ export default function ProfileScreen() {
                 
                 {/* 1. CURVED HEADER GRADIENT */}
                 <LinearGradient
-                    colors={['#051124', '#0d2345']}
+                    colors={['#060d21', '#0d1b3e']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    className="pt-16 pb-24 px-6 rounded-b-[40px] shadow-xl relative"
+                    className="pt-16 pb-20 px-6 rounded-b-[32px] shadow-xl relative"
                 >
                     {/* Top Row: Logo & Action Icons */}
-                    <View className="flex-row items-center justify-between mb-8">
+                    <View className="flex-row items-center justify-between mb-6">
                         <View className="flex-row items-center gap-2">
                             <Image 
                                 source={require('../../assets/images/logo-icon.png')} 
@@ -270,24 +270,24 @@ export default function ProfileScreen() {
                             </View>
                         </View>
 
-                        <View className="flex-row items-center gap-4">
+                        <View className="flex-row items-center gap-3">
                             {/* Notification Bell */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
-                                className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/10 relative"
+                                className="w-9 h-9 bg-white/10 rounded-full items-center justify-center border border-white/10 relative"
                             >
-                                <Ionicons name="notifications" size={20} color="white" />
-                                <View className="absolute -top-1 -right-1 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#051124]">
-                                    <Text className="text-white text-[9px] font-black">3</Text>
+                                <Ionicons name="notifications" size={18} color="white" />
+                                <View className="absolute -top-1 -right-1 bg-red-500 w-4 h-4 rounded-full items-center justify-center border-2 border-[#060d21]">
+                                    <Text className="text-white text-[8px] font-black">3</Text>
                                 </View>
                             </TouchableOpacity>
 
                             {/* Settings Cog */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
-                                className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/10"
+                                className="w-9 h-9 bg-white/10 rounded-full items-center justify-center border border-white/10"
                             >
-                                <Ionicons name="settings" size={20} color="white" />
+                                <Ionicons name="settings" size={18} color="white" />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -296,15 +296,17 @@ export default function ProfileScreen() {
                     <View className="flex-row items-center">
                         {/* Avatar Picker Container */}
                         <View className="relative">
-                            <View className="w-20 h-20 bg-white/10 rounded-full items-center justify-center border-2 border-white/20 overflow-hidden">
+                            <View className="w-16 h-16 bg-white/10 rounded-full items-center justify-center border-2 border-white/20 overflow-hidden">
                                 {profile?.avatar_url ? (
                                     <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
                                 ) : (
                                     <LinearGradient
-                                        colors={['#4f46e5', '#818cf8']}
+                                        colors={['#0d1b3e', '#f5a623']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
                                         className="w-full h-full items-center justify-center"
                                     >
-                                        <Text className="text-3xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
+                                        <Text className="text-2xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
                                     </LinearGradient>
                                 )}
                             </View>
@@ -312,41 +314,41 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={pickImage} 
                                 disabled={uploading}
-                                className="absolute bottom-0 right-0 bg-white w-7 h-7 rounded-full items-center justify-center border border-slate-200 shadow-md"
+                                className="absolute bottom-0 right-0 bg-[#f5a623] w-6 h-6 rounded-full items-center justify-center border border-white shadow-md"
                             >
                                 {uploading ? (
-                                    <ActivityIndicator size="small" color="#051124" />
+                                    <ActivityIndicator size="small" color="white" />
                                 ) : (
-                                    <Ionicons name="camera" size={14} color="#0d2345" />
+                                    <Ionicons name="camera" size={12} color="white" />
                                 )}
                             </TouchableOpacity>
                         </View>
 
                         {/* Name & Subtitle Details */}
                         <View className="ml-4 flex-1">
-                            <Text className="text-white text-xl font-extrabold tracking-tight leading-7" numberOfLines={1}>
+                            <Text className="text-white text-lg font-extrabold tracking-tight leading-6" numberOfLines={1}>
                                 {profile?.full_name || 'User'}
                             </Text>
-                            <Text className="text-slate-300 text-sm font-semibold mb-2">
+                            <Text className="text-slate-300 text-xs font-semibold mb-1.5">
                                 {profile?.phone || profile?.email || 'No Contact'}
                             </Text>
                             
                             {/* Verification Pill */}
                             <View className="flex-row">
                                 {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
-                                    <View className="bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 flex-row items-center gap-1">
-                                        <Ionicons name="checkmark-circle" size={12} color="#10b981" />
-                                        <Text className="text-emerald-400 text-[10px] font-black uppercase tracking-wider">Verified Account</Text>
+                                    <View className="bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="checkmark-circle" size={10} color="#10b981" />
+                                        <Text className="text-emerald-400 text-[8px] font-black uppercase tracking-wider">Verified Account</Text>
                                     </View>
                                 ) : kycStatus === 'pending' ? (
-                                    <View className="bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 flex-row items-center gap-1">
-                                        <Ionicons name="time" size={12} color="#f59e0b" />
-                                        <Text className="text-amber-400 text-[10px] font-black uppercase tracking-wider">Pending Review</Text>
+                                    <View className="bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="time" size={10} color="#f59e0b" />
+                                        <Text className="text-amber-400 text-[8px] font-black uppercase tracking-wider">Pending Review</Text>
                                     </View>
                                 ) : (
-                                    <View className="bg-slate-500/10 px-3 py-1 rounded-full border border-slate-500/20 flex-row items-center gap-1">
-                                        <Ionicons name="alert-circle" size={12} color="#94a3b8" />
-                                        <Text className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Unverified</Text>
+                                    <View className="bg-slate-500/10 px-2.5 py-0.5 rounded-full border border-slate-500/20 flex-row items-center gap-1">
+                                        <Ionicons name="alert-circle" size={10} color="#94a3b8" />
+                                        <Text className="text-slate-400 text-[8px] font-black uppercase tracking-wider">Unverified</Text>
                                     </View>
                                 )}
                             </View>
@@ -354,265 +356,272 @@ export default function ProfileScreen() {
                     </View>
                 </LinearGradient>
 
-                {/* 2. FLOATING STATS CARD */}
-                <View className="bg-white mx-6 rounded-[28px] p-5 -mt-14 shadow-xl shadow-slate-100 border border-slate-100/80 flex-row justify-between items-center z-20">
-                    {/* Wallet Balance */}
-                    <View className="flex-1 items-center">
-                        <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mb-2">
-                            <Ionicons name="wallet" size={18} color="#2563eb" />
+                {/* 2. FLOATING STATS CARD (2x2 Grid) */}
+                <View className="bg-white mx-6 rounded-2xl p-3.5 -mt-10 shadow-lg border border-slate-100/80 z-20">
+                    {/* Row 1 */}
+                    <View className="flex-row justify-between mb-3">
+                        {/* Wallet Balance */}
+                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl mr-1.5">
+                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
+                                <Ionicons name="wallet" size={14} color="#0d1b3e" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Balance</Text>
+                                <Text className="text-[11px] text-[#0d1b3e] font-black mt-0.5" numberOfLines={1}>
+                                    ₦{balanceWhole}
+                                    <Text className="text-[8px] text-slate-400 font-medium">.{balanceDecimal}</Text>
+                                </Text>
+                            </View>
                         </View>
-                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Wallet Balance</Text>
-                        <Text className="text-[13px] text-slate-800 font-black text-center">
-                            ₦{balanceWhole}
-                            <Text className="text-[9px] text-slate-400 font-bold">.{balanceDecimal}</Text>
-                        </Text>
+
+                        {/* Total Transactions */}
+                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl ml-1.5">
+                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
+                                <Ionicons name="stats-chart" size={14} color="#0d1b3e" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Transactions</Text>
+                                <Text className="text-[11px] text-slate-800 font-black mt-0.5">{txCount} <Text className="text-[8px] text-slate-400 font-medium">this mo</Text></Text>
+                            </View>
+                        </View>
                     </View>
 
-                    <View className="w-[1px] h-10 bg-slate-100" />
-
-                    {/* Total Transactions */}
-                    <View className="flex-1 items-center">
-                        <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mb-2">
-                            <Ionicons name="stats-chart" size={16} color="#10b981" />
+                    {/* Row 2 */}
+                    <View className="flex-row justify-between">
+                        {/* Member Since */}
+                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl mr-1.5">
+                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
+                                <Ionicons name="calendar" size={14} color="#0d1b3e" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Member Since</Text>
+                                <Text className="text-[11px] text-slate-800 font-black mt-0.5" numberOfLines={1}>{getMemberSince(profile?.created_at)}</Text>
+                            </View>
                         </View>
-                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Total Transactions</Text>
-                        <Text className="text-[13px] text-slate-800 font-black text-center">{txCount}</Text>
-                        <Text className="text-[8px] text-slate-400 font-bold mt-0.5">This Month</Text>
-                    </View>
 
-                    <View className="w-[1px] h-10 bg-slate-100" />
-
-                    {/* Member Since */}
-                    <View className="flex-1 items-center">
-                        <View className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center mb-2">
-                            <Ionicons name="calendar" size={16} color="#8b5cf6" />
+                        {/* Account Tier */}
+                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl ml-1.5">
+                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
+                                <Ionicons name="medal" size={14} color="#0d1b3e" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Tier</Text>
+                                <Text className="text-[11px] text-slate-800 font-black mt-0.5" numberOfLines={1}>{getTierLabel(profile?.kyc_tier)}</Text>
+                            </View>
                         </View>
-                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Member Since</Text>
-                        <Text className="text-[13px] text-slate-800 font-black text-center">{getMemberSince(profile?.created_at)}</Text>
-                    </View>
-
-                    <View className="w-[1px] h-10 bg-slate-100" />
-
-                    {/* Account Tier */}
-                    <View className="flex-1 items-center">
-                        <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center mb-2">
-                            <Ionicons name="medal" size={16} color="#f59e0b" />
-                        </View>
-                        <Text className="text-[10px] text-slate-400 font-bold mb-1">Account Tier</Text>
-                        <Text className="text-[13px] text-amber-600 font-black text-center">{getTierLabel(profile?.kyc_tier)}</Text>
                     </View>
                 </View>
 
                 {/* 3. GROUPED LIST GROUPS */}
-                <View className="mt-8 px-6 gap-y-6">
+                <View className="mt-6 px-6 gap-y-5">
                     
                     {/* ACCOUNT SECTION */}
                     <View>
-                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Account</Text>
-                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Account</Text>
+                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             {/* Personal Info */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
-                                    <Ionicons name="person" size={18} color="#2563eb" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="person" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Personal Information</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">View and update your personal details</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Personal Information</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">View and update your personal details</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Bank Accounts */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/beneficiaries')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mr-4">
-                                    <Ionicons name="business" size={18} color="#10b981" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="business" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Bank Accounts</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Manage your linked bank accounts</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Bank Accounts</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Manage your linked bank accounts</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Security */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/security')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
-                                    <Ionicons name="shield-checkmark" size={18} color="#6366f1" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="shield-checkmark" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Security</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Password, PIN and security settings</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Security</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Password, PIN and security settings</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Verification */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/kyc')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4"
+                                className="flex-row items-center py-3.5 px-4"
                             >
-                                <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mr-4">
-                                    <Ionicons name="checkmark-done-circle" size={18} color="#10b981" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="checkmark-done-circle" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Verification</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">KYC verification and account status</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Verification</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">KYC verification and account status</Text>
                                 </View>
                                 <View className="flex-row items-center mr-2">
                                     {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
-                                        <View className="bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
-                                            <Text className="text-emerald-600 text-[9px] font-black uppercase">Verified</Text>
+                                        <View className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                            <Text className="text-emerald-600 text-[8px] font-black uppercase">Verified</Text>
                                         </View>
                                     ) : kycStatus === 'pending' ? (
-                                        <View className="bg-amber-50 px-2.5 py-1 rounded-md border border-amber-100">
-                                            <Text className="text-amber-600 text-[9px] font-black uppercase">Pending</Text>
+                                        <View className="bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                                            <Text className="text-amber-600 text-[8px] font-black uppercase">Pending</Text>
                                         </View>
                                     ) : (
-                                        <View className="bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
-                                            <Text className="text-slate-500 text-[9px] font-black uppercase">Unverified</Text>
+                                        <View className="bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                            <Text className="text-slate-500 text-[8px] font-black uppercase">Unverified</Text>
                                         </View>
                                     )}
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* PREFERENCES SECTION */}
                     <View>
-                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Preferences</Text>
-                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Preferences</Text>
+                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             {/* Notification Settings */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center mr-4">
-                                    <Ionicons name="notifications" size={18} color="#8b5cf6" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="notifications" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Notification Settings</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Manage your notification preferences</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Notification Settings</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Manage your notification preferences</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Language */}
                             <TouchableOpacity 
                                 onPress={handleLanguageSelect} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
-                                    <Ionicons name="globe" size={18} color="#3b82f6" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="globe" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Language</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Choose your preferred language</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Language</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Choose your preferred language</Text>
                                 </View>
-                                <Text className="text-slate-400 text-xs font-bold mr-1">English</Text>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Text className="text-slate-400 text-[11px] font-bold mr-1">English</Text>
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Theme */}
                             <TouchableOpacity 
                                 onPress={handleThemeSelect} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4"
+                                className="flex-row items-center py-3.5 px-4"
                             >
-                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
-                                    <Ionicons name="moon" size={18} color="#4f46e5" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="moon" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Theme</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Choose app appearance</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Theme</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Choose app appearance</Text>
                                 </View>
-                                <Text className="text-slate-400 text-xs font-bold mr-1">System</Text>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Text className="text-slate-400 text-[11px] font-bold mr-1">System</Text>
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* SUPPORT & ABOUT SECTION */}
                     <View>
-                        <Text className="text-[12px] text-slate-400 font-extrabold uppercase tracking-widest mb-3 ml-1">Support & About</Text>
-                        <View className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Support & About</Text>
+                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             {/* Help Center */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/support')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
-                                    <Ionicons name="headset" size={18} color="#2563eb" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="headset" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Help Center</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Get help and support</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Help Center</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Get help and support</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* About Mafhal Hub */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/onboarding')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mr-4">
-                                    <Ionicons name="information-circle" size={18} color="#6366f1" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="information-circle" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">About Mafhal Hub</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Learn more about us</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">About Mafhal Hub</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Learn more about us</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Terms & Conditions */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/terms')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4 border-b border-slate-50"
+                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
                             >
-                                <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-4">
-                                    <Ionicons name="document-text" size={18} color="#3b82f6" />
+                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                    <Ionicons name="document-text" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-slate-800">Terms & Conditions</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Read our terms and conditions</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">Terms & Conditions</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Read our terms and conditions</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* Log Out */}
                             <TouchableOpacity 
                                 onPress={handleLogout} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-4 px-4"
+                                className="flex-row items-center py-3.5 px-4"
                             >
-                                <View className="w-10 h-10 rounded-full bg-red-50 items-center justify-center mr-4">
-                                    <Ionicons name="log-out" size={18} color="#ef4444" />
+                                <View className="w-8 h-8 rounded-full bg-red-50 items-center justify-center mr-3">
+                                    <Ionicons name="log-out" size={15} color="#ef4444" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-sm text-red-500">Log Out</Text>
-                                    <Text className="text-slate-400 text-[11px] font-medium mt-0.5">Sign out from your account</Text>
+                                    <Text className="font-extrabold text-xs text-red-500">Log Out</Text>
+                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Sign out from your account</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
                         </View>
                     </View>
