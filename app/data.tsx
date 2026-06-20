@@ -40,10 +40,10 @@ const NETWORK_LOGOS: Record<string, any> = {
 };
 
 const NETWORKS_DATA = [
-    { id: 'mtn', name: 'MTN', color: '#FFCC00', prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
-    { id: 'glo', name: 'Glo', color: '#0F6A37', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
-    { id: 'airtel', name: 'Airtel', color: '#FF0000', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
-    { id: '9mobile', name: '9mobile', color: '#006B3E', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
+    { id: 'mtn', name: 'MTN', color: '#FFCC00', status: '5G Ready', prefixes: ['0803', '0806', '0703', '0903', '0810', '0813', '0814', '0816', '0906', '0706', '0913', '0916'] },
+    { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
+    { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
+    { id: '9mobile', name: '9mobile', color: '#006B3E', status: '4G Active', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
 ];
 
 const getNetworkStyles = (netId: string, isSelected: boolean) => {
@@ -106,6 +106,8 @@ export default function DataScreen() {
     const [browsingHours, setBrowsingHours] = useState(0);
     const [minVolumeFilter, setMinVolumeFilter] = useState<number | null>(null);
     const [showUssdGuide, setShowUssdGuide] = useState(false);
+    const [showRolloverTips, setShowRolloverTips] = useState(false);
+    const [giftingBeneficiaryActive, setGiftingBeneficiaryActive] = useState(false);
     
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
@@ -461,6 +463,11 @@ export default function DataScreen() {
                                     <Text style={[s.networkName, isSelected && { color: styles.text, fontWeight: '800' }]}>
                                         {net.name}
                                     </Text>
+                                    <View style={[s.capabilityBadge, isSelected ? { backgroundColor: styles.border } : { backgroundColor: '#f1f5f9' }]}>
+                                        <Text style={[s.capabilityText, isSelected && { color: '#ffffff' }]}>
+                                            {net.status}
+                                        </Text>
+                                    </View>
                                     {isSelected && (
                                         <View style={[s.checkBadge, { backgroundColor: styles.border }]}>
                                             <Ionicons name="checkmark" size={8} color="white" />
@@ -494,7 +501,10 @@ export default function DataScreen() {
                             maxLength={11}
                         />
                         <TouchableOpacity 
-                            onPress={() => setShowBeneficiaryModal(true)}
+                            onPress={() => {
+                                setGiftingBeneficiaryActive(false);
+                                setShowBeneficiaryModal(true);
+                            }}
                             style={s.beneficiaryBtn}
                             activeOpacity={0.7}
                         >
@@ -904,6 +914,48 @@ export default function DataScreen() {
                         </View>
                     )}
 
+                    {/* Dynamic Cost-per-GB Metric */}
+                    {selectedPlan && (() => {
+                        const gb = parseVolumeToGB(selectedPlan.volume, selectedPlan.originalName || selectedPlan.name);
+                        if (gb <= 0) return null;
+                        
+                        const costPerGB = Math.round(selectedPlan.price / gb);
+                        
+                        // Rating helper
+                        let rating = 'Standard Value';
+                        let ratingColor = '#475569';
+                        let ratingBg = '#f1f5f9';
+                        
+                        if (costPerGB < 250) {
+                            rating = 'Super Saver Value 🔥';
+                            ratingColor = '#166534';
+                            ratingBg = '#dcfce7';
+                        } else if (costPerGB < 400) {
+                            rating = 'Highly Cost-Efficient ⭐';
+                            ratingColor = '#1e3a8a';
+                            ratingBg = '#dbeafe';
+                        } else if (costPerGB < 600) {
+                            rating = 'Good Value 👍';
+                            ratingColor = '#854d0e';
+                            ratingBg = '#fef9c3';
+                        }
+
+                        return (
+                            <View style={s.efficiencyContainer}>
+                                <View style={s.efficiencyLeft}>
+                                    <Ionicons name="stats-chart" size={15} color="#2563eb" style={{ marginRight: 6 }} />
+                                    <Text style={s.efficiencyTitle}>Plan Cost-Efficiency</Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={s.efficiencyText}>₦{costPerGB.toLocaleString()} <Text style={{ fontSize: 9, color: '#64748b' }}>/ GB</Text></Text>
+                                    <View style={[s.efficiencyRatingBadge, { backgroundColor: ratingBg }]}>
+                                        <Text style={[s.efficiencyRatingText, { color: ratingColor }]}>{rating}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        );
+                    })()}
+
                     {/* Auto-Renew and Gifting Options */}
                     {selectedPlan && (
                         <View style={s.optionsContainer}>
@@ -946,18 +998,75 @@ export default function DataScreen() {
                             </View>
 
                             {isGift && (
-                                <View style={s.giftInputContainer}>
-                                    <TextInput 
-                                        style={s.giftInput}
-                                        placeholder="Enter Recipient's Name (e.g. Sani Sadiq)"
-                                        placeholderTextColor="#94a3b8"
-                                        value={recipientName}
-                                        onChangeText={setRecipientName}
-                                    />
+                                <View style={s.giftRowContainer}>
+                                    <View style={[s.giftInputContainer, { flex: 1, marginRight: 8 }]}>
+                                        <TextInput 
+                                            style={s.giftInput}
+                                            placeholder="Enter Recipient's Name (e.g. Sani Sadiq)"
+                                            placeholderTextColor="#94a3b8"
+                                            value={recipientName}
+                                            onChangeText={setRecipientName}
+                                        />
+                                    </View>
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setGiftingBeneficiaryActive(true);
+                                            setShowBeneficiaryModal(true);
+                                        }}
+                                        style={s.giftBeneficiaryBtn}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="people" size={18} color="#0056D2" />
+                                    </TouchableOpacity>
                                 </View>
                             )}
                         </View>
                     )}
+
+                    {/* Data Rollover Guard collapsible guide */}
+                    <View style={s.rolloverContainer}>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowRolloverTips(!showRolloverTips);
+                            }}
+                            style={s.rolloverHeader}
+                            activeOpacity={0.8}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="shield-half-outline" size={16} color="#16a34a" style={{ marginRight: 6 }} />
+                                <Text style={s.rolloverHeaderTitle}>Data Rollover Guard 🛡️</Text>
+                            </View>
+                            <Ionicons 
+                                name={showRolloverTips ? "chevron-up" : "chevron-down"} 
+                                size={14} 
+                                color="#64748b" 
+                            />
+                        </TouchableOpacity>
+
+                        {showRolloverTips && (
+                            <View style={s.rolloverContent}>
+                                <Text style={s.rolloverText}>
+                                    Don't lose your unused data! Most networks support rolling over your remaining balance if you purchase a new bundle before the current one expires:
+                                </Text>
+                                <View style={s.rolloverTipItem}>
+                                    <Text style={s.rolloverBullet}>•</Text>
+                                    <Text style={s.rolloverTipText}>
+                                        <Text style={{ fontWeight: '800' }}>MTN & Airtel</Text>: Renew with any plan within 24 hours of expiration to auto-merge balances.
+                                    </Text>
+                                </View>
+                                <View style={s.rolloverTipItem}>
+                                    <Text style={s.rolloverBullet}>•</Text>
+                                    <Text style={s.rolloverTipText}>
+                                        <Text style={{ fontWeight: '800' }}>Glo</Text>: Supports full rollover if you renew with a plan of equal or higher value.
+                                    </Text>
+                                </View>
+                                <Text style={[s.rolloverText, { fontStyle: 'italic', marginTop: 6, color: '#16a34a' }]}>
+                                    Activate the Auto-Renew toggle above to automatically protect your data balance!
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </ScrollView>
 
                 {/* Bottom Floating Button */}
@@ -1088,7 +1197,13 @@ export default function DataScreen() {
                                 <TouchableOpacity
                                     className="flex-row items-center p-4 border-b border-gray-100"
                                     onPress={() => {
-                                        handlePhoneChange(item.account_number);
+                                        if (giftingBeneficiaryActive) {
+                                            setRecipientName(item.name || '');
+                                            handlePhoneChange(item.account_number);
+                                            setGiftingBeneficiaryActive(false);
+                                        } else {
+                                            handlePhoneChange(item.account_number);
+                                        }
                                         setShowBeneficiaryModal(false);
                                         setBeneficiarySearch('');
                                     }}
@@ -1201,7 +1316,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '22%',
-    aspectRatio: 1.0,
+    paddingVertical: 10,
     borderRadius: 14,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
@@ -1782,5 +1897,115 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#0d1b3e',
+  },
+  capabilityBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  capabilityText: {
+    fontSize: 6,
+    fontWeight: '900',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  giftRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  giftBeneficiaryBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  efficiencyContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginTop: 16,
+    width: '100%',
+  },
+  efficiencyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  efficiencyTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  efficiencyText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2563eb',
+  },
+  efficiencyRatingBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 3,
+  },
+  efficiencyRatingText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+  },
+  rolloverContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    marginTop: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  rolloverHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f0fdf4',
+  },
+  rolloverHeaderTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  rolloverContent: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#dcfce7',
+  },
+  rolloverText: {
+    fontSize: 10.5,
+    color: '#475569',
+    lineHeight: 14,
+  },
+  rolloverTipItem: {
+    flexDirection: 'row',
+    marginTop: 6,
+    paddingLeft: 4,
+  },
+  rolloverBullet: {
+    fontSize: 10.5,
+    color: '#16a34a',
+    marginRight: 6,
+  },
+  rolloverTipText: {
+    fontSize: 10.5,
+    color: '#475569',
+    flex: 1,
   },
 });
