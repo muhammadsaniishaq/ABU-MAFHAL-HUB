@@ -211,12 +211,18 @@ export default function AirtimeScreen() {
                         end={{ x: 1, y: 1 }}
                         style={s.balanceCardGradient}
                     >
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <Text style={s.balanceLabel}>Total Balance</Text>
                             <Text style={s.balanceAmount}>₦{balance.toLocaleString()}</Text>
+                            
+                            {/* Cashback Savings Badge Decoration */}
+                            <View style={s.savingsBadge}>
+                                <Ionicons name="sparkles" size={10} color="#f5a623" style={{ marginRight: 4 }} />
+                                <Text style={s.savingsBadgeText}>Earn up to 3% cashback instantly!</Text>
+                            </View>
                         </View>
                         <View style={s.balanceIconContainer}>
-                            <Ionicons name="wallet-outline" size={24} color="#f5a623" />
+                            <Ionicons name="wallet-outline" size={20} color="#f5a623" />
                         </View>
                     </LinearGradient>
                 )}
@@ -285,7 +291,7 @@ export default function AirtimeScreen() {
                         >
                             <Image 
                                 source={NETWORK_LOGOS[net.id]} 
-                                style={s.networkLogo} 
+                                style={s.networkLogo as any} 
                                 resizeMode="contain" 
                             />
                             {network === net.id && (
@@ -338,7 +344,7 @@ export default function AirtimeScreen() {
                 ]}>
                     <View style={s.inputIconWrapper}>
                         {network ? (
-                            <Image source={NETWORK_LOGOS[network]} style={s.inputNetworkLogo} resizeMode="cover" />
+                            <Image source={NETWORK_LOGOS[network]} style={s.inputNetworkLogo as any} resizeMode="cover" />
                         ) : (
                              <Ionicons name="call" size={18} color="#64748b" />
                         )}
@@ -654,6 +660,7 @@ export default function AirtimeScreen() {
             (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) ||
             (b.account_number || '').includes(beneficiarySearch)
         );
+        const [searchFocused, setSearchFocused] = useState(false);
 
         return (
             <Modal
@@ -665,27 +672,34 @@ export default function AirtimeScreen() {
                     setShowBeneficiaryModal(false);
                 }}
             >
-                <View className="flex-1 justify-end bg-black/50">
+                <View style={s.modalOverlay}>
                     <View 
-                        className="bg-white rounded-t-3xl h-[60%] p-5"
-                        style={isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+                        style={[
+                            s.modalContentContainer,
+                            isWeb && { alignSelf: 'center', width: '100%', maxWidth: 450 }
+                        ]}
                     >
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-xl font-bold text-gray-800">Select Beneficiary</Text>
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalTitle}>Select Beneficiary</Text>
                             <TouchableOpacity onPress={() => {
                                 setBeneficiarySearch('');
                                 setShowBeneficiaryModal(false);
                             }}>
-                                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
+                                <Ionicons name="close-circle" size={26} color="#9ca3af" />
                             </TouchableOpacity>
                         </View>
 
                         <TextInput
-                            style={s.modalSearchInput}
-                            placeholder="Search beneficiary by name or number..."
+                            style={[
+                                s.modalSearchInput,
+                                searchFocused && { borderColor: '#0d1b3e' }
+                            ]}
+                            placeholder="Search beneficiary..."
                             placeholderTextColor="#94a3b8"
                             value={beneficiarySearch}
                             onChangeText={setBeneficiarySearch}
+                            onFocus={() => setSearchFocused(true)}
+                            onBlur={() => setSearchFocused(false)}
                         />
                         
                         <FlatList
@@ -693,26 +707,28 @@ export default function AirtimeScreen() {
                             keyExtractor={item => item.id}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
-                                    className="flex-row items-center p-4 border-b border-gray-100"
+                                    style={s.beneficiaryItem}
                                     onPress={() => {
                                         setPhoneNumber(item.account_number); // Using account_number as phone
                                         detectNetwork(item.account_number);
                                         setBeneficiarySearch('');
                                         setShowBeneficiaryModal(false);
                                     }}
+                                    activeOpacity={0.7}
                                 >
-                                    <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                                        <Text className="text-blue-600 font-bold">{item.name[0]}</Text>
+                                    <View style={s.beneficiaryAvatar}>
+                                        <Text style={s.beneficiaryAvatarText}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
                                     </View>
-                                    <View>
-                                        <Text className="font-bold text-gray-800">{item.name}</Text>
-                                        <Text className="text-gray-500 text-xs">{item.bank_name} - {item.account_number}</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.beneficiaryName}>{item.name}</Text>
+                                        <Text style={s.beneficiarySubtext}>{item.bank_name} - {item.account_number}</Text>
                                     </View>
+                                    <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                                 </TouchableOpacity>
                             )}
                             ListEmptyComponent={
-                                <View className="items-center py-10">
-                                    <Text className="text-gray-400">No beneficiaries found</Text>
+                                <View style={s.modalEmptyState}>
+                                    <Text style={s.modalEmptyStateText}>No beneficiaries found</Text>
                                 </View>
                             }
                         />
@@ -727,13 +743,13 @@ const s = StyleSheet.create({
   networksContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 18,
     width: '100%',
   },
   networkCard: {
-    width: '22%',
-    paddingVertical: 12,
-    borderRadius: 20,
+    width: '22.5%',
+    paddingVertical: 8,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -745,13 +761,13 @@ const s = StyleSheet.create({
     borderColor: '#0d1b3e',
   },
   networkLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     marginBottom: 4,
   },
   networkName: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#64748b',
   },
@@ -759,24 +775,24 @@ const s = StyleSheet.create({
     color: '#0d1b3e',
   },
   cashbackBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1.5,
+    borderRadius: 4,
     marginTop: 4,
   },
   cashbackText: {
-    fontSize: 7.5,
+    fontSize: 7,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   checkmarkBubble: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 3,
+    right: 3,
     backgroundColor: '#2563eb',
-    borderRadius: 8,
-    width: 14,
-    height: 14,
+    borderRadius: 6,
+    width: 12,
+    height: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -784,9 +800,9 @@ const s = StyleSheet.create({
   modeSelectorContainer: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
-    borderRadius: 16,
-    padding: 4,
-    marginBottom: 24,
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 18,
     width: '100%',
   },
   modeButton: {
@@ -794,14 +810,14 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   modeButtonActive: {
     backgroundColor: '#0d1b3e',
   },
   modeButtonText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#64748b',
   },
@@ -811,70 +827,70 @@ const s = StyleSheet.create({
   // Estimator Card
   estimatorContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    marginBottom: 24,
+    marginBottom: 18,
     width: '100%',
   },
   estimatorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   estimatorTitle: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0d1b3e',
   },
   estimatorDivider: {
     height: 1,
     backgroundColor: '#e2e8f0',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   estimatorRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   estimatorLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#64748b',
   },
   estimatorValue: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#0d1b3e',
   },
   estimatorLabelTotal: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0d1b3e',
   },
   estimatorValueTotal: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#0d1b3e',
   },
   estimatorBadge: {
-    marginTop: 10,
-    padding: 8,
-    borderRadius: 10,
+    marginTop: 8,
+    padding: 6,
+    borderRadius: 8,
     alignItems: 'center',
   },
   estimatorBadgeText: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '700',
     color: '#b45309',
   },
   // Auto-Refill Card
   scheduleContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    marginBottom: 24,
+    marginBottom: 18,
     overflow: 'hidden',
     width: '100%',
   },
@@ -882,51 +898,51 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 12,
   },
   scheduleHeaderTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#0d1b3e',
   },
   scheduleHeaderSub: {
-    fontSize: 10.5,
+    fontSize: 10,
     color: '#64748b',
     marginTop: 2,
   },
   scheduleContent: {
-    padding: 16,
+    padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     backgroundColor: '#fafbfc',
   },
   scheduleLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#475569',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   freqButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   freqButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     backgroundColor: '#ffffff',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 3,
   },
   freqButtonActive: {
     backgroundColor: 'rgba(245, 166, 35, 0.08)',
     borderColor: '#0d1b3e',
   },
   freqButtonText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#475569',
   },
@@ -934,7 +950,7 @@ const s = StyleSheet.create({
     color: '#0d1b3e',
   },
   scheduleHint: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#0d1b3e',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -942,10 +958,10 @@ const s = StyleSheet.create({
   // USSD Card
   ussdContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    marginBottom: 24,
+    marginBottom: 18,
     overflow: 'hidden',
     width: '100%',
   },
@@ -953,96 +969,96 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#f0fdfa',
   },
   ussdHeaderTitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#0f766e',
   },
   ussdContent: {
-    padding: 16,
+    padding: 12,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#ccfbf1',
   },
   ussdText: {
-    fontSize: 10.5,
+    fontSize: 10,
     color: '#475569',
-    lineHeight: 14,
+    lineHeight: 13,
   },
   ussdGrid: {
-    marginTop: 8,
+    marginTop: 6,
   },
   ussdRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   ussdNetwork: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '800',
     color: '#334155',
   },
   ussdCode: {
-    fontSize: 10.5,
+    fontSize: 10,
     color: '#475569',
   },
   // Beneficiary Modal Search
   modalSearchInput: {
-    height: 44,
+    height: 38,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
-    fontSize: 14,
+    fontSize: 13,
     color: '#0f172a',
     backgroundColor: '#f8fafc',
     marginBottom: 16,
   },
   // New Modern Styles
   balanceCardGradient: {
-    marginBottom: 24,
-    borderRadius: 24,
-    padding: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#0a1633',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   balanceLabel: {
     color: '#cbd5e1',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 0.8,
+    marginBottom: 2,
   },
   balanceAmount: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
   },
   balanceIconContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 12,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0d1b3e',
-    marginBottom: 8,
+    marginBottom: 6,
     marginLeft: 4,
   },
   inputContainer: {
@@ -1050,11 +1066,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#e2e8f0',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    height: 64,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 50,
     backgroundColor: '#ffffff',
-    marginBottom: 24,
+    marginBottom: 18,
   },
   inputContainerFocused: {
     borderColor: '#0d1b3e',
@@ -1063,13 +1079,13 @@ const s = StyleSheet.create({
     borderColor: '#16a34a',
   },
   inputIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
     overflow: 'hidden',
   },
   inputNetworkLogo: {
@@ -1078,69 +1094,69 @@ const s = StyleSheet.create({
   },
   phoneTextInput: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#0d1b3e',
   },
   meButton: {
     marginRight: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: 'rgba(13, 27, 62, 0.08)',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   meButtonText: {
     color: '#0d1b3e',
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   beneficiarySelectButton: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
-    borderRadius: 20,
+    borderRadius: 17,
   },
   currencySymbol: {
     color: '#94a3b8',
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
-    marginRight: 8,
+    marginRight: 6,
   },
   amountTextInput: {
     flex: 1,
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '800',
     color: '#0d1b3e',
   },
   presetsLabel: {
-    fontSize: 12.5,
+    fontSize: 11,
     fontWeight: '600',
     color: '#64748b',
-    marginBottom: 10,
+    marginBottom: 8,
     marginLeft: 4,
   },
   presetsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   presetCard: {
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    borderRadius: 16,
+    borderRadius: 12,
     width: '31%',
-    paddingVertical: 14,
-    marginBottom: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
     elevation: 1,
   },
   presetCardActive: {
@@ -1150,7 +1166,7 @@ const s = StyleSheet.create({
   presetText: {
     color: '#0d1b3e',
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 13,
   },
   presetTextActive: {
     color: '#ffffff',
@@ -1158,35 +1174,113 @@ const s = StyleSheet.create({
   purchaseButtonWrapper: {
     width: '100%',
     shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
   },
   purchaseButtonGradient: {
-    height: 64,
-    borderRadius: 20,
+    height: 50,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
   },
   purchaseButtonText: {
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 15,
     color: '#ffffff',
-    marginRight: 8,
+    marginRight: 6,
   },
   purchaseButtonTextDisabled: {
     color: '#94a3b8',
   },
   securityFooter: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
     flexDirection: 'row',
     justifyContent: 'center',
   },
   securityFooterText: {
     color: '#94a3b8',
-    fontSize: 12,
+    fontSize: 11,
+  },
+  savingsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  savingsBadgeText: {
+    color: '#f5a623',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  // Modal Enhancements
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContentContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '60%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  beneficiaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  beneficiaryAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(13, 27, 62, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  beneficiaryAvatarText: {
+    color: '#0d1b3e',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  beneficiaryName: {
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#0d1b3e',
+  },
+  beneficiarySubtext: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modalEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  modalEmptyStateText: {
+    color: '#94a3b8',
+    fontSize: 13,
   },
 });

@@ -70,7 +70,7 @@ export default function TransactionConfirmationModal({
                             ) : (
                                 <Ionicons name="wallet" size={32} color="#9CA3AF" />
                             )}
-                            <View className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-1.5 border-2 border-white">
+                            <View className="absolute -bottom-2 -right-2 bg-[#f5a623] rounded-full p-1.5 border-2 border-white">
                                 <Ionicons name="checkmark" size={12} color="white" />
                             </View>
                         </View>
@@ -91,7 +91,7 @@ export default function TransactionConfirmationModal({
                                     </View>
                                 ) : (
                                     <Text className={`font-bold text-right ${
-                                        item.isTotal ? 'text-blue-600 text-xl' : 
+                                        item.isTotal ? 'text-[#0d1b3e] text-xl' : 
                                         item.isAmount ? 'text-gray-800 text-base' : 'text-gray-800'
                                     } ${item.label.includes('Original') ? 'line-through text-gray-400' : ''}`}>
                                         {item.value}
@@ -109,10 +109,10 @@ export default function TransactionConfirmationModal({
                             className="mb-3"
                         >
                             <LinearGradient
-                                colors={['#2563EB', '#1D4ED8']}
+                                colors={['#0d1b3e', '#142258']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
-                                className="h-14 rounded-2xl items-center justify-center shadow-lg shadow-blue-200"
+                                className="h-14 rounded-2xl items-center justify-center shadow-lg shadow-slate-300"
                             >
                                 <Text className="text-white font-bold text-lg">Confirm & Pay</Text>
                             </LinearGradient>

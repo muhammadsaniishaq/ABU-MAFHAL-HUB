@@ -264,13 +264,13 @@ export default function SecurityModal({ visible, onClose, onSuccess, title = "Se
                     </View>
                     <View className="flex-row justify-between items-center h-[60px]">
                       <View className="w-[60px] h-[60px] justify-center items-center">
-                        {!isCreating && biometricAvailable && (
+                         {!isCreating && biometricAvailable && (
                           <AnimatedPressable 
                             onPress={promptBiometric} 
-                            className="w-12 h-12 bg-blue-50/80 rounded-full justify-center items-center active:bg-blue-100"
+                            className="w-12 h-12 bg-slate-100 rounded-full justify-center items-center active:bg-slate-200"
                             entering={FadeIn}
                           >
-                            <MaterialCommunityIcons name={Platform.OS === 'ios' ? "face-recognition" : "fingerprint"} size={24} color="#2563EB" />
+                            <MaterialCommunityIcons name={Platform.OS === 'ios' ? "face-recognition" : "fingerprint"} size={24} color="#0d1b3e" />
                           </AnimatedPressable>
                         )}
                       </View>
@@ -331,8 +331,8 @@ const PinDot = ({ filled, error }: { filled: boolean, error: boolean }) => {
   
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    backgroundColor: filled ? (error ? '#EF4444' : '#2563EB') : 'transparent',
-    borderColor: filled ? (error ? '#EF4444' : '#2563EB') : '#94A3B8'
+    backgroundColor: filled ? (error ? '#EF4444' : '#0d1b3e') : 'transparent',
+    borderColor: filled ? (error ? '#EF4444' : '#0d1b3e') : '#94A3B8'
   }));
 
   return (
