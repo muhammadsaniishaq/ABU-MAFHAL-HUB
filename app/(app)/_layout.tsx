@@ -130,19 +130,22 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                         return (
                             <TouchableOpacity
                                 key={route.key}
-                                onPress={() => router.push('/(app)/pay')}
-                                style={s.payButtonWrapper}
+                                onPress={() => navigation.navigate(route.name)}
+                                style={[s.payButtonWrapper, isFocused && { transform: [{ scale: 1.08 }] }]}
                                 activeOpacity={0.85}
                             >
                                 <LinearGradient
-                                    colors={['#4f46e5', '#0056D2', '#06b6d4']}
-                                    style={s.payButtonGradient}
+                                    colors={['#0d1b3e', '#142258', '#f5a623']}
+                                    style={[
+                                        s.payButtonGradient,
+                                        isFocused && { borderColor: '#f5a623', borderWidth: 2, shadowColor: '#f5a623' }
+                                    ]}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
                                 >
                                     <Ionicons name="qr-code" size={24} color="#ffffff" />
                                 </LinearGradient>
-                                <Text style={s.payLabel}>Pay</Text>
+                                <Text style={[s.payLabel, isFocused && s.payLabelActive]}>Pay</Text>
                             </TouchableOpacity>
                         );
                     }
@@ -182,7 +185,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                                 <Ionicons
                                     name={getIcon(route.name, isFocused) as any}
                                     size={20}
-                                    color={isFocused ? '#0056D2' : '#64748b'}
+                                    color={isFocused ? '#0d1b3e' : '#64748b'}
                                 />
                             </View>
                             <Text style={[
@@ -191,6 +194,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                             ]}>
                                 {getLabel(route.name)}
                             </Text>
+                            {isFocused && (
+                                <View style={s.activeIndicatorDot} />
+                            )}
                         </TouchableOpacity>
                     );
                 })}
@@ -243,7 +249,7 @@ const s = StyleSheet.create({
         marginBottom: 2,
     },
     iconContainerActive: {
-        backgroundColor: 'rgba(0, 86, 210, 0.08)',
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
     },
     tabLabel: {
         fontSize: 10,
@@ -252,7 +258,7 @@ const s = StyleSheet.create({
     },
     tabLabelActive: {
         fontWeight: '800',
-        color: '#0056D2',
+        color: '#0d1b3e',
     },
     payButtonWrapper: {
         top: -24,
@@ -269,16 +275,27 @@ const s = StyleSheet.create({
         borderColor: '#ffffff',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#0056D2',
+        shadowColor: '#f5a623',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.45,
+        shadowOpacity: 0.35,
         shadowRadius: 12,
         elevation: 10,
     },
     payLabel: {
         fontSize: 10,
-        fontWeight: '800',
-        color: '#0056D2',
+        fontWeight: '600',
+        color: '#64748b',
         marginTop: 4,
+    },
+    payLabelActive: {
+        fontWeight: '800',
+        color: '#f5a623',
+    },
+    activeIndicatorDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#f5a623',
+        marginTop: 2,
     },
 });
