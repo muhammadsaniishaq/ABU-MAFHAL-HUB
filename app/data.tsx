@@ -25,6 +25,24 @@ const NETWORKS_DATA = [
     { id: '9mobile', name: '9mobile', color: '#006B3E', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
 ];
 
+const getNetworkStyles = (netId: string, isSelected: boolean) => {
+    if (!isSelected) {
+        return { bg: '#ffffff', border: '#e2e8f0', text: '#64748b' };
+    }
+    switch (netId) {
+        case 'mtn':
+            return { bg: '#fffbeb', border: '#eab308', text: '#854d0e' };
+        case 'airtel':
+            return { bg: '#fef2f2', border: '#ef4444', text: '#991b1b' };
+        case 'glo':
+            return { bg: '#f0fdf4', border: '#16a34a', text: '#166534' };
+        case '9mobile':
+            return { bg: '#ecfdf5', border: '#059669', text: '#065f46' };
+        default:
+            return { bg: '#f1f5f9', border: '#475569', text: '#1e293b' };
+    }
+};
+
 const T = {
   navy:    '#0d1b3e',
   navyMid: '#142258',
@@ -55,6 +73,7 @@ export default function DataScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [lastTransaction, setLastTransaction] = useState<any>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
+    const [beneficiarySearch, setBeneficiarySearch] = useState('');
     
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
@@ -310,9 +329,12 @@ export default function DataScreen() {
                         <View style={{ alignItems: 'center' }}>
                             <Text style={s.headerTitle}>Internet Data</Text>
                             {balance !== null && (
-                                <Text style={s.headerBalance}>
-                                    Balance: ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </Text>
+                                <View style={s.balanceBadge}>
+                                    <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                                    <Text style={s.headerBalance}>
+                                        ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </Text>
+                                </View>
                             )}
                         </View>
                         <View style={{ width: 32 }} />
@@ -352,28 +374,31 @@ export default function DataScreen() {
                     <View style={s.networksRow}>
                         {NETWORKS_DATA.map((net) => {
                             const isSelected = network === net.id;
-                            const netColor = getNetworkColor(net.id);
+                            const styles = getNetworkStyles(net.id, isSelected);
                             return (
                                 <TouchableOpacity
                                     key={net.id}
                                     onPress={() => setNetwork(net.id)}
                                     style={[
                                         s.networkCard,
-                                        isSelected && [s.networkCardSelected, { borderColor: netColor, shadowColor: netColor }]
+                                        { backgroundColor: styles.bg, borderColor: styles.border },
+                                        isSelected && s.networkCardSelected
                                     ]}
                                     activeOpacity={0.8}
                                 >
-                                    <Image 
-                                        source={NETWORK_LOGOS[net.id]} 
-                                        style={s.networkLogo}
-                                        resizeMode="contain" 
-                                    />
-                                    <Text style={[s.networkName, isSelected && s.networkNameSelected]}>
+                                    <View style={s.networkLogoWrapper}>
+                                        <Image 
+                                            source={NETWORK_LOGOS[net.id]} 
+                                            style={s.networkLogo}
+                                            resizeMode="contain" 
+                                        />
+                                    </View>
+                                    <Text style={[s.networkName, isSelected && { color: styles.text, fontWeight: '800' }]}>
                                         {net.name}
                                     </Text>
                                     {isSelected && (
-                                        <View style={[s.checkBadge, { backgroundColor: netColor }]}>
-                                            <Ionicons name="checkmark" size={10} color="white" />
+                                        <View style={[s.checkBadge, { backgroundColor: styles.border }]}>
+                                            <Ionicons name="checkmark" size={8} color="white" />
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -457,18 +482,32 @@ export default function DataScreen() {
 
                                     <Text style={s.sectionTitle}>Filter Plans</Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 8 }}>
-                                        {['All', 'Favorites', 'Daily', 'Weekly', 'Monthly'].map((f) => {
-                                            const isActive = planFilter === f;
+                                        {[
+                                            { name: 'All', icon: 'grid-outline' },
+                                            { name: 'Favorites', icon: 'heart' },
+                                            { name: 'Daily', icon: 'today-outline' },
+                                            { name: 'Weekly', icon: 'calendar-outline' },
+                                            { name: 'Monthly', icon: 'time-outline' },
+                                        ].map((f) => {
+                                            const isActive = planFilter === f.name;
                                             return (
                                                 <TouchableOpacity
-                                                    key={f}
-                                                    onPress={() => setPlanFilter(f as any)}
+                                                    key={f.name}
+                                                    onPress={() => setPlanFilter(f.name as any)}
                                                     style={[s.filterPill, isActive && s.filterPillActive]}
                                                     activeOpacity={0.8}
                                                 >
-                                                    <Text style={[s.filterPillText, isActive && s.filterPillTextActive]}>
-                                                        {f}
-                                                    </Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Ionicons 
+                                                            name={f.icon as any} 
+                                                            size={13} 
+                                                            color={isActive ? '#ffffff' : '#64748b'} 
+                                                            style={{ marginRight: 5 }} 
+                                                        />
+                                                        <Text style={[s.filterPillText, isActive && s.filterPillTextActive]}>
+                                                            {f.name}
+                                                        </Text>
+                                                    </View>
                                                 </TouchableOpacity>
                                             );
                                         })}
@@ -527,9 +566,17 @@ export default function DataScreen() {
 
                                                     <View style={s.planValidityContainer}>
                                                         <View style={[s.validityBadge, isSelected && s.validityBadgeSelected]}>
-                                                            <Text style={[s.validityText, isSelected && s.validityTextSelected]}>
-                                                                {plan.validity}
-                                                            </Text>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                <Ionicons 
+                                                                    name="time-outline" 
+                                                                    size={10} 
+                                                                    color={isSelected ? '#ffffff' : '#64748b'} 
+                                                                    style={{ marginRight: 3 }} 
+                                                                />
+                                                                <Text style={[s.validityText, isSelected && s.validityTextSelected]}>
+                                                                    {plan.validity}
+                                                                </Text>
+                                                            </View>
                                                         </View>
                                                         
                                                         <TouchableOpacity onPress={() => toggleFavorite(plan.id)} style={{ padding: 4 }}>
@@ -574,6 +621,7 @@ export default function DataScreen() {
                     <TouchableOpacity
                         style={[
                             s.purchaseBtn,
+                            network && phoneNumber.length === 11 && selectedPlan && { shadowColor: '#d97706', shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
                             !(network && phoneNumber.length === 11 && selectedPlan && !loadingPurchase) && { backgroundColor: '#cbd5e1', shadowOpacity: 0 }
                         ]}
                         onPress={handlePurchase}
@@ -635,12 +683,18 @@ export default function DataScreen() {
     );
 
     function BeneficiaryModal() {
+        const filteredBens = beneficiaries.filter(b => 
+            (b.name || '').toLowerCase().includes(beneficiarySearch.toLowerCase()) || 
+            (b.account_number || '').includes(beneficiarySearch) ||
+            (b.bank_name || '').toLowerCase().includes(beneficiarySearch.toLowerCase())
+        );
+
         return (
             <Modal
                 animationType="slide"
                 transparent={true}
                 visible={showBeneficiaryModal}
-                onRequestClose={() => setShowBeneficiaryModal(false)}
+                onRequestClose={() => { setShowBeneficiaryModal(false); setBeneficiarySearch(''); }}
             >
                 <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <View 
@@ -649,13 +703,40 @@ export default function DataScreen() {
                     >
                         <View className="flex-row justify-between items-center mb-4">
                             <Text className="text-xl font-bold text-gray-800">Select Beneficiary</Text>
-                            <TouchableOpacity onPress={() => setShowBeneficiaryModal(false)}>
+                            <TouchableOpacity onPress={() => { setShowBeneficiaryModal(false); setBeneficiarySearch(''); }}>
                                 <Ionicons name="close-circle" size={28} color="#9CA3AF" />
                             </TouchableOpacity>
                         </View>
+
+                        {/* Beneficiary Search Input */}
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#f1f5f9',
+                            borderRadius: 14,
+                            paddingHorizontal: 12,
+                            height: 44,
+                            marginBottom: 16,
+                            borderWidth: 1.5,
+                            borderColor: '#e2e8f0',
+                        }}>
+                            <Ionicons name="search-outline" size={16} color="#94a3b8" />
+                            <TextInput 
+                                style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#0d1b3e', fontWeight: '500' }}
+                                placeholder="Search by name or number..."
+                                placeholderTextColor="#94a3b8"
+                                value={beneficiarySearch}
+                                onChangeText={setBeneficiarySearch}
+                            />
+                            {beneficiarySearch.length > 0 && (
+                                <TouchableOpacity onPress={() => setBeneficiarySearch('')}>
+                                    <Ionicons name="close-circle" size={16} color="#D1D5DB" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
                         
                         <FlatList
-                            data={beneficiaries}
+                            data={filteredBens}
                             keyExtractor={item => item.id}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
@@ -663,11 +744,15 @@ export default function DataScreen() {
                                     onPress={() => {
                                         handlePhoneChange(item.account_number);
                                         setShowBeneficiaryModal(false);
+                                        setBeneficiarySearch('');
                                     }}
                                 >
-                                    <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                                        <Text className="text-blue-600 font-bold">{item.name[0]}</Text>
-                                    </View>
+                                    <LinearGradient
+                                        colors={['#eff6ff', '#dbeafe']}
+                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+                                    >
+                                        <Text style={{ color: '#1e40af', fontWeight: '800', fontSize: 14 }}>{item.name ? item.name[0].toUpperCase() : 'B'}</Text>
+                                    </LinearGradient>
                                     <View style={{ flex: 1 }}>
                                         <Text className="font-bold text-gray-800" numberOfLines={1}>{item.name}</Text>
                                         <Text className="text-gray-500 text-xs" numberOfLines={1}>{item.bank_name} - {item.account_number}</Text>
@@ -725,11 +810,21 @@ const s = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  balanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+  },
   headerBalance: {
     color: '#f5a623',
     fontSize: 12,
     fontWeight: '800',
-    marginTop: 2,
     letterSpacing: 0.5,
   },
   scrollContainer: {
@@ -768,16 +863,30 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   networkCardSelected: {
-    backgroundColor: '#ffffff',
     borderWidth: 2,
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 4,
   },
+  networkLogoWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
   networkLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: '80%',
+    height: '80%',
   },
   networkName: {
     fontSize: 10,
