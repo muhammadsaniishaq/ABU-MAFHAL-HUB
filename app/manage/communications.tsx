@@ -13,7 +13,7 @@ import { generateHtmlEmail } from '../../services/emailTemplates';
 // MOCK CONSTANTS (Kept for quick fill, but sending is real)
 const TEMPLATES = {
     email: [
-        { id: 'welcome', title: 'Welcome Series', subject: 'Welcome to Abu Mafhal Hub! 🚀', body: 'Hi {{name}},\n\nWelcome to the future of finance. We are excited to have you on board.' },
+        { id: 'welcome', title: 'Welcome Series', subject: 'Welcome to Abu Mafhal Sub! 🚀', body: 'Hi {{name}},\n\nWelcome to the future of finance. We are excited to have you on board.' },
         { id: 'kyc_reminder', title: 'KYC Reminder', subject: 'Action Required: Verify Identity', body: 'Hello {{name}},\n\nPlease complete your KYC verification to unlock higher limits.' },
         { id: 'promo', title: 'Season Promo', subject: 'Special Offer Just for You!', body: 'Hi {{name}},\n\nEnjoy 5% cashback on all airtime purchases this weekend!' }
     ],

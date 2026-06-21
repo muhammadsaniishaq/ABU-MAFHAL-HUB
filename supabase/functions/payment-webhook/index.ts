@@ -14,7 +14,7 @@ Deno.serve(async (req: Request) => {
     if (req.method === 'GET') {
         return new Response(JSON.stringify({
             status: "active",
-            message: "Abu Mafhal Hub Webhook System is online",
+            message: "Abu Mafhal Sub Webhook System is online",
             timestamp: timestamp,
             supported_providers: ['paystack', 'flutterwave']
         }), { 

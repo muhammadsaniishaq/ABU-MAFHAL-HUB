@@ -210,7 +210,7 @@ export default function AppDesigner() {
                         <View style={[s.phoneMockup, { backgroundColor: darkMode ? '#0f172a' : '#ffffff' }]}>
                             {/* Mock App Header */}
                             <View style={[s.mockHeader, { backgroundColor: primaryColor }]}>
-                                <Text style={s.mockHeaderText}>Abu Mafhal Hub</Text>
+                                <Text style={s.mockHeaderText}>Abu Mafhal Sub</Text>
                             </View>
                             {/* Mock Content */}
                             <View style={s.mockContent}>

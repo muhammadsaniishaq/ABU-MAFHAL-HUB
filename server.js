@@ -1,5 +1,5 @@
 /**
- * Mafhal Hub — Live Static File Server
+ * Mafhal Sub — Live Static File Server
  * Uses ONLY Node.js built-in modules (no npm install needed)
  */
 
@@ -87,7 +87,7 @@ function serve(res, filePath) {
 server.listen(PORT, '127.0.0.1', () => {
   console.log('');
   console.log('  ╔══════════════════════════════════════════════╗');
-  console.log('  ║       MAFHAL HUB — Live Server Running       ║');
+  console.log('  ║       MAFHAL SUB — Live Server Running       ║');
   console.log('  ╠══════════════════════════════════════════════╣');
   console.log(`  ║  🌐  http://localhost:${PORT}/landing.html     ║`);
   console.log('  ╚══════════════════════════════════════════════╝');

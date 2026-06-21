@@ -146,7 +146,7 @@ export default function QRPayScreen() {
                 // Share the downloaded flyer image file
                 await Sharing.shareAsync(uri, {
                     mimeType: 'image/png',
-                    dialogTitle: `Pay ${currentUser.full_name} - Mafhal Hub`,
+                    dialogTitle: `Pay ${currentUser.full_name} - Mafhal Sub`,
                 });
             }
         } catch (error: any) {
@@ -156,7 +156,7 @@ export default function QRPayScreen() {
             try {
                 await Share.share({
                     title: `Pay ${currentUser.full_name}`,
-                    message: `Assalamu alaikum, scan this QR code or use my email to send me money instantly on Mafhal Hub:\n\n👤 Name: ${currentUser.full_name}\n📧 Email: ${currentUser.email}\n\n🔗 View QR Flyer: ${thumIoUrl}`,
+                    message: `Assalamu alaikum, scan this QR code or use my email to send me money instantly on Mafhal Sub:\n\n👤 Name: ${currentUser.full_name}\n📧 Email: ${currentUser.email}\n\n🔗 View QR Flyer: ${thumIoUrl}`,
                 });
             } catch (fallbackError: any) {
                 Alert.alert("Share Error", fallbackError.message);
@@ -670,7 +670,7 @@ export default function QRPayScreen() {
                         <div class="brand-info">
                             <div class="logo-container">
                                 ${logoSrc ? `<img src="${logoSrc}" class="logo-img" />` : ''}
-                                <span class="brand-name">Mafhal Hub</span>
+                                <span class="brand-name">Mafhal Sub</span>
                             </div>
                             <div class="brand-address">Plot 124, Gwarinpa Road, Kano, Nigeria</div>
                             <div class="brand-contact">+234 803 123 4567 | hello@abumafhal.com.ng</div>
@@ -754,7 +754,7 @@ export default function QRPayScreen() {
                         <div class="powered-label">POWERED BY</div>
                         <div class="powered-brand">
                             ${logoSrc ? `<img src="${logoSrc}" class="powered-logo" />` : ''}
-                            <span>MAFHAL HUB</span>
+                            <span>MAFHAL SUB</span>
                         </div>
                     </div>
                 </div>
@@ -772,14 +772,14 @@ export default function QRPayScreen() {
                 await Sharing.shareAsync(uri, {
                     UTI: '.pdf',
                     mimeType: 'application/pdf',
-                    dialogTitle: `Mafhal Hub Receipt - Ref: ${reference}`,
+                    dialogTitle: `Mafhal Sub Receipt - Ref: ${reference}`,
                 });
             }
         } catch (error: any) {
             console.error("PDF Receipt share error:", error);
             // Fallback to text sharing if PDF printing/sharing fails
             try {
-                const receiptText = `*MAFHAL HUB - TRANSACTION RECEIPT*\n\n` +
+                const receiptText = `*MAFHAL SUB - TRANSACTION RECEIPT*\n\n` +
                     `👤 *Sender*: ${senderName}\n` +
                     `👤 *Recipient*: ${recipientName}\n` +
                     `📧 *Email*: ${recipientEmail}\n` +
@@ -787,7 +787,7 @@ export default function QRPayScreen() {
                     `📅 *Date*: ${dateStr}\n` +
                     `📌 *Ref*: ${reference}\n` +
                     `⚡ *Status*: SUCCESSFUL\n\n` +
-                    `Secured by Mafhal Hub Transfer System.`;
+                    `Secured by Mafhal Sub Transfer System.`;
                 
                 await Share.share({
                     title: `Transaction Receipt`,

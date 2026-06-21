@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 
 export default function SystemTerminal() {
     const [output, setOutput] = useState<string[]>([
-        ' Abu Mafhal Hub System Terminal v2.4.0',
+        ' Abu Mafhal Sub System Terminal v2.4.0',
         ' Copyright (c) 2026 Cortex Systems',
         ' ',
         ' [SYS] Connecting to secure gateway...',

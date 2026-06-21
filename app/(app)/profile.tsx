@@ -275,7 +275,7 @@ export default function ProfileScreen() {
                             />
                             <View className="flex-col leading-none">
                                 <Text className="text-white font-black text-sm tracking-wider leading-4">MAFHAL</Text>
-                                <Text className="text-[#f5a623] font-bold text-[10px] tracking-widest leading-3">HUB</Text>
+                                <Text className="text-[#f5a623] font-bold text-[10px] tracking-widest leading-3">SUB</Text>
                             </View>
                         </View>
                         
@@ -600,7 +600,7 @@ export default function ProfileScreen() {
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
-                            {/* About Mafhal Hub */}
+                            {/* About Mafhal Sub */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/onboarding')} 
                                 activeOpacity={0.6}
@@ -610,7 +610,7 @@ export default function ProfileScreen() {
                                     <Ionicons name="information-circle" size={15} color="#0d1b3e" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">About Mafhal Hub</Text>
+                                    <Text className="font-extrabold text-xs text-slate-800">About Mafhal Sub</Text>
                                     <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Learn more about us</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />

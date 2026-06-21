@@ -131,7 +131,7 @@ export default function AdminLayout() {
             <Stack.Screen name="tickets" options={{ title: 'Help Desk' }} />
             <Stack.Screen name="cms" options={{ title: 'Content Manager' }} />
             <Stack.Screen name="reports" options={{ title: 'Report Generator' }} />
-            <Stack.Screen name="security" options={{ title: 'Security Hub' }} />
+            <Stack.Screen name="security" options={{ title: 'Security Sub' }} />
             <Stack.Screen name="ai" options={{ title: 'Cortex AI' }} />
             <Stack.Screen name="db" options={{ title: 'Data Forge' }} />
             <Stack.Screen name="kanban" options={{ title: 'Project Board' }} />

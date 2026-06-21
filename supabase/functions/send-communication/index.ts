@@ -35,7 +35,7 @@ serve(async (req) => {
       throw new Error("Missing email credentials");
     }
 
-    const emailSubject = subject || "Notification from Abu Mafhal Hub";
+    const emailSubject = subject || "Notification from Abu Mafhal Sub";
     let recipients: string[] = [];
 
     // --- RECIPIENT LOGIC ---
@@ -130,7 +130,7 @@ serve(async (req) => {
                       <div style="width:64px;height:64px;background:#ffffff;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:15px;box-shadow:0 4px 15px rgba(0,0,0,0.1);">
                          <span style="font-size:32px;">🦅</span>
                       </div>
-                      <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:1px;text-transform:uppercase;">ABU MAFHAL HUB</h1>
+                      <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:1px;text-transform:uppercase;">ABU MAFHAL SUB</h1>
                       <p style="margin:8px 0 0;font-size:13px;color:#e0e7ff;font-weight:500;letter-spacing:0.5px;">Premium Services • Unmatched Quality</p>
                     </td>
                   </tr>
@@ -166,7 +166,7 @@ serve(async (req) => {
                         </a>
                       </div>
 
-                      <p style="margin:0;font-size:12px;color:#94a3b8;font-weight:500;">© ${new Date().getFullYear()} Abu Mafhal Hub. All rights reserved.</p>
+                      <p style="margin:0;font-size:12px;color:#94a3b8;font-weight:500;">© ${new Date().getFullYear()} Abu Mafhal Sub. All rights reserved.</p>
                       <p style="margin:8px 0 0;font-size:12px;color:#cbd5e1;">Gashua, Yobe State, Nigeria</p>
                       
                       <div style="margin-top:15px;">
@@ -200,7 +200,7 @@ serve(async (req) => {
                     .from('notifications')
                     .insert({
                         user_id: user.id,
-                        title: subject || 'Abu Mafhal Hub',
+                        title: subject || 'Abu Mafhal Sub',
                         body: body,
                         data: {},
                         created_at: new Date().toISOString()
@@ -213,7 +213,7 @@ serve(async (req) => {
                     const message = {
                         to: user.token,
                         sound: 'default',
-                        title: subject || 'Abu Mafhal Hub',
+                        title: subject || 'Abu Mafhal Sub',
                         body: body,
                         data: { someData: 'goes here' },
                     };

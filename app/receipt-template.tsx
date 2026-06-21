@@ -26,7 +26,7 @@ export default function ReceiptTemplateScreen() {
                 resizeMode="contain"
               />
             </View>
-            <Text style={s.brandName}>Mafhal Hub</Text>
+            <Text style={s.brandName}>Mafhal Sub</Text>
             <Text style={s.brandAddress}>Plot 124, Gwarinpa Road, Kano, Nigeria</Text>
             <Text style={s.brandContact}>+234 803 123 4567 | hello@abumafhal.com.ng</Text>
           </View>
@@ -137,7 +137,7 @@ export default function ReceiptTemplateScreen() {
               style={s.footerLogo}
               resizeMode="contain"
             />
-            <Text style={s.footerBrandName}>MAFHAL HUB</Text>
+            <Text style={s.footerBrandName}>MAFHAL SUB</Text>
           </View>
         </View>
 

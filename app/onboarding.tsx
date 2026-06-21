@@ -38,7 +38,7 @@ const TRANSLATIONS = {
     loginAction: 'Log In',
     slides: [
       {
-        title: 'All Payments,\nOne Secure Hub',
+        title: 'All Payments,\nOne Secure Sub',
         desc: 'Instantly buy airtime, cheap data plans, pay electricity bills and cable TV subscriptions without stress.',
         badge: 'CONVENIENCE',
       },
@@ -386,7 +386,7 @@ export default function OnboardingScreen() {
             />
             <View>
               <Text style={s.brandTxt}>MAFHAL</Text>
-              <Text style={s.brandSub}>HUB</Text>
+              <Text style={s.brandSub}>SUB</Text>
             </View>
           </View>
 

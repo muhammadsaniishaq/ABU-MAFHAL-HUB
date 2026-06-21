@@ -47,7 +47,7 @@ export default function Login() {
             <Stack.Screen options={{ headerShown: false }} />
 
             <View className="mb-12">
-                <Text className="text-indigo-500 font-bold uppercase tracking-widest text-xs mb-2">Abu Mafhal Hub</Text>
+                <Text className="text-indigo-500 font-bold uppercase tracking-widest text-xs mb-2">Abu Mafhal Sub</Text>
                 <Text className="text-white font-black text-4xl">Welcome Back.</Text>
                 <Text className="text-slate-500 mt-2">Sign in to access the command center.</Text>
             </View>

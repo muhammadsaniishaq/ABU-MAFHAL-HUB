@@ -19,7 +19,7 @@ export default function BVNServicesScreen() {
                         <View className="flex-row justify-between mb-4">
                             <View>
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">Full Name</Text>
-                                <Text className="text-slate font-bold">ABU MAFHAL HUB</Text>
+                                <Text className="text-slate font-bold">ABU MAFHAL SUB</Text>
                             </View>
                             <View className="items-end">
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">BVN Number</Text>
@@ -71,7 +71,7 @@ export default function BVNServicesScreen() {
                 {view === 'menu' && (
                     <View>
                         <View className="bg-blue-600 p-6 rounded-2xl mb-8">
-                            <Text className="text-white text-xl font-bold mb-2">BVN Advanced Hub</Text>
+                            <Text className="text-white text-xl font-bold mb-2">BVN Advanced Sub</Text>
                             <Text className="text-blue-100 text-sm">Validate, modify or print your BVN documents instantly.</Text>
                         </View>
 

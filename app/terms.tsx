@@ -11,7 +11,7 @@ export default function TermsScreen() {
             <ScrollView className="p-6">
                 <Text className="font-bold text-lg text-slate mb-2">1. Introduction</Text>
                 <Text className="text-gray-600 mb-6 leading-6">
-                    Welcome to Abu Mafhal Hub. By using our app, you agree to these terms. Please read them carefully.
+                    Welcome to Abu Mafhal Sub. By using our app, you agree to these terms. Please read them carefully.
                 </Text>
 
                 <Text className="font-bold text-lg text-slate mb-2">2. Services</Text>

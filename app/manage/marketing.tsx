@@ -88,7 +88,7 @@ export default function MarketingStudio() {
                                     </View>
                                     <View className="flex-1">
                                         <View className="flex-row justify-between">
-                                            <Text className="font-bold text-xs text-slate-900">Abu Mafhal Hub</Text>
+                                            <Text className="font-bold text-xs text-slate-900">Abu Mafhal Sub</Text>
                                             <Text className="text-[10px] text-slate-500">now</Text>
                                         </View>
                                         <Text className="font-bold text-sm text-slate-800 leading-tight">{title || 'Campaign Title'}</Text>

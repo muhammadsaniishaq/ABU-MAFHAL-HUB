@@ -167,7 +167,7 @@ export default function KYCQueue() {
                         Alert.alert('Warning', 'Request approved but failed to upgrade user tier: ' + profileError.message);
                     } else {
                          emailSubject = "KYC Verification Approved! 🎉";
-                         emailBody = `Dear User,\n\nWe are pleased to inform you that your ${request.document_type?.toUpperCase().replace('_', ' ')} verification has been successfully approved.\n\nYou have been upgraded to Tier ${newTier}. You can now enjoy higher limits and more features on Abu Mafhal Hub.\n\nThank you for ensuring your account security.`;
+                         emailBody = `Dear User,\n\nWe are pleased to inform you that your ${request.document_type?.toUpperCase().replace('_', ' ')} verification has been successfully approved.\n\nYou have been upgraded to Tier ${newTier}. You can now enjoy higher limits and more features on Abu Mafhal Sub.\n\nThank you for ensuring your account security.`;
 
                          await supabase.from('notifications').insert({
                             user_id: request.user_id,

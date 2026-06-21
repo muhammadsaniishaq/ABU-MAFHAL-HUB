@@ -31,14 +31,14 @@ export const generateHtmlEmail = (
 
 <img
   src="https://lh3.googleusercontent.com/msqhVq_JQ6x04b9_cy87eDN3tXjT8lzXUkT_PwdVpVQWjODAAakIC0mw_G3mnOjiXT9dTkuNv6ZGSg6O=s265-w265-h265"
-  alt="Abu Mafhal Hub Logo"
+  alt="Abu Mafhal Sub Logo"
   width="72"
   height="72"
   style="display:block;border-radius:50%;margin-bottom:16px;"
 />
 
 <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">
-  ABU MAFHAL HUB
+  ABU MAFHAL SUB
 </h1>
 
 <p style="margin:8px 0 0;font-size:14px;color:#e0e7ff;">
@@ -75,7 +75,7 @@ export const generateHtmlEmail = (
   style="background:#f8fafc;padding:20px;border-top:1px solid #e2e8f0;">
 
 <p style="margin:0;font-size:12px;color:#94a3b8;">
-  © ${currentYear} Abu Mafhal Hub. All rights reserved.
+  © ${currentYear} Abu Mafhal Sub. All rights reserved.
 </p>
 
 <p style="margin:6px 0 0;font-size:12px;color:#94a3b8;">

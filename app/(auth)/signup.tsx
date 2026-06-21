@@ -243,10 +243,10 @@ export default function Signup() {
                                     />
                                     <View style={{ marginLeft: 8 }}>
                                         <Text style={s.brandText}>MAFHAL</Text>
-                                        <Text style={s.brandSubtext}>HUB</Text>
+                                        <Text style={s.brandSubtext}>SUB</Text>
                                     </View>
                                 </View>
-                                <Text style={s.oneHubTextLeft}>One Hub. Endless Possibilities.</Text>
+                                <Text style={s.oneSubTextLeft}>One Sub. Endless Possibilities.</Text>
                             </View>
 
                             <TouchableOpacity 
@@ -314,7 +314,7 @@ export default function Signup() {
                                     </View>
 
                                     <Text style={[s.cardTitle, { fontSize: 24 * scale }]}>
-                                        Join <Text style={{ color: '#d97706' }}>Mafhal Hub</Text>
+                                        Join <Text style={{ color: '#d97706' }}>Mafhal Sub</Text>
                                     </Text>
                                     <Text style={[s.cardSubtitle, { fontSize: 12 * scale, marginBottom: 20 * scale }]}>Enter your details to get started</Text>
 
@@ -633,7 +633,7 @@ const s = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
     },
-    oneHubTextLeft: {
+    oneSubTextLeft: {
         fontSize: 10,
         fontWeight: '700',
         color: '#64748b',

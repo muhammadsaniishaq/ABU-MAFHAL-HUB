@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import * as Clipboard from 'expo-clipboard';
 
-export default function SecurityHub() {
+export default function SecuritySub() {
     const [sessions, setSessions] = useState<any[]>([]);
     const [biometric, setBiometric] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export default function SecurityHub() {
 
                 const { data, error } = await supabase.auth.mfa.enroll({
                     factorType: 'totp',
-                    issuer: 'Mafhal Hub',
+                    issuer: 'Mafhal Sub',
                     friendlyName: user.email || 'Admin'
                 });
 
@@ -187,7 +187,7 @@ export default function SecurityHub() {
                         <Ionicons name="shield-checkmark" size={32} color="#3B82F6" />
                     </View>
                     <View>
-                        <Text className="text-white text-2xl font-black">Security Hub</Text>
+                        <Text className="text-white text-2xl font-black">Security Sub</Text>
                         <Text className="text-slate-400 font-medium">System Integrity & Access</Text>
                     </View>
                 </View>

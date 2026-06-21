@@ -525,7 +525,7 @@ export default function KYCScreen() {
                             <!-- Header -->
                             <div class="header-section">
                                 <img src="${logoSrc}" class="logo" />
-                                <div class="org-name">ABU MAFHAL HUB</div>
+                                <div class="org-name">ABU MAFHAL SUB</div>
                                 <div class="cert-title">Certificate</div>
                                 <div class="cert-subtitle">of Verification</div>
                             </div>
@@ -535,7 +535,7 @@ export default function KYCScreen() {
                                 <div class="presented-to">This certifies that</div>
                                 <div class="recipient-name">${fullName || 'Abu Mafhal User'}</div>
                                 <div class="body-text">
-                                    Has successfully completed all identity verification protocols required by Abu Mafhal Hub. 
+                                    Has successfully completed all identity verification protocols required by Abu Mafhal Sub. 
                                     The holder is hereby recognized as a fully verified Tier 4 member with all associated privileges and trusted status.
                                 </div>
                             </div>

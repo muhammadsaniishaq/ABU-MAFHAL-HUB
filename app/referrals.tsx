@@ -14,7 +14,7 @@ export default function ReferralsScreen() {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `Join me on Abu Mafhal Hub using my referral code ${referralCode} and get instant bonuses on your airtime purchases! Download app at: https://abumafhal.com.ng`,
+                message: `Join me on Abu Mafhal Sub using my referral code ${referralCode} and get instant bonuses on your airtime purchases! Download app at: https://abumafhal.com.ng`,
             });
         } catch (error) { }
     };

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "abu-mafhal-hub",
-    "scheme": "abumafhalhub",
-    "slug": "abu-mafhal-hub",
+    "name": "abu-mafhal-sub",
+    "scheme": "abumafhalsub",
+    "slug": "abu-mafhal-sub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.muhammadsaniishaq.abumafhalhub"
+      "package": "com.muhammadsaniishaq.abumafhalsub"
     },
     "web": {
       "favicon": "./assets/favicon.png",

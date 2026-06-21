@@ -105,7 +105,7 @@ export default function Referrals() {
     const shareLink = async () => {
         try {
             await Share.share({
-                message: `Join me on Abu Mafhal Hub! Use my code "${stats.code}" to sign up and get started. Download app: ${stats.baseUrl}`,
+                message: `Join me on Abu Mafhal Sub! Use my code "${stats.code}" to sign up and get started. Download app: ${stats.baseUrl}`,
             });
         } catch (error) {
             console.log(error);

@@ -88,7 +88,7 @@ export default function OTP() {
 
                 await supabase.from('notifications').insert({
                     user_id: user.id,
-                    title: "Welcome to Abu Mafhal Hub! 🎉",
+                    title: "Welcome to Abu Mafhal Sub! 🎉",
                     body: "Your account is verified. Fund your wallet to start trading.",
                     data: { priority: 'normal', type: 'welcome' }
                 });
@@ -99,7 +99,7 @@ export default function OTP() {
                         type: 'email',
                         recipient_mode: 'single',
                         recipient: email, // Use the email from params
-                        subject: "Welcome to Abu Mafhal Hub! 🚀",
+                        subject: "Welcome to Abu Mafhal Sub! 🚀",
                         body: `<h3>Welcome to the Family!</h3><p>Your account has been successfully verified.</p><p><b>Next Steps:</b></p><ul><li>Fund your wallet</li><li>Explore our services</li><li>Start trading</li></ul><p>We are glad to have you!</p>`
                     }
                 });

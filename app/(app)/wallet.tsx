@@ -189,7 +189,7 @@ export default function WalletScreen() {
                   />
                   <View>
                     <Text style={s.brandTxt}>MAFHAL</Text>
-                    <Text style={s.brandSub}>HUB</Text>
+                    <Text style={s.brandSub}>SUB</Text>
                   </View>
                 </View>
                 

@@ -59,7 +59,7 @@ const SERVICES = [
   { title: 'Internet',        desc: 'Pay for internet subscriptions easily.',                   icon: 'wifi-outline'           as const, color: '#ec4899', route: '/bills'         },
   { title: 'Education',       desc: 'Pay school fees and other educational bills.',             icon: 'school-outline'         as const, color: '#10b981', route: '/education'     },
   { title: 'NIN Services',    desc: 'Access NIN related services quickly and securely.',        icon: 'card-outline'           as const, color: '#0d9488', route: '/nin-services'  },
-  { title: 'More Services',   desc: 'Explore more amazing services in one hub.',               icon: 'grid-outline'           as const, color: '#64748b', route: '/(app)/dashboard' },
+  { title: 'More Services',   desc: 'Explore more amazing services in one sub.',               icon: 'grid-outline'           as const, color: '#64748b', route: '/(app)/dashboard' },
 ];
 
 // ─── Operators ────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ function PhoneMockup({ width: customWidth }: { width?: number }) {
             <View style={ph.hdr}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <Image source={require('../assets/images/logo.png')} style={{ width: 17, height: 17 }} resizeMode="contain" />
-                <Text style={ph.hdrTxt}>MAFHAL HUB</Text>
+                <Text style={ph.hdrTxt}>MAFHAL SUB</Text>
               </View>
               <View style={ph.bell}>
                 <Ionicons name="notifications-outline" size={12} color={T.navy} />
@@ -326,7 +326,7 @@ export default function Landing() {
           <Image source={require('../assets/images/logo.png')} style={{ width: 36, height: 36 }} resizeMode="contain" />
           <View>
             <Text style={s.navBrand}>MAFHAL</Text>
-            <Text style={s.navSub}>HUB</Text>
+            <Text style={s.navSub}>SUB</Text>
           </View>
         </View>
         {/* right */}
@@ -356,12 +356,12 @@ export default function Landing() {
               {/* badge */}
               <Animated.View style={[s.badge, r0]}>
                 <Ionicons name="star" size={10} color={T.goldDk} />
-                <Text style={s.badgeTxt}>WELCOME TO MAFHAL HUB</Text>
+                <Text style={s.badgeTxt}>WELCOME TO MAFHAL SUB</Text>
               </Animated.View>
 
               {/* headline */}
               <Animated.Text style={[s.headline, r1]}>
-                One Hub.{'\n'}
+                One Sub.{'\n'}
                 <Text style={{ color: T.gold }}>Every Payment.{'\n'}</Text>
                 Total Convenience.
               </Animated.Text>
@@ -495,7 +495,7 @@ export default function Landing() {
                 Experience the power of{' '}
                 <Text style={{ color: T.gold }}>convenience.</Text>
               </Text>
-              <Text style={s.dlDesc}>Download the Mafhal Hub app today.</Text>
+              <Text style={s.dlDesc}>Download the Mafhal Sub app today.</Text>
 
               {/* store buttons */}
               <View style={s.storeRow}>
@@ -534,10 +534,10 @@ export default function Landing() {
             <Image source={require('../assets/images/logo.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
             <View>
               <Text style={s.ftBrandTxt}>MAFHAL</Text>
-              <Text style={s.ftSubTxt}>HUB</Text>
+              <Text style={s.ftSubTxt}>SUB</Text>
             </View>
           </View>
-          <Text style={s.ftTagline}>One Hub, Endless Possibilities.</Text>
+          <Text style={s.ftTagline}>One Sub, Endless Possibilities.</Text>
 
           {/* links grid */}
           <View style={s.ftGrid}>
@@ -575,7 +575,7 @@ export default function Landing() {
           </View>
 
           <View style={s.ftDivider} />
-          <Text style={s.ftCopy}>© {new Date().getFullYear()} Mafhal Hub. All rights reserved.</Text>
+          <Text style={s.ftCopy}>© {new Date().getFullYear()} Mafhal Sub. All rights reserved.</Text>
           <Text style={[s.ftCopy, { marginTop: 4 }]}>CAC Reg No: 8979939</Text>
         </View>
 

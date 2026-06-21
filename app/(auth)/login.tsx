@@ -222,10 +222,10 @@ export default function Login() {
                                     />
                                     <View style={{ marginLeft: 8 }}>
                                         <Text style={s.brandText}>MAFHAL</Text>
-                                        <Text style={s.brandSubtext}>HUB</Text>
+                                        <Text style={s.brandSubtext}>SUB</Text>
                                     </View>
                                 </View>
-                                <Text style={s.oneHubTextLeft}>One Hub. Endless Possibilities.</Text>
+                                <Text style={s.oneSubTextLeft}>One Sub. Endless Possibilities.</Text>
                             </View>
 
                             <TouchableOpacity style={s.langSelector}>
@@ -287,7 +287,7 @@ export default function Login() {
                                     </View>
 
                                     <Text style={[s.cardTitle, { fontSize: 24 * scale }]}>
-                                        Login to <Text style={{ color: '#d97706' }}>Mafhal Hub</Text>
+                                        Login to <Text style={{ color: '#d97706' }}>Mafhal Sub</Text>
                                     </Text>
                                     <Text style={[s.cardSubtitle, { fontSize: 12 * scale, marginBottom: 20 * scale }]}>Enter your details to continue</Text>
 
@@ -482,7 +482,7 @@ export default function Login() {
                             </View>
                         </View>
                         
-                        <Text style={[s.copyrightText, { marginTop: spacing.copyrightMarginTop, fontSize: 13 * scale }]}>© {new Date().getFullYear()} Mafhal Hub. All rights reserved. | CAC: 89799349</Text>
+                        <Text style={[s.copyrightText, { marginTop: spacing.copyrightMarginTop, fontSize: 13 * scale }]}>© {new Date().getFullYear()} Mafhal Sub. All rights reserved. | CAC: 89799349</Text>
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
@@ -573,7 +573,7 @@ const s = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
     },
-    oneHubTextLeft: {
+    oneSubTextLeft: {
         fontSize: 10,
         fontWeight: '700',
         color: '#64748b',

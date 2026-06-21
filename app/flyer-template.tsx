@@ -34,7 +34,7 @@ export default function FlyerTemplateScreen() {
                         style={s.logo} 
                         resizeMode="contain" 
                     />
-                    <Text style={s.brandName}>MAFHAL HUB</Text>
+                    <Text style={s.brandName}>MAFHAL SUB</Text>
                     <Text style={s.brandTagline}>INSTANT QR PAYMENT</Text>
                 </View>
 
@@ -46,7 +46,7 @@ export default function FlyerTemplateScreen() {
                     </View>
 
                     <Text style={s.userName} numberOfLines={1}>{name || 'Valued Customer'}</Text>
-                    <Text style={s.userEmail} numberOfLines={1}>{email || 'user@mafhalhub.com'}</Text>
+                    <Text style={s.userEmail} numberOfLines={1}>{email || 'user@mafhalsub.com'}</Text>
 
                     {/* QR Code */}
                     <View style={s.qrWrapper}>
