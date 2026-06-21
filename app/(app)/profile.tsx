@@ -254,9 +254,18 @@ export default function ProfileScreen() {
                     colors={['#060d21', '#0d1b3e']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    className="pt-16 pb-20 px-6 rounded-b-[32px] shadow-xl relative"
+                    className="pt-16 pb-24 px-6 rounded-b-[32px] shadow-xl relative"
                 >
-                    {/* Top Row: Logo & Action Icons */}
+                    {/* Background Gold Mesh Glow */}
+                    <LinearGradient
+                        colors={['rgba(245, 166, 35, 0.12)', 'rgba(245, 166, 35, 0)']}
+                        className="absolute -top-24 -right-24 w-72 h-72 rounded-full blur-[80px] pointer-events-none"
+                    />
+
+                    {/* Decorative Bottom Gold Line */}
+                    <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#f5a623] opacity-80" style={{ borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }} />
+
+                    {/* Top Row: Page Title & Action Icons */}
                     <View className="flex-row items-center justify-between mb-6">
                         <View className="flex-row items-center gap-2">
                             <Image 
@@ -269,15 +278,15 @@ export default function ProfileScreen() {
                                 <Text className="text-[#f5a623] font-bold text-[10px] tracking-widest leading-3">HUB</Text>
                             </View>
                         </View>
-
+                        
                         <View className="flex-row items-center gap-3">
                             {/* Notification Bell */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
-                                className="w-9 h-9 bg-white/10 rounded-full items-center justify-center border border-white/10 relative"
+                                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', position: 'relative' }}
                             >
                                 <Ionicons name="notifications" size={18} color="white" />
-                                <View className="absolute -top-1 -right-1 bg-red-500 w-4 h-4 rounded-full items-center justify-center border-2 border-[#060d21]">
+                                <View style={{ position: 'absolute', top: -1, right: -1, backgroundColor: '#f5a623', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#060d21' }}>
                                     <Text className="text-white text-[8px] font-black">3</Text>
                                 </View>
                             </TouchableOpacity>
@@ -285,70 +294,79 @@ export default function ProfileScreen() {
                             {/* Settings Cog */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
-                                className="w-9 h-9 bg-white/10 rounded-full items-center justify-center border border-white/10"
+                                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
                             >
                                 <Ionicons name="settings" size={18} color="white" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Profile Information Row */}
+                    {/* Profile Information Row (Horizontal Alignment) */}
                     <View className="flex-row items-center">
-                        {/* Avatar Picker Container */}
+                        {/* Avatar Picker Container with Double Gold Ring */}
                         <View className="relative">
-                            <View className="w-16 h-16 bg-white/10 rounded-full items-center justify-center border-2 border-white/20 overflow-hidden">
-                                {profile?.avatar_url ? (
-                                    <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
-                                ) : (
-                                    <LinearGradient
-                                        colors={['#0d1b3e', '#f5a623']}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        className="w-full h-full items-center justify-center"
-                                    >
-                                        <Text className="text-2xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
-                                    </LinearGradient>
-                                )}
+                            <View style={{ width: 72, height: 72, borderRadius: 36, padding: 3, backgroundColor: '#f5a623', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 }}>
+                                <View style={{ width: 66, height: 66, borderRadius: 33, padding: 2, backgroundColor: '#0d1b3e', alignItems: 'center', justifyContent: 'center' }}>
+                                    <View style={{ width: 62, height: 62, borderRadius: 31, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                                        {profile?.avatar_url ? (
+                                            <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
+                                        ) : (
+                                            <LinearGradient
+                                                colors={['#0d1b3e', '#f5a623']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                className="w-full h-full items-center justify-center"
+                                            >
+                                                <Text className="text-xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
+                                            </LinearGradient>
+                                        )}
+                                    </View>
+                                </View>
                             </View>
                             {/* Tappable Camera Icon Overlay */}
                             <TouchableOpacity 
                                 onPress={pickImage} 
                                 disabled={uploading}
-                                className="absolute bottom-0 right-0 bg-[#f5a623] w-6 h-6 rounded-full items-center justify-center border border-white shadow-md"
+                                style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#f5a623', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 3 }}
+                                activeOpacity={0.7}
                             >
                                 {uploading ? (
                                     <ActivityIndicator size="small" color="white" />
                                 ) : (
-                                    <Ionicons name="camera" size={12} color="white" />
+                                    <Ionicons name="camera" size={11} color="white" />
                                 )}
                             </TouchableOpacity>
                         </View>
 
-                        {/* Name & Subtitle Details */}
+                        {/* Name & Contact Info */}
                         <View className="ml-4 flex-1">
-                            <Text className="text-white text-lg font-extrabold tracking-tight leading-6" numberOfLines={1}>
-                                {profile?.full_name || 'User'}
-                            </Text>
-                            <Text className="text-slate-300 text-xs font-semibold mb-1.5">
-                                {profile?.phone || profile?.email || 'No Contact'}
+                            <View className="flex-row items-center gap-1.5 mb-0.5">
+                                <Text className="text-white text-lg font-black tracking-tight max-w-[200px]" numberOfLines={1}>
+                                    {profile?.full_name || 'User'}
+                                </Text>
+                                <Ionicons name="ribbon" size={16} color="#f5a623" />
+                            </View>
+                            
+                            <Text className="text-slate-300 text-xs font-semibold mb-2">
+                                {profile?.phone || profile?.email || 'No Contact Details'}
                             </Text>
                             
                             {/* Verification Pill */}
                             <View className="flex-row">
-                                {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
-                                    <View className="bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex-row items-center gap-1">
-                                        <Ionicons name="checkmark-circle" size={10} color="#10b981" />
-                                        <Text className="text-emerald-400 text-[8px] font-black uppercase tracking-wider">Verified Account</Text>
+                                {profile?.kyc_tier && profile.kyc_tier > 1 ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)', gap: 4 }}>
+                                        <Ionicons name="shield-checkmark" size={10} color="#f5a623" />
+                                        <Text style={{ color: '#f5a623', fontSize: 8, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>Verified Account</Text>
                                     </View>
                                 ) : kycStatus === 'pending' ? (
-                                    <View className="bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 flex-row items-center gap-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 158, 11, 0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.35)', gap: 4 }}>
                                         <Ionicons name="time" size={10} color="#f59e0b" />
-                                        <Text className="text-amber-400 text-[8px] font-black uppercase tracking-wider">Pending Review</Text>
+                                        <Text style={{ color: '#f59e0b', fontSize: 8, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>Pending Review</Text>
                                     </View>
                                 ) : (
-                                    <View className="bg-slate-500/10 px-2.5 py-0.5 rounded-full border border-slate-500/20 flex-row items-center gap-1">
-                                        <Ionicons name="alert-circle" size={10} color="#94a3b8" />
-                                        <Text className="text-slate-400 text-[8px] font-black uppercase tracking-wider">Unverified</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', gap: 4 }}>
+                                        <Ionicons name="alert-circle" size={10} color="#cbd5e1" />
+                                        <Text style={{ color: '#cbd5e1', fontSize: 8, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unverified Profile</Text>
                                     </View>
                                 )}
                             </View>
@@ -357,56 +375,62 @@ export default function ProfileScreen() {
                 </LinearGradient>
 
                 {/* 2. FLOATING STATS CARD (2x2 Grid) */}
-                <View className="bg-white mx-6 rounded-2xl p-3.5 -mt-10 shadow-lg border border-slate-100/80 z-20">
+                <View style={{ backgroundColor: '#ffffff', marginHorizontal: 24, borderRadius: 16, padding: 16, marginTop: -40, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)', zIndex: 20 }}>
                     {/* Row 1 */}
-                    <View className="flex-row justify-between mb-3">
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                         {/* Wallet Balance */}
-                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl mr-1.5">
-                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
-                                <Ionicons name="wallet" size={14} color="#0d1b3e" />
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginRight: 6 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                <Ionicons name="wallet-sharp" size={16} color="#f5a623" />
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Balance</Text>
-                                <Text className="text-[11px] text-[#0d1b3e] font-black mt-0.5" numberOfLines={1}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Balance</Text>
+                                <Text style={{ fontSize: 13, color: '#0d1b3e', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
                                     ₦{balanceWhole}
-                                    <Text className="text-[8px] text-slate-400 font-medium">.{balanceDecimal}</Text>
+                                    <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '500' }}>.{balanceDecimal}</Text>
                                 </Text>
                             </View>
                         </View>
 
                         {/* Total Transactions */}
-                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl ml-1.5">
-                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
-                                <Ionicons name="stats-chart" size={14} color="#0d1b3e" />
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginLeft: 6 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                <Ionicons name="swap-horizontal-sharp" size={16} color="#f5a623" />
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Transactions</Text>
-                                <Text className="text-[11px] text-slate-800 font-black mt-0.5">{txCount} <Text className="text-[8px] text-slate-400 font-medium">this mo</Text></Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Transactions</Text>
+                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
+                                    {txCount} <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '500' }}>this mo</Text>
+                                </Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Row 2 */}
-                    <View className="flex-row justify-between">
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                         {/* Member Since */}
-                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl mr-1.5">
-                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
-                                <Ionicons name="calendar" size={14} color="#0d1b3e" />
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginRight: 6 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                <Ionicons name="calendar-sharp" size={16} color="#f5a623" />
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Member Since</Text>
-                                <Text className="text-[11px] text-slate-800 font-black mt-0.5" numberOfLines={1}>{getMemberSince(profile?.created_at)}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Member Since</Text>
+                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
+                                    {getMemberSince(profile?.created_at)}
+                                </Text>
                             </View>
                         </View>
 
                         {/* Account Tier */}
-                        <View className="flex-1 flex-row items-center bg-[#f4f6fb] p-2.5 rounded-xl ml-1.5">
-                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-2">
-                                <Ionicons name="medal" size={14} color="#0d1b3e" />
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginLeft: 6 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                <Ionicons name="ribbon-sharp" size={16} color="#f5a623" />
                             </View>
-                            <View className="flex-1">
-                                <Text className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">Tier</Text>
-                                <Text className="text-[11px] text-slate-800 font-black mt-0.5" numberOfLines={1}>{getTierLabel(profile?.kyc_tier)}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tier</Text>
+                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
+                                    {getTierLabel(profile?.kyc_tier)}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -481,7 +505,7 @@ export default function ProfileScreen() {
                                     <Text className="text-slate-400 text-[10px] font-medium mt-0.5">KYC verification and account status</Text>
                                 </View>
                                 <View className="flex-row items-center mr-2">
-                                    {profile?.kyc_tier && profile.kyc_tier >= 4 ? (
+                                    {profile?.kyc_tier && profile.kyc_tier > 1 ? (
                                         <View className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                                             <Text className="text-emerald-600 text-[8px] font-black uppercase">Verified</Text>
                                         </View>

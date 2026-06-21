@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [showAllActions, setShowAllActions] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
   
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -38,8 +40,24 @@ export default function Dashboard() {
     useCallback(() => {
       fetchUserData();
       fetchFeatureFlags();
+      fetchLogo();
     }, [])
   );
+
+  const fetchLogo = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'app_logo')
+        .single();
+      if (data?.value?.url) {
+        setLogoUrl(data.value.url);
+      }
+    } catch (e) {
+      console.error('Error fetching dynamic logo:', e);
+    }
+  };
 
   const fetchFeatureFlags = async () => {
     const { data, error } = await supabase.from('feature_flags').select('feature_key, is_enabled, maintenance_message');
@@ -236,8 +254,8 @@ export default function Dashboard() {
           <View style={s.headerTop}>
             <View style={s.brandRow}>
               <Image
-                source={require('../../assets/images/logo.png')}
-                style={s.headerLogo}
+                source={logoUrl ? { uri: logoUrl } : require('../../assets/images/logo.png')}
+                style={s.headerLogo as any}
                 resizeMode="contain"
               />
               <View>

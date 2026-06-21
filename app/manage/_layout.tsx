@@ -22,26 +22,41 @@ export default function AdminLayout() {
                     return;
                 }
                 
+                let authorizedAdmin = false;
                 // Load from cache first
                 const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
                 if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
                     setIsAdmin(true);
-                    setCheckingRole(false);
-                    return;
+                    authorizedAdmin = true;
+                } else {
+                    // Query db
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', user.id)
+                        .single();
+
+                    const role = profile?.role || 'user';
+                    if (['admin', 'super_admin'].includes(role)) {
+                        setIsAdmin(true);
+                        authorizedAdmin = true;
+                    } else {
+                        router.replace('/(app)/dashboard');
+                        return;
+                    }
                 }
 
-                // Query db
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
-
-                const role = profile?.role || 'user';
-                if (['admin', 'super_admin'].includes(role)) {
-                    setIsAdmin(true);
-                } else {
-                    router.replace('/(app)/dashboard');
+                if (authorizedAdmin) {
+                    const lastVerificationStr = await AsyncStorage.getItem('last_security_verification_time');
+                    if (lastVerificationStr) {
+                        const lastVerificationTime = parseInt(lastVerificationStr, 10);
+                        const now = Date.now();
+                        const LOCK_TIMEOUT = 10 * 60 * 1000;
+                        if (now - lastVerificationTime < LOCK_TIMEOUT) {
+                            setIsAuthorized(true);
+                            await AsyncStorage.setItem('last_security_verification_time', String(now));
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Admin verification error:", e);
@@ -70,7 +85,14 @@ export default function AdminLayout() {
             <SecurityModal
                 visible={true}
                 onClose={() => router.replace('/(app)/dashboard')}
-                onSuccess={() => setIsAuthorized(true)}
+                onSuccess={async () => {
+                    try {
+                        await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    setIsAuthorized(true);
+                }}
                 title="Admin Access"
                 description="Biometric authentication required."
                 requiredFor="admin"

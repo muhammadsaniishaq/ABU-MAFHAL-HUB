@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -109,6 +110,8 @@ export default function Login() {
                     .select('role')
                     .eq('id', data.user.id)
                     .single();
+
+                await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
                 if (redirectTo) {
                     router.replace(redirectTo as any);

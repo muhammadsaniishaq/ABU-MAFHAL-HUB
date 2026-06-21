@@ -1,14 +1,15 @@
-import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform, Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width, height } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function PinSetupScreen() {
     const [pin, setPin] = useState('');
@@ -18,6 +19,7 @@ export default function PinSetupScreen() {
     const router = useRouter();
 
     const handlePress = (key: string) => {
+        if (loading) return;
         Vibration.vibrate(10);
         const currentPin = step === 'create' ? pin : confirmPin;
         const setCurrent = step === 'create' ? setPin : setConfirmPin;
@@ -33,155 +35,168 @@ export default function PinSetupScreen() {
     };
 
     const handleNext = async () => {
-        // Validation Logic
         if (step === 'create') {
             if (pin.length === 4) {
                 setStep('confirm');
             }
         } else {
-             // Confirm Step
              if (confirmPin === pin) {
                  setLoading(true);
                  try {
                      const { data: { user } } = await supabase.auth.getUser();
                      if (!user) throw new Error("User not found");
 
-                     // Save to SecureStore
-                     await SecureStore.setItemAsync('user_transaction_pin', pin);
+                     // Save to local SecureStore (or AsyncStorage on web)
+                     if (Platform.OS === 'web') {
+                         await AsyncStorage.setItem('user_transaction_pin', pin);
+                     } else {
+                         await SecureStore.setItemAsync('user_transaction_pin', pin);
+                     }
 
-                     // Success Animation/Alert
+                     // Avoid immediate PIN verification prompt after setup
+                     await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+
+                     // Update PIN in Supabase public.profiles
+                     const { error: dbError } = await supabase
+                         .from('profiles')
+                         .update({ transaction_pin: pin })
+                         .eq('id', user.id);
+
+                     if (dbError) throw dbError;
+
                      Vibration.vibrate(50);
-                     router.replace('/(app)/dashboard');
+                     Alert.alert("Success", "Transaction PIN configured successfully!", [
+                         { text: "Continue", onPress: () => router.replace('/(app)/dashboard') }
+                     ]);
                  } catch (error: any) {
-                     alert(error.message);
+                     Alert.alert("Error", error.message || "Failed to set PIN");
+                     setConfirmPin('');
+                     setPin('');
+                     setStep('create');
                  } finally {
                      setLoading(false);
                  }
-             } else {
-                 // Mismatch
+              } else {
                  Vibration.vibrate([50, 50, 50]);
-                 alert("PINs do not match. Please try again.");
+                 Alert.alert("Mismatch", "PINs do not match. Please try again.");
                  setConfirmPin('');
-                 setStep('create'); // Reset to start for safety
                  setPin('');
+                 setStep('create');
              }
         }
     };
 
-    const renderDot = (index: number) => {
-        const currentLength = step === 'create' ? pin.length : confirmPin.length;
-        const filled = index < currentLength;
-        return (
-            <View 
-                key={index} 
-                className={`w-6 h-6 rounded-full mx-2 border-2 ${
-                    filled ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-blue-200'
-                }`} 
-            />
-        );
-    };
+    // Auto-advance or confirm when 4 digits are input
+    useEffect(() => {
+        if (step === 'create' && pin.length === 4) {
+            handleNext();
+        } else if (step === 'confirm' && confirmPin.length === 4) {
+            handleNext();
+        }
+    }, [pin, confirmPin, step]);
 
     return (
-        <View className="flex-1 bg-white">
+        <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="dark" />
             
             {/* Colorful Mesh Gradient Background */}
-            <View className="absolute inset-0 overflow-hidden pointer-events-none bg-[#F8FAFC]">
-                {/* Top Right - Purple/Pink Glow */}
+            <View style={StyleSheet.absoluteFillObject} className="pointer-events-none">
+                {/* Top Right - Gold Glow */}
                 <LinearGradient
-                    colors={['rgba(168, 85, 247, 0.15)', 'rgba(168, 85, 247, 0)']}
-                    className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full blur-[80px]"
+                    colors={['rgba(245, 166, 35, 0.08)', 'rgba(245, 166, 35, 0)']}
+                    style={s.topGlow}
                 />
                 
-                {/* Bottom Left - Cyan/Teal Glow */}
+                {/* Bottom Left - Navy Glow */}
                 <LinearGradient
-                    colors={['rgba(6, 182, 212, 0.15)', 'rgba(6, 182, 212, 0)']}
-                    className="absolute -bottom-32 -left-32 w-[600px] h-[600px] rounded-full blur-[80px]"
-                />
-
-                {/* Center - Primary Blue Subtle */}
-                <LinearGradient
-                    colors={['rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0)']}
-                    className="absolute top-1/2 left-1/2 -ml-[300px] -mt-[300px] w-[600px] h-[600px] rounded-full blur-[100px]"
+                    colors={['rgba(13, 27, 62, 0.06)', 'rgba(13, 27, 62, 0)']}
+                    style={s.bottomGlow}
                 />
             </View>
 
-            <SafeAreaView className="flex-1">
-                <View 
-                    className="flex-1 px-8 py-6 justify-between"
-                    style={Platform.OS === 'web' && { alignSelf: 'center', width: '100%', maxWidth: 420 }}
-                >
+            <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                {/* Header bar with Back Button */}
+                <View style={s.topBar}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={20} color="#0d1b3e" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Compact Premium Dialer Card */}
+                <View style={s.card}>
                     
                     {/* Header Section (Top) */}
-                    <View className="items-center mt-12">
-                         <View className="w-24 h-24 bg-white/80 rounded-[32px] items-center justify-center mb-8 border border-white backdrop-blur-md shadow-sm shadow-sky-100">
-                           <Image 
+                    <View style={s.headerContainer}>
+                        <View style={s.logoCard}>
+                            <Image 
                                 source={require('../../assets/images/logo.png')}
-                                className="w-12 h-12"
+                                style={s.logo}
                                 resizeMode="contain"
                             />
                         </View>
-                        <Text className="text-3xl font-bold text-slate-800 mb-3 tracking-tight">
+                        <Text style={s.title}>
                             {step === 'create' ? 'Create PIN' : 'Confirm PIN'}
                         </Text>
-                        <Text className="text-slate-500 text-base font-medium tracking-wide">
-                            {step === 'create' ? 'Secure your account' : 'Verify your identity'}
+                        <Text style={s.subtitle}>
+                            {step === 'create' ? 'Secure your transactions' : 'Re-enter your PIN'}
                         </Text>
-
-                        {/* Modern Dots */}
-                        <View className="flex-row gap-6 mt-12">
-                            {[0, 1, 2, 3].map((idx) => {
-                                const currentLength = step === 'create' ? pin.length : confirmPin.length;
-                                const filled = idx < currentLength;
-                                return (
-                                    <View 
-                                        key={idx} 
-                                        className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                                            filled 
-                                            ? 'bg-sky-500 shadow-lg shadow-sky-200 scale-110' 
-                                            : 'bg-slate-200 border border-slate-300'
-                                        }`} 
-                                    />
-                                );
-                            })}
-                        </View>
                     </View>
 
-                    {/* Premium Glass Keypad (Bottom) */}
-                    <View className="w-full max-w-[340px] self-center mb-8">
-                         <View className="gap-y-6">
+                    {/* Modern Dots */}
+                    <View style={s.dotsContainer}>
+                        {[0, 1, 2, 3].map((idx) => {
+                            const currentLength = step === 'create' ? pin.length : confirmPin.length;
+                            const filled = idx < currentLength;
+                            return (
+                                <View 
+                                    key={idx} 
+                                    style={[
+                                        s.dot,
+                                        filled ? s.dotFilled : s.dotEmpty
+                                    ]} 
+                                />
+                            );
+                        })}
+                    </View>
+
+                    {/* Premium Keypad (Bottom) */}
+                    <View style={s.keypadContainer}>
+                         <View style={s.keypadGrid}>
                             {[
                                 [1, 2, 3],
                                 [4, 5, 6],
                                 [7, 8, 9]
                             ].map((row, rIdx) => (
-                                <View key={rIdx} className="flex-row justify-between px-2">
+                                <View key={rIdx} style={s.keypadRow}>
                                     {row.map(num => (
                                         <TouchableOpacity
                                             key={num}
                                             onPress={() => handlePress(num.toString())}
-                                            className="w-[85px] h-[85px] rounded-[32px] bg-white items-center justify-center border border-white shadow-sm active:bg-slate-50 active:scale-95 transition-all"
+                                            style={s.keypadButton}
+                                            activeOpacity={0.6}
                                         >
-                                            <Text className="text-3xl font-semibold text-slate-700">{num}</Text>
+                                            <Text style={s.keypadButtonText}>{num}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
                             ))}
                             
-                            <View className="flex-row justify-between items-center px-2">
-                                <View className="w-[85px] h-[85px]" /> 
+                            <View style={s.keypadRow}>
+                                <View style={[s.keypadButton, { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0, elevation: 0 }]} /> 
                                 <TouchableOpacity
                                     onPress={() => handlePress('0')}
-                                    className="w-[85px] h-[85px] rounded-[32px] bg-white items-center justify-center border border-white shadow-sm active:bg-slate-50 active:scale-95 transition-all"
+                                    style={s.keypadButton}
+                                    activeOpacity={0.6}
                                 >
-                                    <Text className="text-3xl font-semibold text-slate-700">0</Text>
+                                    <Text style={s.keypadButtonText}>0</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => handlePress('back')}
-                                    className="w-[85px] h-[85px] rounded-[32px] items-center justify-center active:bg-slate-100/50 active:scale-95 transition-all"
+                                    style={s.keypadButton}
+                                    activeOpacity={0.6}
                                 >
-                                    <Ionicons name="backspace-outline" size={32} color="#94A3B8" />
+                                    <Ionicons name="backspace-outline" size={24} color="#f5a623" style={{ marginRight: 2 }} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -192,3 +207,152 @@ export default function PinSetupScreen() {
         </View>
     );
 }
+
+const s = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f4f6fb', // Premium soft gray-navy
+    },
+    topGlow: {
+        position: 'absolute',
+        top: -150,
+        right: -150,
+        width: 450,
+        height: 450,
+        borderRadius: 225,
+    },
+    bottomGlow: {
+        position: 'absolute',
+        bottom: -150,
+        left: -150,
+        width: 450,
+        height: 450,
+        borderRadius: 225,
+    },
+    topBar: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 44 : 20,
+        left: 20,
+        zIndex: 10,
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#ffffff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0a1633',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.02,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    card: {
+        width: '90%',
+        maxWidth: 320,
+        backgroundColor: '#ffffff',
+        borderRadius: 32,
+        paddingHorizontal: 20,
+        paddingVertical: 28,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0d1b3e',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.04,
+        shadowRadius: 16,
+        elevation: 4,
+    },
+    headerContainer: {
+        alignItems: 'center',
+        width: '100%',
+    },
+    logoCard: {
+        width: 54,
+        height: 54,
+        backgroundColor: '#f8fafc',
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.2)', // Soft gold border
+    },
+    logo: {
+        width: 26,
+        height: 26,
+    },
+    title: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#0d1b3e',
+        marginBottom: 4,
+        letterSpacing: -0.3,
+    },
+    subtitle: {
+        fontSize: 11,
+        color: '#64748b',
+        fontWeight: '500',
+        textAlign: 'center',
+        paddingHorizontal: 12,
+        lineHeight: 14,
+    },
+    dotsContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        marginVertical: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1.2,
+    },
+    dotEmpty: {
+        backgroundColor: '#ffffff',
+        borderColor: '#cbd5e1',
+    },
+    dotFilled: {
+        backgroundColor: '#f5a623',
+        borderColor: '#f5a623',
+        transform: [{ scale: 1.1 }],
+    },
+    keypadContainer: {
+        width: '100%',
+        marginTop: 4,
+    },
+    keypadGrid: {
+        gap: 10,
+        width: '100%',
+    },
+    keypadRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    keypadButton: {
+        width: 60,
+        height: 60,
+        borderRadius: 30, // Perfectly circular small buttons
+        backgroundColor: '#ffffff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        shadowColor: '#0a1633',
+        shadowOffset: { width: 0, height: 1.5 },
+        shadowOpacity: 0.01,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    keypadButtonText: {
+        fontSize: 21,
+        fontWeight: '700',
+        color: '#0d1b3e',
+    },
+});
