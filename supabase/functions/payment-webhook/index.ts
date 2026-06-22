@@ -16,7 +16,7 @@ Deno.serve(async (req: Request) => {
             status: "active",
             message: "Abu Mafhal Sub Webhook System is online",
             timestamp: timestamp,
-            supported_providers: ['paystack', 'flutterwave']
+            supported_providers: ['paystack', 'flutterwave', 'payvessel']
         }), { 
             headers: { "Content-Type": "application/json" },
             status: 200 
@@ -42,8 +42,93 @@ Deno.serve(async (req: Request) => {
         // Detect Provider based on headers
         const paystackSignature = req.headers.get('x-paystack-signature');
         const flwSignature = req.headers.get('verif-hash') || req.headers.get('flutterwave-signature');
+        const payvesselSignature = req.headers.get('http_payvessel_http_signature') || 
+                                   req.headers.get('http-payvessel-http-signature') ||
+                                   req.headers.get('HTTP_PAYVESSEL_HTTP_SIGNATURE');
         
-        console.log(`[Webhook] Detect: PaystackSig=${!!paystackSignature}, FLWSig=${!!flwSignature}`);
+        console.log(`[Webhook] Detect: PaystackSig=${!!paystackSignature}, FLWSig=${!!flwSignature}, PayvesselSig=${!!payvesselSignature}`);
+
+        // --- PAYVESSEL HANDLER ---
+        if (payvesselSignature) {
+            const PAYVESSEL_API_SECRET = Deno.env.get('PAYVESSEL_API_SECRET');
+            if (!PAYVESSEL_API_SECRET) {
+                console.error("[CRITICAL] PAYVESSEL_API_SECRET not set");
+                return new Response("Provider Config Error", { status: 500 });
+            }
+
+            const bodyText = await req.text();
+            
+            // Signature verification
+            const encoder = new TextEncoder();
+            const key = await crypto.subtle.importKey(
+                "raw",
+                encoder.encode(PAYVESSEL_API_SECRET),
+                { name: "HMAC", hash: "SHA-512" },
+                false,
+                ["sign"]
+            );
+
+            const signatureBuffer = await crypto.subtle.sign(
+                "HMAC",
+                key,
+                encoder.encode(bodyText)
+            );
+
+            const hashArray = Array.from(new Uint8Array(signatureBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            if (hashHex !== payvesselSignature) {
+                console.error("Invalid Payvessel signature match. Signature header:", payvesselSignature, "Computed:", hashHex);
+                return new Response("Invalid signature", { status: 401 });
+            }
+
+            // IP allowlist check
+            const ipHeader = req.headers.get('x-forwarded-for') || '';
+            const clientIp = ipHeader.split(',')[0].trim();
+            const TRUSTED_IPS = ['3.255.23.38', '162.246.254.36'];
+            console.log(`[Payvessel Webhook] Incoming from IP: ${clientIp}`);
+            if (clientIp && !TRUSTED_IPS.includes(clientIp)) {
+                console.warn(`Payvessel webhook request from untrusted IP: ${clientIp}. Continuing signature verified payload...`);
+            }
+
+            const eventData = JSON.parse(bodyText);
+            console.log("Payvessel Webhook Event:", eventData.event);
+
+            if (eventData.event === 'transaction.success' || eventData.event === 'reserved_account.credit') {
+                const transactionObj = eventData.transaction || eventData.data || {};
+                const orderObj = eventData.order || eventData.data || {};
+                
+                const reference = transactionObj.reference || eventData.reference;
+                const rawAmount = orderObj.amount || transactionObj.amount || eventData.amount;
+                const amount = parseFloat(String(rawAmount));
+                const currency = orderObj.currency || transactionObj.currency || eventData.currency || 'NGN';
+                const email = transactionObj.customer_email || transactionObj.customer?.email || eventData.customer_email || eventData.email;
+                const accountNumber = transactionObj.account_number || 
+                                      transactionObj.accountNumber || 
+                                      eventData.account_number || 
+                                      eventData.accountNumber;
+                
+                console.log(`[Payvessel Webhook] Parsed: Ref=${reference}, Amt=${amount}, Email=${email}, AccNum=${accountNumber}`);
+                
+                if (!reference || isNaN(amount)) {
+                    console.error("Missing required fields in parsed webhook data:", { reference, amount });
+                    return new Response("Invalid data structure", { status: 400 });
+                }
+
+                return await handleFundWallet(
+                    supabaseAdmin, 
+                    'payvessel', 
+                    String(reference), 
+                    amount, 
+                    currency, 
+                    email, 
+                    { ...eventData, account_number: accountNumber },
+                    null
+                );
+            }
+
+            return new Response("Event Ignored", { status: 200 });
+        }
 
         // --- PAYSTACK HANDLER ---
         if (paystackSignature) {

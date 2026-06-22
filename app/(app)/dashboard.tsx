@@ -24,7 +24,7 @@ const T = {
 
 export default function Dashboard() {
   const [showBalance, setShowBalance] = useState(true);
-  const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number } | null>(null);
+  const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<boolean>(false);
@@ -110,13 +110,41 @@ export default function Dashboard() {
       if (user) {
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name, balance, role, avatar_url, kyc_tier')
+          .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
           .eq('id', user.id)
           .single();
 
         if (data) {
           setUserData(data);
           setDbError(false);
+          
+          // Auto-generate virtual account if user is eligible and doesn't have one
+          const checkAndCreateVA = async () => {
+            try {
+              const { data: va } = await supabase
+                .from('virtual_accounts')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              if (!va && ((data.kyc_tier && data.kyc_tier >= 2) || data.bvn)) {
+                console.log("Eligible user is missing virtual account. Automatically triggering generation...");
+                const { data: res, error: invokeErr } = await supabase.functions.invoke('create-virtual-account', {
+                    body: { userId: user.id }
+                });
+                if (invokeErr) {
+                  console.error("Auto-generate DVA function error:", invokeErr);
+                } else if (res && res.error) {
+                  console.warn("Auto-generate DVA soft error:", res.error);
+                } else {
+                  console.log("Auto-generate DVA success:", res);
+                }
+              }
+            } catch (e) {
+              console.error("Auto-generate DVA exception:", e);
+            }
+          };
+          checkAndCreateVA();
         } else if (error) {
           console.error('Dashboard profile fetch error:', error);
           if (error.message?.includes('recursion') || error.code === '42P17') {
@@ -136,7 +164,7 @@ export default function Dashboard() {
                   kyc_tier: 1,
                   balance: 0.00
                 })
-                .select('full_name, balance, role, avatar_url, kyc_tier')
+                .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
                 .single();
 
               if (newProfile) {

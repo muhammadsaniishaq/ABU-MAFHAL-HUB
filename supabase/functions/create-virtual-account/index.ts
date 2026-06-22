@@ -1,6 +1,6 @@
 // Removed std/http/server.ts import
 import { createClient } from "@supabase/supabase-js";
-import { createFlutterwaveDVA } from "../_shared/flutterwave.ts";
+import { createPayvesselDVA } from "../_shared/payvessel.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -55,10 +55,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 3. New Requirement: BVN Check for Flutterwave + Smart Retrieval
+        // 3. BVN and NIN Retrieval logic
         let userBVN = profile.bvn;
+        let userNIN = null;
 
-        // If BVN is provided explicitly in request (from frontend fallback), use it and save it
+        // If BVN is provided explicitly in request, use it and update profile
         if (safeBvn && safeBvn.length >= 10) {
             console.log("BVN provided in request. Updating profile...");
             const { error: updateError } = await supabaseAdmin
@@ -67,50 +68,61 @@ Deno.serve(async (req) => {
                 .eq('id', userId);
             
             if (updateError) {
-                 console.error("Failed to update profile with BVN (likely duplicate?):", updateError);
-                 // CRITICAL FIX: Even if update fails, we MUST use the provided BVN for this session
-                 // so we don't return "BVN Required" again.
+                 console.error("Failed to update profile with BVN:", updateError);
             }
             userBVN = safeBvn;
         }
 
         if (!userBVN) {
              console.log("BVN missing in profile, searching kyc_requests...");
-             // Check if they have a 'bvn' record in kyc_requests (even if pending/approved)
-             // We prioritize 'approved', but strictly speaking if they submitted it, we might want to try it.
-             // Let's filter by document_type='bvn'
+             // Check if they have a 'bvn' or 'nin' record in kyc_requests
              const { data: kycs } = await supabaseAdmin
                 .from('kyc_requests')
                 .select('admin_note, status, document_number, document_type')
                 .eq('user_id', userId)
-                .eq('document_type', 'bvn')
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .in('document_type', ['bvn', 'nin'])
+                .order('created_at', { ascending: false });
 
              if (kycs && kycs.length > 0) {
-                 const bestKyc = kycs[0];
-                 
-                 // 1. Check direct document_number (Best Source)
-                 if (bestKyc.document_number && bestKyc.document_number.length >= 10) {
-                     userBVN = bestKyc.document_number;
-                     console.log("BVN found in kyc_requests document_number. Auto-repairing profile...");
-                     await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
-                 }
-                 // 2. Fallback: Parse admin_note
-                 else {
-                     const match = bestKyc.admin_note?.match(/ID:\s*(\d{11})/);
-                     if (match && match[1]) {
-                         userBVN = match[1];
-                         console.log("BVN found in KYC logs (admin_note). Auto-repairing profile...");
+                 // Try to retrieve BVN
+                 const bvnKyc = kycs.find(k => k.document_type === 'bvn');
+                 if (bvnKyc) {
+                     if (bvnKyc.document_number && bvnKyc.document_number.length >= 10) {
+                         userBVN = bvnKyc.document_number;
+                         console.log("BVN found in kyc_requests document_number. Auto-repairing profile...");
                          await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                     } else {
+                         const match = bvnKyc.admin_note?.match(/ID:\s*(\d{11})/);
+                         if (match && match[1]) {
+                             userBVN = match[1];
+                             console.log("BVN found in KYC logs (admin_note). Auto-repairing profile...");
+                             await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
+                         }
+                     }
+                 }
+
+                 // Try to retrieve NIN if BVN not found
+                 if (!userBVN) {
+                     const ninKyc = kycs.find(k => k.document_type === 'nin');
+                     if (ninKyc) {
+                         if (ninKyc.document_number && ninKyc.document_number.length >= 10) {
+                             userNIN = ninKyc.document_number;
+                             console.log("NIN found in kyc_requests document_number.");
+                         } else {
+                             const match = ninKyc.admin_note?.match(/ID:\s*(\d{11})/);
+                             if (match && match[1]) {
+                                 userNIN = match[1];
+                                 console.log("NIN found in KYC logs (admin_note).");
+                             }
+                         }
                      }
                  }
              }
 
-             if (!userBVN) {
+             if (!userBVN && !userNIN) {
                 return new Response(JSON.stringify({ 
                     error: "BVN Required", 
-                    message: "Please complete your BVN verification to generate a virtual account." 
+                    message: "Please complete your BVN or NIN verification to generate a virtual account." 
                 }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200, 
@@ -118,35 +130,34 @@ Deno.serve(async (req) => {
              }
         }
 
-        // 4. Create Flutterwave DVA
+        // 4. Create Payvessel DVA
         const userEmail = profile.email;
         const userName = profile.full_name || 'Valued User';
-        const splitName = userName.split(' ');
-        const firstName = splitName[0];
-        const lastName = splitName.slice(1).join(' ') || firstName;
         const userPhone = profile.phone || '08000000000';
 
+        console.log(`Creating Payvessel DVA for ${userEmail}`);
+        const payvesselRes = await createPayvesselDVA({
+            email: userEmail,
+            name: userName,
+            phone: userPhone,
+            bvn: userBVN || undefined,
+            nin: userNIN || undefined
+        });
 
-
-        console.log(`Creating Flutterwave DVA for ${userEmail}`);
-
-        const tx_ref = `dva_${userId}_${Date.now()}`;
-        const flwRes = await createFlutterwaveDVA(userEmail, userBVN, 'Wallet Funding', firstName, lastName, userPhone, tx_ref);
-
-        if (flwRes.status !== 'success' || !flwRes.data) {
-            throw new Error(flwRes.message || "Flutterwave creation failed");
+        if (!payvesselRes.status || !payvesselRes.banks || payvesselRes.banks.length === 0) {
+            throw new Error(payvesselRes.message || "Payvessel account creation failed");
         }
 
-        // 5. Save to DB
-        // Fix: Ensure we match the exact schema fields
+        // 5. Save to DB (Primary Bank)
+        const primaryBank = payvesselRes.banks[0];
         const virtualAccountData = {
             user_id: userId,
-            provider: 'flutterwave',
-            bank_name: flwRes.data.bank_name,
-            account_number: flwRes.data.account_number,
-            account_name: userName, // FLW DVA sometimes returns order ref as name, better use profile name or check 'note'
+            provider: 'payvessel',
+            bank_name: primaryBank.bankName,
+            account_number: primaryBank.accountNumber,
+            account_name: primaryBank.accountName,
             currency: 'NGN', 
-            metadata: flwRes.data
+            metadata: payvesselRes // Keep the full array and response payload
         };
 
         const { data: newAccount, error: insertError } = await supabaseAdmin
@@ -167,7 +178,6 @@ Deno.serve(async (req) => {
     } catch (error: unknown) {
         console.error("Create DVA Error:", error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown Error';
-        // Return 200 but with error field so client can read message
         return new Response(JSON.stringify({ 
             error: errorMessage,
             details: error instanceof Error ? error.stack : undefined

@@ -8,6 +8,15 @@ export default function AdminSettings() {
     const [registrations, setRegistrations] = useState(true);
     const [usdNgnRate, setUsdNgnRate] = useState('1450.00');
     const [loading, setLoading] = useState(false);
+    const [keysLoading, setKeysLoading] = useState(false);
+
+    // API Keys state
+    const [paystackKey, setPaystackKey] = useState('');
+    const [monnifyKey, setMonnifyKey] = useState('');
+    const [payvesselKey, setPayvesselKey] = useState('');
+    const [payvesselSecret, setPayvesselSecret] = useState('');
+    const [termiiKey, setTermiiKey] = useState('');
+    const [flutterwaveKey, setFlutterwaveKey] = useState('');
 
     useEffect(() => {
         fetchSettings();
@@ -21,7 +30,44 @@ export default function AdminSettings() {
                 .eq('pair', 'USDT / NGN')
                 .single();
             if (data) setUsdNgnRate(String(data.sell_rate));
+
+            // Fetch keys from system_secrets (Only works if user is admin)
+            const { data: secrets } = await supabase.from('system_secrets').select('key, value');
+            if (secrets) {
+                secrets.forEach((secret) => {
+                    if (secret.key === 'PAYSTACK_SECRET_KEY') setPaystackKey(secret.value);
+                    if (secret.key === 'MONNIFY_API_KEY') setMonnifyKey(secret.value);
+                    if (secret.key === 'PAYVESSEL_API_KEY') setPayvesselKey(secret.value);
+                    if (secret.key === 'PAYVESSEL_API_SECRET') setPayvesselSecret(secret.value);
+                    if (secret.key === 'TERMII_API_KEY') setTermiiKey(secret.value);
+                    if (secret.key === 'FLUTTERWAVE_SECRET_KEY') setFlutterwaveKey(secret.value);
+                });
+            }
         } catch (e) { }
+    };
+
+    const handleSaveKeys = async () => {
+        setKeysLoading(true);
+        try {
+            const keysToSave = [
+                { key: 'PAYSTACK_SECRET_KEY', value: paystackKey, description: 'Paystack Secret Key' },
+                { key: 'MONNIFY_API_KEY', value: monnifyKey, description: 'Monnify API Key' },
+                { key: 'PAYVESSEL_API_KEY', value: payvesselKey, description: 'Payvessel API Key' },
+                { key: 'PAYVESSEL_API_SECRET', value: payvesselSecret, description: 'Payvessel API Secret' },
+                { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' },
+                { key: 'FLUTTERWAVE_SECRET_KEY', value: flutterwaveKey, description: 'Flutterwave Secret Key' }
+            ].filter(k => k.value && k.value.trim() !== '');
+
+            if (keysToSave.length > 0) {
+                const { error } = await supabase.from('system_secrets').upsert(keysToSave);
+                if (error) throw error;
+            }
+            Alert.alert('Success', 'API keys have been securely saved.');
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setKeysLoading(false);
+        }
     };
 
     const handleUpdateEconomics = async () => {
@@ -103,14 +149,69 @@ export default function AdminSettings() {
                 <View className="bg-white rounded-2xl p-6 border border-gray-100 gap-4">
                     <View>
                         <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Paystack Secret Key</Text>
-                        <TextInput defaultValue="sk_live_xxxx...94a" secureTextEntry className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" />
+                        <TextInput 
+                            value={paystackKey}
+                            onChangeText={setPaystackKey}
+                            placeholder="sk_live_..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
+                    </View>
+                    <View>
+                        <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Payvessel API Key</Text>
+                        <TextInput 
+                            value={payvesselKey}
+                            onChangeText={setPayvesselKey}
+                            placeholder="PVKEY-..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
+                    </View>
+                    <View>
+                        <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Payvessel API Secret</Text>
+                        <TextInput 
+                            value={payvesselSecret}
+                            onChangeText={setPayvesselSecret}
+                            placeholder="PVSECRET-..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
+                    </View>
+                    <View>
+                        <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Flutterwave Secret Key</Text>
+                        <TextInput 
+                            value={flutterwaveKey}
+                            onChangeText={setFlutterwaveKey}
+                            placeholder="FLWSECK-..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
+                    </View>
+                    <View>
+                        <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Termii API Key</Text>
+                        <TextInput 
+                            value={termiiKey}
+                            onChangeText={setTermiiKey}
+                            placeholder="..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
                     </View>
                     <View>
                         <Text className="text-xs font-bold text-gray-400 uppercase mb-2">Monnify API Key</Text>
-                        <TextInput defaultValue="MK_PROD_xxxx...12b" secureTextEntry className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" />
+                        <TextInput 
+                            value={monnifyKey}
+                            onChangeText={setMonnifyKey}
+                            placeholder="MK_PROD_..." 
+                            secureTextEntry 
+                            className="bg-gray-50 rounded-xl px-4 py-3 font-mono text-slate-800 text-sm" 
+                        />
                     </View>
-                    <TouchableOpacity className="bg-blue-600 h-12 rounded-xl items-center justify-center mt-2">
-                        <Text className="text-white font-bold">Save Keys</Text>
+                    <TouchableOpacity 
+                        onPress={handleSaveKeys}
+                        className="bg-blue-600 h-12 rounded-xl items-center justify-center mt-2"
+                    >
+                        {keysLoading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold">Save Keys</Text>}
                     </TouchableOpacity>
                 </View>
             </View>

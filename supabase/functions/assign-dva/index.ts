@@ -1,6 +1,6 @@
 // Removed std/http/server.ts import
 import { createClient } from "@supabase/supabase-js";
-import { createFlutterwaveDVA } from "../_shared/flutterwave.ts";
+import { createPayvesselDVA } from "../_shared/payvessel.ts";
 
 interface VirtualAccountData {
     user_id: string;
@@ -77,54 +77,59 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 4. Prepare Flutterwave Data
+        // 4. Prepare Payvessel Data
         const userEmail = profile.email;
         const userName = profile.full_name || 'Valued User';
-        const splitName = userName.split(' ');
-        const firstName = splitName[0];
-        const lastName = splitName.slice(1).join(' ') || firstName;
         const userPhone = profile.phone || '08000000000'; 
         let userBVN = profile.bvn;
+        let userNIN = null;
 
-        // Fallback: If profile has no BVN, check if the approved request provides it
+        // Fallback: If profile has no BVN/NIN, check if the approved request provides it
         if (!userBVN && record.document_type === 'bvn' && record.document_number) {
             console.log("Using BVN from current approved request:", record.document_number);
             userBVN = record.document_number;
+        } else if (!userBVN && record.document_type === 'nin' && record.document_number) {
+            console.log("Using NIN from current approved request:", record.document_number);
+            userNIN = record.document_number;
         }
 
-        if (!userBVN) {
-            console.error("User does not have a BVN in profile, cannot create DVA.");
-            // We can't throw error to retry indefinitely if data is missing.
-            // Just log error and exit.
-            return new Response(JSON.stringify({ error: "User missing BVN" }), { status: 400 });
+        if (!userBVN && !userNIN) {
+            console.error("User does not have a BVN or NIN in profile/record, cannot create DVA.");
+            return new Response(JSON.stringify({ error: "User missing BVN and NIN" }), { status: 400 });
         }
 
-        console.log(`Creating Flutterwave DVA for ${userEmail} (${firstName} ${lastName})`);
+        console.log(`Creating Payvessel DVA for ${userEmail} (${userName})`);
 
         let virtualAccountData: VirtualAccountData | null = null;
         let providerError: unknown = null;
 
         try {
-            const tx_ref = `dva_assign_${userId}_${Date.now()}`;
-            const flwRes = await createFlutterwaveDVA(userEmail, userBVN, 'Wallet Funding', firstName, lastName, userPhone, tx_ref);
+            const payvesselRes = await createPayvesselDVA({
+                email: userEmail,
+                name: userName,
+                phone: userPhone,
+                bvn: userBVN || undefined,
+                nin: userNIN || undefined
+            });
             
-            if (flwRes.status === 'success' && flwRes.data) {
-                console.log("Flutterwave DVA Created Successfully");
+            if (payvesselRes.status && payvesselRes.banks && payvesselRes.banks.length > 0) {
+                console.log("Payvessel DVA Created Successfully");
+                const primaryBank = payvesselRes.banks[0];
                 virtualAccountData = {
                     user_id: userId,
-                    provider: 'flutterwave',
-                    bank_name: flwRes.data.bank_name,
-                    account_number: flwRes.data.account_number,
-                    account_name: userName, // Use our profile name or flwRes.data.note if needed
+                    provider: 'payvessel',
+                    bank_name: primaryBank.bankName,
+                    account_number: primaryBank.accountNumber,
+                    account_name: primaryBank.accountName,
                     currency: 'NGN', 
-                    metadata: flwRes.data
+                    metadata: payvesselRes as unknown as Record<string, unknown>
                 };
             } else {
-                console.error("Flutterwave Response Invalid:", flwRes);
-                throw new Error(flwRes.message || "Flutterwave creation failed");
+                console.error("Payvessel Response Invalid:", payvesselRes);
+                throw new Error(payvesselRes.message || "Payvessel creation failed");
             }
         } catch (e) {
-            console.error("Flutterwave Attempt Failed:", e);
+            console.error("Payvessel Attempt Failed:", e);
             providerError = e;
         }
 
