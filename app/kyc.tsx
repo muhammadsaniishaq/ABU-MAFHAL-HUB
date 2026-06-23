@@ -163,21 +163,34 @@ export default function KYCScreen() {
             }
 
             // Create Request
+            const isAutoApprove = (type === 'bvn' || type === 'nin');
             const { data: newRequest, error } = await supabase.from('kyc_requests').insert({
                 user_id: user.id,
                 document_type: type,
                 document_number: dataPayload.number || null,
                 document_url: docUrl,
-                status: 'pending',
+                status: isAutoApprove ? 'approved' : 'pending',
                 notes: dataPayload.address ? `Address: ${dataPayload.address}` : null
             }).select().single();
 
             if (error) throw error;
 
             console.log("Insert success, updating state:", newRequest);
-            setPendingRequest(newRequest);
-            
-            Alert.alert("Submitted", "Your verification is pending admin approval.");
+
+            if (isAutoApprove) {
+                 // Auto-upgrade profile to Tier 2 and save BVN/NIN for Payvessel
+                 const updates: any = { kyc_tier: 2 };
+                 // Both BVN and NIN can be stored in the 'bvn' column for Payvessel generation 
+                 // as the create-virtual-account function checks profiles.bvn
+                 updates.bvn = dataPayload.number;
+                 
+                 await supabase.from('profiles').update(updates).eq('id', user.id);
+                 
+                 Alert.alert("Success", "Your ID has been automatically verified!", [{ text: "OK", onPress: fetchStatus }]);
+            } else {
+                setPendingRequest(newRequest);
+                Alert.alert("Submitted", "Your verification is pending admin approval.");
+            }
 
         } catch (e: any) {
             console.error("Submission/Upload Error:", e);
