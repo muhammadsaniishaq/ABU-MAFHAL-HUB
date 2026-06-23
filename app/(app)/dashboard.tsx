@@ -377,14 +377,17 @@ export default function Dashboard() {
               </View>
               
               <View style={s.amountRow}>
-                <Text style={s.amountSymbol}>₦</Text>
                 {showBalance ? (
-                  <>
-                    <Text style={s.amountMain}>{balanceParts.main}</Text>
+                  <Text style={s.amountMain}>
+                    <Text style={s.amountSymbol}>₦</Text>
+                    {balanceParts.main}
                     <Text style={s.amountDec}>{balanceParts.dec}</Text>
-                  </>
+                  </Text>
                 ) : (
-                  <Text style={s.amountMain}>••••</Text>
+                  <Text style={s.amountMain}>
+                    <Text style={s.amountSymbol}>₦</Text>
+                    ••••
+                  </Text>
                 )}
               </View>
               <Text style={s.availLabel}>Available Balance</Text>
