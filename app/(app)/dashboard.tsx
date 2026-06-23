@@ -195,8 +195,9 @@ export default function Dashboard() {
   };
 
   // ─── Format Balance Helper ──────────────────────────────────────────────────
-  const formatBalance = (bal: number) => {
-    const formatted = (bal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatBalance = (bal: any) => {
+    const numBal = Number(bal) || 0;
+    const formatted = numBal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const parts = formatted.split('.');
     return {
       main: parts[0],
