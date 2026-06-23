@@ -176,24 +176,26 @@ export default function KYC() {
 
                 if (profileError) throw profileError;
 
-                // -- CRITICAL FIX: TRIGGER VIRTUAL ACCOUNT CREATION FOR BVN --
                 if (docType === 'bvn') {
-                    console.log('Triggering Virtual Account creation edge function...');
                     try {
                         const { data: vAccountData, error: vAccountErr } = await supabase.functions.invoke('create-virtual-account', {
                             body: { userId: user.id, bvn: payload.idNumber }
                         });
+                        
                         if (vAccountErr) {
-                            console.error('Virtual account error:', vAccountErr);
+                            Alert.alert('Virtual Account Error', vAccountErr.message || JSON.stringify(vAccountErr));
+                        } else if (vAccountData?.error) {
+                            Alert.alert('Virtual Account Failed', vAccountData.error + (vAccountData.message ? "\n" + vAccountData.message : ""));
                         } else {
-                            console.log('Virtual account created!', vAccountData);
+                            Alert.alert("Verified!", `Your ${docType.toUpperCase()} has been instantly verified, and your Virtual Account is ready!`);
                         }
-                    } catch (e) {
-                        console.error('Virtual account invocation failed', e);
+                    } catch (e: any) {
+                        Alert.alert('Virtual Account Exception', e.message || "Unknown error");
                     }
+                } else {
+                    Alert.alert("Verified!", `Your ${docType.toUpperCase()} has been instantly verified!`);
                 }
 
-                Alert.alert("Verified!", `Your ${docType.toUpperCase()} has been instantly verified!`);
                 setTier(newTier);
             } else {
                 Alert.alert("Submitted", "Your document is under review. This usually takes less than 24 hours.");
