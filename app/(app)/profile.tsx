@@ -7,6 +7,9 @@ import { useState, useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+import { cssInterop } from 'nativewind';
+
+cssInterop(LinearGradient, { className: 'style' });
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<{ 
@@ -19,6 +22,7 @@ export default function ProfileScreen() {
         kyc_tier?: number; 
         balance?: number; 
         created_at?: string;
+        role?: string;
     } | null>(null);
     const [kycStatus, setKycStatus] = useState<'pending' | 'approved' | 'none'>('none');
     const [txCount, setTxCount] = useState<number>(0);
@@ -439,6 +443,29 @@ export default function ProfileScreen() {
                 {/* 3. GROUPED LIST GROUPS */}
                 <View className="mt-6 px-6 gap-y-5">
                     
+                    {/* ADMIN SECTION (Visible only to admins) */}
+                    {profile?.role && ['admin', 'super_admin'].includes(profile.role) && (
+                        <View>
+                            <Text className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest mb-2 ml-1">Administration</Text>
+                            <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+                                <TouchableOpacity 
+                                    onPress={() => router.push('/manage')} 
+                                    activeOpacity={0.6}
+                                    className="flex-row items-center py-3.5 px-4"
+                                >
+                                    <View className="w-8 h-8 rounded-full bg-amber-50 items-center justify-center mr-3">
+                                        <Ionicons name="shield-checkmark" size={15} color="#f59e0b" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="font-extrabold text-xs text-amber-700">Admin Console</Text>
+                                        <Text className="text-amber-600/70 text-[10px] font-medium mt-0.5">Manage app settings, users and system</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={14} color="#fcd34d" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
                     {/* ACCOUNT SECTION */}
                     <View>
                         <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Account</Text>
