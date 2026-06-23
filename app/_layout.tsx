@@ -126,10 +126,10 @@ export default function RootLayout() {
     }, []);
 
     useEffect(() => {
-        if (loaded) {
+        if (loaded && initialized) {
             SplashScreen.hideAsync();
         }
-    }, [loaded]);
+    }, [loaded, initialized]);
 
     useEffect(() => {
         if (!initialized || !loaded) return;
@@ -140,35 +140,26 @@ export default function RootLayout() {
 
         if (session) {
             if (isAuthGroup) {
-                // Determine current screen
                 const currentScreen = segments[segments.length - 1];
                 const allowedAuthScreens = ['otp', 'pin-setup'];
-
-                // Only redirect if NOT on an allowed auth screen (like OTP or Setup)
                 if (userRole && !allowedAuthScreens.includes(currentScreen)) {
                     router.replace('/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
-                // Only allow admin/super_admin to management console
                 if (userRole && !['admin', 'super_admin'].includes(userRole)) {
                     router.replace('/(app)/dashboard');
                 }
             }
         } else {
-            // Guest User
             if (isManagementGroup || isAppGroup) {
-                // Protect non-public routes
                 router.replace('/');
             }
         }
     }, [session, userRole, initialized, segments, loaded]);
 
     if (!loaded || !initialized) {
-        return (
-            <View className="flex-1 items-center justify-center bg-slate-950">
-                <ActivityIndicator size="large" color="#6366F1" />
-            </View>
-        );
+        // Return nothing instead of a spinner, keep the native splash screen visible
+        return null;
     }
 
     return (

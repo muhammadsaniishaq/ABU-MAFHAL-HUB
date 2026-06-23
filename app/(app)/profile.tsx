@@ -1,9 +1,9 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform } from 'react-native';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform, RefreshControl } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase, forceSignOut } from '../../services/supabase';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
@@ -27,50 +27,56 @@ export default function ProfileScreen() {
     const [kycStatus, setKycStatus] = useState<'pending' | 'approved' | 'none'>('none');
     const [txCount, setTxCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [uploading, setUploading] = useState(false);
     const router = useRouter();
 
-    useFocusEffect(
-        useCallback(() => {
-            fetchProfile();
-        }, [])
-    );
+    useEffect(() => {
+        loadAllData();
+    }, []);
 
-    const fetchProfile = async () => {
+    const loadAllData = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // Fetch Profile
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
-                if (error) throw error;
-                if (data) {
-                    setProfile(data);
-                    // Fetch Transaction count for current month
-                    await fetchTransactionCount(user.id);
-                }
+            if (!user) return;
 
-                // Check for Pending KYC
-                const { data: requests } = await supabase
-                    .from('kyc_requests')
-                    .select('id, status')
-                    .eq('user_id', user.id)
-                    .eq('status', 'pending')
-                    .limit(1);
-                
-                if (requests && requests.length > 0) {
-                    setKycStatus('pending');
-                } else {
-                    setKycStatus('approved');
-                }
-            }
+            // Fetch everything concurrently
+            await Promise.all([
+                fetchProfileData(user.id),
+                fetchTransactionCount(user.id),
+                fetchKycStatus(user.id)
+            ]);
         } catch (e) {
-            console.log("Error fetching profile", e);
+            console.log("Error loading profile data", e);
         } finally {
             setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        loadAllData();
+    }, []);
+
+    const fetchProfileData = async (userId: string) => {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (error) console.error("Profile fetch error:", error);
+        if (data) setProfile(data);
+    };
+
+    const fetchKycStatus = async (userId: string) => {
+        const { data: requests } = await supabase
+            .from('kyc_requests')
+            .select('id, status')
+            .eq('user_id', userId)
+            .eq('status', 'pending')
+            .limit(1);
+        
+        if (requests && requests.length > 0) {
+            setKycStatus('pending');
+        } else {
+            setKycStatus('approved');
         }
     };
 
@@ -251,7 +257,14 @@ export default function ProfileScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 160 }}>
+            <ScrollView 
+                style={{ flex: 1 }} 
+                showsVerticalScrollIndicator={false} 
+                contentContainerStyle={{ paddingBottom: 160 }}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f5a623" />
+                }
+            >
                 
                 {/* 1. CURVED HEADER GRADIENT */}
                 <LinearGradient

@@ -1,9 +1,9 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dbError, setDbError] = useState<boolean>(false);
   const [showAllActions, setShowAllActions] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
@@ -36,38 +37,115 @@ export default function Dashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchUserData();
-      fetchFeatureFlags();
-      fetchLogo();
-    }, [])
-  );
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const loadAllData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Run all independent queries concurrently to eliminate waterfall delays
+      await Promise.all([
+        fetchUserData(user),
+        fetchTransactions(user.id),
+        fetchFeatureFlags(),
+        fetchLogo()
+      ]);
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadAllData();
+  }, []);
 
   const fetchLogo = async () => {
     try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'app_logo')
-        .single();
-      if (data?.value?.url) {
-        setLogoUrl(data.value.url);
-      }
+      const { data } = await supabase.from('app_settings').select('value').eq('key', 'app_logo').single();
+      if (data?.value?.url) setLogoUrl(data.value.url);
     } catch (e) {
       console.error('Error fetching dynamic logo:', e);
     }
   };
 
   const fetchFeatureFlags = async () => {
-    const { data, error } = await supabase.from('feature_flags').select('feature_key, is_enabled, maintenance_message');
-    if (error) console.error('Error fetching flags:', error);
-    if (data) {
-      const flags = data.reduce((acc: any, curr: any) => {
-        acc[curr.feature_key] = curr;
-        return acc;
-      }, {});
-      setFeatureFlags(flags);
+    try {
+      const { data, error } = await supabase.from('feature_flags').select('feature_key, is_enabled, maintenance_message');
+      if (error) throw error;
+      if (data) {
+        const flags = data.reduce((acc: any, curr: any) => {
+          acc[curr.feature_key] = curr;
+          return acc;
+        }, {});
+        setFeatureFlags(flags);
+      }
+    } catch (e) {
+      console.error('Error fetching flags:', e);
+    }
+  };
+
+  const fetchTransactions = async (userId: string) => {
+    try {
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (txData) setTransactions(txData);
+    } catch (e) {
+      console.error('Error fetching transactions:', e);
+    }
+  };
+
+  const fetchUserData = async (user: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
+        .eq('id', user.id)
+        .single();
+
+      if (data) {
+        setUserData(data);
+        setDbError(false);
+        
+        // Auto-generate virtual account silently in the background without blocking UI
+        setTimeout(async () => {
+          if ((data.kyc_tier && data.kyc_tier >= 2) || data.bvn) {
+            const { data: va } = await supabase.from('virtual_accounts').select('id').eq('user_id', user.id).maybeSingle();
+            if (!va) {
+              console.log("Eligible user is missing virtual account. Triggering generation in background...");
+              supabase.functions.invoke('create-virtual-account', { body: { userId: user.id } }).catch(console.error);
+            }
+          }
+        }, 3000); // Wait 3 seconds so it doesn't compete with initial load network
+      } else if (error) {
+        if (error.message?.includes('recursion') || error.code === '42P17') {
+          setDbError(true);
+        } else if (error.code === 'PGRST116') {
+          setDbError(false);
+          // Auto-insert profile
+          const fallbackName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .insert({ id: user.id, email: user.email || '', full_name: fallbackName, role: 'user', kyc_tier: 1, balance: 0.00 })
+            .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
+            .single();
+          if (newProfile) setUserData(newProfile);
+        } else {
+          setDbError(false);
+        }
+      }
+    } catch (e) {
+      console.error('Profile fetch exception:', e);
     }
   };
 
@@ -102,96 +180,6 @@ export default function Dashboard() {
     }
 
     if (action.route) router.push(action.route as any);
-  };
-
-  const fetchUserData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
-          .eq('id', user.id)
-          .single();
-
-        if (data) {
-          setUserData(data);
-          setDbError(false);
-          
-          // Auto-generate virtual account if user is eligible and doesn't have one
-          const checkAndCreateVA = async () => {
-            try {
-              const { data: va } = await supabase
-                .from('virtual_accounts')
-                .select('id')
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-              if (!va && ((data.kyc_tier && data.kyc_tier >= 2) || data.bvn)) {
-                console.log("Eligible user is missing virtual account. Automatically triggering generation...");
-                const { data: res, error: invokeErr } = await supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: user.id }
-                });
-                if (invokeErr) {
-                  console.error("Auto-generate DVA function error:", invokeErr);
-                } else if (res && res.error) {
-                  console.warn("Auto-generate DVA soft error:", res.error);
-                } else {
-                  console.log("Auto-generate DVA success:", res);
-                }
-              }
-            } catch (e) {
-              console.error("Auto-generate DVA exception:", e);
-            }
-          };
-          checkAndCreateVA();
-        } else if (error) {
-          console.error('Dashboard profile fetch error:', error);
-          if (error.message?.includes('recursion') || error.code === '42P17') {
-            setDbError(true);
-          } else if (error.code === 'PGRST116') {
-            setDbError(false);
-            // Profile missing: try to auto-insert a profile
-            try {
-              const fallbackName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-              const { data: newProfile, error: insertError } = await supabase
-                .from('profiles')
-                .insert({
-                  id: user.id,
-                  email: user.email || '',
-                  full_name: fallbackName,
-                  role: 'user',
-                  kyc_tier: 1,
-                  balance: 0.00
-                })
-                .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
-                .single();
-
-              if (newProfile) {
-                setUserData(newProfile);
-              } else {
-                console.error('Failed to auto-create profile:', insertError);
-              }
-            } catch (insertErr) {
-              console.error('Failed to auto-create profile exception:', insertErr);
-            }
-          } else {
-            setDbError(false);
-          }
-        }
-
-        const { data: txData } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(3);
-
-        if (txData) setTransactions(txData);
-      }
-    } finally {
-      setLoading(false);
-    }
   };
 
   // ─── Format Balance Helper ──────────────────────────────────────────────────
@@ -271,6 +259,9 @@ export default function Dashboard() {
         style={s.scrollView}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />
+        }
       >
         {/* ─── Navy Curved Header ─── */}
         <LinearGradient 
