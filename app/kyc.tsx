@@ -96,7 +96,6 @@ export default function KYC() {
                 document_type: docType,
                 document_number: payload.idNumber || null,
                 document_url: fileUrl,
-                data: payload.extra || null,
                 status: status
             });
 
