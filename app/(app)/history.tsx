@@ -1,9 +1,10 @@
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
 import { useEffect, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HistoryScreen() {
     const router = useRouter();
@@ -19,7 +20,7 @@ export default function HistoryScreen() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data, error } = await supabase
+                const { data } = await supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', user.id)
@@ -28,15 +29,15 @@ export default function HistoryScreen() {
                 if (data) {
                     const mapped = data.map(tx => {
                         const amount = parseFloat(tx.amount.toString());
-                        const isIncome = tx.type === 'deposit' || amount > 0; // Simplified
+                        const isIncome = tx.type === 'deposit' || amount > 0;
                         let icon = 'wallet';
-                        let color = '#107C10';
+                        let color = '#f5a623'; // Default gold
 
-                        if (tx.type === 'transfer') { icon = 'send'; color = '#0056D2'; }
-                        else if (tx.type === 'withdrawal') { icon = 'cash'; color = '#EF4444'; }
-                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait'; color = '#F37021'; }
-                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi'; color = '#008080'; }
-                        else if (tx.type === 'payment') { icon = 'flash'; color = '#D97706'; }
+                        if (tx.type === 'transfer') { icon = 'send'; color = '#3b82f6'; }
+                        else if (tx.type === 'withdrawal') { icon = 'cash'; color = '#ef4444'; }
+                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait'; color = '#8b5cf6'; }
+                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi'; color = '#10b981'; }
+                        else if (tx.type === 'payment') { icon = 'flash'; color = '#f59e0b'; }
 
                         return {
                             ...tx,
@@ -57,67 +58,217 @@ export default function HistoryScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-gray-50">
-                <ActivityIndicator size="large" color="#0056D2" />
-            </View>
+            <SafeAreaView style={s.centerContainer}>
+                <ActivityIndicator size="large" color="#0d1b3e" />
+            </SafeAreaView>
         );
     }
 
     return (
-        <View className="flex-1 bg-gray-50">
-            {/* Header if not handled by tabs, but tabs usually handle it. 
-                However, layout says headerShown: false, so we need a header here or in layout options.
-                Layout has title: 'History' in options, but headerShown: false on Tabs.
-                Wait, Tabs screenOptions says headerShown: false. 
-                Individual screens have options.
-                But usually we want a header. 
-                I will add a custom header or SafeAreaView.
-            */}
+        <SafeAreaView style={s.container} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
-
-            <View className="pt-12 px-6 pb-4 bg-white border-b border-gray-200">
-                <Text className="text-2xl font-bold text-slate">History</Text>
+            
+            {/* Minimalist Modern Header */}
+            <View style={s.header}>
+                <View>
+                    <Text style={s.headerTitle}>Transaction History</Text>
+                    <Text style={s.headerSubtitle}>Track your latest activities</Text>
+                </View>
+                <View style={s.iconWrapper}>
+                    <Ionicons name="calendar-outline" size={22} color="#f5a623" />
+                </View>
             </View>
 
             <FlatList
                 data={history}
                 keyExtractor={(item) => item.id}
-                contentContainerStyle={{ padding: 24, paddingBottom: 100 }}
+                contentContainerStyle={s.listContent}
                 onRefresh={fetchHistory}
                 refreshing={loading}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                     <TouchableOpacity
-                        className="flex-row justify-between items-center bg-white p-4 rounded-xl mb-3 shadow-sm border border-gray-100"
+                        style={s.transactionCard}
                         onPress={() => router.push(`/transaction-details/${item.id}`)}
                     >
-                        <View className="flex-row items-center">
-                            <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: item.color + '20' }}>
-                                <Ionicons name={item.icon as any} size={20} color={item.color} />
+                        <View style={s.cardLeft}>
+                            <View style={[s.txIcon, { backgroundColor: item.color + '15' }]}>
+                                <Ionicons name={item.icon as any} size={18} color={item.color} />
                             </View>
-                            <View>
-                                <Text className="font-bold text-gray-800 text-base">{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</Text>
-                                <Text className="text-sm text-gray-500" numberOfLines={1}>{item.description || item.reference}</Text>
-                                <Text className="text-xs text-gray-400 mt-1">{item.dateDisplay}</Text>
+                            <View style={s.txInfo}>
+                                <Text style={s.txTitle} numberOfLines={1}>
+                                    {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                </Text>
+                                <Text style={s.txDesc} numberOfLines={1}>{item.description || item.reference}</Text>
                             </View>
                         </View>
-                        <View className="items-end">
-                            <Text className={`font-bold text-base ${item.isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                        <View style={s.cardRight}>
+                            <Text style={[s.txAmount, item.isIncome ? s.amountPlus : s.amountMinus]}>
                                 {item.displayAmount}
                             </Text>
-                            <Text className={`text-xs mt-1 ${item.status === 'success' ? 'text-green-500' : 'text-yellow-600'}`}>
-                                {item.status.toUpperCase()}
-                            </Text>
+                            <View style={s.statusRow}>
+                                <Text style={s.txDate}>{item.dateDisplay}</Text>
+                                <View style={[s.statusDot, item.status === 'success' ? s.dotSuccess : s.dotPending]} />
+                            </View>
                         </View>
                     </TouchableOpacity>
                 )}
                 ListEmptyComponent={() => (
-                    <View className="items-center justify-center pt-20">
-                        <Ionicons name="receipt-outline" size={48} color="#CBD5E1" />
-                        <Text className="text-gray-400 mt-4 font-medium">No transactions yet</Text>
+                    <View style={s.emptyState}>
+                        <View style={s.emptyIcon}>
+                            <Ionicons name="receipt-outline" size={40} color="#cbd5e1" />
+                        </View>
+                        <Text style={s.emptyText}>No transactions yet</Text>
                     </View>
                 )}
             />
             <StatusBar style="dark" />
-        </View>
+        </SafeAreaView>
     );
 }
+
+const s = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8f9fc',
+    },
+    centerContainer: {
+        flex: 1,
+        backgroundColor: '#f8f9fc',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 24,
+        backgroundColor: '#f8f9fc',
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#0d1b3e',
+        letterSpacing: -0.5,
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748b',
+        marginTop: 4,
+    },
+    iconWrapper: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(245, 166, 35, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    listContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 100,
+    },
+    transactionCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 16,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 5,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    cardLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    txIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
+    txInfo: {
+        flex: 1,
+        paddingRight: 10,
+    },
+    txTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#0d1b3e',
+        marginBottom: 2,
+    },
+    txDesc: {
+        fontSize: 12,
+        color: '#94a3b8',
+        fontWeight: '500',
+    },
+    cardRight: {
+        alignItems: 'flex-end',
+    },
+    txAmount: {
+        fontSize: 15,
+        fontWeight: '900',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    amountPlus: {
+        color: '#10b981',
+    },
+    amountMinus: {
+        color: '#0d1b3e',
+    },
+    statusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    txDate: {
+        fontSize: 11,
+        color: '#94a3b8',
+        fontWeight: '600',
+        marginRight: 6,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    dotSuccess: {
+        backgroundColor: '#10b981',
+    },
+    dotPending: {
+        backgroundColor: '#f59e0b',
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 80,
+    },
+    emptyIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#f1f5f9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    emptyText: {
+        fontSize: 15,
+        color: '#94a3b8',
+        fontWeight: '600',
+    },
+});
