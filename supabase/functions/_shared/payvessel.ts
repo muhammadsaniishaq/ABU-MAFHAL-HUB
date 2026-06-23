@@ -1,13 +1,3 @@
-
-const PAYVESSEL_API_KEY = Deno.env.get('PAYVESSEL_API_KEY') ?? '';
-const PAYVESSEL_API_SECRET = Deno.env.get('PAYVESSEL_API_SECRET') ?? '';
-const PAYVESSEL_BUSINESS_ID = Deno.env.get('PAYVESSEL_BUSINESS_ID') ?? '';
-const PAYVESSEL_URL = Deno.env.get('PAYVESSEL_URL') || 'https://api.payvessel.com';
-
-if (!PAYVESSEL_API_KEY || !PAYVESSEL_API_SECRET || !PAYVESSEL_BUSINESS_ID) {
-    console.warn("Payvessel credentials (API Key, Secret, or Business ID) are not completely configured.");
-}
-
 export interface PayvesselBank {
     bankName: string;
     accountNumber: string;
@@ -26,14 +16,35 @@ export interface PayvesselDVAResponse {
     errors?: Record<string, string[]>;
 }
 
-export async function createPayvesselDVA(params: {
-    email: string;
-    name: string;
-    phone: string;
-    bvn?: string;
-    nin?: string;
-}): Promise<PayvesselDVAResponse> {
+export interface PayvesselConfig {
+    apiKey: string;
+    apiSecret: string;
+    businessId: string;
+    url?: string;
+}
+
+export async function createPayvesselDVA(
+    params: {
+        email: string;
+        name: string;
+        phone: string;
+        bvn?: string;
+        nin?: string;
+    },
+    config: PayvesselConfig
+): Promise<PayvesselDVAResponse> {
     console.log(`Creating Payvessel STATIC DVA for ${params.email} (BVN: ${params.bvn ? 'present' : 'absent'}, NIN: ${params.nin ? 'present' : 'absent'})`);
+
+    const { apiKey, apiSecret, businessId, url = 'https://api.payvessel.com' } = config;
+
+    if (!apiKey || !apiSecret || !businessId) {
+        console.warn("Payvessel credentials (API Key, Secret, or Business ID) are not completely configured.");
+        return {
+            status: false,
+            service: "CREATE_VIRTUAL_ACCOUNT",
+            message: "Payvessel is not properly configured in Admin Settings. Please add API keys.",
+        };
+    }
 
     try {
         const payload: Record<string, any> = {
@@ -42,7 +53,7 @@ export async function createPayvesselDVA(params: {
             phoneNumber: params.phone,
             bankcode: ["120001", "999991"], // 9PSB (120001) and PalmPay (999991)
             account_type: "STATIC",
-            businessid: PAYVESSEL_BUSINESS_ID,
+            businessid: businessId,
         };
 
         // Static accounts require BVN or NIN
@@ -53,14 +64,14 @@ export async function createPayvesselDVA(params: {
             payload.nin = params.nin;
         }
 
-        const endpoint = `${PAYVESSEL_URL}/pms/api/external/request/customerReservedAccount/`;
+        const endpoint = `${url}/pms/api/external/request/customerReservedAccount/`;
         console.log(`Requesting Payvessel Endpoint: ${endpoint}`);
 
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
-                'api-key': PAYVESSEL_API_KEY,
-                'api-secret': PAYVESSEL_API_SECRET,
+                'api-key': apiKey,
+                'api-secret': apiSecret,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),

@@ -130,6 +130,20 @@ Deno.serve(async (req) => {
              }
         }
 
+        // 3.5 Fetch Payvessel Credentials from DB
+        const { data: secrets } = await supabaseAdmin
+            .from('system_secrets')
+            .select('key, value')
+            .in('key', ['PAYVESSEL_API_KEY', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_BUSINESS_ID']);
+
+        const getSecret = (keyName: string) => secrets?.find(s => s.key === keyName)?.value || Deno.env.get(keyName) || '';
+
+        const pvConfig = {
+            apiKey: getSecret('PAYVESSEL_API_KEY'),
+            apiSecret: getSecret('PAYVESSEL_API_SECRET'),
+            businessId: getSecret('PAYVESSEL_BUSINESS_ID'),
+        };
+
         // 4. Create Payvessel DVA
         const userEmail = profile.email;
         const userName = profile.full_name || 'Valued User';
@@ -142,7 +156,7 @@ Deno.serve(async (req) => {
             phone: userPhone,
             bvn: userBVN || undefined,
             nin: userNIN || undefined
-        });
+        }, pvConfig);
 
         if (!payvesselRes.status || !payvesselRes.banks || payvesselRes.banks.length === 0) {
             throw new Error(payvesselRes.message || "Payvessel account creation failed");
