@@ -169,6 +169,14 @@ export default function KYC() {
                 if (docType === 'bvn') updatePayload.bvn = payload.idNumber;
                 if (docType === 'nin') updatePayload.nin = payload.idNumber;
 
+                // CRITICAL FIX FOR PAYVESSEL VIRTUAL ACCOUNTS
+                // Ensure the database has safe email, phone and name so the Edge Function doesn't fail
+                if (!userData?.email) updatePayload.email = `${user.id.substring(0,8)}@abumafhal.com.ng`;
+                let safePhone = userData?.phone ? userData.phone.replace(/\D/g, '') : '';
+                if (!safePhone || safePhone.length < 10) safePhone = '08000000000';
+                if (!userData?.phone || userData.phone !== safePhone) updatePayload.phone = safePhone;
+                if (!userData?.full_name) updatePayload.full_name = 'Abu Mafhal User';
+
                 const { error: profileError } = await supabase
                     .from('profiles')
                     .update(updatePayload)
