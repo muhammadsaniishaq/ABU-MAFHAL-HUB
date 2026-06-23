@@ -197,7 +197,7 @@ export default function Dashboard() {
   // ─── Format Balance Helper ──────────────────────────────────────────────────
   const formatBalance = (bal: any) => {
     const numBal = Number(bal) || 0;
-    const formatted = numBal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formatted = numBal.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const parts = formatted.split('.');
     return {
       main: parts[0],
@@ -815,7 +815,7 @@ const s = StyleSheet.create({
   },
   amountRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'flex-end',
   },
   amountSymbol: {
     fontSize: 20,
