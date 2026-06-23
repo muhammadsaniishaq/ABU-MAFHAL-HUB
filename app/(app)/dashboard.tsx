@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: W } = Dimensions.get('window');
 
@@ -21,6 +22,8 @@ const T = {
   textSub: '#5a6890',
   indigo:  '#4F46E5',
 };
+
+const CACHE_KEY = '@dashboard_data_v1';
 
 export default function Dashboard() {
   const [showBalance, setShowBalance] = useState(true);
@@ -38,8 +41,37 @@ export default function Dashboard() {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadAllData();
+    loadCachedData().then(() => {
+      loadAllData(); // fetch fresh data silently
+    });
   }, []);
+
+  const loadCachedData = async () => {
+    try {
+      const cachedStr = await AsyncStorage.getItem(CACHE_KEY);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        if (cached.userData) setUserData(cached.userData);
+        if (cached.transactions) setTransactions(cached.transactions);
+        if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
+        if (cached.logoUrl) setLogoUrl(cached.logoUrl);
+        setLoading(false); // UI instantly ready!
+      }
+    } catch (e) {
+      console.warn("Cache read error:", e);
+    }
+  };
+
+  const saveCache = async (data: any) => {
+    try {
+      const currentCacheStr = await AsyncStorage.getItem(CACHE_KEY);
+      const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
+      const newCache = { ...currentCache, ...data };
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
+    } catch (e) {
+      console.warn("Cache write error:", e);
+    }
+  };
 
   const loadAllData = async () => {
     try {
@@ -69,7 +101,10 @@ export default function Dashboard() {
   const fetchLogo = async () => {
     try {
       const { data } = await supabase.from('app_settings').select('value').eq('key', 'app_logo').single();
-      if (data?.value?.url) setLogoUrl(data.value.url);
+      if (data?.value?.url) {
+        setLogoUrl(data.value.url);
+        saveCache({ logoUrl: data.value.url });
+      }
     } catch (e) {
       console.error('Error fetching dynamic logo:', e);
     }
@@ -85,6 +120,7 @@ export default function Dashboard() {
           return acc;
         }, {});
         setFeatureFlags(flags);
+        saveCache({ featureFlags: flags });
       }
     } catch (e) {
       console.error('Error fetching flags:', e);
@@ -99,7 +135,10 @@ export default function Dashboard() {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(3);
-      if (txData) setTransactions(txData);
+      if (txData) {
+        setTransactions(txData);
+        saveCache({ transactions: txData });
+      }
     } catch (e) {
       console.error('Error fetching transactions:', e);
     }
@@ -115,6 +154,7 @@ export default function Dashboard() {
 
       if (data) {
         setUserData(data);
+        saveCache({ userData: data });
         setDbError(false);
         
         // Auto-generate virtual account silently in the background without blocking UI
@@ -139,7 +179,10 @@ export default function Dashboard() {
             .insert({ id: user.id, email: user.email || '', full_name: fallbackName, role: 'user', kyc_tier: 1, balance: 0.00 })
             .select('full_name, balance, role, avatar_url, kyc_tier, bvn')
             .single();
-          if (newProfile) setUserData(newProfile);
+          if (newProfile) {
+            setUserData(newProfile);
+            saveCache({ userData: newProfile });
+          }
         } else {
           setDbError(false);
         }

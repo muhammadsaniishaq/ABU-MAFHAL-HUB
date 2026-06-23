@@ -8,8 +8,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { cssInterop } from 'nativewind';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 cssInterop(LinearGradient, { className: 'style' });
+
+const CACHE_KEY = '@profile_data_v1';
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<{ 
@@ -32,8 +35,36 @@ export default function ProfileScreen() {
     const router = useRouter();
 
     useEffect(() => {
-        loadAllData();
+        loadCachedData().then(() => {
+            loadAllData();
+        });
     }, []);
+
+    const loadCachedData = async () => {
+        try {
+            const cachedStr = await AsyncStorage.getItem(CACHE_KEY);
+            if (cachedStr) {
+                const cached = JSON.parse(cachedStr);
+                if (cached.profile) setProfile(cached.profile);
+                if (cached.txCount !== undefined) setTxCount(cached.txCount);
+                if (cached.kycStatus) setKycStatus(cached.kycStatus);
+                setLoading(false); // Instantly ready
+            }
+        } catch (e) {
+            console.warn("Cache read error:", e);
+        }
+    };
+
+    const saveCache = async (data: any) => {
+        try {
+            const currentCacheStr = await AsyncStorage.getItem(CACHE_KEY);
+            const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
+            const newCache = { ...currentCache, ...data };
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
+        } catch (e) {
+            console.warn("Cache write error:", e);
+        }
+    };
 
     const loadAllData = async () => {
         try {
@@ -62,7 +93,10 @@ export default function ProfileScreen() {
     const fetchProfileData = async (userId: string) => {
         const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (error) console.error("Profile fetch error:", error);
-        if (data) setProfile(data);
+        if (data) {
+            setProfile(data);
+            saveCache({ profile: data });
+        }
     };
 
     const fetchKycStatus = async (userId: string) => {
@@ -73,11 +107,14 @@ export default function ProfileScreen() {
             .eq('status', 'pending')
             .limit(1);
         
+        let newStatus: 'pending' | 'approved' | 'none' = 'none';
         if (requests && requests.length > 0) {
-            setKycStatus('pending');
+            newStatus = 'pending';
         } else {
-            setKycStatus('approved');
+            newStatus = 'approved';
         }
+        setKycStatus(newStatus);
+        saveCache({ kycStatus: newStatus });
     };
 
     const fetchTransactionCount = async (userId: string) => {
@@ -91,6 +128,7 @@ export default function ProfileScreen() {
                 .gte('created_at', startOfMonth);
             if (error) throw error;
             setTxCount(count || 0);
+            saveCache({ txCount: count || 0 });
         } catch (e) {
             console.log("Error fetching transaction count:", e);
         }
