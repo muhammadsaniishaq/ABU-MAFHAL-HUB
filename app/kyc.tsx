@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView, KeyboardAvoidingView, Platform, useWindowDimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,19 +15,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function KYC() {
     const router = useRouter();
 
-    // Core States
     const [loading, setLoading] = useState(true);
     const [tier, setTier] = useState(0);
     const [userData, setUserData] = useState<any>(null);
     const [pendingRequest, setPendingRequest] = useState<any>(null);
     const [verifying, setVerifying] = useState(false);
 
-    // Camera Permissions
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
     const [showCamera, setShowCamera] = useState(false);
 
-    // Form Data States
     const [bvn, setBvn] = useState('');
     const [bvnAvailable, setBvnAvailable] = useState<boolean | null>(null);
     const [checkingBvn, setCheckingBvn] = useState(false);
@@ -37,10 +34,6 @@ export default function KYC() {
     const [checkingNin, setCheckingNin] = useState(false);
 
     const [selfie, setSelfie] = useState<string | null>(null);
-
-    // Layout Constants - reduced significantly for smaller mobile view
-    const { width } = useWindowDimensions();
-    const scale = width < 400 ? 0.8 : width < 600 ? 0.9 : 1; // Made scale even smaller for smaller screens
 
     useEffect(() => {
         loadData();
@@ -167,8 +160,7 @@ export default function KYC() {
                 if (docType === 'bvn') updatePayload.bvn = payload.idNumber;
                 if (docType === 'nin') updatePayload.nin = payload.idNumber;
 
-                // CRITICAL FIX FOR PAYVESSEL VIRTUAL ACCOUNTS
-                // Ensure the database has safe email, phone and name so the Edge Function doesn't fail
+                // Ensure safe fallback data for virtual account
                 if (!userData?.email) updatePayload.email = `${user.id.substring(0,8)}@abumafhal.com.ng`;
                 let safePhone = userData?.phone ? userData.phone.replace(/\D/g, '') : '';
                 if (!safePhone || safePhone.length < 10) safePhone = '08000000000';
@@ -183,23 +175,34 @@ export default function KYC() {
                 if (profileError) throw profileError;
 
                 if (docType === 'bvn') {
+                    // Using Promise.race to enforce a 15-second timeout for the edge function
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Request timed out. The server took too long to respond.")), 15000)
+                    );
+                    
                     try {
-                        const { data: vAccountData, error: vAccountErr } = await supabase.functions.invoke('create-virtual-account', {
-                            body: { userId: user.id, bvn: payload.idNumber }
-                        });
+                        const response: any = await Promise.race([
+                            supabase.functions.invoke('create-virtual-account', {
+                                body: { userId: user.id, bvn: payload.idNumber }
+                            }),
+                            timeoutPromise
+                        ]);
+                        
+                        const vAccountData = response?.data;
+                        const vAccountErr = response?.error;
                         
                         if (vAccountErr) {
                             Alert.alert('Virtual Account Error', vAccountErr.message || JSON.stringify(vAccountErr));
                         } else if (vAccountData?.error) {
                             Alert.alert('Virtual Account Failed', vAccountData.error + (vAccountData.message ? "\n" + vAccountData.message : ""));
                         } else {
-                            Alert.alert("Verified!", `Your ${docType.toUpperCase()} has been instantly verified, and your Virtual Account is ready!`);
+                            Alert.alert("Success!", `Your ${docType.toUpperCase()} is verified and Virtual Account created!`);
                         }
                     } catch (e: any) {
-                        Alert.alert('Virtual Account Exception', e.message || "Unknown error");
+                        Alert.alert('Server Error', e.message || "Failed to contact server.");
                     }
                 } else {
-                    Alert.alert("Verified!", `Your ${docType.toUpperCase()} has been instantly verified!`);
+                    Alert.alert("Success!", `Your ${docType.toUpperCase()} has been verified!`);
                 }
 
                 setTier(newTier);
@@ -209,26 +212,28 @@ export default function KYC() {
             }
 
         } catch (error: any) {
-            Alert.alert("Error", error.message || "Failed to submit document");
+            Alert.alert("Error", error.message || "An unexpected error occurred");
         } finally {
             setVerifying(false);
         }
     };
 
     const submitBVN = () => {
-        if (!bvn) return Alert.alert("Required", "Please enter your BVN");
+        if (!bvn) return Alert.alert("Required", "Please enter your 11-digit BVN");
+        if (bvn.length !== 11) return Alert.alert("Required", "BVN must be exactly 11 digits");
         if (bvnAvailable === false) return Alert.alert("Error", "BVN already in use");
         handleSubmit('bvn', { idNumber: bvn });
     };
 
     const submitNIN = () => {
-        if (!nin) return Alert.alert("Required", "Please enter your NIN");
+        if (!nin) return Alert.alert("Required", "Please enter your 11-digit NIN");
+        if (nin.length !== 11) return Alert.alert("Required", "NIN must be exactly 11 digits");
         if (ninAvailable === false) return Alert.alert("Error", "NIN already in use");
         handleSubmit('nin', { idNumber: nin });
     };
 
     const submitLiveness = () => {
-        if (!selfie) return Alert.alert("Selfie Required", "Please take a selfie");
+        if (!selfie) return Alert.alert("Required", "Please take a selfie first");
         handleSubmit('liveness', { fileUri: selfie });
     };
 
@@ -308,241 +313,231 @@ export default function KYC() {
         }
     };
 
-    if (loading) return <View style={s.centerContainer}><ActivityIndicator size="small" color="#4F46E5" /></View>;
+    if (loading) return (
+        <View style={s.centerContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+    );
 
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
+            {/* SUPER MODERN HEADER WITH ABSTRACT SHAPES */}
             <View style={s.headerContainer}>
                 <LinearGradient 
-                    colors={['#0F172A', '#1E293B']} 
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[s.headerGradient, { paddingBottom: 24 * scale, paddingTop: 16 * scale }]}
+                    colors={['#0F172A', '#1E293B', '#0F172A']} 
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.headerGradient}
                 >
-                    {/* Add decorative elements */}
-                    <View style={s.headerDecoration1} />
-                    <View style={s.headerDecoration2} />
+                    <View style={s.abstractShape1} />
+                    <View style={s.abstractShape2} />
+                    <View style={s.abstractShape3} />
 
                     <View style={s.headerRow}>
-                        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={[s.backBtn, { width: 32 * scale, height: 32 * scale }]}>
-                            <Ionicons name="chevron-back" size={16 * scale} color="white" />
+                        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn}>
+                            <Ionicons name="arrow-back" size={20} color="white" />
                         </TouchableOpacity>
-                        <View style={[s.statusBadge, { paddingHorizontal: 10 * scale, paddingVertical: 4 * scale }]}>
-                            <View style={[s.statusDot, { backgroundColor: tier >= 3 ? '#34D399' : '#FBBF24', width: 6 * scale, height: 6 * scale }]} />
-                            <Text style={[s.statusText, { fontSize: 9 * scale }]}>{tier >= 3 ? 'Verified' : 'Unverified'}</Text>
+                        <View style={s.statusBadge}>
+                            <View style={[s.statusDot, { backgroundColor: tier >= 3 ? '#10B981' : '#F59E0B' }]} />
+                            <Text style={s.statusText}>{tier >= 3 ? 'Verified' : 'Unverified'}</Text>
                         </View>
                     </View>
                     
-                    <View style={{ paddingHorizontal: 16 * scale }}>
-                        <Text style={[s.headerTitle, { fontSize: 22 * scale }]}>KYC Center</Text>
-                        <Text style={[s.headerSubtitle, { fontSize: 11 * scale, maxWidth: '90%' }]}>
-                            Complete 3 simple steps to unlock maximum limits and your official certificate.
-                        </Text>
+                    <View style={s.headerTextWrap}>
+                        <Text style={s.headerTitle}>KYC Verification</Text>
+                        <Text style={s.headerSubtitle}>Complete your profile to unlock full features, increased limits, and your Virtual Account.</Text>
                     </View>
                 </LinearGradient>
             </View>
             
-            <KeyboardAvoidingView 
-                style={{ flex: 1 }} 
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView 
                     style={{ flex: 1 }}
-                    contentContainerStyle={[s.scrollContent, { paddingHorizontal: 16 * scale }]}
+                    contentContainerStyle={s.scrollContent}
                     showsVerticalScrollIndicator={false} 
                 >
-                    {/* PROGRESS CARD */}
-                    <View style={[s.card, { padding: 16 * scale, marginTop: -20 * scale, marginBottom: 16 * scale }]}>
-                        <View style={[s.progressHeader, { marginBottom: 16 * scale }]}>
-                            <View>
-                                <Text style={[s.progressLabel, { fontSize: 9 * scale }]}>Current Progress</Text>
-                                <Text style={[s.progressStepText, { fontSize: 16 * scale }]}>Step {Math.min(tier + 1, 3)} of 3</Text>
-                            </View>
-                            <View style={[s.progressRing, { width: 44 * scale, height: 44 * scale }]}>
-                                <Text style={[s.progressPercent, { fontSize: 13 * scale }]}>{Math.floor((tier / 3) * 100)}%</Text>
-                            </View>
+                    {/* SLEEK STEPPER CARD */}
+                    <View style={s.stepperCard}>
+                        <View style={s.stepperHeader}>
+                            <Text style={s.stepperLabel}>Current Phase</Text>
+                            <Text style={s.stepperTitle}>Step {Math.min(tier + 1, 3)} of 3</Text>
                         </View>
-                        
-                        <View style={[s.stepperRow, { paddingHorizontal: 8 * scale }]}>
+
+                        <View style={s.stepperTrackWrap}>
                             {[1, 2, 3].map((t, index) => (
                                 <View key={t} style={s.stepItem}>
-                                    <View style={[s.stepCircle, { width: 28 * scale, height: 28 * scale }, tier >= t ? s.stepCircleDone : tier + 1 === t ? s.stepCircleActive : s.stepCirclePending]}>
+                                    <View style={[s.stepDot, tier >= t ? s.stepDotDone : tier + 1 === t ? s.stepDotActive : s.stepDotPending]}>
                                         {tier >= t ? (
-                                            <Ionicons name="checkmark" size={14 * scale} color="white" />
+                                            <Ionicons name="checkmark" size={12} color="white" />
                                         ) : (
-                                            <Text style={[s.stepCircleText, { fontSize: 11 * scale }, tier + 1 === t ? { color: '#4F46E5' } : { color: '#94A3B8' }]}>{t}</Text>
+                                            <View style={tier + 1 === t ? s.stepDotInnerActive : s.stepDotInnerPending} />
                                         )}
                                     </View>
+                                    <Text style={[s.stepText, tier >= t ? s.stepTextDone : tier + 1 === t ? s.stepTextActive : s.stepTextPending]}>
+                                        {t === 1 ? 'BVN' : t === 2 ? 'NIN' : 'Selfie'}
+                                    </Text>
                                     {index < 2 && (
-                                        <View style={[s.stepLine, tier > t ? { backgroundColor: '#4F46E5' } : { backgroundColor: '#F1F5F9' }]} />
+                                        <View style={s.stepConnector}>
+                                            <View style={[s.stepConnectorFill, { width: tier > t ? '100%' : '0%' }]} />
+                                        </View>
                                     )}
                                 </View>
                             ))}
                         </View>
-                        
-                        <View style={[s.stepLabelsRow, { marginTop: 8 * scale }]}>
-                            <Text style={[s.stepLabelText, { fontSize: 8 * scale }, tier >= 0 ? { color: '#4F46E5' } : { color: '#94A3B8' }]}>BVN</Text>
-                            <Text style={[s.stepLabelText, { fontSize: 8 * scale }, tier >= 1 ? { color: '#4F46E5' } : { color: '#94A3B8' }]}>NIN</Text>
-                            <Text style={[s.stepLabelText, { fontSize: 8 * scale }, tier >= 2 ? { color: '#4F46E5' } : { color: '#94A3B8' }]}>Biometric</Text>
-                        </View>
                     </View>
     
                     {pendingRequest ? (
-                        <View style={[s.card, s.pendingCard, { padding: 24 * scale }]}>
-                            <View style={[s.pendingIconWrapper, { width: 48 * scale, height: 48 * scale, marginBottom: 16 * scale }]}>
-                                <ActivityIndicator size="small" color="#F59E0B" />
+                        <View style={s.glassCard}>
+                            <View style={s.pendingIconBg}>
+                                <Ionicons name="time" size={32} color="#F59E0B" />
                             </View>
-                            <Text style={[s.pendingTitle, { fontSize: 16 * scale, marginBottom: 4 * scale }]}>Review In Progress</Text>
-                            <Text style={[s.pendingSubtitle, { fontSize: 11 * scale }]}>
-                                We are carefully reviewing your document. This usually takes less than 24 hours.
+                            <Text style={s.cardTitle}>Under Review</Text>
+                            <Text style={s.cardDesc}>
+                                We are reviewing your document. This usually takes less than 24 hours to process.
                             </Text>
                         </View>
                     ) : (
                         <View>
-                            
                         {/* STEP 1: BVN */}
                         {tier === 0 && (
-                            <View>
-                                <View style={[s.stepHeader, { marginBottom: 12 * scale }]}>
-                                    <View style={[s.stepIconBox, { width: 28 * scale, height: 28 * scale, borderRadius: 8 * scale }]}><Ionicons name="card" size={14 * scale} color="#4F46E5" /></View>
-                                    <Text style={[s.stepTitle, { fontSize: 16 * scale }]}>BVN Verification</Text>
+                            <View style={s.glassCard}>
+                                <View style={s.cardHeaderRow}>
+                                    <View style={s.cardIconWrap}><Ionicons name="card" size={20} color="#3B82F6" /></View>
+                                    <View>
+                                        <Text style={s.cardTitle}>BVN Verification</Text>
+                                        <Text style={s.cardDesc}>Step 1 required for Virtual Account</Text>
+                                    </View>
                                 </View>
                                 
-                                <View style={[s.card, { padding: 16 * scale }]}>
-                                    <View style={[s.instantBadge, { padding: 12 * scale, marginBottom: 16 * scale }]}>
-                                        <View style={[s.instantIcon, { width: 32 * scale, height: 32 * scale }]}><Ionicons name="flash" size={16 * scale} color="#059669" /></View>
-                                        <View style={{ flex: 1, marginLeft: 10 * scale }}>
-                                            <Text style={[s.instantTitle, { fontSize: 11 * scale }]}>Instant Virtual Account</Text>
-                                            <Text style={[s.instantSubtitle, { fontSize: 9 * scale }]}>Submitting your BVN instantly unlocks and creates your Virtual Account!</Text>
-                                        </View>
+                                <LinearGradient colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']} style={s.promoBanner}>
+                                    <Ionicons name="flash" size={20} color="#10B981" />
+                                    <View style={s.promoBannerTextWrap}>
+                                        <Text style={s.promoBannerTitle}>Instant Virtual Account</Text>
+                                        <Text style={s.promoBannerDesc}>Submitting your BVN creates your account instantly!</Text>
                                     </View>
-                                    
-                                    <View style={{ marginBottom: 16 * scale }}>
-                                        <Text style={[s.inputLabel, { fontSize: 9 * scale, marginBottom: 6 * scale }]}>Enter 11-Digit BVN</Text>
-                                        <View style={[s.inputBox, { height: 44 * scale, paddingHorizontal: 12 * scale }, bvnAvailable === false ? s.inputError : bvnAvailable === true ? s.inputSuccess : {}]}>
-                                            <Ionicons name="keypad" size={14 * scale} color="#94A3B8" style={{ marginRight: 8 * scale }} />
-                                            <TextInput 
-                                                value={bvn} 
-                                                onChangeText={setBvn} 
-                                                placeholder="00000000000" 
-                                                style={[s.inputText, { fontSize: 14 * scale, letterSpacing: 2 * scale }]} 
-                                                keyboardType="numeric"
-                                                maxLength={11}
-                                            />
-                                            {checkingBvn ? <ActivityIndicator size="small" color="#4F46E5" /> : bvnAvailable === true ? <Ionicons name="checkmark-circle" size={16 * scale} color="#059669" /> : bvnAvailable === false ? <Ionicons name="close-circle" size={16 * scale} color="#EF4444" /> : null}
-                                        </View>
-                                        {bvnAvailable === false && <Text style={[s.errorText, { fontSize: 9 * scale, marginTop: 6 * scale }]}>This BVN is already linked.</Text>}
+                                </LinearGradient>
+                                
+                                <View style={s.inputGroup}>
+                                    <Text style={s.inputLabel}>Bank Verification Number (11 Digits)</Text>
+                                    <View style={[s.inputWrapper, bvnAvailable === false ? s.inputWrapperError : bvnAvailable === true ? s.inputWrapperSuccess : {}]}>
+                                        <TextInput 
+                                            value={bvn} 
+                                            onChangeText={setBvn} 
+                                            placeholder="Enter 11 Digits" 
+                                            placeholderTextColor="#94A3B8"
+                                            style={s.inputElement} 
+                                            keyboardType="numeric"
+                                            maxLength={11}
+                                        />
+                                        {checkingBvn ? <ActivityIndicator size="small" color="#3B82F6" /> : bvnAvailable === true ? <Ionicons name="checkmark-circle" size={20} color="#10B981" /> : bvnAvailable === false ? <Ionicons name="close-circle" size={20} color="#EF4444" /> : <Ionicons name="keypad" size={20} color="#CBD5E1" />}
                                     </View>
-
-                                    <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8}>
-                                        <LinearGradient colors={['#0F172A', '#1E293B']} style={[s.submitBtn, { height: 44 * scale, borderRadius: 12 * scale }]}>
-                                            {verifying ? <ActivityIndicator color="white" size="small" /> : (
-                                                <View style={s.btnInner}>
-                                                    <Text style={[s.btnText, { fontSize: 12 * scale }]}>Verify BVN Now</Text>
-                                                    <Ionicons name="arrow-forward" size={14 * scale} color="white" />
-                                                </View>
-                                            )}
-                                        </LinearGradient>
-                                    </TouchableOpacity>
+                                    {bvnAvailable === false && <Text style={s.errorHintText}>This BVN is already registered to another account.</Text>}
                                 </View>
+
+                                <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8}>
+                                    <LinearGradient colors={['#3B82F6', '#2563EB']} style={s.primaryBtn}>
+                                        {verifying ? <ActivityIndicator color="white" /> : (
+                                            <>
+                                                <Text style={s.primaryBtnText}>Verify & Open Account</Text>
+                                                <Ionicons name="arrow-forward" size={18} color="white" />
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
                             </View>
                         )}
 
                         {/* STEP 2: NIN */}
                         {tier === 1 && (
-                            <View>
-                                <View style={[s.stepHeader, { marginBottom: 12 * scale }]}>
-                                    <View style={[s.stepIconBox, { width: 28 * scale, height: 28 * scale, borderRadius: 8 * scale }]}><Ionicons name="document-text" size={14 * scale} color="#4F46E5" /></View>
-                                    <Text style={[s.stepTitle, { fontSize: 16 * scale }]}>NIN Verification</Text>
+                            <View style={s.glassCard}>
+                                <View style={s.cardHeaderRow}>
+                                    <View style={s.cardIconWrap}><Ionicons name="document-text" size={20} color="#3B82F6" /></View>
+                                    <View>
+                                        <Text style={s.cardTitle}>NIN Verification</Text>
+                                        <Text style={s.cardDesc}>Step 2 for identity confirmation</Text>
+                                    </View>
                                 </View>
                                 
-                                <View style={[s.card, { padding: 16 * scale }]}>
-                                    <Text style={[s.instructionText, { fontSize: 11 * scale, marginBottom: 16 * scale }]}>
-                                        Please provide your National Identification Number (NIN) to proceed to the final step.
-                                    </Text>
-                                    
-                                    <View style={{ marginBottom: 16 * scale }}>
-                                        <Text style={[s.inputLabel, { fontSize: 9 * scale, marginBottom: 6 * scale }]}>Enter 11-Digit NIN</Text>
-                                        <View style={[s.inputBox, { height: 44 * scale, paddingHorizontal: 12 * scale }, ninAvailable === false ? s.inputError : ninAvailable === true ? s.inputSuccess : {}]}>
-                                            <Ionicons name="keypad" size={14 * scale} color="#94A3B8" style={{ marginRight: 8 * scale }} />
-                                            <TextInput 
-                                                value={nin} 
-                                                onChangeText={setNin} 
-                                                placeholder="00000000000" 
-                                                style={[s.inputText, { fontSize: 14 * scale, letterSpacing: 2 * scale }]} 
-                                                keyboardType="numeric"
-                                                maxLength={11}
-                                            />
-                                            {checkingNin ? <ActivityIndicator size="small" color="#4F46E5" /> : ninAvailable === true ? <Ionicons name="checkmark-circle" size={16 * scale} color="#059669" /> : ninAvailable === false ? <Ionicons name="close-circle" size={16 * scale} color="#EF4444" /> : null}
-                                        </View>
-                                        {ninAvailable === false && <Text style={[s.errorText, { fontSize: 9 * scale, marginTop: 6 * scale }]}>This NIN is already linked.</Text>}
+                                <View style={s.inputGroup}>
+                                    <Text style={s.inputLabel}>National Identity Number (11 Digits)</Text>
+                                    <View style={[s.inputWrapper, ninAvailable === false ? s.inputWrapperError : ninAvailable === true ? s.inputWrapperSuccess : {}]}>
+                                        <TextInput 
+                                            value={nin} 
+                                            onChangeText={setNin} 
+                                            placeholder="Enter 11 Digits" 
+                                            placeholderTextColor="#94A3B8"
+                                            style={s.inputElement} 
+                                            keyboardType="numeric"
+                                            maxLength={11}
+                                        />
+                                        {checkingNin ? <ActivityIndicator size="small" color="#3B82F6" /> : ninAvailable === true ? <Ionicons name="checkmark-circle" size={20} color="#10B981" /> : ninAvailable === false ? <Ionicons name="close-circle" size={20} color="#EF4444" /> : <Ionicons name="keypad" size={20} color="#CBD5E1" />}
                                     </View>
-
-                                    <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8}>
-                                        <LinearGradient colors={['#0F172A', '#1E293B']} style={[s.submitBtn, { height: 44 * scale, borderRadius: 12 * scale }]}>
-                                            {verifying ? <ActivityIndicator color="white" size="small" /> : (
-                                                <View style={s.btnInner}>
-                                                    <Text style={[s.btnText, { fontSize: 12 * scale }]}>Verify NIN</Text>
-                                                    <Ionicons name="arrow-forward" size={14 * scale} color="white" />
-                                                </View>
-                                            )}
-                                        </LinearGradient>
-                                    </TouchableOpacity>
+                                    {ninAvailable === false && <Text style={s.errorHintText}>This NIN is already registered to another account.</Text>}
                                 </View>
+
+                                <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8}>
+                                    <LinearGradient colors={['#3B82F6', '#2563EB']} style={s.primaryBtn}>
+                                        {verifying ? <ActivityIndicator color="white" /> : (
+                                            <>
+                                                <Text style={s.primaryBtnText}>Verify NIN</Text>
+                                                <Ionicons name="arrow-forward" size={18} color="white" />
+                                            </>
+                                        )}
+                                    </LinearGradient>
+                                </TouchableOpacity>
                             </View>
                         )}
 
                         {/* STEP 3: LIVENESS */}
                         {tier === 2 && (
-                            <View>
-                                <View style={[s.stepHeader, { marginBottom: 12 * scale }]}>
-                                    <View style={[s.stepIconBox, { width: 28 * scale, height: 28 * scale, borderRadius: 8 * scale }]}><Ionicons name="scan" size={14 * scale} color="#4F46E5" /></View>
-                                    <Text style={[s.stepTitle, { fontSize: 16 * scale }]}>Biometric Check</Text>
+                            <View style={s.glassCard}>
+                                <View style={s.cardHeaderRow}>
+                                    <View style={s.cardIconWrap}><Ionicons name="scan" size={20} color="#3B82F6" /></View>
+                                    <View>
+                                        <Text style={s.cardTitle}>Facial Verification</Text>
+                                        <Text style={s.cardDesc}>Final step: Take a quick selfie</Text>
+                                    </View>
                                 </View>
-                                <View style={[s.card, { padding: 24 * scale, alignItems: 'center' }]}>
-                                    
-                                    <Text style={[s.instructionText, { fontSize: 11 * scale, marginBottom: 20 * scale, textAlign: 'center' }]}>
-                                        We need to verify that you are a real person. Please take a quick selfie in good lighting.
-                                    </Text>
-                                    
-                                    <View style={[s.selfieBox, { width: 140 * scale, height: 140 * scale, borderRadius: 70 * scale, marginBottom: 20 * scale, borderWidth: 6 * scale }]}>
+                                
+                                <View style={s.selfieContainer}>
+                                    <View style={s.selfieFrame}>
                                         {selfie ? (
-                                            <Image source={{ uri: selfie }} style={{ width: '100%', height: '100%', resizeMode: 'cover', borderRadius: 70 * scale }} />
+                                            <Image source={{ uri: selfie }} style={s.selfieImage} />
                                         ) : (
-                                            <View style={[s.selfiePlaceholder]}>
-                                                <Ionicons name="person" size={48 * scale} color="#CBD5E1" />
+                                            <View style={s.selfiePlaceholder}>
+                                                <Ionicons name="person" size={56} color="#CBD5E1" />
                                             </View>
                                         )}
                                         <TouchableOpacity 
                                             onPress={async () => {
                                                 if (!permission?.granted) {
                                                     const { granted } = await requestPermission();
-                                                    if (!granted) return Alert.alert("Permission", "Need camera permission");
+                                                    if (!granted) return Alert.alert("Permission Required", "We need camera access to take your selfie.");
                                                 }
                                                 setShowCamera(true);
                                             }} 
-                                            style={[s.cameraBtn, { height: 28 * scale, bottom: 8 * scale, paddingHorizontal: 12 * scale }]}
+                                            style={s.cameraTriggerBtn}
                                         >
-                                            <Text style={[s.cameraBtnText, { fontSize: 8 * scale }]}>{selfie ? 'Retake' : 'Open Camera'}</Text>
+                                            <Ionicons name="camera" size={16} color="white" />
+                                            <Text style={s.cameraTriggerText}>{selfie ? 'Retake' : 'Open Camera'}</Text>
                                         </TouchableOpacity>
                                     </View>
-
-                                    {selfie && (
-                                        <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8} style={{ width: '100%' }}>
-                                            <LinearGradient colors={['#0F172A', '#1E293B']} style={[s.submitBtn, { height: 44 * scale, borderRadius: 12 * scale }]}>
-                                                {verifying ? <ActivityIndicator color="white" size="small" /> : (
-                                                    <View style={s.btnInner}>
-                                                        <Text style={[s.btnText, { fontSize: 12 * scale }]}>Complete KYC</Text>
-                                                        <Ionicons name="checkmark-circle" size={14 * scale} color="white" />
-                                                    </View>
-                                                )}
-                                            </LinearGradient>
-                                        </TouchableOpacity>
-                                    )}
                                 </View>
+
+                                {selfie && (
+                                    <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8}>
+                                        <LinearGradient colors={['#10B981', '#059669']} style={s.primaryBtn}>
+                                            {verifying ? <ActivityIndicator color="white" /> : (
+                                                <>
+                                                    <Text style={s.primaryBtnText}>Complete KYC</Text>
+                                                    <Ionicons name="checkmark-circle" size={18} color="white" />
+                                                </>
+                                            )}
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         )}
                         </View>
@@ -550,69 +545,56 @@ export default function KYC() {
 
                     {/* COMPLETED VIEW */}
                     {tier >= 3 && (
-                        <View style={[s.completedView, { paddingVertical: 24 * scale }]}>
-                            <View style={[s.successIconWrap, { marginBottom: 20 * scale }]}>
-                                <View style={[s.successIconBlur, { width: 100 * scale, height: 100 * scale }]} />
-                                <View style={[s.successIconInner, { width: 70 * scale, height: 70 * scale, borderWidth: 3 * scale }]}>
-                                    <Ionicons name="checkmark-done" size={32 * scale} color="#059669" />
+                        <View style={s.completedContainer}>
+                            <View style={s.completedIconPulse}>
+                                <View style={s.completedIconBg}>
+                                    <Ionicons name="shield-checkmark" size={48} color="#10B981" />
                                 </View>
                             </View>
-                            <Text style={[s.successTitle, { fontSize: 20 * scale, marginBottom: 8 * scale }]}>Fully Verified!</Text>
-                            <Text style={[s.successSubtitle, { fontSize: 11 * scale, marginBottom: 24 * scale, paddingHorizontal: 16 * scale }]}>
-                                Your identity has been fully verified. You now have unlimited access to all features.
+                            <Text style={s.completedTitle}>Account Verified!</Text>
+                            <Text style={s.completedDesc}>
+                                Congratulations, you have successfully completed all KYC requirements. You now have full access to all features.
                             </Text>
                             
-                            <View style={[s.certCard, { padding: 16 * scale, borderRadius: 16 * scale, marginBottom: 20 * scale }]}>
-                                <View style={[s.certRow, { marginBottom: 16 * scale }]}>
-                                    <View style={[s.certIcon, { width: 32 * scale, height: 32 * scale }]}><Ionicons name="ribbon" size={16 * scale} color="#F59E0B" /></View>
-                                    <View style={{ marginLeft: 12 * scale }}>
-                                        <Text style={[s.certTitle, { fontSize: 13 * scale }]}>Official Certificate</Text>
-                                        <Text style={[s.certSub, { fontSize: 9 * scale }]}>Fully Verified Status</Text>
+                            <TouchableOpacity onPress={generateCertificate} activeOpacity={0.8} style={{ width: '100%' }}>
+                                <LinearGradient colors={['#1E293B', '#0F172A']} style={s.certBtn}>
+                                    <View style={s.certBtnIcon}><Ionicons name="ribbon" size={20} color="#F59E0B" /></View>
+                                    <View style={s.certBtnContent}>
+                                        <Text style={s.certBtnTitle}>Official Certificate</Text>
+                                        <Text style={s.certBtnSub}>Download your verified status PDF</Text>
                                     </View>
-                                </View>
-                                
-                                <TouchableOpacity onPress={generateCertificate} activeOpacity={0.8}>
-                                    <LinearGradient colors={['#F59E0B', '#D97706']} style={[s.submitBtn, { height: 40 * scale, borderRadius: 10 * scale }]}>
-                                        <View style={s.btnInner}>
-                                            <Text style={[s.btnText, { fontSize: 11 * scale, letterSpacing: 1 * scale, textTransform: 'uppercase' }]}>Download PDF</Text>
-                                            <Ionicons name="cloud-download" size={14 * scale} color="white" />
-                                        </View>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
+                                    <Ionicons name="download" size={20} color="#94A3B8" />
+                                </LinearGradient>
+                            </TouchableOpacity>
                         </View>
                     )}
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <Modal visible={showCamera} animationType="fade" transparent={true} onRequestClose={() => setShowCamera(false)}>
-                 <View style={s.modalBg}>
-                     <View style={{ flex: 1, position: 'relative' }}>
-                         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
+            <Modal visible={showCamera} animationType="slide" transparent={false} onRequestClose={() => setShowCamera(false)}>
+                 <View style={s.cameraModalContainer}>
+                     <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
+                     
+                     <SafeAreaView style={s.cameraOverlayWrapper}>
+                         <View style={s.cameraTopBar}>
+                            <TouchableOpacity onPress={() => setShowCamera(false)} style={s.cameraBackBtn}>
+                                <Ionicons name="close" size={24} color="white" />
+                            </TouchableOpacity>
+                            <Text style={s.cameraTitleText}>Face Alignment</Text>
+                            <View style={{ width: 44 }} />
+                         </View>
                          
-                         <View style={s.cameraOverlay} pointerEvents="none">
-                             <View style={s.cameraOverlayBg} />
-                             <View style={[s.cameraFrame, { width: 220 * scale, height: 280 * scale, borderRadius: 110 * scale, borderWidth: 3 * scale }]} />
-                             <View style={[s.cameraPrompt, { top: 60 * scale, paddingHorizontal: 16 * scale, paddingVertical: 8 * scale }]}>
-                                <Text style={[s.cameraPromptText, { fontSize: 11 * scale }]}>Position your face inside</Text>
-                             </View>
+                         <View style={s.cameraFrameContainer}>
+                             <View style={s.cameraOvalFrame} />
+                             <Text style={s.cameraHintText}>Position your face clearly within the frame</Text>
                          </View>
 
-                         <View style={[s.cameraControls, { paddingBottom: 30 * scale, paddingTop: 40 * scale }]} pointerEvents="box-none">
-                            <View style={s.cameraControlsRow} pointerEvents="box-none">
-                                <TouchableOpacity onPress={() => setShowCamera(false)} style={[s.cameraCloseBtn, { width: 40 * scale, height: 40 * scale }]}>
-                                    <Ionicons name="close" size={20 * scale} color="white" />
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity onPress={takeSelfie} style={[s.shutterBtn, { width: 64 * scale, height: 64 * scale, borderWidth: 4 * scale }]}>
-                                    <View style={[s.shutterBtnInner, { width: 50 * scale, height: 50 * scale, borderWidth: 2 * scale }]} />
-                                </TouchableOpacity>
-
-                                <View style={{ width: 40 * scale, height: 40 * scale }} />
-                            </View>
-                            <Text style={[s.cameraHintText, { fontSize: 9 * scale, marginTop: 16 * scale }]}>ENSURE GOOD LIGHTING</Text>
+                         <View style={s.cameraBottomBar}>
+                            <TouchableOpacity onPress={takeSelfie} style={s.cameraCaptureBtn}>
+                                <View style={s.cameraCaptureInner} />
+                            </TouchableOpacity>
                          </View>
-                     </View>
+                     </SafeAreaView>
                  </View>
             </Modal>
         </SafeAreaView>
@@ -620,99 +602,99 @@ export default function KYC() {
 }
 
 const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8FAFC' },
-    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
-    headerContainer: { zIndex: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-    headerGradient: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingHorizontal: 16, position: 'relative', overflow: 'hidden' },
+    container: { flex: 1, backgroundColor: '#F1F5F9' },
+    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
     
-    // Extra Decorations
-    headerDecoration1: { position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.05)', zIndex: 0 },
-    headerDecoration2: { position: 'absolute', left: -30, bottom: -10, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.03)', zIndex: 0 },
-
-    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, zIndex: 1 },
-    backBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    statusBadge: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center' },
-    statusDot: { borderRadius: 10, marginRight: 4 },
-    statusText: { color: 'white', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-    headerTitle: { color: 'white', fontWeight: '900', marginBottom: 4, letterSpacing: -0.5, zIndex: 1 },
-    headerSubtitle: { color: '#94A3B8', fontWeight: '500', lineHeight: 16, zIndex: 1 },
+    headerContainer: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
+    headerGradient: { paddingHorizontal: 24, paddingVertical: 24, position: 'relative' },
+    abstractShape1: { position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(59, 130, 246, 0.1)' },
+    abstractShape2: { position: 'absolute', bottom: -30, left: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(16, 185, 129, 0.05)' },
+    abstractShape3: { position: 'absolute', top: 20, left: 60, width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255, 255, 255, 0.02)' },
     
-    scrollContent: { paddingBottom: 80, maxWidth: 600, alignSelf: 'center', width: '100%' },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, zIndex: 2 },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+    statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+    statusText: { color: 'white', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
     
-    card: { backgroundColor: 'white', borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
-    progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    progressLabel: { color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 },
-    progressStepText: { color: '#0F172A', fontWeight: '900' },
-    progressRing: { backgroundColor: '#EEF2FF', borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0E7FF' },
-    progressPercent: { color: '#4F46E5', fontWeight: '900' },
+    headerTextWrap: { zIndex: 2, marginBottom: 10 },
+    headerTitle: { color: 'white', fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginBottom: 8 },
+    headerSubtitle: { color: '#94A3B8', fontSize: 13, lineHeight: 20, opacity: 0.9 },
     
-    stepperRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'center' },
-    stepCircle: { borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-    stepCircleDone: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-    stepCircleActive: { backgroundColor: 'white', borderColor: '#4F46E5', shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
-    stepCirclePending: { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
-    stepCircleText: { fontWeight: '700' },
-    stepLine: { flex: 1, height: 3, borderRadius: 2, marginHorizontal: 6 },
-    stepLabelsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
-    stepLabelText: { fontWeight: '700', textTransform: 'uppercase' },
-
-    pendingCard: { alignItems: 'center', backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' },
-    pendingIconWrapper: { backgroundColor: 'white', borderRadius: 30, alignItems: 'center', justifyContent: 'center', shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 2 },
-    pendingTitle: { color: '#78350F', fontWeight: '900', textAlign: 'center' },
-    pendingSubtitle: { color: '#92400E', textAlign: 'center', fontWeight: '500', lineHeight: 16 },
-
-    stepHeader: { flexDirection: 'row', alignItems: 'center' },
-    stepIconBox: { backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-    stepTitle: { color: '#0F172A', fontWeight: '900', letterSpacing: -0.5 },
+    scrollContent: { padding: 20, paddingBottom: 60 },
     
-    instantBadge: { backgroundColor: '#ECFDF5', borderRadius: 16, borderWidth: 1, borderColor: '#A7F3D0', flexDirection: 'row', alignItems: 'center' },
-    instantIcon: { backgroundColor: '#D1FAE5', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-    instantTitle: { color: '#064E3B', fontWeight: '900', marginBottom: 2 },
-    instantSubtitle: { color: '#047857', fontWeight: '600', lineHeight: 14 },
-
-    inputLabel: { color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginLeft: 6 },
-    inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 2, borderColor: '#E2E8F0', borderRadius: 12 },
-    inputSuccess: { borderColor: '#34D399', backgroundColor: '#ECFDF5' },
-    inputError: { borderColor: '#F87171', backgroundColor: '#FEF2F2' },
-    inputText: { flex: 1, color: '#1E293B', fontWeight: '900' },
-    errorText: { color: '#EF4444', fontWeight: '700', textAlign: 'center', backgroundColor: '#FEF2F2', paddingVertical: 6, borderRadius: 8 },
+    stepperCard: { backgroundColor: 'white', borderRadius: 20, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F8FAFC' },
+    stepperHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    stepperLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 },
+    stepperTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
     
-    instructionText: { color: '#64748b', fontWeight: '500', lineHeight: 16 },
+    stepperTrackWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 },
+    stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    stepDot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+    stepDotDone: { backgroundColor: '#3B82F6' },
+    stepDotActive: { backgroundColor: 'white', borderWidth: 2, borderColor: '#3B82F6' },
+    stepDotPending: { backgroundColor: '#F1F5F9', borderWidth: 2, borderColor: '#E2E8F0' },
+    stepDotInnerActive: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#3B82F6' },
+    stepDotInnerPending: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#CBD5E1' },
+    stepText: { fontSize: 11, fontWeight: '700', marginLeft: 8 },
+    stepTextDone: { color: '#3B82F6' },
+    stepTextActive: { color: '#0F172A' },
+    stepTextPending: { color: '#94A3B8' },
+    stepConnector: { flex: 1, height: 3, backgroundColor: '#F1F5F9', borderRadius: 2, marginHorizontal: 8, overflow: 'hidden' },
+    stepConnectorFill: { height: '100%', backgroundColor: '#3B82F6', borderRadius: 2 },
 
-    submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-    btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    btnText: { color: 'white', fontWeight: '700', marginRight: 6 },
-
-    selfieBox: { backgroundColor: '#F8FAFC', borderColor: '#EEF2FF', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, alignItems: 'center', justifyContent: 'center' },
-    selfiePlaceholder: { width: '100%', height: '100%', backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', borderRadius: 70 },
-    cameraBtn: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-    cameraBtnText: { color: 'white', fontWeight: '700', letterSpacing: 1 },
-
-    completedView: { alignItems: 'center' },
-    successIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-    successIconBlur: { position: 'absolute', backgroundColor: '#34D399', borderRadius: 80, opacity: 0.3 },
-    successIconInner: { backgroundColor: '#ECFDF5', borderRadius: 40, borderColor: 'white', alignItems: 'center', justifyContent: 'center', shadowColor: '#34D399', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
-    successTitle: { color: '#0F172A', fontWeight: '900', letterSpacing: -0.5 },
-    successSubtitle: { color: '#64748B', fontWeight: '500', textAlign: 'center', lineHeight: 16 },
+    glassCard: { backgroundColor: 'white', borderRadius: 24, padding: 24, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 4, borderWidth: 1, borderColor: '#F8FAFC' },
+    cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+    cardIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    cardTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
+    cardDesc: { fontSize: 13, color: '#64748B', fontWeight: '500' },
     
-    certCard: { width: '100%', backgroundColor: '#0F172A', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 5 },
-    certRow: { flexDirection: 'row', alignItems: 'center' },
-    certIcon: { backgroundColor: 'rgba(245,158,11,0.2)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
-    certTitle: { color: 'white', fontWeight: '900' },
-    certSub: { color: '#94A3B8', fontWeight: '600' },
+    promoBanner: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
+    promoBannerTextWrap: { marginLeft: 12, flex: 1 },
+    promoBannerTitle: { fontSize: 13, fontWeight: '800', color: '#064E3B', marginBottom: 2 },
+    promoBannerDesc: { fontSize: 11, color: '#047857', lineHeight: 16 },
 
-    modalBg: { flex: 1, backgroundColor: 'black' },
-    cameraOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
-    cameraOverlayBg: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
-    cameraFrame: { borderColor: 'rgba(52,211,153,0.8)', backgroundColor: 'transparent' },
-    cameraPrompt: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    cameraPromptText: { color: 'white', fontWeight: '900', letterSpacing: -0.5 },
+    inputGroup: { marginBottom: 24 },
+    inputLabel: { fontSize: 11, fontWeight: '700', color: '#475569', marginBottom: 8, letterSpacing: 0.5 },
+    inputWrapper: { flexDirection: 'row', alignItems: 'center', height: 52, backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', paddingHorizontal: 16 },
+    inputWrapperSuccess: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+    inputWrapperError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+    inputElement: { flex: 1, fontSize: 16, fontWeight: '700', color: '#0F172A', letterSpacing: 2 },
+    errorHintText: { fontSize: 11, color: '#EF4444', marginTop: 8, fontWeight: '600' },
+
+    primaryBtn: { flexDirection: 'row', height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+    primaryBtnText: { color: 'white', fontSize: 15, fontWeight: '800', marginRight: 8, letterSpacing: 0.5 },
+
+    selfieContainer: { alignItems: 'center', marginBottom: 32 },
+    selfieFrame: { width: 160, height: 160, borderRadius: 80, padding: 4, backgroundColor: '#EFF6FF', borderWidth: 2, borderColor: '#DBEAFE', position: 'relative' },
+    selfieImage: { width: '100%', height: '100%', borderRadius: 80, resizeMode: 'cover' },
+    selfiePlaceholder: { width: '100%', height: '100%', borderRadius: 80, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+    cameraTriggerBtn: { position: 'absolute', bottom: -10, alignSelf: 'center', backgroundColor: '#0F172A', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+    cameraTriggerText: { color: 'white', fontSize: 11, fontWeight: '700', marginLeft: 6 },
+
+    pendingIconBg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+
+    completedContainer: { alignItems: 'center', paddingVertical: 20 },
+    completedIconPulse: { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    completedIconBg: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
+    completedTitle: { fontSize: 24, fontWeight: '900', color: '#0F172A', marginBottom: 12 },
+    completedDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: 32, paddingHorizontal: 20 },
     
-    cameraControls: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
-    cameraControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 30 },
-    cameraCloseBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    shutterBtn: { backgroundColor: 'white', borderRadius: 40, borderColor: 'rgba(52,211,153,0.5)', alignItems: 'center', justifyContent: 'center' },
-    shutterBtnInner: { backgroundColor: 'white', borderRadius: 30, borderColor: 'rgba(0,0,0,0.1)' },
-    cameraHintText: { color: 'rgba(255,255,255,0.6)', fontWeight: '700', letterSpacing: 1 }
+    certBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, width: '100%' },
+    certBtnIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    certBtnContent: { flex: 1 },
+    certBtnTitle: { color: 'white', fontSize: 15, fontWeight: '800', marginBottom: 2 },
+    certBtnSub: { color: '#94A3B8', fontSize: 11, fontWeight: '500' },
+
+    cameraModalContainer: { flex: 1, backgroundColor: '#000' },
+    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between' },
+    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 },
+    cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+    cameraTitleText: { color: 'white', fontSize: 16, fontWeight: '700' },
+    cameraFrameContainer: { alignItems: 'center', justifyContent: 'center' },
+    cameraOvalFrame: { width: 250, height: 350, borderRadius: 125, borderWidth: 4, borderColor: 'rgba(59, 130, 246, 0.8)', backgroundColor: 'transparent' },
+    cameraHintText: { color: 'white', fontSize: 14, fontWeight: '600', marginTop: 24, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    cameraBottomBar: { alignItems: 'center', paddingBottom: 40 },
+    cameraCaptureBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+    cameraCaptureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'white' }
 });
