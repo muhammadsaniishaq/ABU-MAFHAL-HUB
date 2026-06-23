@@ -2,14 +2,9 @@ import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Moda
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function KYC() {
@@ -203,24 +198,27 @@ export default function KYC() {
 
     if (loading) return (
         <View style={s.centerContainer}>
-            <ActivityIndicator size="large" color="#000" />
+            <ActivityIndicator size="large" color="#f5a623" />
         </View>
     );
 
     return (
         <SafeAreaView style={s.container} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="dark" />
+            <StatusBar style="light" />
 
-            <View style={s.topBar}>
-                <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#000" />
-                </TouchableOpacity>
-            </View>
+            {/* BRANDED HEADER BACKGROUND */}
+            <View style={s.brandedHeaderBg}>
+                <View style={s.topBar}>
+                    <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn}>
+                        <Ionicons name="arrow-back" size={24} color="#f5a623" />
+                    </TouchableOpacity>
+                </View>
 
-            <View style={s.headerSection}>
-                <Text style={s.titleText}>Identity</Text>
-                <Text style={s.titleTextLight}>Verification</Text>
+                <View style={s.headerSection}>
+                    <Text style={s.titleText}>Identity</Text>
+                    <Text style={s.titleTextLight}>Verification</Text>
+                </View>
             </View>
             
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -258,7 +256,7 @@ export default function KYC() {
                                         value={bvn} 
                                         onChangeText={setBvn} 
                                         placeholder="00000000000" 
-                                        placeholderTextColor="#A1A1AA"
+                                        placeholderTextColor="#94a3b8"
                                         style={s.textInput} 
                                         keyboardType="numeric"
                                         maxLength={11}
@@ -266,7 +264,7 @@ export default function KYC() {
                                 </View>
 
                                 <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                    {verifying ? <ActivityIndicator color="#FFF" /> : (
+                                    {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
                                         <Text style={s.actionButtonText}>VERIFY & OPEN ACCOUNT</Text>
                                     )}
                                 </TouchableOpacity>
@@ -283,7 +281,7 @@ export default function KYC() {
                                         value={nin} 
                                         onChangeText={setNin} 
                                         placeholder="00000000000" 
-                                        placeholderTextColor="#A1A1AA"
+                                        placeholderTextColor="#94a3b8"
                                         style={s.textInput} 
                                         keyboardType="numeric"
                                         maxLength={11}
@@ -291,7 +289,7 @@ export default function KYC() {
                                 </View>
 
                                 <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                    {verifying ? <ActivityIndicator color="#FFF" /> : (
+                                    {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
                                         <Text style={s.actionButtonText}>VERIFY NIN</Text>
                                     )}
                                 </TouchableOpacity>
@@ -326,7 +324,7 @@ export default function KYC() {
 
                                 {selfie && (
                                     <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                        {verifying ? <ActivityIndicator color="#FFF" /> : (
+                                        {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
                                             <Text style={s.actionButtonText}>COMPLETE VERIFICATION</Text>
                                         )}
                                     </TouchableOpacity>
@@ -373,50 +371,51 @@ export default function KYC() {
 }
 
 const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+    container: { flex: 1, backgroundColor: '#f8f9fc' },
+    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1b3e' },
     
+    brandedHeaderBg: { backgroundColor: '#0d1b3e', paddingBottom: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5, marginBottom: 24 },
     topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },
     
-    headerSection: { paddingHorizontal: 24, marginBottom: 32 },
-    titleText: { fontSize: 36, fontWeight: '900', color: '#000000', letterSpacing: -1 },
-    titleTextLight: { fontSize: 36, fontWeight: '300', color: '#000000', letterSpacing: -1, marginTop: -8 },
+    headerSection: { paddingHorizontal: 24 },
+    titleText: { fontSize: 32, fontWeight: '900', color: '#ffffff', letterSpacing: 1, textTransform: 'uppercase' },
+    titleTextLight: { fontSize: 32, fontWeight: '300', color: '#f5a623', letterSpacing: 1, marginTop: -8, textTransform: 'uppercase' },
     
     scrollContent: { paddingHorizontal: 24, paddingBottom: 60 },
     
-    stepperRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
-    stepTab: { flex: 1, paddingVertical: 12, borderBottomWidth: 2 },
-    stepTabActive: { borderBottomColor: '#000000' },
-    stepTabInactive: { borderBottomColor: '#F4F4F5' },
-    stepTabText: { fontSize: 12, fontWeight: '700', letterSpacing: 1, textAlign: 'center' },
-    stepTabTextActive: { color: '#000000' },
-    stepTabTextInactive: { color: '#A1A1AA' },
+    stepperRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
+    stepTab: { flex: 1, paddingVertical: 12, borderBottomWidth: 3 },
+    stepTabActive: { borderBottomColor: '#f5a623' },
+    stepTabInactive: { borderBottomColor: '#e2e8f0' },
+    stepTabText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, textAlign: 'center' },
+    stepTabTextActive: { color: '#0d1b3e' },
+    stepTabTextInactive: { color: '#94a3b8' },
 
-    cleanCard: { marginBottom: 24 },
-    cleanCardTitle: { fontSize: 20, fontWeight: '800', color: '#000000', marginBottom: 8 },
-    cleanCardDesc: { fontSize: 14, color: '#71717A', lineHeight: 22, marginBottom: 32 },
+    cleanCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: '#f1f5f9' },
+    cleanCardTitle: { fontSize: 20, fontWeight: '900', color: '#0d1b3e', marginBottom: 8 },
+    cleanCardDesc: { fontSize: 13, color: '#64748b', lineHeight: 20, marginBottom: 24 },
 
     inputContainer: { marginBottom: 32 },
-    textInput: { height: 60, backgroundColor: '#F4F4F5', borderRadius: 0, paddingHorizontal: 20, fontSize: 18, fontWeight: '600', color: '#000000', letterSpacing: 2 },
+    textInput: { height: 56, backgroundColor: '#f8f9fc', borderRadius: 12, paddingHorizontal: 20, fontSize: 18, fontWeight: '700', color: '#0d1b3e', letterSpacing: 2, borderWidth: 1, borderColor: '#e2e8f0' },
 
-    actionButton: { height: 60, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center', borderRadius: 0 },
-    actionButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 2 },
+    actionButton: { height: 56, backgroundColor: '#f5a623', justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5 },
+    actionButtonText: { color: '#0d1b3e', fontSize: 13, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
 
-    secondaryButton: { height: 60, backgroundColor: '#F4F4F5', justifyContent: 'center', alignItems: 'center', borderRadius: 0, marginBottom: 16 },
-    secondaryButtonText: { color: '#000000', fontSize: 14, fontWeight: '800', letterSpacing: 2 },
+    secondaryButton: { height: 56, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', borderRadius: 12, marginBottom: 16 },
+    secondaryButtonText: { color: '#0d1b3e', fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
 
-    selfieBox: { width: '100%', aspectRatio: 1, backgroundColor: '#F4F4F5', marginBottom: 32 },
+    selfieBox: { width: '100%', aspectRatio: 1, backgroundColor: '#f8f9fc', marginBottom: 32, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0' },
     selfieImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     selfieEmpty: { width: '100%', height: '100%' },
 
-    successBox: { padding: 24, backgroundColor: '#F4F4F5', alignItems: 'center', marginTop: 24 },
-    successBoxText: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: '#000000' },
+    successBox: { padding: 16, backgroundColor: '#ecfdf5', alignItems: 'center', marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0' },
+    successBoxText: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: '#059669' },
 
     cameraModalContainer: { flex: 1, backgroundColor: '#000' },
     cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between' },
     cameraTopBar: { padding: 24, alignItems: 'flex-start' },
-    cameraBackBtn: { paddingVertical: 12, paddingHorizontal: 20, backgroundColor: 'rgba(0,0,0,0.5)' },
+    cameraBackBtn: { paddingVertical: 12, paddingHorizontal: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12 },
     cameraBackText: { color: 'white', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
     cameraBottomBar: { paddingBottom: 60, alignItems: 'center' },
     cameraCaptureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
