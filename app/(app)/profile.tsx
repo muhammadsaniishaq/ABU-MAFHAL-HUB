@@ -238,7 +238,7 @@ export default function ProfileScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-slate-950">
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#020617" }}>
                 <ActivityIndicator size="large" color="#f5a623" />
             </View>
         );
@@ -247,11 +247,11 @@ export default function ProfileScreen() {
     const [balanceWhole, balanceDecimal] = formatCurrency(profile?.balance);
 
     return (
-        <View className="flex-1 bg-[#f8f9fc]">
+        <View style={{ flex: 1, backgroundColor: "#f8f9fc" }}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 160 }}>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 160 }}>
                 
                 {/* 1. CURVED HEADER GRADIENT */}
                 <LinearGradient
@@ -271,20 +271,20 @@ export default function ProfileScreen() {
                     <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#f5a623] opacity-80" style={{ borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }} />
 
                     {/* Top Row: Page Title & Action Icons */}
-                    <View className="flex-row items-center justify-between mb-6">
-                        <View className="flex-row items-center gap-2">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             <Image 
                                 source={require('../../assets/images/logo-icon.png')} 
-                                className="w-8 h-8"
+                                style={{ width: 32, height: 32 }}
                                 resizeMode="contain"
                             />
-                            <View className="flex-col leading-none">
-                                <Text className="text-white font-black text-sm tracking-wider leading-4">MAFHAL</Text>
-                                <Text className="text-[#f5a623] font-bold text-[10px] tracking-widest leading-3">SUB</Text>
+                            <View style={{ flexDirection: 'column' }}>
+                                <Text style={{ color: 'white', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>MAFHAL</Text>
+                                <Text style={{ color: '#f5a623', fontWeight: 'bold', fontSize: 10, letterSpacing: 1.5 }}>SUB</Text>
                             </View>
                         </View>
                         
-                        <View className="flex-row items-center gap-3">
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                             {/* Notification Bell */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
@@ -307,9 +307,9 @@ export default function ProfileScreen() {
                     </View>
 
                     {/* Profile Information Row (Horizontal Alignment) */}
-                    <View className="flex-row items-center">
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {/* Avatar Picker Container with Double Gold Ring */}
-                        <View className="relative">
+                        <View style={{ position: 'relative' }}>
                             <View style={{ width: 72, height: 72, borderRadius: 36, padding: 3, backgroundColor: '#f5a623', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 }}>
                                 <View style={{ width: 66, height: 66, borderRadius: 33, padding: 2, backgroundColor: '#0d1b3e', alignItems: 'center', justifyContent: 'center' }}>
                                     <View style={{ width: 62, height: 62, borderRadius: 31, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.1)' }}>
@@ -344,20 +344,20 @@ export default function ProfileScreen() {
                         </View>
 
                         {/* Name & Contact Info */}
-                        <View className="ml-4 flex-1">
-                            <View className="flex-row items-center gap-1.5 mb-0.5">
-                                <Text className="text-white text-lg font-black tracking-tight max-w-[200px]" numberOfLines={1}>
+                        <View style={{ marginLeft: 16, flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <Text style={{ color: 'white', fontSize: 18, fontWeight: '900', letterSpacing: -0.5, maxWidth: 200 }} numberOfLines={1}>
                                     {profile?.full_name || 'User'}
                                 </Text>
                                 <Ionicons name="ribbon" size={16} color="#f5a623" />
                             </View>
                             
-                            <Text className="text-slate-300 text-xs font-semibold mb-2">
+                            <Text style={{ color: '#cbd5e1', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
                                 {profile?.phone || profile?.email || 'No Contact Details'}
                             </Text>
                             
                             {/* Verification Pill */}
-                            <View className="flex-row">
+                            <View style={{ flexDirection: 'row' }}>
                                 {profile?.kyc_tier && profile.kyc_tier > 1 ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)', gap: 4 }}>
                                         <Ionicons name="shield-checkmark" size={10} color="#f5a623" />
@@ -442,24 +442,24 @@ export default function ProfileScreen() {
                 </View>
 
                 {/* 3. GROUPED LIST GROUPS */}
-                <View className="mt-6 px-6 gap-y-5">
+                <View style={{ marginTop: 24, paddingHorizontal: 24, gap: 20 }}>
                     
                     {/* ADMIN SECTION (Visible only to admins) */}
                     {profile?.role && ['admin', 'super_admin'].includes(profile.role) && (
                         <View>
-                            <Text className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest mb-2 ml-1">Administration</Text>
-                            <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+                            <Text style={{ fontSize: 10, color: "#f59e0b", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Administration</Text>
+                            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#fde68a", overflow: "hidden" }}>
                                 <TouchableOpacity 
                                     onPress={() => router.push('/manage')} 
                                     activeOpacity={0.6}
-                                    className="flex-row items-center py-3.5 px-4"
+                                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                                 >
-                                    <View className="w-8 h-8 rounded-full bg-amber-50 items-center justify-center mr-3">
+                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#fffbeb", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                         <Ionicons name="shield-checkmark" size={15} color="#f59e0b" />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="font-extrabold text-xs text-amber-700">Admin Console</Text>
-                                        <Text className="text-amber-600/70 text-[10px] font-medium mt-0.5">Manage app settings, users and system</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontWeight: "800", fontSize: 12, color: "#b45309" }}>Admin Console</Text>
+                                        <Text style={{ color: "rgba(217, 119, 6, 0.7)", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage app settings, users and system</Text>
                                     </View>
                                     <Ionicons name="chevron-forward" size={14} color="#fcd34d" />
                                 </TouchableOpacity>
@@ -469,20 +469,20 @@ export default function ProfileScreen() {
 
                     {/* ACCOUNT SECTION */}
                     <View>
-                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Account</Text>
-                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Account</Text>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
                             {/* Personal Info */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="person" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Personal Information</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">View and update your personal details</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Personal Information</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>View and update your personal details</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -491,14 +491,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={() => router.push('/beneficiaries')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="business" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Bank Accounts</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Manage your linked bank accounts</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Bank Accounts</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage your linked bank accounts</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -507,14 +507,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={() => router.push('/security')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="shield-checkmark" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Security</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Password, PIN and security settings</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Security</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Password, PIN and security settings</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -523,14 +523,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={() => router.push('/kyc')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="checkmark-done-circle" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Verification</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">KYC verification and account status</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Verification</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>KYC verification and account status</Text>
                                 </View>
                                 <View className="flex-row items-center mr-2">
                                     {profile?.kyc_tier && profile.kyc_tier > 1 ? (
@@ -554,20 +554,20 @@ export default function ProfileScreen() {
 
                     {/* PREFERENCES SECTION */}
                     <View>
-                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Preferences</Text>
-                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Preferences</Text>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
                             {/* Notification Settings */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="notifications" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Notification Settings</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Manage your notification preferences</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Notification Settings</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage your notification preferences</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -576,14 +576,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={handleLanguageSelect} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="globe" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Language</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Choose your preferred language</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Language</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Choose your preferred language</Text>
                                 </View>
                                 <Text className="text-slate-400 text-[11px] font-bold mr-1">English</Text>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
@@ -593,14 +593,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={handleThemeSelect} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="moon" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Theme</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Choose app appearance</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Theme</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Choose app appearance</Text>
                                 </View>
                                 <Text className="text-slate-400 text-[11px] font-bold mr-1">System</Text>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
@@ -610,20 +610,20 @@ export default function ProfileScreen() {
 
                     {/* SUPPORT & ABOUT SECTION */}
                     <View>
-                        <Text className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-2 ml-1">Support & About</Text>
-                        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Support & About</Text>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
                             {/* Help Center */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/support')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="headset" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Help Center</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Get help and support</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Help Center</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Get help and support</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -632,14 +632,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={() => router.push('/onboarding')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="information-circle" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">About Mafhal Sub</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Learn more about us</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>About Mafhal Sub</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Learn more about us</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -648,14 +648,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={() => router.push('/terms')} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4 border-b border-slate-50"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-[#0d1b3e]/5 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="document-text" size={15} color="#0d1b3e" />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="font-extrabold text-xs text-slate-800">Terms & Conditions</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Read our terms and conditions</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Terms & Conditions</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Read our terms and conditions</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -664,14 +664,14 @@ export default function ProfileScreen() {
                             <TouchableOpacity 
                                 onPress={handleLogout} 
                                 activeOpacity={0.6}
-                                className="flex-row items-center py-3.5 px-4"
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View className="w-8 h-8 rounded-full bg-red-50 items-center justify-center mr-3">
+                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#fef2f2", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
                                     <Ionicons name="log-out" size={15} color="#ef4444" />
                                 </View>
-                                <View className="flex-1">
+                                <View style={{ flex: 1 }}>
                                     <Text className="font-extrabold text-xs text-red-500">Log Out</Text>
-                                    <Text className="text-slate-400 text-[10px] font-medium mt-0.5">Sign out from your account</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Sign out from your account</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
