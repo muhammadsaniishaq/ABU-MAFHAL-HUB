@@ -258,12 +258,13 @@ export default function ProfileScreen() {
                     colors={['#060d21', '#0d1b3e']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    className="pt-16 pb-24 px-6 rounded-b-[32px] shadow-xl relative"
+                    style={{ paddingTop: 64, paddingBottom: 96, paddingHorizontal: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5, position: 'relative' }}
                 >
                     {/* Background Gold Mesh Glow */}
                     <LinearGradient
                         colors={['rgba(245, 166, 35, 0.12)', 'rgba(245, 166, 35, 0)']}
-                        className="absolute -top-24 -right-24 w-72 h-72 rounded-full blur-[80px] pointer-events-none"
+                        style={{ position: 'absolute', top: -96, right: -96, width: 288, height: 288, borderRadius: 144 }}
+                        pointerEvents="none"
                     />
 
                     {/* Decorative Bottom Gold Line */}
@@ -319,9 +320,9 @@ export default function ProfileScreen() {
                                                 colors={['#0d1b3e', '#f5a623']}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
-                                                className="w-full h-full items-center justify-center"
+                                                style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                                             >
-                                                <Text className="text-xl font-black text-white">{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
+                                                <Text style={{ fontSize: 20, fontWeight: '900', color: 'white' }}>{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
                                             </LinearGradient>
                                         )}
                                     </View>
