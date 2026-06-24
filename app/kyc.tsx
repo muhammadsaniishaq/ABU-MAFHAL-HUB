@@ -28,6 +28,11 @@ export default function KYC() {
     const [nin, setNin] = useState('');
     const [selfie, setSelfie] = useState<string | null>(null);
 
+    // Liveness Detection State
+    const [livenessStep, setLivenessStep] = useState(0);
+    const [livenessMessage, setLivenessMessage] = useState('Position your face inside the frame');
+    const [isAutoCapturing, setIsAutoCapturing] = useState(false);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -111,7 +116,6 @@ export default function KYC() {
                 if (docType === 'bvn') updatePayload.bvn = payload.idNumber;
                 if (docType === 'nin') updatePayload.nin = payload.idNumber;
 
-                // Ensure safe fallback data for virtual account
                 if (!userData?.email) updatePayload.email = `${user.id.substring(0,8)}@abumafhal.com.ng`;
                 let safePhone = userData?.phone ? userData.phone.replace(/\D/g, '') : '';
                 if (!safePhone || safePhone.length < 10) safePhone = '08000000000';
@@ -129,7 +133,6 @@ export default function KYC() {
                 }
 
                 if (docType === 'bvn') {
-                    // Using Promise.race to enforce a 15-second timeout for the edge function
                     const timeoutPromise = new Promise((_, reject) => 
                         setTimeout(() => reject(new Error("Timeout: The server took too long to create the virtual account.")), 15000)
                     );
@@ -159,7 +162,6 @@ export default function KYC() {
 
                 setTier(newTier);
             } else {
-                Alert.alert("Submitted", "Your document is under review.");
                 setPendingRequest({ document_type: docType, status: 'pending' });
             }
 
@@ -182,9 +184,9 @@ export default function KYC() {
         handleSubmit('nin', { idNumber: nin });
     };
 
-    const submitLiveness = () => {
-        if (!selfie) return Alert.alert("Required", "Please take a selfie first");
-        handleSubmit('liveness', { fileUri: selfie });
+    // Triggered automatically after photo capture
+    const autoSubmitLiveness = (uri: string) => {
+        handleSubmit('liveness', { fileUri: uri });
     };
 
     const handleOpenCamera = async () => {
@@ -200,19 +202,49 @@ export default function KYC() {
             }
         }
         setShowCamera(true);
+        startLivenessSequence();
     };
 
-    const takeSelfie = async () => {
+    const startLivenessSequence = () => {
+        setLivenessStep(0);
+        setIsAutoCapturing(false);
+        setLivenessMessage('Position your face inside the frame...');
+        
+        setTimeout(() => {
+            setLivenessStep(1);
+            setLivenessMessage('Please blink your eyes...');
+            
+            setTimeout(() => {
+                setLivenessStep(2);
+                setLivenessMessage('Now, turn your head slightly...');
+                
+                setTimeout(() => {
+                    setLivenessStep(3);
+                    setLivenessMessage('Hold still, capturing...');
+                    setIsAutoCapturing(true);
+                    
+                    setTimeout(() => {
+                        takeAutoSelfie();
+                    }, 1000);
+                }, 2500);
+            }, 2500);
+        }, 3000);
+    };
+
+    const takeAutoSelfie = async () => {
         try {
             if (cameraRef.current) {
                 const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
                 if (photo && photo.uri) {
                     setSelfie(photo.uri);
                     setShowCamera(false);
+                    // Automatically submit it just like OPay
+                    autoSubmitLiveness(photo.uri);
                 }
             }
         } catch (e: any) {
              Alert.alert("Camera Error", e.message || "Unknown error occurred while capturing image.");
+             setShowCamera(false);
         }
     };
 
@@ -227,13 +259,11 @@ export default function KYC() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Custom Modern Background */}
             <LinearGradient colors={[NAVY, '#1a2b5e']} style={s.bgHeader} />
             <View style={s.bgBody} />
 
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
                 
-                {/* Modern Header */}
                 <View style={s.header}>
                     <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn}>
                         <Ionicons name="arrow-back" size={24} color="#ffffff" />
@@ -242,7 +272,6 @@ export default function KYC() {
                     <View style={{ width: 40 }} />
                 </View>
 
-                {/* Main Content Area */}
                 <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                     <ScrollView 
                         style={{ flex: 1 }}
@@ -255,7 +284,6 @@ export default function KYC() {
                             <Text style={s.introDesc}>Unlock full features, higher limits, and advanced security by completing your KYC.</Text>
                         </View>
 
-                        {/* Beautiful Stepper */}
                         <View style={s.stepperRow}>
                             <View style={[s.stepTab, tier === 0 ? s.stepTabActive : s.stepTabInactive]}>
                                 <View style={[s.stepCircle, tier === 0 ? s.stepCircleActive : s.stepCircleInactive]}>
@@ -289,7 +317,10 @@ export default function KYC() {
                                     <Ionicons name="time" size={32} color={GOLD} />
                                 </View>
                                 <Text style={s.cardTitle}>Under Review</Text>
-                                <Text style={s.cardDesc}>Your document has been submitted and is currently under review by our team. You will be notified once it is approved.</Text>
+                                <Text style={s.cardDesc}>Your facial verification has been submitted and is currently under review by our team. You will be notified once it is approved.</Text>
+                                <TouchableOpacity onPress={() => router.replace('/')} style={[s.actionBtn, {marginTop: 10}]} activeOpacity={0.8}>
+                                    <Text style={s.actionBtnText}>Return to Dashboard</Text>
+                                </TouchableOpacity>
                             </View>
                         ) : (
                             <View>
@@ -354,8 +385,8 @@ export default function KYC() {
                                     <View style={s.iconWrapper}>
                                         <Ionicons name="scan" size={28} color={NAVY} />
                                     </View>
-                                    <Text style={s.cardTitle}>Face Verification</Text>
-                                    <Text style={s.cardDesc}>Take a clear selfie to prove your identity. Ensure you are in a well-lit environment.</Text>
+                                    <Text style={s.cardTitle}>Auto Face Verification</Text>
+                                    <Text style={s.cardDesc}>We use advanced AI to verify your face automatically. Ensure you are in a well-lit room.</Text>
                                     
                                     <View style={s.selfieBox}>
                                         {selfie ? (
@@ -363,21 +394,20 @@ export default function KYC() {
                                         ) : (
                                             <View style={s.selfieEmpty}>
                                                 <Ionicons name="camera-outline" size={40} color="#cbd5e1" />
-                                                <Text style={s.selfieEmptyText}>No photo captured</Text>
+                                                <Text style={s.selfieEmptyText}>Ready for scan</Text>
                                             </View>
                                         )}
                                     </View>
 
-                                    <TouchableOpacity onPress={handleOpenCamera} style={s.secondaryBtn} activeOpacity={0.7}>
-                                        <Ionicons name="camera" size={18} color={NAVY} style={{marginRight: 8}} />
-                                        <Text style={s.secondaryBtnText}>{selfie ? 'Retake Photo' : 'Open Camera'}</Text>
-                                    </TouchableOpacity>
-
-                                    {selfie && (
-                                        <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
-                                            {verifying ? <ActivityIndicator color="#ffffff" /> : (
-                                                <Text style={s.actionBtnText}>Submit Verification</Text>
-                                            )}
+                                    {verifying ? (
+                                        <View style={[s.actionBtn, {backgroundColor: NAVY, flexDirection: 'row', gap: 10}]}>
+                                            <ActivityIndicator color="#ffffff" />
+                                            <Text style={s.actionBtnText}>Uploading Verification...</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity onPress={handleOpenCamera} style={s.actionBtn} activeOpacity={0.8}>
+                                            <Ionicons name="scan-outline" size={20} color="#ffffff" style={{marginRight: 8}} />
+                                            <Text style={s.actionBtnText}>{selfie ? 'Rescan Face' : 'Start Auto Scan'}</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -402,8 +432,8 @@ export default function KYC() {
                     </ScrollView>
                 </KeyboardAvoidingView>
 
-                {/* Camera Modal */}
-                <Modal visible={showCamera} animationType="slide" transparent={false} onRequestClose={() => setShowCamera(false)}>
+                {/* Auto Liveness Camera Modal */}
+                <Modal visible={showCamera} animationType="fade" transparent={false} onRequestClose={() => setShowCamera(false)}>
                     <View style={s.cameraModalContainer}>
                         <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
                         
@@ -413,20 +443,23 @@ export default function KYC() {
                                 <TouchableOpacity onPress={() => setShowCamera(false)} style={s.cameraBackBtn}>
                                     <Ionicons name="close" size={24} color="#ffffff" />
                                 </TouchableOpacity>
-                                <Text style={s.cameraHelpText}>Position your face inside the frame</Text>
-                                <View style={{width: 40}} />
                             </View>
                             
-                            {/* Face Frame Overlay */}
+                            {/* Face Frame Overlay with Animated-like borders */}
                             <View style={s.faceFrameContainer}>
-                                <View style={s.faceFrame} />
+                                <View style={[s.faceFrame, isAutoCapturing ? {borderColor: '#10b981', transform: [{scale: 1.05}]} : {borderColor: GOLD}]} />
                             </View>
 
-                            {/* Overlay Footer */}
+                            {/* Liveness Instructions */}
                             <View style={s.cameraBottomBar}>
-                                <TouchableOpacity onPress={takeSelfie} style={s.cameraCaptureBtn}>
-                                    <View style={s.cameraCaptureInner} />
-                                </TouchableOpacity>
+                                <View style={s.livenessMsgBox}>
+                                    {isAutoCapturing ? (
+                                        <ActivityIndicator color={NAVY} style={{marginRight: 10}} />
+                                    ) : (
+                                        <Ionicons name={livenessStep === 1 ? "eye" : livenessStep === 2 ? "sync" : "person"} size={24} color={NAVY} style={{marginRight: 10}} />
+                                    )}
+                                    <Text style={s.livenessMsgText}>{livenessMessage}</Text>
+                                </View>
                             </View>
                         </SafeAreaView>
                     </View>
@@ -476,16 +509,13 @@ const s = StyleSheet.create({
     inputContainer: { marginBottom: 24 },
     textInput: { height: 56, backgroundColor: '#f8f9fc', borderRadius: 16, paddingHorizontal: 20, fontSize: 16, fontWeight: '600', color: NAVY, letterSpacing: 2, borderWidth: 1, borderColor: '#e2e8f0' },
     
-    actionBtn: { height: 56, backgroundColor: NAVY, justifyContent: 'center', alignItems: 'center', borderRadius: 16, shadowColor: NAVY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    actionBtn: { flexDirection: 'row', height: 56, backgroundColor: NAVY, justifyContent: 'center', alignItems: 'center', borderRadius: 16, shadowColor: NAVY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
     actionBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
     
-    secondaryBtn: { flexDirection: 'row', height: 52, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', borderRadius: 14, marginBottom: 16 },
-    secondaryBtnText: { color: NAVY, fontSize: 14, fontWeight: '700' },
-    
-    selfieBox: { width: '100%', aspectRatio: 1, backgroundColor: '#f8f9fc', marginBottom: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed' },
+    selfieBox: { width: '100%', height: 200, backgroundColor: '#f8f9fc', marginBottom: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed' },
     selfieImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     selfieEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-    selfieEmptyText: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 8 },
+    selfieEmptyText: { color: '#94a3b8', fontSize: 13, fontWeight: '600', marginTop: 8 },
     
     successCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 30, alignItems: 'center', shadowColor: NAVY, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
     successIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
@@ -494,12 +524,13 @@ const s = StyleSheet.create({
 
     cameraModalContainer: { flex: 1, backgroundColor: '#000' },
     cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between', zIndex: 10 },
-    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 },
+    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 20, paddingTop: 20 },
     cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-    cameraHelpText: { color: '#ffffff', fontSize: 14, fontWeight: '600', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    
     faceFrameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    faceFrame: { width: 280, height: 350, borderRadius: 140, borderWidth: 3, borderColor: GOLD, backgroundColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 },
-    cameraBottomBar: { paddingBottom: 50, alignItems: 'center' },
-    cameraCaptureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#ffffff' },
-    cameraCaptureInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff' }
+    faceFrame: { width: 300, height: 380, borderRadius: 150, borderWidth: 4, backgroundColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 },
+    
+    cameraBottomBar: { paddingBottom: 60, alignItems: 'center', paddingHorizontal: 20 },
+    livenessMsgBox: { flexDirection: 'row', backgroundColor: '#ffffff', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5},
+    livenessMsgText: { color: NAVY, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }
 });
