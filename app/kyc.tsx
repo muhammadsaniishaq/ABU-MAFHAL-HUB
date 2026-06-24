@@ -6,6 +6,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const NAVY = '#0d1b3e';
+const GOLD = '#f5a623';
 
 export default function KYC() {
     const router = useRouter();
@@ -69,7 +73,7 @@ export default function KYC() {
             let fileUrl = null;
 
             if (payload.fileUri) {
-                const fileExt = payload.fileUri.split('.').pop();
+                const fileExt = payload.fileUri.split('.').pop() || 'jpg';
                 const fileName = `${user.id}_${docType}_${Date.now()}.${fileExt}`;
                 
                 const response = await fetch(payload.fileUri);
@@ -183,240 +187,319 @@ export default function KYC() {
         handleSubmit('liveness', { fileUri: selfie });
     };
 
+    const handleOpenCamera = async () => {
+        let currentPermission = permission;
+        if (!currentPermission || !currentPermission.granted) {
+            const response = await requestPermission();
+            if (!response.granted) {
+                Alert.alert(
+                    "Permission Denied", 
+                    "Camera access is required for Face Verification. Please enable it in your device settings."
+                );
+                return;
+            }
+        }
+        setShowCamera(true);
+    };
+
     const takeSelfie = async () => {
         try {
             if (cameraRef.current) {
                 const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
-                setSelfie(photo.uri);
-                setShowCamera(false);
+                if (photo && photo.uri) {
+                    setSelfie(photo.uri);
+                    setShowCamera(false);
+                }
             }
         } catch (e: any) {
-             Alert.alert("Camera Error", e.message || "Unknown error occurred");
+             Alert.alert("Camera Error", e.message || "Unknown error occurred while capturing image.");
         }
     };
 
     if (loading) return (
-        <View style={s.centerContainer}>
-            <ActivityIndicator size="large" color="#f5a623" />
-        </View>
+        <SafeAreaView style={s.centerContainer}>
+            <ActivityIndicator size="large" color={GOLD} />
+        </SafeAreaView>
     );
 
     return (
-        <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* BRANDED HEADER BACKGROUND */}
-            <View style={s.brandedHeaderBg}>
-                <View style={s.topBar}>
+            {/* Custom Modern Background */}
+            <LinearGradient colors={[NAVY, '#1a2b5e']} style={s.bgHeader} />
+            <View style={s.bgBody} />
+
+            <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+                
+                {/* Modern Header */}
+                <View style={s.header}>
                     <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn}>
-                        <Ionicons name="arrow-back" size={24} color="#f5a623" />
+                        <Ionicons name="arrow-back" size={24} color="#ffffff" />
                     </TouchableOpacity>
+                    <Text style={s.headerTitle}>KYC Verification</Text>
+                    <View style={{ width: 40 }} />
                 </View>
 
-                <View style={s.headerSection}>
-                    <Text style={s.titleText}>Identity</Text>
-                    <Text style={s.titleTextLight}>Verification</Text>
-                </View>
-            </View>
-            
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView 
-                    style={{ flex: 1 }}
-                    contentContainerStyle={s.scrollContent}
-                    showsVerticalScrollIndicator={false} 
-                >
-                    <View style={s.stepperRow}>
-                        <View style={[s.stepTab, tier === 0 ? s.stepTabActive : s.stepTabInactive]}>
-                            <Text style={[s.stepTabText, tier === 0 ? s.stepTabTextActive : s.stepTabTextInactive]}>01 BVN</Text>
+                {/* Main Content Area */}
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                    <ScrollView 
+                        style={{ flex: 1 }}
+                        contentContainerStyle={s.scrollContent}
+                        showsVerticalScrollIndicator={false} 
+                    >
+                        
+                        <View style={s.introBlock}>
+                            <Text style={s.introTitle}>Verify Your Identity</Text>
+                            <Text style={s.introDesc}>Unlock full features, higher limits, and advanced security by completing your KYC.</Text>
                         </View>
-                        <View style={[s.stepTab, tier === 1 ? s.stepTabActive : s.stepTabInactive]}>
-                            <Text style={[s.stepTabText, tier === 1 ? s.stepTabTextActive : s.stepTabTextInactive]}>02 NIN</Text>
-                        </View>
-                        <View style={[s.stepTab, tier === 2 ? s.stepTabActive : s.stepTabInactive]}>
-                            <Text style={[s.stepTabText, tier === 2 ? s.stepTabTextActive : s.stepTabTextInactive]}>03 FACE</Text>
-                        </View>
-                    </View>
 
-                    {pendingRequest ? (
-                        <View style={s.cleanCard}>
-                            <Text style={s.cleanCardTitle}>Pending Review</Text>
-                            <Text style={s.cleanCardDesc}>Your document has been submitted and is currently under review by our team.</Text>
-                        </View>
-                    ) : (
-                        <View>
-                        {tier === 0 && (
-                            <View style={s.cleanCard}>
-                                <Text style={s.cleanCardTitle}>Enter BVN</Text>
-                                <Text style={s.cleanCardDesc}>Your 11-digit Bank Verification Number is required to instantly generate your Virtual Account.</Text>
-                                
-                                <View style={s.inputContainer}>
-                                    <TextInput 
-                                        value={bvn} 
-                                        onChangeText={setBvn} 
-                                        placeholder="00000000000" 
-                                        placeholderTextColor="#94a3b8"
-                                        style={s.textInput} 
-                                        keyboardType="numeric"
-                                        maxLength={11}
-                                    />
+                        {/* Beautiful Stepper */}
+                        <View style={s.stepperRow}>
+                            <View style={[s.stepTab, tier === 0 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier === 0 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    <Text style={[s.stepNum, tier === 0 ? s.stepNumActive : s.stepNumInactive]}>1</Text>
                                 </View>
-
-                                <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                    {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
-                                        <Text style={s.actionButtonText}>VERIFY & OPEN ACCOUNT</Text>
-                                    )}
-                                </TouchableOpacity>
+                                <Text style={[s.stepText, tier === 0 ? s.stepTextActive : s.stepTextInactive]}>BVN</Text>
                             </View>
-                        )}
+                            
+                            <View style={s.stepLine} />
 
-                        {tier === 1 && (
-                            <View style={s.cleanCard}>
-                                <Text style={s.cleanCardTitle}>Enter NIN</Text>
-                                <Text style={s.cleanCardDesc}>Your 11-digit National Identity Number is required for advanced verification.</Text>
-                                
-                                <View style={s.inputContainer}>
-                                    <TextInput 
-                                        value={nin} 
-                                        onChangeText={setNin} 
-                                        placeholder="00000000000" 
-                                        placeholderTextColor="#94a3b8"
-                                        style={s.textInput} 
-                                        keyboardType="numeric"
-                                        maxLength={11}
-                                    />
+                            <View style={[s.stepTab, tier === 1 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier === 1 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    <Text style={[s.stepNum, tier === 1 ? s.stepNumActive : s.stepNumInactive]}>2</Text>
                                 </View>
-
-                                <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                    {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
-                                        <Text style={s.actionButtonText}>VERIFY NIN</Text>
-                                    )}
-                                </TouchableOpacity>
+                                <Text style={[s.stepText, tier === 1 ? s.stepTextActive : s.stepTextInactive]}>NIN</Text>
                             </View>
-                        )}
 
-                        {tier === 2 && (
-                            <View style={s.cleanCard}>
-                                <Text style={s.cleanCardTitle}>Facial Check</Text>
-                                <Text style={s.cleanCardDesc}>Take a clear selfie to finalize your identity verification process.</Text>
-                                
-                                <View style={s.selfieBox}>
-                                    {selfie ? (
-                                        <Image source={{ uri: selfie }} style={s.selfieImage} />
-                                    ) : (
-                                        <View style={s.selfieEmpty} />
-                                    )}
+                            <View style={s.stepLine} />
+
+                            <View style={[s.stepTab, tier === 2 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier === 2 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    <Text style={[s.stepNum, tier === 2 ? s.stepNumActive : s.stepNumInactive]}>3</Text>
                                 </View>
+                                <Text style={[s.stepText, tier === 2 ? s.stepTextActive : s.stepTextInactive]}>FACE</Text>
+                            </View>
+                        </View>
 
-                                <TouchableOpacity 
-                                    onPress={async () => {
-                                        if (!permission?.granted) {
-                                            const { granted } = await requestPermission();
-                                            if (!granted) return Alert.alert("Permission Required", "Camera access needed.");
-                                        }
-                                        setShowCamera(true);
-                                    }} 
-                                    style={s.secondaryButton}
-                                >
-                                    <Text style={s.secondaryButtonText}>{selfie ? 'RETAKE PHOTO' : 'OPEN CAMERA'}</Text>
-                                </TouchableOpacity>
+                        {pendingRequest ? (
+                            <View style={s.card}>
+                                <View style={s.iconWrapper}>
+                                    <Ionicons name="time" size={32} color={GOLD} />
+                                </View>
+                                <Text style={s.cardTitle}>Under Review</Text>
+                                <Text style={s.cardDesc}>Your document has been submitted and is currently under review by our team. You will be notified once it is approved.</Text>
+                            </View>
+                        ) : (
+                            <View>
+                            {tier === 0 && (
+                                <View style={s.card}>
+                                    <View style={s.iconWrapper}>
+                                        <Ionicons name="card" size={28} color={NAVY} />
+                                    </View>
+                                    <Text style={s.cardTitle}>Bank Verification Number</Text>
+                                    <Text style={s.cardDesc}>Enter your 11-digit BVN to instantly generate your Virtual Account. This does not give us access to your money.</Text>
+                                    
+                                    <View style={s.inputContainer}>
+                                        <TextInput 
+                                            value={bvn} 
+                                            onChangeText={setBvn} 
+                                            placeholder="Enter 11-digit BVN" 
+                                            placeholderTextColor="#94a3b8"
+                                            style={s.textInput} 
+                                            keyboardType="numeric"
+                                            maxLength={11}
+                                        />
+                                    </View>
 
-                                {selfie && (
-                                    <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8} style={s.actionButton}>
-                                        {verifying ? <ActivityIndicator color="#0d1b3e" /> : (
-                                            <Text style={s.actionButtonText}>COMPLETE VERIFICATION</Text>
+                                    <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
+                                        {verifying ? <ActivityIndicator color="#ffffff" /> : (
+                                            <Text style={s.actionBtnText}>Verify & Continue</Text>
                                         )}
                                     </TouchableOpacity>
-                                )}
+                                </View>
+                            )}
+
+                            {tier === 1 && (
+                                <View style={s.card}>
+                                    <View style={s.iconWrapper}>
+                                        <Ionicons name="id-card" size={28} color={NAVY} />
+                                    </View>
+                                    <Text style={s.cardTitle}>National Identity Number</Text>
+                                    <Text style={s.cardDesc}>Provide your 11-digit NIN for advanced security profiling and higher limits.</Text>
+                                    
+                                    <View style={s.inputContainer}>
+                                        <TextInput 
+                                            value={nin} 
+                                            onChangeText={setNin} 
+                                            placeholder="Enter 11-digit NIN" 
+                                            placeholderTextColor="#94a3b8"
+                                            style={s.textInput} 
+                                            keyboardType="numeric"
+                                            maxLength={11}
+                                        />
+                                    </View>
+
+                                    <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
+                                        {verifying ? <ActivityIndicator color="#ffffff" /> : (
+                                            <Text style={s.actionBtnText}>Verify NIN</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {tier === 2 && (
+                                <View style={s.card}>
+                                    <View style={s.iconWrapper}>
+                                        <Ionicons name="scan" size={28} color={NAVY} />
+                                    </View>
+                                    <Text style={s.cardTitle}>Face Verification</Text>
+                                    <Text style={s.cardDesc}>Take a clear selfie to prove your identity. Ensure you are in a well-lit environment.</Text>
+                                    
+                                    <View style={s.selfieBox}>
+                                        {selfie ? (
+                                            <Image source={{ uri: selfie }} style={s.selfieImage} />
+                                        ) : (
+                                            <View style={s.selfieEmpty}>
+                                                <Ionicons name="camera-outline" size={40} color="#cbd5e1" />
+                                                <Text style={s.selfieEmptyText}>No photo captured</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <TouchableOpacity onPress={handleOpenCamera} style={s.secondaryBtn} activeOpacity={0.7}>
+                                        <Ionicons name="camera" size={18} color={NAVY} style={{marginRight: 8}} />
+                                        <Text style={s.secondaryBtnText}>{selfie ? 'Retake Photo' : 'Open Camera'}</Text>
+                                    </TouchableOpacity>
+
+                                    {selfie && (
+                                        <TouchableOpacity onPress={submitLiveness} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
+                                            {verifying ? <ActivityIndicator color="#ffffff" /> : (
+                                                <Text style={s.actionBtnText}>Submit Verification</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
                             </View>
                         )}
-                        </View>
-                    )}
 
-                    {tier >= 3 && (
-                        <View style={s.cleanCard}>
-                            <Text style={s.cleanCardTitle}>Verification Complete</Text>
-                            <Text style={s.cleanCardDesc}>Your account is fully verified and you have unrestricted access.</Text>
-                            
-                            <View style={s.successBox}>
-                                <Text style={s.successBoxText}>ALL SYSTEMS ACTIVE</Text>
+                        {tier >= 3 && (
+                            <View style={s.successCard}>
+                                <View style={s.successIconBox}>
+                                    <Ionicons name="checkmark-done" size={40} color="#10b981" />
+                                </View>
+                                <Text style={s.successTitle}>Fully Verified</Text>
+                                <Text style={s.successDesc}>Congratulations! Your account is fully verified. You now have unrestricted access to all premium features.</Text>
+                                
+                                <TouchableOpacity onPress={() => router.replace('/')} style={[s.actionBtn, {marginTop: 24}]} activeOpacity={0.8}>
+                                    <Text style={s.actionBtnText}>Go to Dashboard</Text>
+                                </TouchableOpacity>
                             </View>
-                        </View>
-                    )}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                        )}
 
-            <Modal visible={showCamera} animationType="slide" transparent={false} onRequestClose={() => setShowCamera(false)}>
-                 <View style={s.cameraModalContainer}>
-                     <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
-                     
-                     <SafeAreaView style={s.cameraOverlayWrapper}>
-                         <View style={s.cameraTopBar}>
-                            <TouchableOpacity onPress={() => setShowCamera(false)} style={s.cameraBackBtn}>
-                                <Text style={s.cameraBackText}>CANCEL</Text>
-                            </TouchableOpacity>
-                         </View>
-                         
-                         <View style={s.cameraBottomBar}>
-                            <TouchableOpacity onPress={takeSelfie} style={s.cameraCaptureBtn}>
-                                <View style={s.cameraCaptureInner} />
-                            </TouchableOpacity>
-                         </View>
-                     </SafeAreaView>
-                 </View>
-            </Modal>
-        </SafeAreaView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+
+                {/* Camera Modal */}
+                <Modal visible={showCamera} animationType="slide" transparent={false} onRequestClose={() => setShowCamera(false)}>
+                    <View style={s.cameraModalContainer}>
+                        <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
+                        
+                        <SafeAreaView style={s.cameraOverlayWrapper} edges={['top', 'bottom']}>
+                            {/* Overlay Header */}
+                            <View style={s.cameraTopBar}>
+                                <TouchableOpacity onPress={() => setShowCamera(false)} style={s.cameraBackBtn}>
+                                    <Ionicons name="close" size={24} color="#ffffff" />
+                                </TouchableOpacity>
+                                <Text style={s.cameraHelpText}>Position your face inside the frame</Text>
+                                <View style={{width: 40}} />
+                            </View>
+                            
+                            {/* Face Frame Overlay */}
+                            <View style={s.faceFrameContainer}>
+                                <View style={s.faceFrame} />
+                            </View>
+
+                            {/* Overlay Footer */}
+                            <View style={s.cameraBottomBar}>
+                                <TouchableOpacity onPress={takeSelfie} style={s.cameraCaptureBtn}>
+                                    <View style={s.cameraCaptureInner} />
+                                </TouchableOpacity>
+                            </View>
+                        </SafeAreaView>
+                    </View>
+                </Modal>
+            </SafeAreaView>
+        </View>
     );
 }
 
 const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f8f9fc' },
-    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1b3e' },
+    container: { flex: 1, backgroundColor: '#f4f6fb' },
+    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: NAVY },
     
-    brandedHeaderBg: { backgroundColor: '#0d1b3e', paddingBottom: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5, marginBottom: 24 },
-    topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
-    backBtn: { width: 40, height: 40, justifyContent: 'center' },
+    bgHeader: { position: 'absolute', top: 0, left: 0, right: 0, height: 280, borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
+    bgBody: { position: 'absolute', top: 280, left: 0, right: 0, bottom: 0, backgroundColor: '#f4f6fb' },
     
-    headerSection: { paddingHorizontal: 24 },
-    titleText: { fontSize: 32, fontWeight: '900', color: '#ffffff', letterSpacing: 1, textTransform: 'uppercase' },
-    titleTextLight: { fontSize: 32, fontWeight: '300', color: '#f5a623', letterSpacing: 1, marginTop: -8, textTransform: 'uppercase' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 10 : 20, paddingBottom: 20 },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#ffffff' },
     
-    scrollContent: { paddingHorizontal: 24, paddingBottom: 60 },
+    scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
     
-    stepperRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
-    stepTab: { flex: 1, paddingVertical: 12, borderBottomWidth: 3 },
-    stepTabActive: { borderBottomColor: '#f5a623' },
-    stepTabInactive: { borderBottomColor: '#e2e8f0' },
-    stepTabText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, textAlign: 'center' },
-    stepTabTextActive: { color: '#0d1b3e' },
-    stepTabTextInactive: { color: '#94a3b8' },
-
-    cleanCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: '#f1f5f9' },
-    cleanCardTitle: { fontSize: 20, fontWeight: '900', color: '#0d1b3e', marginBottom: 8 },
-    cleanCardDesc: { fontSize: 13, color: '#64748b', lineHeight: 20, marginBottom: 24 },
-
-    inputContainer: { marginBottom: 32 },
-    textInput: { height: 56, backgroundColor: '#f8f9fc', borderRadius: 12, paddingHorizontal: 20, fontSize: 18, fontWeight: '700', color: '#0d1b3e', letterSpacing: 2, borderWidth: 1, borderColor: '#e2e8f0' },
-
-    actionButton: { height: 56, backgroundColor: '#f5a623', justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5 },
-    actionButtonText: { color: '#0d1b3e', fontSize: 13, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
-
-    secondaryButton: { height: 56, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', borderRadius: 12, marginBottom: 16 },
-    secondaryButtonText: { color: '#0d1b3e', fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-
-    selfieBox: { width: '100%', aspectRatio: 1, backgroundColor: '#f8f9fc', marginBottom: 32, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0' },
+    introBlock: { marginTop: 10, marginBottom: 30, alignItems: 'center' },
+    introTitle: { fontSize: 26, fontWeight: '800', color: '#ffffff', marginBottom: 6 },
+    introDesc: { fontSize: 14, color: 'rgba(255,255,255,0.8)', textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
+    
+    stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 30, paddingHorizontal: 10 },
+    stepTab: { alignItems: 'center', opacity: 0.5 },
+    stepTabActive: { opacity: 1 },
+    stepTabInactive: { opacity: 0.5 },
+    stepCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 6, borderWidth: 2 },
+    stepCircleActive: { backgroundColor: GOLD, borderColor: GOLD },
+    stepCircleInactive: { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.3)' },
+    stepNum: { fontSize: 12, fontWeight: '800' },
+    stepNumActive: { color: NAVY },
+    stepNumInactive: { color: '#ffffff' },
+    stepText: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+    stepTextActive: { color: GOLD },
+    stepTextInactive: { color: 'rgba(255,255,255,0.6)' },
+    stepLine: { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 10, alignSelf: 'flex-start', marginTop: 15 },
+    
+    card: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, shadowColor: NAVY, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
+    iconWrapper: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    cardTitle: { fontSize: 20, fontWeight: '800', color: NAVY, marginBottom: 8 },
+    cardDesc: { fontSize: 13, color: '#64748b', lineHeight: 20, marginBottom: 24 },
+    
+    inputContainer: { marginBottom: 24 },
+    textInput: { height: 56, backgroundColor: '#f8f9fc', borderRadius: 16, paddingHorizontal: 20, fontSize: 16, fontWeight: '600', color: NAVY, letterSpacing: 2, borderWidth: 1, borderColor: '#e2e8f0' },
+    
+    actionBtn: { height: 56, backgroundColor: NAVY, justifyContent: 'center', alignItems: 'center', borderRadius: 16, shadowColor: NAVY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    actionBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+    
+    secondaryBtn: { flexDirection: 'row', height: 52, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', borderRadius: 14, marginBottom: 16 },
+    secondaryBtnText: { color: NAVY, fontSize: 14, fontWeight: '700' },
+    
+    selfieBox: { width: '100%', aspectRatio: 1, backgroundColor: '#f8f9fc', marginBottom: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed' },
     selfieImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    selfieEmpty: { width: '100%', height: '100%' },
-
-    successBox: { padding: 16, backgroundColor: '#ecfdf5', alignItems: 'center', marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0' },
-    successBoxText: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: '#059669' },
+    selfieEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+    selfieEmptyText: { color: '#94a3b8', fontSize: 12, fontWeight: '600', marginTop: 8 },
+    
+    successCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 30, alignItems: 'center', shadowColor: NAVY, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
+    successIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    successTitle: { fontSize: 24, fontWeight: '800', color: NAVY, marginBottom: 12, textAlign: 'center' },
+    successDesc: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22 },
 
     cameraModalContainer: { flex: 1, backgroundColor: '#000' },
-    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between' },
-    cameraTopBar: { padding: 24, alignItems: 'flex-start' },
-    cameraBackBtn: { paddingVertical: 12, paddingHorizontal: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12 },
-    cameraBackText: { color: 'white', fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-    cameraBottomBar: { paddingBottom: 60, alignItems: 'center' },
-    cameraCaptureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
-    cameraCaptureInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'white' }
+    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between', zIndex: 10 },
+    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 },
+    cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+    cameraHelpText: { color: '#ffffff', fontSize: 14, fontWeight: '600', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    faceFrameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    faceFrame: { width: 280, height: 350, borderRadius: 140, borderWidth: 3, borderColor: GOLD, backgroundColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 },
+    cameraBottomBar: { paddingBottom: 50, alignItems: 'center' },
+    cameraCaptureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#ffffff' },
+    cameraCaptureInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff' }
 });
