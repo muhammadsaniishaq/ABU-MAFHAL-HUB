@@ -93,7 +93,7 @@ export default function KYC() {
 
             if (payload.fileUri) {
                 const base64 = await FileSystem.readAsStringAsync(payload.fileUri, {
-                    encoding: FileSystem.EncodingType.Base64,
+                    encoding: 'base64',
                 });
                 
                 const fileExt = payload.fileUri.split('.').pop() || 'jpg';
