@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { BlurView } from 'expo-blur';
 
@@ -242,28 +242,24 @@ export default function KYC() {
     const startLivenessSequence = () => {
         setLivenessStep(0);
         setIsAutoCapturing(false);
-        
-        speakMsg('Position your face inside the frame');
-        
-        setTimeout(() => {
+        speakMsg('Position your face inside the frame and tap ready');
+    };
+
+    const nextLivenessStep = () => {
+        if (livenessStep === 0) {
             setLivenessStep(1);
-            speakMsg('Please blink your eyes');
-            
+            speakMsg('Please blink your eyes, then tap next');
+        } else if (livenessStep === 1) {
+            setLivenessStep(2);
+            speakMsg('Now, turn your head slightly, then tap next');
+        } else if (livenessStep === 2) {
+            setLivenessStep(3);
+            speakMsg('Hold still, capturing');
+            setIsAutoCapturing(true);
             setTimeout(() => {
-                setLivenessStep(2);
-                speakMsg('Now, turn your head slightly');
-                
-                setTimeout(() => {
-                    setLivenessStep(3);
-                    speakMsg('Hold still, capturing');
-                    setIsAutoCapturing(true);
-                    
-                    setTimeout(() => {
-                        takeAutoSelfie();
-                    }, 1500);
-                }, 3000);
-            }, 3000);
-        }, 3500);
+                takeAutoSelfie();
+            }, 2000);
+        }
     };
 
     const takeAutoSelfie = async () => {
@@ -477,39 +473,52 @@ export default function KYC() {
                     </ScrollView>
                 </KeyboardAvoidingView>
 
-                {/* Glassmorphism Camera Modal */}
-                <Modal visible={showCamera} animationType="fade" transparent={true} onRequestClose={() => setShowCamera(false)}>
+                {/* Modernized Camera Modal */}
+                <Modal visible={showCamera} animationType="slide" transparent={true} onRequestClose={() => setShowCamera(false)}>
                     <View style={s.cameraModalContainer}>
                         <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
                         
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject}>
-                            <SafeAreaView style={s.cameraOverlayWrapper} edges={['top', 'bottom']}>
-                                <View style={s.cameraTopBar}>
-                                    <TouchableOpacity onPress={() => { Speech.stop(); setShowCamera(false); }} style={s.cameraBackBtn}>
-                                        <Ionicons name="close" size={24} color="#ffffff" />
-                                    </TouchableOpacity>
-                                    <View style={s.cameraHelpBadge}>
-                                        <Text style={s.cameraHelpText}>Auto Capture</Text>
-                                    </View>
-                                    <View style={{width: 44}}/>
-                                </View>
-                                
-                                <View style={s.faceFrameContainer}>
-                                    <View style={[s.faceFrame, isAutoCapturing ? {borderColor: '#10b981', transform: [{scale: 1.05}]} : {borderColor: GOLD}]} />
-                                </View>
+                        {/* Dark semi-transparent overlay to dim the background, without blurring the face */}
+                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
 
-                                <View style={s.cameraBottomBar}>
-                                    <BlurView intensity={40} tint="light" style={s.livenessMsgBox}>
-                                        {isAutoCapturing ? (
-                                            <ActivityIndicator color={NAVY} style={{marginRight: 10}} />
-                                        ) : (
-                                            <Ionicons name={livenessStep === 1 ? "eye" : livenessStep === 2 ? "sync" : "person"} size={24} color={NAVY} style={{marginRight: 10}} />
-                                        )}
-                                        <Text style={s.livenessMsgText}>{livenessMessage}</Text>
-                                    </BlurView>
+                        <SafeAreaView style={s.cameraOverlayWrapper} edges={['top', 'bottom']}>
+                            <View style={s.cameraTopBar}>
+                                <TouchableOpacity onPress={() => { Speech.stop(); setShowCamera(false); }} style={s.cameraBackBtn}>
+                                    <Ionicons name="close" size={24} color="#ffffff" />
+                                </TouchableOpacity>
+                                <View style={s.cameraHelpBadge}>
+                                    <Text style={s.cameraHelpText}>Liveness Check</Text>
                                 </View>
-                            </SafeAreaView>
-                        </BlurView>
+                                <View style={{width: 44}}/>
+                            </View>
+                            
+                            <View style={s.faceFrameContainer}>
+                                {/* Using a clear center with solid border to create a "hole" effect */}
+                                <View style={[s.faceFrame, isAutoCapturing ? {borderColor: '#10b981', transform: [{scale: 1.05}]} : {borderColor: GOLD}]} />
+                            </View>
+
+                            <View style={s.cameraBottomBar}>
+                                <View style={s.livenessCard}>
+                                    {isAutoCapturing ? (
+                                        <ActivityIndicator color={GOLD} size="large" style={{marginBottom: 12}} />
+                                    ) : (
+                                        <View style={s.livenessIconCircle}>
+                                            <Ionicons name={livenessStep === 1 ? "eye" : livenessStep === 2 ? "sync" : "person"} size={36} color={GOLD} />
+                                        </View>
+                                    )}
+                                    <Text style={s.livenessTitle}>
+                                        {livenessStep === 1 ? "Blink Your Eyes" : livenessStep === 2 ? "Turn Head Slightly" : isAutoCapturing ? "Hold Still" : "Position Face"}
+                                    </Text>
+                                    <Text style={s.livenessMsgText}>{livenessMessage}</Text>
+                                    
+                                    {!isAutoCapturing && (
+                                        <TouchableOpacity style={s.livenessBtn} onPress={nextLivenessStep} activeOpacity={0.8}>
+                                            <Text style={s.livenessBtnText}>{livenessStep === 0 ? "I'm Ready" : "Next"}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        </SafeAreaView>
                     </View>
                 </Modal>
             </SafeAreaView>
@@ -566,17 +575,21 @@ const s = StyleSheet.create({
     
     successIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
 
-    cameraModalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)' },
-    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between', zIndex: 10 },
-    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 },
-    cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-    cameraHelpBadge: { backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    cameraHelpText: { color: GOLD, fontSize: 13, fontWeight: '700', letterSpacing: 1 },
+    cameraModalContainer: { flex: 1, backgroundColor: '#000' },
+    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between', zIndex: 10, ...StyleSheet.absoluteFillObject },
+    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 50 : 30 },
+    cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+    cameraHelpBadge: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: GOLD },
+    cameraHelpText: { color: GOLD, fontSize: 13, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     
     faceFrameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    faceFrame: { width: 280, height: 380, borderRadius: 140, borderWidth: 3, backgroundColor: 'transparent', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 },
+    faceFrame: { width: 280, height: 380, borderRadius: 140, borderWidth: 4, backgroundColor: 'transparent', shadowColor: GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 20 },
     
-    cameraBottomBar: { paddingBottom: 60, alignItems: 'center', paddingHorizontal: 20 },
-    livenessMsgBox: { flexDirection: 'row', paddingVertical: 18, paddingHorizontal: 28, borderRadius: 30, alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-    livenessMsgText: { color: NAVY, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }
+    cameraBottomBar: { paddingBottom: 50, alignItems: 'center', paddingHorizontal: 20 },
+    livenessCard: { width: '100%', backgroundColor: 'rgba(13, 27, 62, 0.95)', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.4)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10 },
+    livenessIconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.2)' },
+    livenessTitle: { color: '#ffffff', fontSize: 22, fontWeight: '900', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' },
+    livenessMsgText: { color: 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: '500', textAlign: 'center', lineHeight: 22, paddingHorizontal: 10 },
+    livenessBtn: { backgroundColor: GOLD, paddingHorizontal: 36, paddingVertical: 14, borderRadius: 20, marginTop: 20, shadowColor: GOLD, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+    livenessBtnText: { color: NAVY, fontWeight: '900', fontSize: 16, letterSpacing: 1, textTransform: 'uppercase' }
 });

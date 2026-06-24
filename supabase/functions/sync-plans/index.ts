@@ -170,18 +170,41 @@ Deno.serve(async (req) => {
                     }
                     finalSellingPrice = Math.round(finalSellingPrice);
                     
-                    const { error: upsertError } = await supabaseAdmin.from('data_plans').upsert({
-                            network: networkName,
-                            plan_id: planId,
-                            name: name,
-                            cost_price: costPrice,
-                            selling_price: finalSellingPrice,
-                            is_active: true
-                    }, { onConflict: 'plan_id' });
+                    // We manually check for existing plan because 'plan_id' might not have a unique constraint
+                    const { data: existingPlan } = await supabaseAdmin.from('data_plans')
+                        .select('id')
+                        .eq('network', networkName)
+                        .eq('plan_id', planId)
+                        .maybeSingle();
 
-                    if (upsertError) {
-                        console.error(`Insert Failed for ${planId}:`, upsertError);
-                        networksFound.push(`Error ${planId}: ${upsertError.message}`);
+                    let opError = null;
+
+                    if (existingPlan) {
+                        const { error } = await supabaseAdmin.from('data_plans')
+                            .update({
+                                name: name,
+                                cost_price: costPrice,
+                                selling_price: finalSellingPrice,
+                                is_active: true
+                            })
+                            .eq('id', existingPlan.id);
+                        opError = error;
+                    } else {
+                        const { error } = await supabaseAdmin.from('data_plans')
+                            .insert({
+                                network: networkName,
+                                plan_id: planId,
+                                name: name,
+                                cost_price: costPrice,
+                                selling_price: finalSellingPrice,
+                                is_active: true
+                            });
+                        opError = error;
+                    }
+
+                    if (opError) {
+                        console.error(`Operation Failed for ${planId}:`, opError);
+                        networksFound.push(`Error ${planId}: ${opError.message}`);
                     } else {
                         totalInserted++;
                     }

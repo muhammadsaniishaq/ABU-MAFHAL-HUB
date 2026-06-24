@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
@@ -42,8 +42,8 @@ export default function PinSetupScreen() {
                     if (data?.transaction_pin) {
                         savedPin = data.transaction_pin;
                         // Save it back locally
-                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', savedPin);
-                        else await SecureStore.setItemAsync('user_transaction_pin', savedPin);
+                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', savedPin as string);
+                        else await SecureStore.setItemAsync('user_transaction_pin', savedPin as string);
                     }
                 }
             }

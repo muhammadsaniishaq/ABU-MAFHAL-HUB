@@ -1,4 +1,4 @@
-import { View, Text, Switch, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, Switch, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
@@ -283,6 +283,6 @@ const s = StyleSheet.create({
     apiGroup: { marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
     apiGroupTitle: { fontSize: 14, fontWeight: '900', color: '#f5a623', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
 
-    primaryBtn: { height: 56, backgroundColor: '#f5a623', justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5, mt: 8 },
+    primaryBtn: { height: 56, backgroundColor: '#f5a623', justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 5, marginTop: 8 },
     primaryBtnText: { color: '#0d1b3e', fontSize: 13, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
 });

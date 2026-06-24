@@ -50,9 +50,22 @@ Deno.serve(async (req: Request) => {
 
         // --- PAYVESSEL HANDLER ---
         if (payvesselSignature) {
-            const PAYVESSEL_API_SECRET = Deno.env.get('PAYVESSEL_API_SECRET');
+            let PAYVESSEL_API_SECRET = Deno.env.get('PAYVESSEL_API_SECRET');
+            
+            // Fallback to system_secrets if not in Deno.env
             if (!PAYVESSEL_API_SECRET) {
-                console.error("[CRITICAL] PAYVESSEL_API_SECRET not set");
+                const { data: secrets } = await supabaseAdmin
+                    .from('system_secrets')
+                    .select('value')
+                    .eq('key', 'PAYVESSEL_API_SECRET')
+                    .single();
+                if (secrets && secrets.value) {
+                    PAYVESSEL_API_SECRET = secrets.value;
+                }
+            }
+
+            if (!PAYVESSEL_API_SECRET) {
+                console.error("[CRITICAL] PAYVESSEL_API_SECRET not set in Deno.env or system_secrets");
                 return new Response("Provider Config Error", { status: 500 });
             }
 

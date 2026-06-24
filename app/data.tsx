@@ -109,6 +109,14 @@ export default function DataScreen() {
     const [showRolloverTips, setShowRolloverTips] = useState(false);
     const [giftingBeneficiaryActive, setGiftingBeneficiaryActive] = useState(false);
     
+    // Modern segmented control state
+    const [purchaseMode, setPurchaseMode] = useState<'self' | 'others'>('self');
+    const [userPhone, setUserPhone] = useState<string>('');
+    
+    // Plan Type Dropdown State
+    const [planTypeFilter, setPlanTypeFilter] = useState<string>('All');
+    const [showPlanTypeModal, setShowPlanTypeModal] = useState(false);
+    
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
 
@@ -151,8 +159,18 @@ export default function DataScreen() {
     const fetchUserData = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-            if (data) setBalance(data.balance);
+            const { data } = await supabase.from('profiles').select('balance, phone').eq('id', user.id).single();
+            if (data) {
+                setBalance(data.balance);
+                if (data.phone) {
+                    setUserPhone(data.phone);
+                    // Pre-fill phone number if currently in 'self' mode
+                    if (purchaseMode === 'self' && !phoneNumber) {
+                        setPhoneNumber(data.phone);
+                        detectNetwork(data.phone);
+                    }
+                }
+            }
         }
     };
 
@@ -186,10 +204,23 @@ export default function DataScreen() {
         if (network) {
             fetchPlans(network);
             setSelectedPlan(null); // Reset selection
+            setPlanTypeFilter('All'); // Reset plan type filter on network change
+            setPlanFilter('All'); // Reset duration filter too
         } else {
             setPlans([]);
         }
     }, [network]);
+
+    // Update phone based on mode
+    useEffect(() => {
+        if (purchaseMode === 'self' && userPhone) {
+            setPhoneNumber(userPhone);
+            detectNetwork(userPhone);
+        } else if (purchaseMode === 'others') {
+            setPhoneNumber('');
+            setNetwork('');
+        }
+    }, [purchaseMode, userPhone, detectNetwork]);
 
     // Derived State: Filtered Plans
     const filteredPlans = plans.filter(p => {
@@ -204,6 +235,19 @@ export default function DataScreen() {
             if (gb < minVolumeFilter) {
                 return false;
             }
+        }
+        
+        // Plan Type Filter (Dynamic)
+        if (planTypeFilter !== 'All') {
+            const nameUpper = (p.originalName || p.name).toUpperCase();
+            let pType = 'Standard';
+            if (nameUpper.includes('SME')) pType = 'SME';
+            else if (nameUpper.includes('CG') || nameUpper.includes('CORPORATE')) pType = 'CG';
+            else if (nameUpper.includes('DIRECT') || nameUpper.includes('GIFTING')) pType = 'Direct';
+            else if (nameUpper.includes('AWOOF')) pType = 'Awoof';
+            else if (nameUpper.includes('MEGA')) pType = 'Mega';
+            
+            if (pType !== planTypeFilter) return false;
         }
 
         // Duration Filter
@@ -478,45 +522,69 @@ export default function DataScreen() {
                         })}
                     </View>
 
-                    {/* Phone Number Input */}
-                    <View style={s.sectionHeader}>
-                        <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
-                        <Text style={s.sectionTitle}>Phone Number</Text>
-                    </View>
-                    <View style={[s.inputBoxContainer, phoneNumber.length > 0 && s.inputBoxFocused]}>
-                        <View style={s.inputBoxLogoWrapper}>
-                            {network ? (
-                                <Image source={NETWORK_LOGOS[network]} style={s.inputBoxLogo as any} resizeMode="cover" />
-                            ) : (
-                                <Ionicons name="call-outline" size={18} color="#94a3b8" />
-                            )}
-                        </View>
-                        <TextInput
-                            style={s.textInput}
-                            keyboardType="phone-pad"
-                            placeholder="Enter 11-digit phone number"
-                            placeholderTextColor="#94a3b8"
-                            value={phoneNumber}
-                            onChangeText={handlePhoneChange}
-                            maxLength={11}
-                        />
+                    {/* Mode Segmented Control */}
+                    <View style={s.segmentContainer}>
                         <TouchableOpacity 
-                            onPress={() => {
-                                setGiftingBeneficiaryActive(false);
-                                setShowBeneficiaryModal(true);
-                            }}
-                            style={s.beneficiaryBtn}
-                            activeOpacity={0.7}
+                            style={[s.segmentBtn, purchaseMode === 'self' && s.segmentBtnActive]}
+                            onPress={() => setPurchaseMode('self')}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="people" size={18} color="#0056D2" />
+                            <Ionicons name="person" size={16} color={purchaseMode === 'self' ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                            <Text style={[s.segmentText, purchaseMode === 'self' && s.segmentTextActive]}>Buy for Me</Text>
                         </TouchableOpacity>
-
-                        {phoneNumber.length > 0 && (
-                            <TouchableOpacity onPress={() => handlePhoneChange('')} style={s.clearBtn}>
-                                <Ionicons name="close-circle" size={18} color="#D1D5DB" />
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                            style={[s.segmentBtn, purchaseMode === 'others' && s.segmentBtnActive]}
+                            onPress={() => setPurchaseMode('others')}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="people" size={16} color={purchaseMode === 'others' ? '#ffffff' : '#64748b'} style={{ marginRight: 6 }} />
+                            <Text style={[s.segmentText, purchaseMode === 'others' && s.segmentTextActive]}>Buy for Others</Text>
+                        </TouchableOpacity>
                     </View>
+
+                    {/* Phone Number Input */}
+                    {purchaseMode === 'others' && (
+                        <View>
+                            <View style={s.sectionHeader}>
+                                <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                <Text style={s.sectionTitle}>Phone Number</Text>
+                            </View>
+                            <View style={[s.inputBoxContainer, phoneNumber.length > 0 && s.inputBoxFocused]}>
+                                <View style={s.inputBoxLogoWrapper}>
+                                    {network ? (
+                                        <Image source={NETWORK_LOGOS[network]} style={s.inputBoxLogo as any} resizeMode="cover" />
+                                    ) : (
+                                        <Ionicons name="call-outline" size={18} color="#94a3b8" />
+                                    )}
+                                </View>
+                                <TextInput
+                                    style={s.textInput}
+                                    keyboardType="phone-pad"
+                                    placeholder="Enter 11-digit phone number"
+                                    placeholderTextColor="#94a3b8"
+                                    value={phoneNumber}
+                                    onChangeText={handlePhoneChange}
+                                    maxLength={11}
+                                />
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setGiftingBeneficiaryActive(false);
+                                        setShowBeneficiaryModal(true);
+                                    }}
+                                    style={s.beneficiaryBtn}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="people" size={18} color="#0056D2" />
+                                </TouchableOpacity>
+
+                                {phoneNumber.length > 0 && (
+                                    <TouchableOpacity onPress={() => handlePhoneChange('')} style={s.clearBtn}>
+                                        <Ionicons name="close-circle" size={18} color="#D1D5DB" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    )}
 
                     {/* USSD Check Codes Collapsible Card */}
                     <View style={s.ussdContainer}>
@@ -741,6 +809,26 @@ export default function DataScreen() {
                         <View>
                             {plans.length > 0 && (
                                 <View style={{ marginBottom: 20 }}>
+                                
+                                    {/* Plan Type Dropdown */}
+                                    <View style={s.sectionHeader}>
+                                        <Ionicons name="list-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
+                                        <Text style={s.sectionTitle}>Select Plan Type</Text>
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={s.dropdownBtn}
+                                        onPress={() => setShowPlanTypeModal(true)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="cellular" size={18} color="#0056D2" style={{ marginRight: 8 }} />
+                                            <Text style={s.dropdownBtnText}>
+                                                {planTypeFilter === 'All' ? 'All Plan Types (SME, CG, Direct...)' : `${planTypeFilter} Plans`}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-down" size={20} color="#64748b" />
+                                    </TouchableOpacity>
+
                                     {/* Search Bar */}
                                     <View style={{
                                         flexDirection: 'row',
@@ -834,68 +922,84 @@ export default function DataScreen() {
                                      </Text>
                                  </View>
                             ) : (
-                                <View style={s.plansContainer}>
+                                <View style={s.plansListContainer}>
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
                                         const isBestValue = (plan.validity.toLowerCase().includes('30') && plan.price < 1000);
                                         const isMega = plan.name.toLowerCase().includes('mega');
                                         
+                                        // Extract Data Volume for beautiful display
+                                        const gbVol = parseVolumeToGB(plan.volume, plan.originalName || plan.name);
+                                        let displayVol = gbVol > 0 ? (gbVol >= 1 ? `${gbVol}GB` : `${gbVol * 1024}MB`) : '';
+                                        
                                         return (
-                                        <View key={plan.id} style={s.planCardWrapper}>
-                                            <TouchableOpacity
-                                                onPress={() => setSelectedPlan(plan)}
-                                                style={[s.planCard, isSelected && s.planCardSelected]}
-                                                activeOpacity={0.7}
+                                        <TouchableOpacity
+                                            key={plan.id}
+                                            onPress={() => setSelectedPlan(plan)}
+                                            style={[s.planListCard, isSelected && s.planListCardSelected]}
+                                            activeOpacity={0.7}
+                                        >
+                                            <LinearGradient
+                                                colors={isSelected ? ['#102258', '#0b163a'] : ['#ffffff', '#ffffff']}
+                                                style={s.planListCardGradient}
                                             >
-                                                <LinearGradient
-                                                    colors={isSelected ? ['#102258', '#0b163a'] : ['#ffffff', '#ffffff']}
-                                                    style={s.planCardGradient}
-                                                >
-                                                    {isBestValue && (
-                                                        <View style={s.bestValueBadge}>
-                                                            <Text style={s.bestValueText}>BEST VALUE</Text>
-                                                        </View>
+                                                {/* Left: Volume Badge */}
+                                                <View style={[s.planVolumeBadge, isSelected && s.planVolumeBadgeSelected]}>
+                                                    {displayVol ? (
+                                                        <>
+                                                            <Text style={[s.planVolumeValue, isSelected && { color: '#ffffff' }]}>
+                                                                {displayVol.replace(/[a-zA-Z]+/g, '')}
+                                                            </Text>
+                                                            <Text style={[s.planVolumeUnit, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>
+                                                                {displayVol.replace(/[0-9.]+/g, '')}
+                                                            </Text>
+                                                        </>
+                                                    ) : (
+                                                        <Ionicons name="wifi" size={24} color={isSelected ? '#ffffff' : '#0d1b3e'} />
                                                     )}
-                                                    {isMega && (
-                                                        <View style={[s.bestValueBadge, { backgroundColor: '#8b5cf6' }]}>
-                                                            <Text style={s.bestValueText}>MEGA</Text>
-                                                        </View>
-                                                    )}
-
-                                                    <View style={s.planValidityContainer}>
-                                                        <View style={[s.validityBadge, isSelected && s.validityBadgeSelected]}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <Ionicons 
-                                                                    name="time-outline" 
-                                                                    size={10} 
-                                                                    color={isSelected ? '#ffffff' : '#64748b'} 
-                                                                    style={{ marginRight: 3 }} 
-                                                                />
-                                                                <Text style={[s.validityText, isSelected && s.validityTextSelected]}>
-                                                                    {plan.validity}
-                                                                </Text>
+                                                </View>
+                                                
+                                                {/* Middle: Details */}
+                                                <View style={s.planDetailsMid}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                                        <Text style={[s.planListName, isSelected && s.planListNameSelected]} numberOfLines={2}>
+                                                            {plan.name}
+                                                        </Text>
+                                                        {isBestValue && (
+                                                            <View style={[s.tinyBadge, { backgroundColor: '#f97316' }]}>
+                                                                <Text style={s.tinyBadgeText}>BEST VALUE</Text>
                                                             </View>
-                                                        </View>
-                                                        
-                                                        <TouchableOpacity onPress={() => toggleFavorite(plan.id)} style={{ padding: 4 }}>
-                                                            <Ionicons 
-                                                                name={isFav ? "heart" : "heart-outline"} 
-                                                                size={18} 
-                                                                color={isFav ? (isSelected ? "#f87171" : "#ef4444") : (isSelected ? "rgba(255,255,255,0.4)" : "#94a3b8")} 
-                                                            />
-                                                        </TouchableOpacity>
+                                                        )}
+                                                        {isMega && (
+                                                            <View style={[s.tinyBadge, { backgroundColor: '#8b5cf6' }]}>
+                                                                <Text style={s.tinyBadgeText}>MEGA</Text>
+                                                            </View>
+                                                        )}
                                                     </View>
-                                                    
-                                                    <Text style={[s.planName, isSelected && s.planNameSelected]} numberOfLines={2}>
-                                                        {plan.name}
-                                                    </Text>
-                                                    <Text style={[s.planPrice, isSelected && s.planPriceSelected]}>
+                                                    <View style={s.planListValidityContainer}>
+                                                        <Ionicons name="time-outline" size={10} color={isSelected ? '#fde047' : '#64748b'} style={{ marginRight: 3 }} />
+                                                        <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
+                                                            {plan.validity}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                {/* Right: Price & Fav */}
+                                                <View style={s.planRightSide}>
+                                                    <Text style={[s.planListPrice, isSelected && s.planListPriceSelected]}>
                                                         ₦{plan.price.toLocaleString()}
                                                     </Text>
-                                                </LinearGradient>
-                                            </TouchableOpacity>
-                                        </View>
+                                                    <TouchableOpacity onPress={() => toggleFavorite(plan.id)} style={{ padding: 4 }}>
+                                                        <Ionicons 
+                                                            name={isFav ? "heart" : "heart-outline"} 
+                                                            size={20} 
+                                                            color={isFav ? (isSelected ? "#f87171" : "#ef4444") : (isSelected ? "rgba(255,255,255,0.4)" : "#94a3b8")} 
+                                                        />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </LinearGradient>
+                                        </TouchableOpacity>
                                     )})}
                                     
                                     {plans.length > 0 && filteredPlans.length === 0 && (
@@ -1134,8 +1238,81 @@ export default function DataScreen() {
                 description={selectedPlan ? `Confirm purchase of ${selectedPlan.name} for ${phoneNumber} @ ₦${selectedPlan.price}` : "Enter PIN"}
                 requiredFor="purchase"
             />
+            
+            <PlanTypeModal />
         </View>
     );
+
+    function PlanTypeModal() {
+        // Dynamically get available types from current plans
+        const availableTypes = new Set<string>();
+        plans.forEach(p => {
+             const n = (p.originalName || p.name).toUpperCase();
+             if (n.includes('SME')) availableTypes.add('SME');
+             else if (n.includes('CG') || n.includes('CORPORATE')) availableTypes.add('CG');
+             else if (n.includes('DIRECT') || n.includes('GIFTING')) availableTypes.add('Direct');
+             else if (n.includes('AWOOF')) availableTypes.add('Awoof');
+             else if (n.includes('MEGA')) availableTypes.add('Mega');
+             else availableTypes.add('Standard');
+        });
+
+        const typeMap: Record<string, { name: string; desc: string }> = {
+             'SME': { name: 'SME Data', desc: 'Small and Medium Enterprise plans' },
+             'CG': { name: 'Corporate Gifting (CG)', desc: 'Corporate Gifting data plans' },
+             'Direct': { name: 'Direct Data', desc: 'Direct network gifting plans' },
+             'Awoof': { name: 'Awoof Data', desc: 'Special promo Awoof plans' },
+             'Mega': { name: 'Mega Plans', desc: 'Large volume data plans' },
+             'Standard': { name: 'Standard Data', desc: 'Regular network data plans' },
+        };
+
+        const planTypes = [
+            { id: 'All', name: 'All Plan Types', desc: 'Show all available data plans' },
+            ...Array.from(availableTypes).map(t => ({ id: t, ...typeMap[t] }))
+        ];
+
+        return (
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={showPlanTypeModal}
+                onRequestClose={() => setShowPlanTypeModal(false)}
+            >
+                <TouchableOpacity 
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}
+                    activeOpacity={1}
+                    onPress={() => setShowPlanTypeModal(false)}
+                >
+                    <View style={s.modalContent} onStartShouldSetResponder={() => true}>
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalTitle}>Select Plan Type</Text>
+                            <TouchableOpacity onPress={() => setShowPlanTypeModal(false)}>
+                                <Ionicons name="close-circle" size={26} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        {planTypes.map((type, idx) => (
+                            <TouchableOpacity
+                                key={type.id}
+                                style={[s.planTypeOption, idx < planTypes.length - 1 && { borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }]}
+                                onPress={() => {
+                                    setPlanTypeFilter(type.id);
+                                    setShowPlanTypeModal(false);
+                                }}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[s.planTypeOptionName, planTypeFilter === type.id && { color: '#0d1b3e', fontWeight: '800' }]}>{type.name}</Text>
+                                    <Text style={s.planTypeOptionDesc}>{type.desc}</Text>
+                                </View>
+                                {planTypeFilter === type.id && (
+                                    <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        );
+    }
 
     function BeneficiaryModal() {
         const filteredBens = beneficiaries.filter(b => 
@@ -1446,22 +1623,49 @@ const s = StyleSheet.create({
   filterPillTextActive: {
     color: '#ffffff',
   },
-  plansContainer: {
+  segmentContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#0d1b3e',
+    shadowColor: '#0a1633',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  segmentTextActive: {
+    color: '#ffffff',
+  },
+  plansListContainer: {
     width: '100%',
     marginTop: 10,
   },
-  planCardWrapper: {
-    width: '48.5%',
-    marginBottom: 10,
-  },
-  planCard: {
-    borderRadius: 14,
+  planListCard: {
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
+    marginBottom: 12,
     shadowColor: '#0a1633',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
@@ -1469,76 +1673,94 @@ const s = StyleSheet.create({
     elevation: 2,
     overflow: 'hidden',
   },
-  planCardSelected: {
+  planListCardSelected: {
     borderColor: '#f5a623',
     borderWidth: 2,
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  planCardGradient: {
-    padding: 10,
-    minHeight: 90,
-    justifyContent: 'space-between',
-  },
-  planValidityContainer: {
+  planListCardGradient: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 4,
+    padding: 14,
   },
-  validityBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+  planVolumeBadge: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  validityBadgeSelected: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  planVolumeBadgeSelected: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  validityText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  validityTextSelected: {
-    color: '#ffffff',
-  },
-  planName: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0d1b3e',
-    lineHeight: 15,
-    marginBottom: 4,
-    flexWrap: 'wrap',
-  },
-  planNameSelected: {
-    color: '#ffffff',
-  },
-  planPrice: {
-    fontSize: 14,
+  planVolumeValue: {
+    fontSize: 18,
     fontWeight: '900',
     color: '#0d1b3e',
+    lineHeight: 20,
   },
-  planPriceSelected: {
-    color: '#f5a623',
-  },
-  bestValueBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#f97316',
-    borderBottomLeftRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    zIndex: 10,
-  },
-  bestValueText: {
-    color: '#ffffff',
-    fontSize: 6.5,
+  planVolumeUnit: {
+    fontSize: 10,
     fontWeight: '800',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  planDetailsMid: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  planListName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0d1b3e',
+    flexShrink: 1,
+  },
+  planListNameSelected: {
+    color: '#ffffff',
+  },
+  planListValidityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  planListValidity: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  planListValiditySelected: {
+    color: '#fde047',
+  },
+  tinyBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  tinyBadgeText: {
+    color: '#ffffff',
+    fontSize: 7,
+    fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  planRightSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  planListPrice: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0d1b3e',
+    marginBottom: 4,
+  },
+  planListPriceSelected: {
+    color: '#f5a623',
   },
   quickRepeatCard: {
     backgroundColor: '#ffffff',
@@ -2007,5 +2229,71 @@ const s = StyleSheet.create({
     fontSize: 10.5,
     color: '#475569',
     flex: 1,
+  },
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 50,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0a1633',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    width: '100%',
+  },
+  dropdownBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0d1b3e',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    width: '100%',
+    maxWidth: 450,
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0d1b3e',
+  },
+  planTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  planTypeOptionName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 2,
+  },
+  planTypeOptionDesc: {
+    fontSize: 11,
+    color: '#94a3b8',
   },
 });
