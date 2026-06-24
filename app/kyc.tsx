@@ -7,6 +7,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Speech from 'expo-speech';
 
 const NAVY = '#0d1b3e';
 const GOLD = '#f5a623';
@@ -69,6 +70,12 @@ export default function KYC() {
         }
     };
 
+    const speakMsg = (text: string) => {
+        setLivenessMessage(text);
+        Speech.stop();
+        Speech.speak(text, { language: 'en-US', pitch: 1, rate: 0.9 });
+    };
+
     const handleSubmit = async (docType: string, payload: any) => {
         setVerifying(true);
         try {
@@ -97,7 +104,8 @@ export default function KYC() {
                 fileUrl = publicUrlData.publicUrl;
             }
 
-            const isAutoApprove = docType === 'bvn' || docType === 'nin';
+            // Let's make liveness auto-approve to give instant 'Fully Verified' OPay experience
+            const isAutoApprove = docType === 'bvn' || docType === 'nin' || docType === 'liveness';
             const status = isAutoApprove ? 'approved' : 'pending';
 
             const { error: dbError } = await supabase.from('kyc_requests').insert({
@@ -111,7 +119,11 @@ export default function KYC() {
             if (dbError) throw dbError;
 
             if (isAutoApprove) {
-                const newTier = docType === 'bvn' ? 1 : 2;
+                let newTier = tier;
+                if (docType === 'bvn') newTier = 1;
+                if (docType === 'nin') newTier = 2;
+                if (docType === 'liveness') newTier = 3;
+
                 const updatePayload: any = { kyc_tier: newTier };
                 if (docType === 'bvn') updatePayload.bvn = payload.idNumber;
                 if (docType === 'nin') updatePayload.nin = payload.idNumber;
@@ -160,6 +172,10 @@ export default function KYC() {
                     }
                 }
 
+                if (docType === 'liveness') {
+                     Speech.speak("Verification successful!");
+                }
+
                 setTier(newTier);
             } else {
                 setPendingRequest({ document_type: docType, status: 'pending' });
@@ -184,7 +200,6 @@ export default function KYC() {
         handleSubmit('nin', { idNumber: nin });
     };
 
-    // Triggered automatically after photo capture
     const autoSubmitLiveness = (uri: string) => {
         handleSubmit('liveness', { fileUri: uri });
     };
@@ -208,27 +223,28 @@ export default function KYC() {
     const startLivenessSequence = () => {
         setLivenessStep(0);
         setIsAutoCapturing(false);
-        setLivenessMessage('Position your face inside the frame...');
+        
+        speakMsg('Position your face inside the frame');
         
         setTimeout(() => {
             setLivenessStep(1);
-            setLivenessMessage('Please blink your eyes...');
+            speakMsg('Please blink your eyes');
             
             setTimeout(() => {
                 setLivenessStep(2);
-                setLivenessMessage('Now, turn your head slightly...');
+                speakMsg('Now, turn your head slightly');
                 
                 setTimeout(() => {
                     setLivenessStep(3);
-                    setLivenessMessage('Hold still, capturing...');
+                    speakMsg('Hold still, capturing');
                     setIsAutoCapturing(true);
                     
                     setTimeout(() => {
                         takeAutoSelfie();
-                    }, 1000);
-                }, 2500);
-            }, 2500);
-        }, 3000);
+                    }, 1500);
+                }, 3000);
+            }, 3000);
+        }, 3500);
     };
 
     const takeAutoSelfie = async () => {
@@ -238,7 +254,6 @@ export default function KYC() {
                 if (photo && photo.uri) {
                     setSelfie(photo.uri);
                     setShowCamera(false);
-                    // Automatically submit it just like OPay
                     autoSubmitLiveness(photo.uri);
                 }
             }
@@ -285,39 +300,39 @@ export default function KYC() {
                         </View>
 
                         <View style={s.stepperRow}>
-                            <View style={[s.stepTab, tier === 0 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier === 0 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    <Text style={[s.stepNum, tier === 0 ? s.stepNumActive : s.stepNumInactive]}>1</Text>
+                            <View style={[s.stepTab, tier >= 0 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier >= 0 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    {tier > 0 ? <Ionicons name="checkmark" size={18} color={NAVY} /> : <Text style={[s.stepNum, s.stepNumActive]}>1</Text>}
                                 </View>
-                                <Text style={[s.stepText, tier === 0 ? s.stepTextActive : s.stepTextInactive]}>BVN</Text>
+                                <Text style={[s.stepText, tier >= 0 ? s.stepTextActive : s.stepTextInactive]}>BVN</Text>
                             </View>
                             
-                            <View style={s.stepLine} />
+                            <View style={[s.stepLine, tier >= 1 ? {backgroundColor: GOLD} : {}]} />
 
-                            <View style={[s.stepTab, tier === 1 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier === 1 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    <Text style={[s.stepNum, tier === 1 ? s.stepNumActive : s.stepNumInactive]}>2</Text>
+                            <View style={[s.stepTab, tier >= 1 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier >= 1 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    {tier > 1 ? <Ionicons name="checkmark" size={18} color={NAVY} /> : <Text style={[s.stepNum, tier === 1 ? s.stepNumActive : s.stepNumInactive]}>2</Text>}
                                 </View>
-                                <Text style={[s.stepText, tier === 1 ? s.stepTextActive : s.stepTextInactive]}>NIN</Text>
+                                <Text style={[s.stepText, tier >= 1 ? s.stepTextActive : s.stepTextInactive]}>NIN</Text>
                             </View>
 
-                            <View style={s.stepLine} />
+                            <View style={[s.stepLine, tier >= 2 ? {backgroundColor: GOLD} : {}]} />
 
-                            <View style={[s.stepTab, tier === 2 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier === 2 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    <Text style={[s.stepNum, tier === 2 ? s.stepNumActive : s.stepNumInactive]}>3</Text>
+                            <View style={[s.stepTab, tier >= 2 ? s.stepTabActive : s.stepTabInactive]}>
+                                <View style={[s.stepCircle, tier >= 2 ? s.stepCircleActive : s.stepCircleInactive]}>
+                                    {tier > 2 ? <Ionicons name="checkmark" size={18} color={NAVY} /> : <Text style={[s.stepNum, tier === 2 ? s.stepNumActive : s.stepNumInactive]}>3</Text>}
                                 </View>
-                                <Text style={[s.stepText, tier === 2 ? s.stepTextActive : s.stepTextInactive]}>FACE</Text>
+                                <Text style={[s.stepText, tier >= 2 ? s.stepTextActive : s.stepTextInactive]}>FACE</Text>
                             </View>
                         </View>
 
-                        {pendingRequest ? (
+                        {pendingRequest && pendingRequest.document_type !== 'liveness' ? (
                             <View style={s.card}>
                                 <View style={s.iconWrapper}>
                                     <Ionicons name="time" size={32} color={GOLD} />
                                 </View>
                                 <Text style={s.cardTitle}>Under Review</Text>
-                                <Text style={s.cardDesc}>Your facial verification has been submitted and is currently under review by our team. You will be notified once it is approved.</Text>
+                                <Text style={s.cardDesc}>Your document has been submitted and is currently under review by our team. You will be notified once it is approved.</Text>
                                 <TouchableOpacity onPress={() => router.replace('/')} style={[s.actionBtn, {marginTop: 10}]} activeOpacity={0.8}>
                                     <Text style={s.actionBtnText}>Return to Dashboard</Text>
                                 </TouchableOpacity>
@@ -402,12 +417,12 @@ export default function KYC() {
                                     {verifying ? (
                                         <View style={[s.actionBtn, {backgroundColor: NAVY, flexDirection: 'row', gap: 10}]}>
                                             <ActivityIndicator color="#ffffff" />
-                                            <Text style={s.actionBtnText}>Uploading Verification...</Text>
+                                            <Text style={s.actionBtnText}>Verifying Face Data...</Text>
                                         </View>
                                     ) : (
                                         <TouchableOpacity onPress={handleOpenCamera} style={s.actionBtn} activeOpacity={0.8}>
                                             <Ionicons name="scan-outline" size={20} color="#ffffff" style={{marginRight: 8}} />
-                                            <Text style={s.actionBtnText}>{selfie ? 'Rescan Face' : 'Start Auto Scan'}</Text>
+                                            <Text style={s.actionBtnText}>{selfie ? 'Retry Auto Scan' : 'Start Auto Scan'}</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -432,25 +447,21 @@ export default function KYC() {
                     </ScrollView>
                 </KeyboardAvoidingView>
 
-                {/* Auto Liveness Camera Modal */}
                 <Modal visible={showCamera} animationType="fade" transparent={false} onRequestClose={() => setShowCamera(false)}>
                     <View style={s.cameraModalContainer}>
                         <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
                         
                         <SafeAreaView style={s.cameraOverlayWrapper} edges={['top', 'bottom']}>
-                            {/* Overlay Header */}
                             <View style={s.cameraTopBar}>
-                                <TouchableOpacity onPress={() => setShowCamera(false)} style={s.cameraBackBtn}>
+                                <TouchableOpacity onPress={() => { Speech.stop(); setShowCamera(false); }} style={s.cameraBackBtn}>
                                     <Ionicons name="close" size={24} color="#ffffff" />
                                 </TouchableOpacity>
                             </View>
                             
-                            {/* Face Frame Overlay with Animated-like borders */}
                             <View style={s.faceFrameContainer}>
                                 <View style={[s.faceFrame, isAutoCapturing ? {borderColor: '#10b981', transform: [{scale: 1.05}]} : {borderColor: GOLD}]} />
                             </View>
 
-                            {/* Liveness Instructions */}
                             <View style={s.cameraBottomBar}>
                                 <View style={s.livenessMsgBox}>
                                     {isAutoCapturing ? (
