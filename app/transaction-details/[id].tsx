@@ -32,7 +32,7 @@ export default function ReceiptScreen() {
             setLoading(true);
             
             // Fetch transaction
-            const { data: txData, error: txError } = await supabase
+            const { data: txData } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('id', id)
@@ -40,13 +40,12 @@ export default function ReceiptScreen() {
 
             if (txData) setTransaction(txData);
 
-            // Fetch dynamic logo from app_settings
+            // Fetch dynamic logo
             const { data: settingsData } = await supabase
                 .from('app_settings')
                 .select('key, value');
             
             if (settingsData) {
-                // Try fetching logo_icon first, else full banner, or fallback
                 const iconSetting = settingsData.find(s => s.key === 'app_logo_icon');
                 if (iconSetting?.value?.url) {
                     setLogoUrl(iconSetting.value.url);
@@ -57,7 +56,6 @@ export default function ReceiptScreen() {
                     }
                 }
             }
-
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -103,15 +101,18 @@ export default function ReceiptScreen() {
     }
 
     const amount = parseFloat(transaction.amount.toString());
+    const isIncome = transaction.type === 'deposit' || amount > 0;
     const absAmount = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
+    
     const formattedDate = new Date(transaction.created_at).toLocaleDateString([], { 
-        year: 'numeric', month: '2-digit', day: '2-digit' 
+        year: 'numeric', month: 'short', day: 'numeric' 
     });
     const formattedTime = new Date(transaction.created_at).toLocaleTimeString([], { 
         hour: '2-digit', minute: '2-digit' 
     });
 
-    const receiptNo = transaction.reference || transaction.id.substring(0, 8).toUpperCase();
+    const receiptNo = transaction.reference || transaction.id.substring(0, 10).toUpperCase();
+    const isSuccess = transaction.status === 'success';
 
     return (
         <SafeAreaView style={s.container} edges={['top', 'bottom']}>
@@ -119,9 +120,9 @@ export default function ReceiptScreen() {
             
             <View style={s.appHeader}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={24} color={NAVY} />
+                    <Ionicons name="close" size={24} color={NAVY} />
                 </TouchableOpacity>
-                <Text style={s.appHeaderTitle}>Transaction Receipt</Text>
+                <Text style={s.appHeaderTitle}>E-Receipt</Text>
                 <TouchableOpacity onPress={shareReceipt} style={s.iconButton}>
                     <Ionicons name="share-outline" size={22} color={NAVY} />
                 </TouchableOpacity>
@@ -130,104 +131,73 @@ export default function ReceiptScreen() {
             <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={s.receiptWrapper}>
                     <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={s.viewShot}>
+                        
+                        {/* The Main Receipt Card */}
                         <View style={s.receiptCard}>
                             
-                            {/* Top Brand Bar */}
-                            <View style={s.topBar} />
+                            {/* Logo Badge overlapping the top */}
+                            <View style={s.logoBadgeContainer}>
+                                <View style={s.logoCircle}>
+                                    {logoUrl ? (
+                                        <Image source={{ uri: logoUrl }} style={s.dynamicLogo} resizeMode="contain" />
+                                    ) : (
+                                        <Image source={require('../../assets/images/logo-icon.png')} style={s.dynamicLogo} resizeMode="contain" />
+                                    )}
+                                </View>
+                            </View>
 
                             <View style={s.receiptInner}>
-                                {/* Header Section */}
-                                <View style={s.headerSection}>
-                                    <View style={s.logoSide}>
-                                        <View style={s.logoCircle}>
-                                            {logoUrl ? (
-                                                <Image source={{ uri: logoUrl }} style={s.dynamicLogo} resizeMode="contain" />
-                                            ) : (
-                                                <Ionicons name="shield-checkmark" size={28} color="#ffffff" />
-                                            )}
-                                        </View>
-                                        <Text style={s.receiptTitle}>Receipt</Text>
-                                    </View>
-                                    <View style={s.companySide}>
-                                        <Text style={s.companyName}>ABU MAFHAL HUB</Text>
-                                        <Text style={s.companyAddress}>Digital Services</Text>
-                                        <Text style={s.companyAddress}>support@abumafhalhub.com</Text>
-                                    </View>
+                                
+                                {/* Status Icon */}
+                                <View style={s.statusIconContainer}>
+                                    <Ionicons 
+                                        name={isSuccess ? "checkmark-circle" : "time"} 
+                                        size={28} 
+                                        color={isSuccess ? "#107C10" : GOLD} 
+                                    />
+                                    <Text style={[s.statusText, {color: isSuccess ? "#107C10" : GOLD}]}>
+                                        {isSuccess ? 'Payment Successful' : 'Payment Pending'}
+                                    </Text>
                                 </View>
 
-                                {/* Info Section */}
-                                <View style={s.infoSection}>
-                                    <View style={s.infoLeft}>
-                                        <Text style={s.infoLabel}>BILLED TO:</Text>
-                                        <Text style={s.infoValueBold}>Customer</Text>
-                                        <Text style={s.infoValue}>User ID: {transaction.user_id.substring(0,8)}...</Text>
-                                    </View>
-                                    <View style={s.infoRight}>
-                                        <View style={s.infoRow}>
-                                            <Text style={s.infoLabelRight}>RECEIPT #</Text>
-                                            <Text style={s.infoValueRight}>{receiptNo}</Text>
-                                        </View>
-                                        <View style={s.infoRow}>
-                                            <Text style={s.infoLabelRight}>DATE</Text>
-                                            <Text style={s.infoValueRight}>{formattedDate}</Text>
-                                        </View>
-                                        <View style={s.infoRow}>
-                                            <Text style={s.infoLabelRight}>TIME</Text>
-                                            <Text style={s.infoValueRight}>{formattedTime}</Text>
-                                        </View>
-                                        <View style={s.infoRow}>
-                                            <Text style={s.infoLabelRight}>STATUS</Text>
-                                            <Text style={[s.infoValueRight, {color: transaction.status === 'success' ? '#107C10' : GOLD, fontWeight: '700'}]}>
-                                                {transaction.status.toUpperCase()}
-                                            </Text>
-                                        </View>
-                                    </View>
+                                {/* Amount Section */}
+                                <Text style={s.amountLabel}>Total Amount</Text>
+                                <Text style={s.amountValue}>₦{absAmount}</Text>
+
+                                {/* Dashed Divider */}
+                                <View style={s.dashedDividerWrapper}>
+                                    <View style={s.cutoutLeft} />
+                                    <View style={s.dashedLine} />
+                                    <View style={s.cutoutRight} />
                                 </View>
 
-                                {/* Table Section */}
-                                <View style={s.tableContainer}>
-                                    {/* Table Header */}
-                                    <View style={s.tableHeader}>
-                                        <Text style={[s.thText, {flex: 2}]}>DESCRIPTION</Text>
-                                        <Text style={[s.thText, {flex: 1, textAlign: 'center'}]}>TYPE</Text>
-                                        <Text style={[s.thText, {flex: 1, textAlign: 'right'}]}>AMOUNT</Text>
-                                    </View>
+                                {/* Details Section */}
+                                <View style={s.detailsContainer}>
                                     
-                                    {/* Table Row */}
-                                    <View style={s.tableRow}>
-                                        <Text style={[s.tdText, {flex: 2, fontWeight: '500'}]}>{transaction.description || 'Transaction'}</Text>
-                                        <Text style={[s.tdText, {flex: 1, textAlign: 'center', textTransform: 'capitalize'}]}>{transaction.type}</Text>
-                                        <Text style={[s.tdText, {flex: 1, textAlign: 'right'}]}>₦{absAmount}</Text>
-                                    </View>
+                                    <DetailRow label="Transaction Type" value={transaction.type.toUpperCase()} />
+                                    <DetailRow label="Description" value={transaction.description || 'N/A'} />
+                                    <DetailRow label="Reference No." value={receiptNo} />
+                                    <DetailRow label="Date" value={formattedDate} />
+                                    <DetailRow label="Time" value={formattedTime} />
+                                    <DetailRow label="User ID" value={transaction.user_id.substring(0,8)} noBorder />
+                                    
                                 </View>
 
-                                {/* Summary Section */}
-                                <View style={s.summarySection}>
-                                    <View style={s.notesArea}>
-                                        <Text style={s.notesLabel}>NOTES:</Text>
-                                        <Text style={s.notesText}>This is an electronically generated receipt and does not require a physical signature.</Text>
-                                    </View>
-                                    <View style={s.totalArea}>
-                                        <Text style={s.totalLabel}>TOTAL</Text>
-                                        <Text style={s.totalValue}>₦{absAmount}</Text>
-                                    </View>
+                                {/* Footer Logo / Watermark area */}
+                                <View style={s.footerArea}>
+                                    <Text style={s.footerBrandText}>ABU MAFHAL HUB</Text>
+                                    <Text style={s.footerMotto}>Reliable Digital Services</Text>
                                 </View>
 
                             </View>
-
-                            {/* Footer Bar */}
-                            <View style={s.footerBar}>
-                                <Text style={s.footerText}>Powered by <Text style={{fontWeight: '800'}}>ABU MAFHAL HUB</Text></Text>
-                            </View>
-
                         </View>
                     </ViewShot>
                 </View>
 
-                {/* Main Action Button */}
+                {/* Bottom Action */}
                 <TouchableOpacity style={s.downloadBtn} onPress={shareReceipt} activeOpacity={0.8}>
                     <Ionicons name="download-outline" size={20} color="#ffffff" style={{marginRight: 8}} />
-                    <Text style={s.downloadBtnText}>Download Receipt</Text>
+                    <Text style={s.downloadBtnText}>Save Receipt</Text>
                 </TouchableOpacity>
 
             </ScrollView>
@@ -235,14 +205,24 @@ export default function ReceiptScreen() {
     );
 }
 
+// Helper component for rows
+function DetailRow({ label, value, noBorder = false }: { label: string, value: string, noBorder?: boolean }) {
+    return (
+        <View style={[s.detailRow, !noBorder && s.detailRowBorder]}>
+            <Text style={s.detailLabel}>{label}</Text>
+            <Text style={s.detailValue}>{value}</Text>
+        </View>
+    );
+}
+
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F1F5F9', // Light grayish-blue background outside the receipt
+        backgroundColor: '#F8FAFC',
     },
     centerContainer: {
         flex: 1,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: '#F8FAFC',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -269,8 +249,8 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingTop: 10,
-        paddingBottom: 15,
-        backgroundColor: '#F1F5F9',
+        paddingBottom: 10,
+        backgroundColor: '#F8FAFC',
     },
     iconButton: {
         width: 40,
@@ -278,7 +258,7 @@ const s = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
@@ -287,226 +267,182 @@ const s = StyleSheet.create({
     },
     appHeaderTitle: {
         fontSize: 17,
-        fontWeight: '700',
+        fontWeight: '800',
         color: NAVY,
     },
     scrollContent: {
         paddingBottom: 40,
     },
     receiptWrapper: {
-        paddingHorizontal: 16,
-        paddingTop: 10,
+        paddingHorizontal: 20,
+        paddingTop: 30, // Extra padding for the floating logo
         paddingBottom: 20,
     },
     viewShot: {
-        backgroundColor: '#F1F5F9', // Matches outer background so corners look clean
+        backgroundColor: '#F8FAFC', 
     },
     receiptCard: {
         backgroundColor: '#FFFFFF',
         width: '100%',
+        borderRadius: 24,
+        marginTop: 30, // Push card down so logo can overlap
+        paddingBottom: 24,
         shadowColor: NAVY,
-        shadowOffset: { width: 0, height: 12 },
+        shadowOffset: { width: 0, height: 16 },
         shadowOpacity: 0.08,
-        shadowRadius: 24,
-        elevation: 6,
-        // Modern sharp-yet-smooth look
-        borderRadius: 8,
+        shadowRadius: 32,
+        elevation: 8,
     },
-    topBar: {
-        height: 12,
-        backgroundColor: NAVY, // Primary Brand Color
-        width: '100%',
-        borderTopLeftRadius: 8,
-        borderTopRightRadius: 8,
-    },
-    receiptInner: {
-        padding: 24,
-    },
-    headerSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 40,
-    },
-    logoSide: {
-        alignItems: 'flex-start',
+    logoBadgeContainer: {
+        alignItems: 'center',
+        marginTop: -36, // Pull logo up halfway out of the card
+        marginBottom: 20,
+        zIndex: 10,
     },
     logoCircle: {
-        width: 56,
-        height: 56,
-        backgroundColor: '#ffffff',
-        borderRadius: 12, 
+        width: 72,
+        height: 72,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 36,
+        padding: 4,
+        borderWidth: 2,
+        borderColor: '#F8FAFC', // faint border
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
-        borderWidth: 1.5,
-        borderColor: NAVY,
         overflow: 'hidden',
     },
     dynamicLogo: {
         width: '100%',
         height: '100%',
+        borderRadius: 32,
     },
-    receiptTitle: {
-        fontSize: 32,
-        fontWeight: '300',
-        color: NAVY,
-        letterSpacing: -1,
+    receiptInner: {
+        paddingHorizontal: 24,
+        alignItems: 'center',
     },
-    companySide: {
-        alignItems: 'flex-end',
-    },
-    companyName: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: NAVY,
-        marginBottom: 4,
-    },
-    companyAddress: {
-        fontSize: 12,
-        color: '#64748B',
-        marginBottom: 2,
-    },
-    infoSection: {
+    statusIconContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 40,
-        paddingBottom: 24,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
-    infoLeft: {
-        flex: 1,
-    },
-    infoLabel: {
-        fontSize: 11,
-        color: NAVY,
-        fontWeight: '800',
-        marginBottom: 8,
-    },
-    infoValueBold: {
+    statusText: {
         fontSize: 14,
         fontWeight: '700',
-        color: NAVY,
+        marginLeft: 8,
+    },
+    amountLabel: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
         marginBottom: 4,
     },
-    infoValue: {
-        fontSize: 13,
-        color: '#64748B',
-        marginBottom: 2,
+    amountValue: {
+        fontSize: 36,
+        fontWeight: '900',
+        color: NAVY,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        letterSpacing: -1,
     },
-    infoRight: {
-        flex: 1,
-        alignItems: 'flex-end',
-    },
-    infoRow: {
+    dashedDividerWrapper: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
         alignItems: 'center',
-        marginBottom: 6,
+        width: '100%',
+        marginVertical: 30,
+        position: 'relative',
+    },
+    cutoutLeft: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        position: 'absolute',
+        left: -36, // pulls it to the very edge of the card
+        zIndex: 2,
+    },
+    cutoutRight: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        position: 'absolute',
+        right: -36,
+        zIndex: 2,
+    },
+    dashedLine: {
+        flex: 1,
+        height: 1,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderStyle: 'dashed',
+    },
+    detailsContainer: {
         width: '100%',
     },
-    infoLabelRight: {
-        fontSize: 11,
-        color: NAVY,
-        fontWeight: '800',
-        marginRight: 16,
-        textAlign: 'right',
-    },
-    infoValueRight: {
-        fontSize: 13,
-        color: '#64748B',
-        textAlign: 'right',
-        minWidth: 80,
-    },
-    tableContainer: {
-        marginBottom: 40,
-    },
-    tableHeader: {
+    detailRow: {
         flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: NAVY,
-        paddingBottom: 8,
-        marginBottom: 16,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 14,
     },
-    thText: {
-        fontSize: 11,
-        color: NAVY,
-        fontWeight: '800',
-    },
-    tableRow: {
-        flexDirection: 'row',
-        paddingBottom: 16,
+    detailRowBorder: {
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
     },
-    tdText: {
+    detailLabel: {
         fontSize: 13,
-        color: '#475569',
-    },
-    summarySection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingTop: 10,
-        marginBottom: 20,
-    },
-    notesArea: {
-        flex: 1.5,
-        paddingRight: 20,
-    },
-    notesLabel: {
-        fontSize: 11,
-        color: NAVY,
-        fontWeight: '800',
-        marginBottom: 6,
-    },
-    notesText: {
-        fontSize: 11,
         color: '#64748B',
-        lineHeight: 16,
+        fontWeight: '500',
     },
-    totalArea: {
+    detailValue: {
+        fontSize: 13,
+        color: NAVY,
+        fontWeight: '700',
+        textAlign: 'right',
         flex: 1,
-        alignItems: 'flex-end',
+        marginLeft: 20,
     },
-    totalLabel: {
-        fontSize: 12,
-        color: NAVY,
-        fontWeight: '800',
-        marginBottom: 6,
-    },
-    totalValue: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: NAVY,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    },
-    footerBar: {
-        backgroundColor: 'rgba(13, 27, 62, 0.05)', 
-        paddingVertical: 16,
+    footerArea: {
+        marginTop: 40,
         alignItems: 'center',
-        borderBottomLeftRadius: 8,
-        borderBottomRightRadius: 8,
     },
-    footerText: {
-        fontSize: 12,
+    footerBrandText: {
+        fontSize: 16,
+        fontWeight: '900',
         color: NAVY,
+        letterSpacing: 1,
+    },
+    footerMotto: {
+        fontSize: 10,
+        color: GOLD,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        marginTop: 4,
+        letterSpacing: 2,
     },
     downloadBtn: {
         flexDirection: 'row',
         backgroundColor: NAVY,
-        marginHorizontal: 16,
+        marginHorizontal: 20,
         marginTop: 10,
         paddingVertical: 16,
-        borderRadius: 12,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: NAVY,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        elevation: 6,
     },
     downloadBtnText: {
         color: '#ffffff',
