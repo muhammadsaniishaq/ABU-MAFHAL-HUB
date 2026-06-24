@@ -120,7 +120,13 @@ Deno.serve(async (req: Request) => {
                 const accountNumber = transactionObj.account_number || 
                                       transactionObj.accountNumber || 
                                       eventData.account_number || 
-                                      eventData.accountNumber;
+                                      eventData.accountNumber ||
+                                      eventData.virtual_account?.account_number ||
+                                      eventData.virtualAccount?.accountNumber ||
+                                      eventData.virtualAccount?.account_number ||
+                                      eventData.virtual_account?.accountNumber ||
+                                      eventData.customer?.virtual_account_number ||
+                                      eventData.customer?.virtualAccountNumber;
                 
                 console.log(`[Payvessel Webhook] Parsed: Ref=${reference}, Amt=${amount}, Email=${email}, AccNum=${accountNumber}`);
                 
@@ -321,8 +327,16 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
 
     if (!profile) {
         console.error(`[FundWallet] User NOT found. Email: ${email}, ID: ${explicitUserId}, Data: ${JSON.stringify(data)}`);
-        // We log the event anyway so we can debug later? No, payment_events usually requires valid processing?
-        // Actually, we SHOULD record the orphaned payment attempt in a separate table or log it well.
+        // We SHOULD record the orphaned payment attempt in a separate table or log it well.
+        await supabaseAdmin.from('payment_events').insert({
+            provider: provider,
+            reference: reference,
+            amount: amount,
+            currency: currency,
+            status: 'orphaned',
+            metadata: data,
+            processed_at: new Date().toISOString()
+        });
         return new Response("User not found", { status: 200 }); // Return 200 to stop retry loops if it's a structural failure
     }
     
