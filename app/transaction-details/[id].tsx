@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -79,326 +78,150 @@ export default function ReceiptScreen() {
     }
 
     const amount = parseFloat(transaction.amount.toString());
-    const isIncome = transaction.type === 'deposit' || amount > 0;
     const absAmount = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
-    const formattedDate = new Date(transaction.created_at).toLocaleString([], { 
-        year: 'numeric', month: 'short', day: 'numeric', 
+    const formattedDate = new Date(transaction.created_at).toLocaleDateString([], { 
+        year: 'numeric', month: '2-digit', day: '2-digit' 
+    });
+    const formattedTime = new Date(transaction.created_at).toLocaleTimeString([], { 
         hour: '2-digit', minute: '2-digit' 
     });
+
+    const receiptNo = transaction.reference || transaction.id.substring(0, 8).toUpperCase();
 
     return (
         <SafeAreaView style={s.container} edges={['top', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
             
-            <View style={s.header}>
+            <View style={s.appHeader}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={20} color="#0056D2" />
+                    <Ionicons name="chevron-back" size={24} color="#0F172A" />
                 </TouchableOpacity>
-                <Text style={s.headerTitle}>E-Receipt</Text>
-                <View style={{ width: 36 }} />
-            </View>
-
-            <View style={s.receiptWrapper}>
-                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={s.viewShot}>
-                    <View style={s.receiptCard}>
-                        
-                        {/* Receipt Top Section */}
-                        <View style={s.receiptTop}>
-                            <View style={s.logoWrapper}>
-                                <Ionicons name="shield-checkmark" size={24} color="#0056D2" />
-                            </View>
-                            <Text style={s.brandName}>ABU MAFHAL HUB</Text>
-                            <Text style={s.receiptSubtitle}>TRANSACTION RECEIPT</Text>
-                        </View>
-
-                        {/* Amount Section */}
-                        <View style={s.amountSection}>
-                            <Text style={s.amountLabel}>AMOUNT</Text>
-                            <Text style={[s.amountValue, isIncome ? s.amountPlus : s.amountMinus]}>
-                                ₦{absAmount}
-                            </Text>
-                            <View style={[s.statusBadge, transaction.status === 'success' ? s.badgeSuccess : s.badgePending]}>
-                                <Text style={[s.statusText, transaction.status === 'success' ? s.textSuccess : s.textPending]}>
-                                    {transaction.status.toUpperCase()}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* Divider */}
-                        <View style={s.dividerContainer}>
-                            <View style={s.dividerCircleLeft} />
-                            <View style={s.dividerDashedLine} />
-                            <View style={s.dividerCircleRight} />
-                        </View>
-
-                        {/* Details Section */}
-                        <View style={s.detailsSection}>
-                            <DetailRow label="Type" value={transaction.type.toUpperCase()} />
-                            <DetailRow label="Description" value={transaction.description || 'N/A'} />
-                            <DetailRow label="Ref" value={transaction.reference || transaction.id.substring(0, 10).toUpperCase()} />
-                            <DetailRow label="Date" value={formattedDate} />
-                        </View>
-
-                        {/* Footer */}
-                        <View style={s.receiptFooter}>
-                            <Ionicons name="checkmark-circle" size={14} color="#107C10" />
-                            <Text style={s.footerText}>Verified by ABU MAFHAL HUB</Text>
-                        </View>
-                    </View>
-                </ViewShot>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={s.bottomActions}>
-                <TouchableOpacity style={s.shareBtn} onPress={shareReceipt} activeOpacity={0.8}>
-                    <LinearGradient 
-                        colors={['#0056D2', '#1E40AF']} 
-                        style={s.shareBtnGradient}
-                        start={{x: 0, y: 0}} end={{x: 1, y: 0}}
-                    >
-                        <Ionicons name="share-social" size={18} color="#ffffff" />
-                        <Text style={s.shareBtnText}>Share Receipt</Text>
-                    </LinearGradient>
+                <Text style={s.appHeaderTitle}>Transaction Receipt</Text>
+                <TouchableOpacity onPress={shareReceipt} style={s.iconButton}>
+                    <Ionicons name="share-outline" size={22} color="#0056D2" />
                 </TouchableOpacity>
             </View>
+
+            <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={s.receiptWrapper}>
+                    <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={s.viewShot}>
+                        <View style={s.receiptCard}>
+                            
+                            {/* Top Brand Bar */}
+                            <View style={s.topBar} />
+
+                            <View style={s.receiptInner}>
+                                {/* Header Section */}
+                                <View style={s.headerSection}>
+                                    <View style={s.logoSide}>
+                                        <View style={s.logoCircle}>
+                                            <Ionicons name="shield-checkmark" size={28} color="#ffffff" />
+                                        </View>
+                                        <Text style={s.receiptTitle}>Receipt</Text>
+                                    </View>
+                                    <View style={s.companySide}>
+                                        <Text style={s.companyName}>ABU MAFHAL HUB</Text>
+                                        <Text style={s.companyAddress}>Digital Services</Text>
+                                        <Text style={s.companyAddress}>support@abumafhalhub.com</Text>
+                                    </View>
+                                </View>
+
+                                {/* Info Section */}
+                                <View style={s.infoSection}>
+                                    <View style={s.infoLeft}>
+                                        <Text style={s.infoLabel}>BILLED TO:</Text>
+                                        <Text style={s.infoValueBold}>Customer</Text>
+                                        <Text style={s.infoValue}>User ID: {transaction.user_id.substring(0,8)}...</Text>
+                                    </View>
+                                    <View style={s.infoRight}>
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabelRight}>RECEIPT #</Text>
+                                            <Text style={s.infoValueRight}>{receiptNo}</Text>
+                                        </View>
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabelRight}>DATE</Text>
+                                            <Text style={s.infoValueRight}>{formattedDate}</Text>
+                                        </View>
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabelRight}>TIME</Text>
+                                            <Text style={s.infoValueRight}>{formattedTime}</Text>
+                                        </View>
+                                        <View style={s.infoRow}>
+                                            <Text style={s.infoLabelRight}>STATUS</Text>
+                                            <Text style={[s.infoValueRight, {color: transaction.status === 'success' ? '#107C10' : '#C5A059'}]}>
+                                                {transaction.status.toUpperCase()}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Table Section */}
+                                <View style={s.tableContainer}>
+                                    {/* Table Header */}
+                                    <View style={s.tableHeader}>
+                                        <Text style={[s.thText, {flex: 2}]}>DESCRIPTION</Text>
+                                        <Text style={[s.thText, {flex: 1, textAlign: 'center'}]}>TYPE</Text>
+                                        <Text style={[s.thText, {flex: 1, textAlign: 'right'}]}>AMOUNT</Text>
+                                    </View>
+                                    
+                                    {/* Table Row */}
+                                    <View style={s.tableRow}>
+                                        <Text style={[s.tdText, {flex: 2, fontWeight: '500'}]}>{transaction.description || 'Transaction'}</Text>
+                                        <Text style={[s.tdText, {flex: 1, textAlign: 'center', textTransform: 'capitalize'}]}>{transaction.type}</Text>
+                                        <Text style={[s.tdText, {flex: 1, textAlign: 'right'}]}>₦{absAmount}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Summary Section */}
+                                <View style={s.summarySection}>
+                                    <View style={s.notesArea}>
+                                        <Text style={s.notesLabel}>NOTES:</Text>
+                                        <Text style={s.notesText}>This is an electronically generated receipt and does not require a physical signature.</Text>
+                                    </View>
+                                    <View style={s.totalArea}>
+                                        <Text style={s.totalLabel}>TOTAL</Text>
+                                        <Text style={s.totalValue}>₦{absAmount}</Text>
+                                    </View>
+                                </View>
+
+                            </View>
+
+                            {/* Footer Bar */}
+                            <View style={s.footerBar}>
+                                <Text style={s.footerText}>Powered by <Text style={{fontWeight: '800'}}>ABU MAFHAL HUB</Text></Text>
+                            </View>
+
+                        </View>
+                    </ViewShot>
+                </View>
+
+                {/* Main Action Button */}
+                <TouchableOpacity style={s.downloadBtn} onPress={shareReceipt} activeOpacity={0.8}>
+                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{marginRight: 8}} />
+                    <Text style={s.downloadBtnText}>Download Receipt</Text>
+                </TouchableOpacity>
+
+            </ScrollView>
         </SafeAreaView>
-    );
-}
-
-function DetailRow({ label, value }: { label: string, value: string }) {
-    return (
-        <View style={s.detailRow}>
-            <Text style={s.detailLabel}>{label}</Text>
-            <Text style={s.detailValue}>{value}</Text>
-        </View>
     );
 }
 
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F1F5F9', // Light grayish-blue background outside the receipt
     },
     centerContainer: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 20,
     },
     notFoundText: {
         fontSize: 16,
         color: '#0F172A',
         fontWeight: '600',
         marginBottom: 16,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 12,
-    },
-    iconButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#EFF6FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#0F172A',
-    },
-    receiptWrapper: {
-        flex: 1,
-        paddingHorizontal: 20,
-        justifyContent: 'center',
-    },
-    viewShot: {
-        backgroundColor: 'transparent',
-    },
-    receiptCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#0056D2',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 6,
-    },
-    receiptTop: {
-        alignItems: 'center',
-        paddingTop: 24,
-        paddingBottom: 16,
-        backgroundColor: '#F8FAFC',
-    },
-    logoWrapper: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#EFF6FF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
-    },
-    brandName: {
-        color: '#0056D2',
-        fontSize: 16,
-        fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: 4,
-    },
-    receiptSubtitle: {
-        color: '#64748B',
-        fontSize: 10,
-        fontWeight: '600',
-        letterSpacing: 1.5,
-    },
-    amountSection: {
-        alignItems: 'center',
-        paddingVertical: 24,
-        backgroundColor: '#FFFFFF',
-    },
-    amountLabel: {
-        fontSize: 11,
-        color: '#94A3B8',
-        fontWeight: '700',
-        letterSpacing: 1,
-        marginBottom: 8,
-    },
-    amountValue: {
-        fontSize: 32,
-        fontWeight: '800',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    },
-    amountPlus: {
-        color: '#107C10',
-    },
-    amountMinus: {
-        color: '#0F172A',
-    },
-    statusBadge: {
-        marginTop: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    badgeSuccess: {
-        backgroundColor: '#DCFCE7',
-    },
-    badgePending: {
-        backgroundColor: '#FEF3C7',
-    },
-    textSuccess: {
-        color: '#15803D',
-        fontWeight: '700',
-        fontSize: 11,
-    },
-    textPending: {
-        color: '#B45309',
-        fontWeight: '700',
-        fontSize: 11,
-    },
-    dividerContainer: {
-        height: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        position: 'relative',
-        zIndex: 1,
-    },
-    dividerCircleLeft: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#F8FAFC',
-        position: 'absolute',
-        left: -10,
-        borderRightWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    dividerCircleRight: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#F8FAFC',
-        position: 'absolute',
-        right: -10,
-        borderLeftWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    dividerDashedLine: {
-        flex: 1,
-        height: 1,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderStyle: 'dashed',
-        marginHorizontal: 16,
-    },
-    detailsSection: {
-        padding: 20,
-        backgroundColor: '#FFFFFF',
-    },
-    detailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 12,
-    },
-    detailLabel: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    detailValue: {
-        fontSize: 12,
-        color: '#0F172A',
-        fontWeight: '700',
-    },
-    receiptFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        backgroundColor: '#F1F5F9',
-        borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
-    },
-    footerText: {
-        fontSize: 11,
-        color: '#64748B',
-        fontWeight: '600',
-        marginLeft: 6,
-    },
-    bottomActions: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    shareBtn: {
-        shadowColor: '#0056D2',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    shareBtnGradient: {
-        flexDirection: 'row',
-        paddingVertical: 14,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    shareBtnText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '700',
-        marginLeft: 8,
     },
     backBtn: {
         paddingVertical: 10,
@@ -410,5 +233,248 @@ const s = StyleSheet.create({
         color: '#0F172A',
         fontSize: 14,
         fontWeight: '600',
+    },
+    appHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 15,
+        backgroundColor: '#F1F5F9',
+    },
+    iconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    appHeaderTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    scrollContent: {
+        paddingBottom: 40,
+    },
+    receiptWrapper: {
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 20,
+    },
+    viewShot: {
+        backgroundColor: '#F1F5F9', // Matches outer background so corners look clean
+    },
+    receiptCard: {
+        backgroundColor: '#FFFFFF',
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        elevation: 5,
+        // Modern sharp-yet-smooth look
+        borderRadius: 4,
+    },
+    topBar: {
+        height: 12,
+        backgroundColor: '#0056D2', // Primary Brand Color
+        width: '100%',
+        borderTopLeftRadius: 4,
+        borderTopRightRadius: 4,
+    },
+    receiptInner: {
+        padding: 24,
+    },
+    headerSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 40,
+    },
+    logoSide: {
+        alignItems: 'flex-start',
+    },
+    logoCircle: {
+        width: 56,
+        height: 56,
+        backgroundColor: '#0056D2',
+        borderRadius: 12, // slightly rounded modern square
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    receiptTitle: {
+        fontSize: 32,
+        fontWeight: '300',
+        color: '#0F172A',
+        letterSpacing: -1,
+    },
+    companySide: {
+        alignItems: 'flex-end',
+    },
+    companyName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    companyAddress: {
+        fontSize: 12,
+        color: '#64748B',
+        marginBottom: 2,
+    },
+    infoSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 40,
+        paddingBottom: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    infoLeft: {
+        flex: 1,
+    },
+    infoLabel: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '800',
+        marginBottom: 8,
+    },
+    infoValueBold: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    infoValue: {
+        fontSize: 13,
+        color: '#64748B',
+        marginBottom: 2,
+    },
+    infoRight: {
+        flex: 1,
+        alignItems: 'flex-end',
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: 6,
+        width: '100%',
+    },
+    infoLabelRight: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '800',
+        marginRight: 16,
+        textAlign: 'right',
+    },
+    infoValueRight: {
+        fontSize: 13,
+        color: '#64748B',
+        textAlign: 'right',
+        minWidth: 80,
+    },
+    tableContainer: {
+        marginBottom: 40,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        borderBottomColor: '#0F172A',
+        paddingBottom: 8,
+        marginBottom: 16,
+    },
+    thText: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '800',
+    },
+    tableRow: {
+        flexDirection: 'row',
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    tdText: {
+        fontSize: 13,
+        color: '#475569',
+    },
+    summarySection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingTop: 10,
+        marginBottom: 20,
+    },
+    notesArea: {
+        flex: 1.5,
+        paddingRight: 20,
+    },
+    notesLabel: {
+        fontSize: 11,
+        color: '#0F172A',
+        fontWeight: '800',
+        marginBottom: 6,
+    },
+    notesText: {
+        fontSize: 11,
+        color: '#64748B',
+        lineHeight: 16,
+    },
+    totalArea: {
+        flex: 1,
+        alignItems: 'flex-end',
+    },
+    totalLabel: {
+        fontSize: 12,
+        color: '#0F172A',
+        fontWeight: '800',
+        marginBottom: 6,
+    },
+    totalValue: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#0F172A',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    footerBar: {
+        backgroundColor: '#EFF6FF', // Light primary tint
+        paddingVertical: 16,
+        alignItems: 'center',
+        borderBottomLeftRadius: 4,
+        borderBottomRightRadius: 4,
+    },
+    footerText: {
+        fontSize: 12,
+        color: '#0056D2',
+    },
+    downloadBtn: {
+        flexDirection: 'row',
+        backgroundColor: '#0056D2',
+        marginHorizontal: 16,
+        marginTop: 10,
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#0056D2',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    downloadBtnText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '700',
     }
 });
