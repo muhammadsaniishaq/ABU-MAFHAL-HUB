@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
+import * as FileSystem from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 
 const NAVY = '#0d1b3e';
 const GOLD = '#f5a623';
@@ -72,8 +74,12 @@ export default function KYC() {
 
     const speakMsg = (text: string) => {
         setLivenessMessage(text);
-        Speech.stop();
-        Speech.speak(text, { language: 'en-US', pitch: 1, rate: 0.9 });
+        try {
+            Speech.stop();
+            Speech.speak(text, { language: 'en-US', pitch: 1.1, rate: 0.9 });
+        } catch (e) {
+            console.log("Speech error: ", e);
+        }
     };
 
     const handleSubmit = async (docType: string, payload: any) => {
@@ -85,17 +91,24 @@ export default function KYC() {
             let fileUrl = null;
 
             if (payload.fileUri) {
+                // Read file as Base64 to avoid fetch('file://...') Network Request Failed bugs on React Native
+                const base64 = await FileSystem.readAsStringAsync(payload.fileUri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+                
                 const fileExt = payload.fileUri.split('.').pop() || 'jpg';
                 const fileName = `${user.id}_${docType}_${Date.now()}.${fileExt}`;
                 
-                const response = await fetch(payload.fileUri);
-                const blob = await response.blob();
-                
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('kyc-documents')
-                    .upload(fileName, blob);
+                    .upload(fileName, decode(base64), {
+                        contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
+                    });
                 
-                if (uploadError) throw uploadError;
+                if (uploadError) {
+                    console.error("Upload Error:", uploadError);
+                    throw new Error("Failed to upload image. " + uploadError.message);
+                }
                 
                 const { data: publicUrlData } = supabase.storage
                     .from('kyc-documents')
@@ -104,7 +117,6 @@ export default function KYC() {
                 fileUrl = publicUrlData.publicUrl;
             }
 
-            // Let's make liveness auto-approve to give instant 'Fully Verified' OPay experience
             const isAutoApprove = docType === 'bvn' || docType === 'nin' || docType === 'liveness';
             const status = isAutoApprove ? 'approved' : 'pending';
 
@@ -116,7 +128,10 @@ export default function KYC() {
                 status: status
             });
 
-            if (dbError) throw dbError;
+            if (dbError) {
+                console.error("DB Insert Error:", dbError);
+                throw new Error("Failed to save KYC request. " + dbError.message);
+            }
 
             if (isAutoApprove) {
                 let newTier = tier;
@@ -140,8 +155,8 @@ export default function KYC() {
                     .eq('id', user.id);
 
                 if (profileError) {
-                    Alert.alert("Profile Update Error", JSON.stringify(profileError));
-                    throw profileError;
+                    console.error("Profile Update Error:", profileError);
+                    throw new Error("Failed to update profile tier. " + profileError.message);
                 }
 
                 if (docType === 'bvn') {
@@ -173,7 +188,7 @@ export default function KYC() {
                 }
 
                 if (docType === 'liveness') {
-                     Speech.speak("Verification successful!");
+                     speakMsg("Verification successful!");
                 }
 
                 setTier(newTier);
@@ -182,7 +197,8 @@ export default function KYC() {
             }
 
         } catch (error: any) {
-            Alert.alert("Fatal Error", JSON.stringify(error) || error.message);
+            console.error("HandleSubmit Fatal Error:", error);
+            Alert.alert("Submission Failed", error.message || "An unexpected error occurred.");
         } finally {
             setVerifying(false);
         }
