@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
@@ -62,7 +61,7 @@ export default function ReceiptScreen() {
     if (loading) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#ffffff" />
+                <ActivityIndicator size="large" color="#0056D2" />
             </SafeAreaView>
         );
     }
@@ -70,10 +69,10 @@ export default function ReceiptScreen() {
     if (!transaction) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <Ionicons name="warning-outline" size={60} color="#f5a623" style={{marginBottom: 20}} />
+                <Ionicons name="warning-outline" size={40} color="#C5A059" style={{marginBottom: 16}} />
                 <Text style={s.notFoundText}>Transaction not found</Text>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-                    <Text style={s.backBtnText}>Return to History</Text>
+                    <Text style={s.backBtnText}>Return</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -83,7 +82,7 @@ export default function ReceiptScreen() {
     const isIncome = transaction.type === 'deposit' || amount > 0;
     const absAmount = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 });
     const formattedDate = new Date(transaction.created_at).toLocaleString([], { 
-        year: 'numeric', month: 'long', day: 'numeric', 
+        year: 'numeric', month: 'short', day: 'numeric', 
         hour: '2-digit', minute: '2-digit' 
     });
 
@@ -91,63 +90,41 @@ export default function ReceiptScreen() {
         <SafeAreaView style={s.container} edges={['top', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
             
-            {/* Background Gradient */}
-            <LinearGradient
-                colors={['#0d1b3e', '#09122a', '#050a17']}
-                style={StyleSheet.absoluteFillObject}
-            />
-
-            {/* Decorative background shapes */}
-            <View style={s.bgShape1} />
-            <View style={s.bgShape2} />
-
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={24} color="#ffffff" />
+                    <Ionicons name="chevron-back" size={20} color="#0056D2" />
                 </TouchableOpacity>
                 <Text style={s.headerTitle}>E-Receipt</Text>
-                <View style={{ width: 44 }} />
+                <View style={{ width: 36 }} />
             </View>
 
             <View style={s.receiptWrapper}>
                 <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={s.viewShot}>
-                    {/* The main receipt card */}
                     <View style={s.receiptCard}>
                         
-                        {/* Watermark Logo */}
-                        <View style={s.watermarkContainer}>
-                            <Ionicons name="shield-checkmark" size={200} color="rgba(241, 245, 249, 0.4)" />
-                        </View>
-
-                        {/* Top Header Section */}
+                        {/* Receipt Top Section */}
                         <View style={s.receiptTop}>
                             <View style={s.logoWrapper}>
-                                <Ionicons name="shield-checkmark" size={32} color="#ffffff" />
+                                <Ionicons name="shield-checkmark" size={24} color="#0056D2" />
                             </View>
                             <Text style={s.brandName}>ABU MAFHAL HUB</Text>
-                            <Text style={s.receiptSubtitle}>OFFICIAL TRANSACTION RECEIPT</Text>
+                            <Text style={s.receiptSubtitle}>TRANSACTION RECEIPT</Text>
                         </View>
 
                         {/* Amount Section */}
                         <View style={s.amountSection}>
-                            <Text style={s.amountLabel}>TRANSACTION AMOUNT</Text>
+                            <Text style={s.amountLabel}>AMOUNT</Text>
                             <Text style={[s.amountValue, isIncome ? s.amountPlus : s.amountMinus]}>
                                 ₦{absAmount}
                             </Text>
                             <View style={[s.statusBadge, transaction.status === 'success' ? s.badgeSuccess : s.badgePending]}>
-                                <Ionicons 
-                                    name={transaction.status === 'success' ? 'checkmark-circle' : 'time'} 
-                                    size={16} 
-                                    color={transaction.status === 'success' ? '#059669' : '#d97706'} 
-                                    style={{marginRight: 6}}
-                                />
                                 <Text style={[s.statusText, transaction.status === 'success' ? s.textSuccess : s.textPending]}>
                                     {transaction.status.toUpperCase()}
                                 </Text>
                             </View>
                         </View>
 
-                        {/* Premium Divider */}
+                        {/* Divider */}
                         <View style={s.dividerContainer}>
                             <View style={s.dividerCircleLeft} />
                             <View style={s.dividerDashedLine} />
@@ -156,22 +133,16 @@ export default function ReceiptScreen() {
 
                         {/* Details Section */}
                         <View style={s.detailsSection}>
-                            <DetailRow label="Transaction Type" value={transaction.type.toUpperCase()} />
+                            <DetailRow label="Type" value={transaction.type.toUpperCase()} />
                             <DetailRow label="Description" value={transaction.description || 'N/A'} />
-                            <DetailRow label="Reference No" value={transaction.reference || transaction.id.substring(0, 12).toUpperCase()} copyable />
-                            <DetailRow label="Date & Time" value={formattedDate} />
-                            
-                            {/* Barcode/QR Placeholder */}
-                            <View style={s.barcodeSection}>
-                                <Ionicons name="barcode-outline" size={50} color="#0d1b3e" />
-                                <Text style={s.barcodeText}>{transaction.id.substring(0, 18).toUpperCase()}</Text>
-                            </View>
+                            <DetailRow label="Ref" value={transaction.reference || transaction.id.substring(0, 10).toUpperCase()} />
+                            <DetailRow label="Date" value={formattedDate} />
                         </View>
 
                         {/* Footer */}
                         <View style={s.receiptFooter}>
-                            <Text style={s.footerText}>Thank you for choosing Abu Mafhal Hub!</Text>
-                            <Text style={s.footerSub}>support@abumafhalhub.com</Text>
+                            <Ionicons name="checkmark-circle" size={14} color="#107C10" />
+                            <Text style={s.footerText}>Verified by ABU MAFHAL HUB</Text>
                         </View>
                     </View>
                 </ViewShot>
@@ -181,28 +152,24 @@ export default function ReceiptScreen() {
             <View style={s.bottomActions}>
                 <TouchableOpacity style={s.shareBtn} onPress={shareReceipt} activeOpacity={0.8}>
                     <LinearGradient 
-                        colors={['#f5a623', '#d97706']} 
+                        colors={['#0056D2', '#1E40AF']} 
                         style={s.shareBtnGradient}
                         start={{x: 0, y: 0}} end={{x: 1, y: 0}}
                     >
-                        <Ionicons name="share-social" size={22} color="#ffffff" />
-                        <Text style={s.shareBtnText}>Share E-Receipt</Text>
+                        <Ionicons name="share-social" size={18} color="#ffffff" />
+                        <Text style={s.shareBtnText}>Share Receipt</Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
-
         </SafeAreaView>
     );
 }
 
-function DetailRow({ label, value, copyable }: { label: string, value: string, copyable?: boolean }) {
+function DetailRow({ label, value }: { label: string, value: string }) {
     return (
         <View style={s.detailRow}>
             <Text style={s.detailLabel}>{label}</Text>
-            <View style={s.detailValueWrapper}>
-                <Text style={s.detailValue}>{value}</Text>
-                {copyable && <Ionicons name="copy-outline" size={14} color="#94a3b8" style={{marginLeft: 6}} />}
-            </View>
+            <Text style={s.detailValue}>{value}</Text>
         </View>
     );
 }
@@ -210,300 +177,238 @@ function DetailRow({ label, value, copyable }: { label: string, value: string, c
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0d1b3e',
+        backgroundColor: '#F8FAFC',
     },
     centerContainer: {
         flex: 1,
-        backgroundColor: '#0d1b3e',
+        backgroundColor: '#F8FAFC',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
     },
     notFoundText: {
-        fontSize: 18,
-        color: '#ffffff',
-        fontWeight: '700',
-        marginBottom: 24,
-    },
-    bgShape1: {
-        position: 'absolute',
-        top: -100,
-        left: -100,
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(245, 166, 35, 0.1)',
-    },
-    bgShape2: {
-        position: 'absolute',
-        bottom: -50,
-        right: -50,
-        width: 250,
-        height: 250,
-        borderRadius: 125,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fontSize: 16,
+        color: '#0F172A',
+        fontWeight: '600',
+        marginBottom: 16,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
     },
     iconButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#EFF6FF',
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#ffffff',
-        letterSpacing: 1,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
     },
     receiptWrapper: {
         flex: 1,
-        paddingHorizontal: 24,
-        paddingTop: 10,
-        paddingBottom: 20,
+        paddingHorizontal: 20,
         justifyContent: 'center',
     },
     viewShot: {
         backgroundColor: 'transparent',
     },
     receiptCard: {
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
         overflow: 'hidden',
-        position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 20 },
-        shadowOpacity: 0.25,
-        shadowRadius: 30,
-        elevation: 15,
-    },
-    watermarkContainer: {
-        position: 'absolute',
-        top: '30%',
-        left: '10%',
-        right: 0,
-        bottom: 0,
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 0,
-        pointerEvents: 'none',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0056D2',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 6,
     },
     receiptTop: {
         alignItems: 'center',
-        paddingTop: 36,
-        paddingBottom: 20,
-        backgroundColor: '#0d1b3e',
-        zIndex: 1,
+        paddingTop: 24,
+        paddingBottom: 16,
+        backgroundColor: '#F8FAFC',
     },
     logoWrapper: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#f5a623',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#EFF6FF',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
-        borderWidth: 4,
-        borderColor: 'rgba(255,255,255,0.2)',
+        marginBottom: 12,
     },
     brandName: {
-        color: '#ffffff',
-        fontSize: 22,
-        fontWeight: '900',
-        letterSpacing: 1.5,
-        marginBottom: 6,
+        color: '#0056D2',
+        fontSize: 16,
+        fontWeight: '800',
+        letterSpacing: 1,
+        marginBottom: 4,
     },
     receiptSubtitle: {
-        color: '#94a3b8',
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 3,
+        color: '#64748B',
+        fontSize: 10,
+        fontWeight: '600',
+        letterSpacing: 1.5,
     },
     amountSection: {
         alignItems: 'center',
-        paddingVertical: 36,
-        backgroundColor: '#ffffff',
-        zIndex: 1,
+        paddingVertical: 24,
+        backgroundColor: '#FFFFFF',
     },
     amountLabel: {
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '800',
-        letterSpacing: 2,
-        marginBottom: 12,
+        fontSize: 11,
+        color: '#94A3B8',
+        fontWeight: '700',
+        letterSpacing: 1,
+        marginBottom: 8,
     },
     amountValue: {
-        fontSize: 42,
-        fontWeight: '900',
+        fontSize: 32,
+        fontWeight: '800',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        letterSpacing: -1,
     },
     amountPlus: {
-        color: '#10b981',
+        color: '#107C10',
     },
     amountMinus: {
-        color: '#0f172a',
+        color: '#0F172A',
     },
     statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 16,
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        borderRadius: 24,
+        marginTop: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     badgeSuccess: {
-        backgroundColor: '#d1fae5',
+        backgroundColor: '#DCFCE7',
     },
     badgePending: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#FEF3C7',
     },
     textSuccess: {
-        color: '#059669',
-        fontWeight: '800',
-        fontSize: 13,
+        color: '#15803D',
+        fontWeight: '700',
+        fontSize: 11,
     },
     textPending: {
-        color: '#d97706',
-        fontWeight: '800',
-        fontSize: 13,
+        color: '#B45309',
+        fontWeight: '700',
+        fontSize: 11,
     },
     dividerContainer: {
-        height: 30,
+        height: 20,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         position: 'relative',
         zIndex: 1,
     },
     dividerCircleLeft: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#09122a', // Matches background
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
         position: 'absolute',
-        left: -15,
+        left: -10,
+        borderRightWidth: 1,
+        borderColor: '#E2E8F0',
     },
     dividerCircleRight: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#09122a', // Matches background
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#F8FAFC',
         position: 'absolute',
-        right: -15,
+        right: -10,
+        borderLeftWidth: 1,
+        borderColor: '#E2E8F0',
     },
     dividerDashedLine: {
         flex: 1,
         height: 1,
-        borderWidth: 1.5,
-        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         borderStyle: 'dashed',
-        marginHorizontal: 24,
+        marginHorizontal: 16,
     },
     detailsSection: {
-        padding: 28,
-        backgroundColor: '#ffffff',
-        zIndex: 1,
+        padding: 20,
+        backgroundColor: '#FFFFFF',
     },
     detailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 20,
+        marginBottom: 12,
     },
     detailLabel: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '600',
-        flex: 1,
-    },
-    detailValueWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1.5,
-        justifyContent: 'flex-end',
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
     },
     detailValue: {
-        fontSize: 14,
-        color: '#0f172a',
-        fontWeight: '800',
-        textAlign: 'right',
-    },
-    barcodeSection: {
-        alignItems: 'center',
-        marginTop: 10,
-        paddingTop: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-    },
-    barcodeText: {
-        fontSize: 11,
-        letterSpacing: 4,
-        color: '#64748b',
-        marginTop: 6,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 12,
+        color: '#0F172A',
+        fontWeight: '700',
     },
     receiptFooter: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 20,
-        backgroundColor: '#f8fafc',
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        zIndex: 1,
+        justifyContent: 'center',
+        paddingVertical: 14,
+        backgroundColor: '#F1F5F9',
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
     },
     footerText: {
-        fontSize: 13,
-        color: '#0d1b3e',
-        fontWeight: '800',
-        marginBottom: 4,
-    },
-    footerSub: {
         fontSize: 11,
-        color: '#94a3b8',
+        color: '#64748B',
         fontWeight: '600',
+        marginLeft: 6,
     },
     bottomActions: {
-        paddingHorizontal: 24,
-        paddingBottom: 30,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
     shareBtn: {
-        shadowColor: '#f5a623',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 15,
-        elevation: 8,
+        shadowColor: '#0056D2',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     shareBtnGradient: {
         flexDirection: 'row',
-        paddingVertical: 18,
-        borderRadius: 20,
+        paddingVertical: 14,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
     shareBtnText: {
-        color: '#ffffff',
-        fontSize: 18,
-        fontWeight: '800',
-        marginLeft: 10,
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+        marginLeft: 8,
     },
     backBtn: {
-        paddingVertical: 14,
-        paddingHorizontal: 30,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 12,
     },
     backBtnText: {
-        color: '#ffffff',
-        fontSize: 16,
+        color: '#0F172A',
+        fontSize: 14,
         fontWeight: '600',
     }
 });

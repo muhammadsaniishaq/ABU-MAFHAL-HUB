@@ -33,13 +33,13 @@ export default function HistoryScreen() {
                         const amount = parseFloat(tx.amount.toString());
                         const isIncome = tx.type === 'deposit' || amount > 0;
                         let icon = 'wallet-outline';
-                        let color = '#f5a623';
+                        let color = '#C5A059'; // Gold brand color
 
-                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#3b82f6'; }
-                        else if (tx.type === 'withdrawal') { icon = 'cash-outline'; color = '#ef4444'; }
-                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#8b5cf6'; }
-                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#10b981'; }
-                        else if (tx.type === 'payment') { icon = 'flash-outline'; color = '#f59e0b'; }
+                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#0056D2'; } // Primary brand color
+                        else if (tx.type === 'withdrawal') { icon = 'cash-outline'; color = '#DC2626'; }
+                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#107C10'; }
+                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#0056D2'; }
+                        else if (tx.type === 'payment') { icon = 'flash-outline'; color = '#C5A059'; }
 
                         return {
                             ...tx,
@@ -69,7 +69,7 @@ export default function HistoryScreen() {
 
         filtered.forEach(tx => {
             const txDate = new Date(tx.dateObj).setHours(0,0,0,0);
-            let title = tx.dateObj.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+            let title = tx.dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
             if (txDate === today) title = 'Today';
             else if (txDate === yesterday) title = 'Yesterday';
 
@@ -88,7 +88,7 @@ export default function HistoryScreen() {
     if (loading && history.length === 0) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#f5a623" />
+                <ActivityIndicator size="large" color="#0056D2" />
             </SafeAreaView>
         );
     }
@@ -97,41 +97,38 @@ export default function HistoryScreen() {
         <SafeAreaView style={s.container} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
             
-            {/* Ultra Modern Header */}
+            {/* Header */}
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={24} color="#0d1b3e" />
+                    <Ionicons name="chevron-back" size={20} color="#0056D2" />
                 </TouchableOpacity>
-                <Text style={s.headerTitle}>Transactions</Text>
+                <Text style={s.headerTitle}>History</Text>
                 <TouchableOpacity style={s.iconButton}>
-                    <Ionicons name="options-outline" size={22} color="#0d1b3e" />
+                    <Ionicons name="filter" size={18} color="#0056D2" />
                 </TouchableOpacity>
             </View>
 
-            {/* Glassmorphic-like Summary Card */}
+            {/* Compact Summary Card with Brand Colors */}
             <View style={s.summaryContainer}>
                 <LinearGradient 
-                    colors={['#0d1b3e', '#1e3a8a', '#2563eb']} 
+                    colors={['#0056D2', '#1E40AF']} 
                     style={s.summaryCard} 
                     start={{ x: 0, y: 0 }} 
                     end={{ x: 1, y: 1 }}
                 >
-                    <View style={s.summaryTop}>
-                        <View style={s.summaryIconBox}>
-                            <Ionicons name="bar-chart" size={20} color="#fff" />
+                    <View style={s.summaryContent}>
+                        <View>
+                            <Text style={s.summaryLabel}>Total Records</Text>
+                            <Text style={s.summaryValue}>{history.length}</Text>
                         </View>
-                        <Text style={s.summaryLabel}>Total Records</Text>
+                        <View style={s.summaryIconBox}>
+                            <Ionicons name="stats-chart" size={18} color="#C5A059" />
+                        </View>
                     </View>
-                    <Text style={s.summaryValue}>{history.length}</Text>
-                    <Text style={s.summarySub}>Lifetime transaction history</Text>
-                    
-                    {/* Decorative Elements */}
-                    <View style={s.circleDecoration1} />
-                    <View style={s.circleDecoration2} />
                 </LinearGradient>
             </View>
 
-            {/* Smooth Filters */}
+            {/* Compact Filters */}
             <View style={s.filterRow}>
                 {['All', 'In', 'Out'].map(f => (
                     <TouchableOpacity 
@@ -144,7 +141,7 @@ export default function HistoryScreen() {
                 ))}
             </View>
 
-            {/* Clean Section List */}
+            {/* Compact Section List */}
             <SectionList
                 sections={sections}
                 keyExtractor={(item) => item.id}
@@ -154,20 +151,17 @@ export default function HistoryScreen() {
                 showsVerticalScrollIndicator={false}
                 stickySectionHeadersEnabled={false}
                 renderSectionHeader={({ section: { title } }) => (
-                    <View style={s.sectionHeaderContainer}>
-                        <Text style={s.sectionHeader}>{title}</Text>
-                        <View style={s.sectionLine} />
-                    </View>
+                    <Text style={s.sectionHeader}>{title}</Text>
                 )}
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={s.transactionCard}
                         onPress={() => router.push(`/transaction-details/${item.id}`)}
-                        activeOpacity={0.7}
+                        activeOpacity={0.6}
                     >
                         <View style={s.cardLeft}>
-                            <View style={[s.txIcon, { backgroundColor: item.color + '15' }]}>
-                                <Ionicons name={item.icon as any} size={22} color={item.color} />
+                            <View style={[s.txIcon, { backgroundColor: item.color + '10' }]}>
+                                <Ionicons name={item.icon as any} size={18} color={item.color} />
                             </View>
                             <View style={s.txInfo}>
                                 <Text style={s.txTitle} numberOfLines={1}>
@@ -188,11 +182,8 @@ export default function HistoryScreen() {
                 )}
                 ListEmptyComponent={() => (
                     <View style={s.emptyState}>
-                        <View style={s.emptyIcon}>
-                            <Ionicons name="document-text-outline" size={40} color="#cbd5e1" />
-                        </View>
+                        <Ionicons name="document-text-outline" size={32} color="#CBD5E1" />
                         <Text style={s.emptyText}>No records found</Text>
-                        <Text style={s.emptySubText}>Your transaction history will appear here.</Text>
                     </View>
                 )}
             />
@@ -204,11 +195,11 @@ export default function HistoryScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F3F6F8', // Lighter, cleaner background
+        backgroundColor: '#F8FAFC',
     },
     centerContainer: {
         flex: 1,
-        backgroundColor: '#F3F6F8',
+        backgroundColor: '#F8FAFC',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -216,160 +207,110 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
     },
     iconButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#ffffff',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#EFF6FF',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 3,
     },
     headerTitle: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#0d1b3e',
-        letterSpacing: -0.5,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0F172A',
     },
     summaryContainer: {
-        paddingHorizontal: 20,
-        marginBottom: 24,
-    },
-    summaryCard: {
-        borderRadius: 28,
-        padding: 24,
-        shadowColor: '#1e3a8a',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
-        overflow: 'hidden',
-    },
-    summaryTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        paddingHorizontal: 16,
         marginBottom: 16,
     },
+    summaryCard: {
+        borderRadius: 16,
+        padding: 16,
+    },
+    summaryContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     summaryIconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
     },
     summaryLabel: {
-        color: '#e2e8f0',
-        fontSize: 15,
-        fontWeight: '600',
+        color: '#BFDBFE',
+        fontSize: 12,
+        fontWeight: '500',
+        marginBottom: 4,
     },
     summaryValue: {
-        color: '#ffffff',
-        fontSize: 38,
-        fontWeight: '900',
-        marginBottom: 6,
-        letterSpacing: -1,
-    },
-    summarySub: {
-        color: '#cbd5e1',
-        fontSize: 13,
-        fontWeight: '500',
-    },
-    circleDecoration1: {
-        position: 'absolute',
-        top: -30,
-        right: -30,
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    circleDecoration2: {
-        position: 'absolute',
-        bottom: -40,
-        right: 40,
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        color: '#FFFFFF',
+        fontSize: 24,
+        fontWeight: '800',
     },
     filterRow: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
-        marginBottom: 20,
+        paddingHorizontal: 16,
+        marginBottom: 12,
     },
     filterChip: {
-        paddingHorizontal: 24,
-        paddingVertical: 10,
-        borderRadius: 25,
-        backgroundColor: '#ffffff',
-        marginRight: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 2,
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
+        marginRight: 8,
         borderWidth: 1,
-        borderColor: '#f1f5f9',
+        borderColor: '#E2E8F0',
     },
     filterChipActive: {
-        backgroundColor: '#0d1b3e',
-        borderColor: '#0d1b3e',
+        backgroundColor: '#0056D2',
+        borderColor: '#0056D2',
     },
     filterText: {
-        color: '#64748b',
-        fontSize: 14,
-        fontWeight: '700',
+        color: '#64748B',
+        fontSize: 13,
+        fontWeight: '600',
     },
     filterTextActive: {
-        color: '#ffffff',
+        color: '#FFFFFF',
     },
     listContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 120,
-    },
-    sectionHeaderContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 10,
-        marginBottom: 16,
+        paddingHorizontal: 16,
+        paddingBottom: 40,
     },
     sectionHeader: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#94a3b8',
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#94A3B8',
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
-        marginRight: 10,
-    },
-    sectionLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#e2e8f0',
+        marginTop: 12,
+        marginBottom: 8,
+        marginLeft: 4,
     },
     transactionCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
-        paddingVertical: 18,
-        paddingHorizontal: 18,
-        borderRadius: 24,
-        marginBottom: 14,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        marginBottom: 8,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.04,
-        shadowRadius: 10,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.02,
+        shadowRadius: 3,
+        elevation: 1,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
     cardLeft: {
         flexDirection: 'row',
@@ -377,76 +318,57 @@ const s = StyleSheet.create({
         flex: 1,
     },
     txIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 18,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
+        marginRight: 12,
     },
     txInfo: {
         flex: 1,
-        paddingRight: 10,
+        paddingRight: 8,
     },
     txTitle: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#0f172a',
-        marginBottom: 4,
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 2,
     },
     txDesc: {
-        fontSize: 13,
-        color: '#64748b',
-        fontWeight: '500',
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '400',
     },
     cardRight: {
         alignItems: 'flex-end',
     },
     txAmount: {
-        fontSize: 17,
-        fontWeight: '900',
+        fontSize: 14,
+        fontWeight: '800',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        marginBottom: 6,
+        marginBottom: 2,
     },
     amountPlus: {
-        color: '#10b981',
+        color: '#107C10',
     },
     amountMinus: {
-        color: '#0f172a',
+        color: '#0F172A',
     },
     txTime: {
-        fontSize: 12,
-        color: '#94a3b8',
-        fontWeight: '600',
+        fontSize: 11,
+        color: '#94A3B8',
+        fontWeight: '500',
     },
     emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: 80,
-    },
-    emptyIcon: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        backgroundColor: '#ffffff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 2,
+        paddingTop: 60,
     },
     emptyText: {
-        fontSize: 18,
-        color: '#0f172a',
-        fontWeight: '800',
-        marginBottom: 8,
-    },
-    emptySubText: {
         fontSize: 14,
-        color: '#94a3b8',
-        fontWeight: '500',
+        color: '#94A3B8',
+        fontWeight: '600',
+        marginTop: 12,
     },
 });
