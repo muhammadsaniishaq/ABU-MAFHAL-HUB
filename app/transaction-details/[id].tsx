@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Platform, ScrollView, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,32 +9,57 @@ import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 
+// Brand Colors
+const NAVY = '#0d1b3e';
+const GOLD = '#f5a623';
+
 export default function ReceiptScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const [transaction, setTransaction] = useState<any>(null);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const viewShotRef = useRef<any>(null);
 
     useEffect(() => {
         if (id) {
-            fetchTransaction();
+            fetchData();
         }
     }, [id]);
 
-    const fetchTransaction = async () => {
+    const fetchData = async () => {
         try {
-            const { data, error } = await supabase
+            setLoading(true);
+            
+            // Fetch transaction
+            const { data: txData, error: txError } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('id', id)
                 .single();
 
-            if (data) {
-                setTransaction(data);
+            if (txData) setTransaction(txData);
+
+            // Fetch dynamic logo from app_settings
+            const { data: settingsData } = await supabase
+                .from('app_settings')
+                .select('key, value');
+            
+            if (settingsData) {
+                // Try fetching logo_icon first, else full banner, or fallback
+                const iconSetting = settingsData.find(s => s.key === 'app_logo_icon');
+                if (iconSetting?.value?.url) {
+                    setLogoUrl(iconSetting.value.url);
+                } else {
+                    const logoSetting = settingsData.find(s => s.key === 'app_logo');
+                    if (logoSetting?.value?.url) {
+                        setLogoUrl(logoSetting.value.url);
+                    }
+                }
             }
+
         } catch (error) {
-            console.error('Error fetching transaction:', error);
+            console.error('Error fetching data:', error);
         } finally {
             setLoading(false);
         }
@@ -60,7 +85,7 @@ export default function ReceiptScreen() {
     if (loading) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#0056D2" />
+                <ActivityIndicator size="large" color={NAVY} />
             </SafeAreaView>
         );
     }
@@ -68,7 +93,7 @@ export default function ReceiptScreen() {
     if (!transaction) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <Ionicons name="warning-outline" size={40} color="#C5A059" style={{marginBottom: 16}} />
+                <Ionicons name="warning-outline" size={40} color={GOLD} style={{marginBottom: 16}} />
                 <Text style={s.notFoundText}>Transaction not found</Text>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
                     <Text style={s.backBtnText}>Return</Text>
@@ -94,11 +119,11 @@ export default function ReceiptScreen() {
             
             <View style={s.appHeader}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={24} color="#0F172A" />
+                    <Ionicons name="chevron-back" size={24} color={NAVY} />
                 </TouchableOpacity>
                 <Text style={s.appHeaderTitle}>Transaction Receipt</Text>
                 <TouchableOpacity onPress={shareReceipt} style={s.iconButton}>
-                    <Ionicons name="share-outline" size={22} color="#0056D2" />
+                    <Ionicons name="share-outline" size={22} color={NAVY} />
                 </TouchableOpacity>
             </View>
 
@@ -115,7 +140,11 @@ export default function ReceiptScreen() {
                                 <View style={s.headerSection}>
                                     <View style={s.logoSide}>
                                         <View style={s.logoCircle}>
-                                            <Ionicons name="shield-checkmark" size={28} color="#ffffff" />
+                                            {logoUrl ? (
+                                                <Image source={{ uri: logoUrl }} style={s.dynamicLogo} resizeMode="contain" />
+                                            ) : (
+                                                <Ionicons name="shield-checkmark" size={28} color="#ffffff" />
+                                            )}
                                         </View>
                                         <Text style={s.receiptTitle}>Receipt</Text>
                                     </View>
@@ -148,7 +177,7 @@ export default function ReceiptScreen() {
                                         </View>
                                         <View style={s.infoRow}>
                                             <Text style={s.infoLabelRight}>STATUS</Text>
-                                            <Text style={[s.infoValueRight, {color: transaction.status === 'success' ? '#107C10' : '#C5A059'}]}>
+                                            <Text style={[s.infoValueRight, {color: transaction.status === 'success' ? '#107C10' : GOLD, fontWeight: '700'}]}>
                                                 {transaction.status.toUpperCase()}
                                             </Text>
                                         </View>
@@ -219,7 +248,7 @@ const s = StyleSheet.create({
     },
     notFoundText: {
         fontSize: 16,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '600',
         marginBottom: 16,
     },
@@ -230,7 +259,7 @@ const s = StyleSheet.create({
         borderRadius: 12,
     },
     backBtnText: {
-        color: '#0F172A',
+        color: NAVY,
         fontSize: 14,
         fontWeight: '600',
     },
@@ -259,7 +288,7 @@ const s = StyleSheet.create({
     appHeaderTitle: {
         fontSize: 17,
         fontWeight: '700',
-        color: '#0F172A',
+        color: NAVY,
     },
     scrollContent: {
         paddingBottom: 40,
@@ -275,20 +304,20 @@ const s = StyleSheet.create({
     receiptCard: {
         backgroundColor: '#FFFFFF',
         width: '100%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
+        shadowColor: NAVY,
+        shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 5,
+        shadowRadius: 24,
+        elevation: 6,
         // Modern sharp-yet-smooth look
-        borderRadius: 4,
+        borderRadius: 8,
     },
     topBar: {
         height: 12,
-        backgroundColor: '#0056D2', // Primary Brand Color
+        backgroundColor: NAVY, // Primary Brand Color
         width: '100%',
-        borderTopLeftRadius: 4,
-        borderTopRightRadius: 4,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
     },
     receiptInner: {
         padding: 24,
@@ -305,16 +334,23 @@ const s = StyleSheet.create({
     logoCircle: {
         width: 56,
         height: 56,
-        backgroundColor: '#0056D2',
-        borderRadius: 12, // slightly rounded modern square
+        backgroundColor: '#ffffff',
+        borderRadius: 12, 
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 12,
+        borderWidth: 1.5,
+        borderColor: NAVY,
+        overflow: 'hidden',
+    },
+    dynamicLogo: {
+        width: '100%',
+        height: '100%',
     },
     receiptTitle: {
         fontSize: 32,
         fontWeight: '300',
-        color: '#0F172A',
+        color: NAVY,
         letterSpacing: -1,
     },
     companySide: {
@@ -322,8 +358,8 @@ const s = StyleSheet.create({
     },
     companyName: {
         fontSize: 16,
-        fontWeight: '700',
-        color: '#0F172A',
+        fontWeight: '800',
+        color: NAVY,
         marginBottom: 4,
     },
     companyAddress: {
@@ -344,14 +380,14 @@ const s = StyleSheet.create({
     },
     infoLabel: {
         fontSize: 11,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '800',
         marginBottom: 8,
     },
     infoValueBold: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#0F172A',
+        color: NAVY,
         marginBottom: 4,
     },
     infoValue: {
@@ -372,7 +408,7 @@ const s = StyleSheet.create({
     },
     infoLabelRight: {
         fontSize: 11,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '800',
         marginRight: 16,
         textAlign: 'right',
@@ -389,13 +425,13 @@ const s = StyleSheet.create({
     tableHeader: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: '#0F172A',
+        borderBottomColor: NAVY,
         paddingBottom: 8,
         marginBottom: 16,
     },
     thText: {
         fontSize: 11,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '800',
     },
     tableRow: {
@@ -421,7 +457,7 @@ const s = StyleSheet.create({
     },
     notesLabel: {
         fontSize: 11,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '800',
         marginBottom: 6,
     },
@@ -436,37 +472,37 @@ const s = StyleSheet.create({
     },
     totalLabel: {
         fontSize: 12,
-        color: '#0F172A',
+        color: NAVY,
         fontWeight: '800',
         marginBottom: 6,
     },
     totalValue: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#0F172A',
+        color: NAVY,
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
     footerBar: {
-        backgroundColor: '#EFF6FF', // Light primary tint
+        backgroundColor: 'rgba(13, 27, 62, 0.05)', 
         paddingVertical: 16,
         alignItems: 'center',
-        borderBottomLeftRadius: 4,
-        borderBottomRightRadius: 4,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
     },
     footerText: {
         fontSize: 12,
-        color: '#0056D2',
+        color: NAVY,
     },
     downloadBtn: {
         flexDirection: 'row',
-        backgroundColor: '#0056D2',
+        backgroundColor: NAVY,
         marginHorizontal: 16,
         marginTop: 10,
         paddingVertical: 16,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#0056D2',
+        shadowColor: NAVY,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,

@@ -1,4 +1,4 @@
-import { View, Text, SectionList, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, SectionList, TouchableOpacity, ActivityIndicator, StyleSheet, Platform, Image } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -33,13 +33,13 @@ export default function HistoryScreen() {
                         const amount = parseFloat(tx.amount.toString());
                         const isIncome = tx.type === 'deposit' || amount > 0;
                         let icon = 'wallet-outline';
-                        let color = '#C5A059'; // Gold brand color
+                        let color = '#f5a623'; // Gold brand color
 
-                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#0056D2'; } // Primary brand color
+                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#0d1b3e'; } // Navy brand color
                         else if (tx.type === 'withdrawal') { icon = 'cash-outline'; color = '#DC2626'; }
                         else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#107C10'; }
-                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#0056D2'; }
-                        else if (tx.type === 'payment') { icon = 'flash-outline'; color = '#C5A059'; }
+                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#0d1b3e'; }
+                        else if (tx.type === 'payment') { icon = 'flash-outline'; color = '#f5a623'; }
 
                         return {
                             ...tx,
@@ -88,7 +88,7 @@ export default function HistoryScreen() {
     if (loading && history.length === 0) {
         return (
             <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#0056D2" />
+                <ActivityIndicator size="large" color="#0d1b3e" />
             </SafeAreaView>
         );
     }
@@ -100,18 +100,18 @@ export default function HistoryScreen() {
             {/* Header */}
             <View style={s.header}>
                 <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={20} color="#0056D2" />
+                    <Ionicons name="chevron-back" size={20} color="#0d1b3e" />
                 </TouchableOpacity>
                 <Text style={s.headerTitle}>History</Text>
                 <TouchableOpacity style={s.iconButton}>
-                    <Ionicons name="filter" size={18} color="#0056D2" />
+                    <Ionicons name="filter" size={18} color="#0d1b3e" />
                 </TouchableOpacity>
             </View>
 
             {/* Compact Summary Card with Brand Colors */}
             <View style={s.summaryContainer}>
                 <LinearGradient 
-                    colors={['#0056D2', '#1E40AF']} 
+                    colors={['#0d1b3e', '#142258']} 
                     style={s.summaryCard} 
                     start={{ x: 0, y: 0 }} 
                     end={{ x: 1, y: 1 }}
@@ -122,7 +122,7 @@ export default function HistoryScreen() {
                             <Text style={s.summaryValue}>{history.length}</Text>
                         </View>
                         <View style={s.summaryIconBox}>
-                            <Ionicons name="stats-chart" size={18} color="#C5A059" />
+                            <Ionicons name="stats-chart" size={18} color="#f5a623" />
                         </View>
                     </View>
                 </LinearGradient>
@@ -215,7 +215,7 @@ const s = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#f1f5f9',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -231,6 +231,11 @@ const s = StyleSheet.create({
     summaryCard: {
         borderRadius: 16,
         padding: 16,
+        shadowColor: '#0d1b3e',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
     },
     summaryContent: {
         flexDirection: 'row',
@@ -246,7 +251,7 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     summaryLabel: {
-        color: '#BFDBFE',
+        color: '#e2e8f0',
         fontSize: 12,
         fontWeight: '500',
         marginBottom: 4,
@@ -271,8 +276,8 @@ const s = StyleSheet.create({
         borderColor: '#E2E8F0',
     },
     filterChipActive: {
-        backgroundColor: '#0056D2',
-        borderColor: '#0056D2',
+        backgroundColor: '#0d1b3e',
+        borderColor: '#0d1b3e',
     },
     filterText: {
         color: '#64748B',
@@ -353,7 +358,7 @@ const s = StyleSheet.create({
         color: '#107C10',
     },
     amountMinus: {
-        color: '#0F172A',
+        color: '#0d1b3e',
     },
     txTime: {
         fontSize: 11,
