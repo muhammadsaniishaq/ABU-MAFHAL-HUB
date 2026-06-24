@@ -42,7 +42,8 @@ Deno.serve(async (req: Request) => {
         // Detect Provider based on headers
         const paystackSignature = req.headers.get('x-paystack-signature');
         const flwSignature = req.headers.get('verif-hash') || req.headers.get('flutterwave-signature');
-        const payvesselSignature = req.headers.get('http_payvessel_http_signature') || 
+        const payvesselSignature = req.headers.get('payvessel-http-signature') ||
+                                   req.headers.get('http_payvessel_http_signature') || 
                                    req.headers.get('http-payvessel-http-signature') ||
                                    req.headers.get('HTTP_PAYVESSEL_HTTP_SIGNATURE');
         
