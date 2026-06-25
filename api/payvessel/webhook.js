@@ -31,9 +31,14 @@ async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-      console.error('[CRITICAL] Missing Supabase configuration variables (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
-      return res.status(500).json({ error: 'Server Configuration Error' });
+    if (!supabaseUrl) {
+      console.error('[CRITICAL] Missing SUPABASE_URL.');
+      return res.status(500).json({ error: 'Server Configuration Error', details: 'SUPABASE_URL (or EXPO_PUBLIC_SUPABASE_URL) is missing in Vercel environment variables' });
+    }
+
+    if (!supabaseServiceRoleKey) {
+      console.error('[CRITICAL] Missing SUPABASE_SERVICE_ROLE_KEY.');
+      return res.status(500).json({ error: 'Server Configuration Error', details: 'SUPABASE_SERVICE_ROLE_KEY is missing in Vercel environment variables. Please add it to your Vercel Dashboard.' });
     }
 
     // Initialize Supabase Client with service role key to bypass Row Level Security
@@ -59,7 +64,7 @@ async function handler(req, res) {
 
       if (secretError) {
         console.error('[Database Error] Failed to read system_secrets:', secretError);
-        return res.status(500).json({ error: 'Database verification error' });
+        return res.status(500).json({ error: 'Database verification error', details: secretError.message });
       }
 
       if (secretRow && secretRow.value) {
@@ -68,8 +73,8 @@ async function handler(req, res) {
     }
 
     if (!payvesselSecret) {
-      console.error('[CRITICAL] PAYVESSEL_API_SECRET is not configured anywhere.');
-      return res.status(500).json({ error: 'Provider Config Error' });
+      console.error('[CRITICAL] PAYVESSEL_API_SECRET is not configured.');
+      return res.status(500).json({ error: 'Provider Config Error', details: 'PAYVESSEL_API_SECRET is not set in Vercel env or system_secrets table' });
     }
 
     // 3. Verify signature
@@ -90,7 +95,10 @@ async function handler(req, res) {
 
     if (computedSignature !== signature) {
       console.error(`Signature verification failed: Mismatch.\nHeader: ${signature}\nComputed: ${computedSignature}`);
-      return res.status(401).json({ error: 'Unauthorized: Invalid signature' });
+      return res.status(401).json({ 
+        error: 'Unauthorized: Invalid signature', 
+        details: 'The signature computed by the server does not match the payvessel-http-signature header. Check if PAYVESSEL_API_SECRET is correct.' 
+      });
     }
 
     // 4. Parse the payload
