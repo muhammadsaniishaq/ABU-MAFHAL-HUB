@@ -49,6 +49,24 @@ Deno.serve(async (req: Request) => {
         
         console.log(`[Webhook] Detect: PaystackSig=${!!paystackSignature}, FLWSig=${!!flwSignature}, PayvesselSig=${!!payvesselSignature}`);
 
+        const rawBody = await req.text();
+        
+        // --- DEBUG LOGGING ---
+        try {
+             await supabaseAdmin.from('payment_events').insert({
+                 provider: 'DEBUG_RAW',
+                 reference: `req_${Date.now()}`,
+                 amount: 0,
+                 currency: 'NGN',
+                 status: 'debug',
+                 metadata: { 
+                     headers: Object.fromEntries(req.headers),
+                     body: rawBody
+                 },
+                 processed_at: new Date().toISOString()
+             });
+        } catch (e) { console.error("Debug log failed", e); }
+
         // --- PAYVESSEL HANDLER ---
         if (payvesselSignature) {
             let PAYVESSEL_API_SECRET = Deno.env.get('PAYVESSEL_API_SECRET');
@@ -70,9 +88,8 @@ Deno.serve(async (req: Request) => {
                 return new Response("Provider Config Error", { status: 500 });
             }
 
-            const bodyText = await req.text();
-            
-            // Signature verification
+            // signature verification uses rawBody
+            const bodyText = rawBody;
             const encoder = new TextEncoder();
             const key = await crypto.subtle.importKey(
                 "raw",
@@ -121,12 +138,15 @@ Deno.serve(async (req: Request) => {
                                       transactionObj.accountNumber || 
                                       eventData.account_number || 
                                       eventData.accountNumber ||
+                                      transactionObj.virtual_account?.account_number ||
+                                      transactionObj.virtualAccount?.accountNumber ||
+                                      transactionObj.virtualAccount?.account_number ||
+                                      transactionObj.virtual_account?.accountNumber ||
+                                      transactionObj.customer?.virtual_account_number ||
+                                      transactionObj.customer?.virtualAccountNumber ||
                                       eventData.virtual_account?.account_number ||
                                       eventData.virtualAccount?.accountNumber ||
-                                      eventData.virtualAccount?.account_number ||
-                                      eventData.virtual_account?.accountNumber ||
-                                      eventData.customer?.virtual_account_number ||
-                                      eventData.customer?.virtualAccountNumber;
+                                      eventData.customer?.virtual_account_number;
                 
                 console.log(`[Payvessel Webhook] Parsed: Ref=${reference}, Amt=${amount}, Email=${email}, AccNum=${accountNumber}`);
                 
@@ -156,7 +176,7 @@ Deno.serve(async (req: Request) => {
                 console.error("[CRITICAL] PAYSTACK_SECRET_KEY not set");
                 return new Response("Provider Config Error", { status: 500 });
             }
-            const body = await req.text();
+            const body = rawBody;
             const encoder = new TextEncoder();
             const key = await crypto.subtle.importKey(
                 "raw",
@@ -189,7 +209,7 @@ Deno.serve(async (req: Request) => {
 
         // --- FLUTTERWAVE HANDLER ---
         if (flwSignature) {
-             const bodyText = await req.text();
+             const bodyText = rawBody;
              let event;
              try {
                 event = JSON.parse(bodyText);

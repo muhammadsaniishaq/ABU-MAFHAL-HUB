@@ -12,7 +12,10 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
 $curl_headers = array('Content-Type: application/json');
 foreach ($headers as $key => $value) {
-    $curl_headers[] = "$key: $value";
+    $lower_key = strtolower($key);
+    if ($lower_key !== 'host' && $lower_key !== 'content-length' && $lower_key !== 'content-type') {
+        $curl_headers[] = "$key: $value";
+    }
 }
 curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
 
