@@ -1,10 +1,11 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../services/supabase';
 
 // Slip Components
 import { IDCardMockup } from '../../components/IDCardMockup';
@@ -16,11 +17,11 @@ import { InformationSlip } from '../../components/InformationSlip';
 const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
 
-const SLIP_LAYOUTS = [
-    { id: 'premium', name: 'Premium', price: 200, type: 'prem', image: require('../../assets/images/premium.png') },
-    { id: 'standard', name: 'Standard', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png') },
-    { id: 'regular', name: 'Regular', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png') },
-    { id: 'info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png') },
+const DEFAULT_LAYOUTS = [
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium', price: 200, type: 'prem', image: require('../../assets/images/premium.png') },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png') },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png') },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png') },
 ];
 
 export default function VerifyNINScreen() {
@@ -30,6 +31,27 @@ export default function VerifyNINScreen() {
     const [consent, setConsent] = useState(false);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
+    const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
+
+    useEffect(() => {
+        const fetchPrices = async () => {
+            try {
+                const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'nin');
+                if (error || !data) return;
+                
+                setLayouts(prev => prev.map(layout => {
+                    const dbPrice = data.find(d => d.id === layout.db_id);
+                    if (dbPrice) {
+                        return { ...layout, price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price) };
+                    }
+                    return layout;
+                }));
+            } catch (e) {
+                console.warn('Failed to fetch dynamic prices', e);
+            }
+        };
+        fetchPrices();
+    }, []);
 
     const handleVerify = async () => {
         if (nin.length !== 11) {
@@ -39,7 +61,7 @@ export default function VerifyNINScreen() {
             return Alert.alert('Consent Required', 'You must agree that the owner of the ID has granted you consent.');
         }
 
-        const layoutConfig = SLIP_LAYOUTS.find(l => l.id === selectedLayout) || SLIP_LAYOUTS[0];
+        const layoutConfig = layouts.find(l => l.id === selectedLayout) || layouts[0];
 
         setLoading(true);
         try {
@@ -150,7 +172,7 @@ export default function VerifyNINScreen() {
                         <Text className="text-slate-800 font-bold text-xs tracking-wider">Slip Layout</Text>
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {SLIP_LAYOUTS.map((layout) => {
+                        {layouts.map((layout) => {
                             const isSelected = selectedLayout === layout.id;
                             return (
                                 <TouchableOpacity
