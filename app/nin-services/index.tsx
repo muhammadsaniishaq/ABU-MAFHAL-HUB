@@ -14,30 +14,33 @@ const SERVICES = [
     { id: 'delink', title: 'Delink Phone', desc: 'Remove phone from NIN', icon: 'cut', color: 'bg-red-100', iconColor: '#DC2626', route: '/nin-services/delink' },
 ];
 
-export default function NINServicesDashboard() {
+export default function NINServicesScreen() {
+    const insets = useSafeAreaInsets();
+
     return (
         <View className="flex-1 bg-slate-50">
-            <Stack.Screen
-                options={{
-                    title: 'NIN Services',
-                    headerStyle: { backgroundColor: '#0f172a' }, // Navy blue
-                    headerTintColor: '#C5A059', // Gold
-                    headerTitleStyle: { fontWeight: '900', fontSize: 18 },
-                    headerShadowVisible: false
-                }}
-            />
+            <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
             
-            <View className="bg-[#0f172a] px-6 pt-6 pb-12 rounded-b-[40px] shadow-sm relative overflow-hidden">
+            <LinearGradient 
+                colors={['#060d21', '#0d1b3e']} 
+                style={{ paddingTop: insets.top + 20, paddingBottom: 60, paddingHorizontal: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+            >
                 {/* Gold accent decorations */}
-                <View className="absolute -top-10 -right-10 w-32 h-32 bg-[#C5A059] rounded-full opacity-10" />
-                <View className="absolute bottom-[-20px] -left-8 w-24 h-24 bg-[#C5A059] rounded-full opacity-10" />
+                <View className="absolute -top-10 -right-10 w-32 h-32 bg-[#f5a623] rounded-full opacity-10" />
+                <View className="absolute bottom-[-20px] -left-8 w-24 h-24 bg-[#f5a623] rounded-full opacity-10" />
                 
-                <Text className="text-white text-2xl font-black mb-1">NIN Services</Text>
-                <Text className="text-[#C5A059] text-sm font-semibold">Select a service to proceed</Text>
-            </View>
+                <TouchableOpacity onPress={() => router.back()} className="mb-6 bg-white/10 w-10 h-10 rounded-full items-center justify-center">
+                    <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                </TouchableOpacity>
 
-            <ScrollView className="flex-1 px-4 -mt-6" contentContainerStyle={{ paddingTop: 10, paddingBottom: 60 }}>
+                <Text className="text-white text-3xl font-black mb-1 tracking-tight">NIN Services</Text>
+                <Text className="text-[#f5a623] text-sm font-semibold opacity-90">Identity verification and management</Text>
+            </LinearGradient>
+
+            <ScrollView className="flex-1 px-4 -mt-10" contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}>
                 <View className="flex-row flex-wrap justify-between">
                     {SERVICES.map((service, index) => (
                         <TouchableOpacity 
