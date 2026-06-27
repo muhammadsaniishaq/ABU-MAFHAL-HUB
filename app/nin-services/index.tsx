@@ -25,44 +25,44 @@ export default function NINServicesScreen() {
             
             <LinearGradient 
                 colors={['#050B14', '#0B163A']} 
-                style={{ paddingTop: insets.top + 20, paddingBottom: 50, paddingHorizontal: 24, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 }}
+                style={{ paddingTop: insets.top + 10, paddingBottom: 30, paddingHorizontal: 20, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 15, elevation: 10 }}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
                 {/* Decorative Elements */}
-                <View className="absolute -top-16 -right-12 w-48 h-48 bg-[#f5a623] rounded-full opacity-[0.05]" />
-                <View className="absolute top-20 -left-12 w-32 h-32 bg-[#4F46E5] rounded-full opacity-[0.06]" />
+                <View className="absolute -top-10 -right-8 w-32 h-32 bg-[#f5a623] rounded-full opacity-[0.05]" />
+                <View className="absolute top-10 -left-8 w-24 h-24 bg-[#4F46E5] rounded-full opacity-[0.06]" />
                 
-                <View className="flex-row items-center justify-between mb-8">
-                    <TouchableOpacity onPress={() => router.back()} className="bg-white/10 w-11 h-11 rounded-full items-center justify-center border border-white/10">
-                        <Ionicons name="chevron-back" size={24} color="#ffffff" />
+                <View className="flex-row items-center justify-between mb-4">
+                    <TouchableOpacity onPress={() => router.back()} className="bg-white/10 w-9 h-9 rounded-full items-center justify-center border border-white/10">
+                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
                     </TouchableOpacity>
-                    <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/10 flex-row items-center">
-                        <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2" />
-                        <Text className="text-white text-xs font-bold tracking-wider">SECURE</Text>
+                    <View className="bg-white/10 px-2 py-1 rounded-full border border-white/10 flex-row items-center">
+                        <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                        <Text className="text-white text-[10px] font-bold tracking-wider">SECURE</Text>
                     </View>
                 </View>
 
                 <View className="flex-row items-center mb-1">
-                    <Ionicons name="shield-checkmark" size={26} color="#f5a623" className="mr-2" />
-                    <Text className="text-white text-3xl font-black tracking-tight">NIN Services</Text>
+                    <Ionicons name="shield-checkmark" size={20} color="#f5a623" className="mr-2" />
+                    <Text className="text-white text-2xl font-black tracking-tight">NIN Services</Text>
                 </View>
-                <Text className="text-slate-300 text-sm font-medium opacity-90 mt-1">National Identity Management Gateway</Text>
+                <Text className="text-slate-300 text-xs font-medium opacity-90 mt-0.5">National Identity Management Gateway</Text>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-5 -mt-6" contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}>
+            <ScrollView className="flex-1 px-4 -mt-4" contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}>
                 <View className="flex-row flex-wrap justify-between">
                     {SERVICES.map((service, index) => (
                         <TouchableOpacity 
                             key={service.id}
                             onPress={() => router.push(service.route as any)}
-                            className="bg-white w-[48%] rounded-3xl p-5 mb-4 shadow-sm border border-slate-100 items-start"
+                            className="bg-white w-[48%] rounded-2xl p-4 mb-3 shadow-sm border border-slate-100 items-start"
                         >
-                            <View className={`w-12 h-12 rounded-2xl ${service.color} items-center justify-center mb-4`}>
-                                <Ionicons name={service.icon as any} size={24} color={service.iconColor} />
+                            <View className={`w-10 h-10 rounded-xl ${service.color} items-center justify-center mb-3`}>
+                                <Ionicons name={service.icon as any} size={20} color={service.iconColor} />
                             </View>
-                            <Text className="text-slate-800 font-extrabold text-sm mb-1">{service.title}</Text>
-                            <Text className="text-slate-500 text-[10px] font-medium leading-4">{service.desc}</Text>
+                            <Text className="text-slate-800 font-extrabold text-xs mb-1">{service.title}</Text>
+                            <Text className="text-slate-500 text-[10px] leading-3">{service.desc}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
