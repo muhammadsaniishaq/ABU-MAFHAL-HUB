@@ -5,6 +5,12 @@ import { useState } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 
+// Slip Components
+import { IDCardMockup } from '../../components/IDCardMockup';
+import { StandardSlip } from '../../components/StandardSlip';
+import { RegularSlip } from '../../components/RegularSlip';
+import { InformationSlip } from '../../components/InformationSlip';
+
 // Simulated API Call
 const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; // We should use secure storage usually
@@ -63,24 +69,34 @@ export default function VerifyNINScreen() {
         }
     };
 
+    const renderSlip = () => {
+        if (!result || !result.data) return null;
+        
+        switch(selectedLayout) {
+            case 'premium': return <IDCardMockup data={result.data} />;
+            case 'standard': return <StandardSlip data={result.data} />;
+            case 'regular': return <RegularSlip data={result.data} />;
+            case 'info': return <InformationSlip data={result.data} />;
+            default: return <IDCardMockup data={result.data} />;
+        }
+    };
+
     if (result) {
         // Result Screen 
         return (
             <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 24, paddingBottom: 50 }}>
                 <Stack.Screen options={{ title: 'Verification Result', headerStyle: { backgroundColor: '#050B14' }, headerTintColor: '#fff' }} />
+                
                 <View className="bg-emerald-50 p-6 rounded-3xl mb-6 items-center">
                     <Ionicons name="checkmark-circle" size={48} color="#059669" />
                     <Text className="text-emerald-800 font-bold text-lg mt-2">ID Verified Successfully</Text>
                     <Text className="text-emerald-700 text-sm">{result.data.firstname} {result.data.surname}</Text>
                 </View>
                 
-                {/* Note: IDCardMockup needs to be updated or we can just display data here */}
-                <View className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6">
-                    <Text className="font-bold text-slate-800 mb-4 text-lg">Details</Text>
-                    <Text className="text-slate-600 mb-2">Name: <Text className="font-bold text-slate-800">{result.data.firstname} {result.data.middlename} {result.data.surname}</Text></Text>
-                    <Text className="text-slate-600 mb-2">DOB: <Text className="font-bold text-slate-800">{result.data.birthdate}</Text></Text>
-                    <Text className="text-slate-600 mb-2">Gender: <Text className="font-bold text-slate-800">{result.data.gender}</Text></Text>
-                    <Text className="text-slate-600 mb-2">State: <Text className="font-bold text-slate-800">{result.data.residence_state}</Text></Text>
+                {/* Render the selected slip layout */}
+                <View className="mb-6 items-center w-full">
+                    <Text className="font-bold text-slate-500 mb-2 uppercase text-[10px] tracking-widest">{selectedLayout} Slip</Text>
+                    {renderSlip()}
                 </View>
 
                 <TouchableOpacity onPress={() => setResult(null)} className="bg-[#050B14] h-14 rounded-xl items-center justify-center">
