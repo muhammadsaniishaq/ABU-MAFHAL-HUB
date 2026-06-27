@@ -27,7 +27,7 @@ export default function NINServicesScreen() {
             
             <LinearGradient 
                 colors={['#050B14', '#0B163A']} 
-                style={{ paddingTop: insets.top + 10, paddingBottom: 30, paddingHorizontal: 20, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 15, elevation: 10 }}
+                style={{ paddingTop: insets.top + 10, paddingBottom: 50, paddingHorizontal: 20, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 15, elevation: 10 }}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
@@ -52,8 +52,24 @@ export default function NINServicesScreen() {
                 <Text className="text-slate-300 text-xs font-medium opacity-90 mt-0.5">National Identity Management Gateway</Text>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-4 -mt-4" contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}>
-                <View className="flex-row flex-wrap justify-between">
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
+                {/* Floating Stats Card */}
+                <View className="mx-4 -mt-8 mb-6 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-row justify-between items-center">
+                    <View className="flex-1 items-center">
+                        <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Checks</Text>
+                        <Text className="text-slate-800 text-xl font-black">1,248</Text>
+                    </View>
+                    <View className="w-[1px] h-10 bg-slate-100 mx-2" />
+                    <View className="flex-1 items-center">
+                        <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">System Status</Text>
+                        <View className="flex-row items-center mt-1">
+                            <View className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 shadow-sm shadow-emerald-200" />
+                            <Text className="text-emerald-600 text-xs font-extrabold">Online</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View className="flex-row flex-wrap justify-between px-4">
                     {SERVICES.map((service, index) => (
                         <TouchableOpacity 
                             key={service.id}
