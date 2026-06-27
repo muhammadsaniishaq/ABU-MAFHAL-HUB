@@ -14,7 +14,6 @@ const SERVICES = [
     { id: 'track', title: 'Card Tracking', desc: 'Check Personalization status', icon: 'card', color: 'bg-orange-100', iconColor: '#EA580C', route: '/nin-services/tracking' },
     { id: 'delink', title: 'Delink Phone', desc: 'Remove phone from NIN', icon: 'cut', color: 'bg-red-100', iconColor: '#DC2626', route: '/nin-services/delink' },
     { id: 'modify', title: 'Modification', desc: 'Update NIN information', icon: 'create', color: 'bg-yellow-100', iconColor: '#D97706', route: '#' },
-    { id: 'lost', title: 'Lost/Stolen Card', desc: 'Report or block NIN card', icon: 'warning', color: 'bg-rose-100', iconColor: '#E11D48', route: '#' },
 ];
 
 export default function NINServicesScreen() {
