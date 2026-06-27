@@ -43,6 +43,18 @@ export default function NinPricingBoard() {
         }));
     };
 
+    const updateCost = (id: string, newCost: string) => {
+        const val = parseInt(newCost, 10);
+        if (isNaN(val) && newCost !== '') return;
+
+        setPrices(prev => prev.map(p => {
+            if (p.id === id) {
+                return { ...p, cost_price: newCost === '' ? 0 : val };
+            }
+            return p;
+        }));
+    };
+
     const handleSave = async () => {
         try {
             setSaving(true);
@@ -50,6 +62,7 @@ export default function NinPricingBoard() {
                 const { error } = await supabase
                     .from('service_pricing')
                     .update({
+                        cost_price: item.cost_price,
                         markup_price: item.markup_price,
                         updated_at: new Date().toISOString()
                     })
@@ -98,9 +111,17 @@ export default function NinPricingBoard() {
 
                                     <View className="flex-row gap-3">
                                         {/* Cost Price */}
-                                        <View className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                            <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider mb-1">Cost Price (Base)</Text>
-                                            <Text className="text-lg font-bold text-slate-700">₦{Number(item.cost_price).toLocaleString()}</Text>
+                                        <View className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                            <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-1">Cost Price (Base)</Text>
+                                            <View className="flex-row items-center border-b border-slate-300 h-8">
+                                                <Text className="text-slate-600 font-bold text-lg">₦</Text>
+                                                <TextInput
+                                                    className="flex-1 text-lg font-bold text-slate-700 ml-1 h-full"
+                                                    value={String(item.cost_price)}
+                                                    onChangeText={(val) => updateCost(item.id, val)}
+                                                    keyboardType="number-pad"
+                                                />
+                                            </View>
                                         </View>
 
                                         {/* Profit / Markup */}
