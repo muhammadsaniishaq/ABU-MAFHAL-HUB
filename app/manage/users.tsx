@@ -124,7 +124,7 @@ export default function UserManagement() {
     // Stats
     const stats = {
         totalUsers: users.length,
-        totalBalance: users.reduce((acc, u) => acc + (u.balance || 0), 0),
+        totalBalance: users.reduce((acc, u) => acc + (u.credit_balance || 0), 0),
         activeUsers: users.filter(u => u.status === 'active').length,
         verifiedUsers: users.filter(u => u.kyc_verified).length
     };
@@ -157,7 +157,7 @@ export default function UserManagement() {
 
     const runSmartScan = (user: UserProfile) => {
         // Simulated AI Logic
-        const balance = user.balance || 0;
+        const balance = user.credit_balance || 0;
         const risk = user.status === 'suspended' ? 'High' : (balance > 1000000 ? 'Medium' : 'Low');
         const loyalty = balance > 500000 ? 'Gold' : (balance > 50000 ? 'Silver' : 'Bronze');
         let next = 'None';
@@ -293,7 +293,7 @@ export default function UserManagement() {
         try {
             if (pendingAction.type === 'fund') {
                 const amount = Number(pendingAction.amount);
-                const newBalance = (selectedUser.balance || 0) + amount;
+                const newBalance = (selectedUser.credit_balance || 0) + amount;
                 const { error } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', selectedUser.id);
                 if (error) throw error;
                 Alert.alert("Success", amount > 0 ? `Funded ₦${amount.toLocaleString()}` : `Debited ₦${Math.abs(amount).toLocaleString()}`);
@@ -518,7 +518,7 @@ export default function UserManagement() {
              let csv = "ID,Name,Email,Phone,Balance,Status,Role,Joined\n";
              // CSV Rows
              selectedUsers.forEach(u => {
-                 csv += `${u.id},"${u.full_name}","${u.email}","${u.phone || ''}",${u.balance},${u.status},${u.role},${u.created_at}\n`;
+                 csv += `${u.id},"${u.full_name}","${u.email}","${u.phone || ''}",${u.credit_balance},${u.status},${u.role},${u.created_at}\n`;
              });
              
              try {
@@ -542,7 +542,7 @@ Status: ${selectedUser.status} [KYC: ${selectedUser.kyc_verified ? 'Yes' : 'No'}
 Role: ${selectedUser.role}
 
 Financials:
-- Balance: ₦${selectedUser.balance?.toLocaleString()}
+- Balance: ₦${selectedUser.credit_balance?.toLocaleString()}
 - Account: ${selectedUser.account_number || 'N/A'}
 - Limit: ${selectedUser.transfer_limit ? '₦'+selectedUser.transfer_limit : 'Unlimited'}
 
@@ -1384,7 +1384,7 @@ Metadata:
                             </View>
                         </View>
                         <View className="items-end pl-2">
-                            <Text className="font-bold text-slate-800 text-lg">₦{item.balance?.toLocaleString() || '0'}</Text>
+                            <Text className="font-bold text-slate-800 text-lg">₦{item.credit_balance?.toLocaleString() || '0'}</Text>
                         </View>
                     </TouchableOpacity>
                 )}

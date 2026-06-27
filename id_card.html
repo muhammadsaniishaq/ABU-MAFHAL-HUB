@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A.Y.F ID Card</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --dark-blue: #041E42;
+            --gold: #D4AF37;
+            --dark-green: #004D25;
+            --light-gold: #E8CA65;
+            --text-dark: #1A1A1A;
+            --text-light: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding: 50px;
+            flex-wrap: wrap;
+        }
+
+        .card-container {
+            width: 350px;
+            height: 550px;
+            background-color: #FFFFFF;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 10px 10px; /* Subtle pattern */
+        }
+
+        /* --- FRONT CARD SPECIFICS --- */
+        
+        /* Top Backgrounds */
+        .top-shape-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 160px;
+        }
+        
+        .top-green-swoosh {
+            position: absolute;
+            top: 100px;
+            right: -20px;
+            width: 150%;
+            height: 100px;
+            background-color: var(--dark-green);
+            border-bottom-right-radius: 100%;
+            transform: rotate(-10deg);
+            z-index: 1;
+        }
+
+        .top-blue-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 140px;
+            background-color: var(--dark-blue);
+            border-bottom-right-radius: 60% 40px;
+            border-bottom-left-radius: 40% 60px;
+            border-bottom: 4px solid var(--gold);
+            z-index: 2;
+            display: flex;
+            justify-content: flex-end;
+            padding-top: 15px;
+            padding-right: 15px;
+        }
+
+        /* Logos and Header Text */
+        .logo-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 110px;
+            height: 110px;
+            z-index: 3;
+            background: var(--dark-blue);
+            border-radius: 50%;
+            border: 3px solid var(--gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .logo-container::after {
+            content: "A.Y.F";
+            position: absolute;
+            bottom: -20px;
+            background: var(--dark-blue);
+            color: white;
+            padding: 2px 15px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 14px;
+            border: 2px solid var(--gold);
+            border-radius: 3px;
+        }
+
+        .logo-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            text-align: center;
+            color: var(--dark-blue);
+            font-weight: bold;
+        }
+
+        .header-text {
+            color: var(--text-light);
+            text-align: right;
+            z-index: 3;
+            width: 60%;
+            margin-right: 10px;
+        }
+
+        .header-text h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .header-text h2 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            margin: 2px 0 0 0;
+            letter-spacing: 0.5px;
+        }
+
+        .header-text .ayf-dots {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-light);
+            margin-top: 5px;
+            letter-spacing: 2px;
+        }
+        
+        .header-text .ayf-dots span {
+            color: var(--gold);
+        }
+
+        /* Subheader */
+        .subheader {
+            position: absolute;
+            top: 155px;
+            right: 15px;
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--dark-green);
+            text-align: right;
+            z-index: 3;
+        }
+
+        /* Center Content: Photo and QR */
+        .center-content {
+            position: absolute;
+            top: 170px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+
+        .photo-box {
+            width: 120px;
+            height: 140px;
+            border: 2px solid var(--gold);
+            border-radius: 10px;
+            background-color: #fff;
+            margin-left: 10px;
+        }
+
+        .qr-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 15px;
+        }
+
+        .qr-box {
+            width: 60px;
+            height: 60px;
+            border: 1px solid var(--gold);
+            padding: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .qr-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scan-verify {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--dark-green);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scan-verify i {
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        /* Details Section */
+        .details-section {
+            position: absolute;
+            top: 325px;
+            left: 20px;
+            width: calc(100% - 40px);
+            z-index: 5;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .detail-icon {
+            width: 22px;
+            height: 22px;
+            background-color: var(--dark-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 10px;
+        }
+
+        .detail-label {
+            width: 90px;
+        }
+
+        .detail-colon {
+            margin: 0 5px;
+        }
+
+        .detail-line {
+            flex-grow: 1;
+            border-bottom: 1px solid #ccc;
+            height: 12px;
+        }
+
+        /* Active Member Badge */
+        .active-member-badge {
+            position: absolute;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--dark-blue);
+            color: white;
+            padding: 4px 15px 4px 30px;
+            border-radius: 20px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 11px;
+            border: 2px solid var(--gold);
+            z-index: 6;
+            display: flex;
+            align-items: center;
+        }
+
+        .active-member-badge .icon-circle {
+            position: absolute;
+            left: -2px;
+            top: -2px;
+            width: 24px;
+            height: 24px;
+            background-color: var(--dark-blue);
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Bottom Shape Front */
+        .bottom-shape-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background-color: var(--dark-green);
+            border-top-left-radius: 50% 20px;
+            border-top-right-radius: 50% 20px;
+            border-top: 4px solid var(--gold);
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            box-sizing: border-box;
+        }
+
+        .member-id-text {
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+
+        .member-id-input {
+            background-color: white;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-weight: 800;
+            font-size: 13px;
+            width: 160px;
+            text-align: center;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .together-we-can {
+            color: var(--gold);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .bottom-icon-left, .bottom-icon-right {
+            position: absolute;
+            bottom: 15px;
+            color: var(--gold);
+            font-size: 24px;
+        }
+
+        .bottom-icon-left {
+            left: 20px;
+        }
+
+        .bottom-icon-right {
+            right: 20px;
+        }
+
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            opacity: 0.05;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+
+        /* --- BACK CARD SPECIFICS --- */
+        .back-together-we-can {
+            position: absolute;
+            top: 160px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: var(--dark-green);
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 14px;
+            z-index: 5;
+        }
+
+        .back-together-line {
+            width: 180px;
+            height: 1px;
+            background-color: var(--gold);
+            margin: 5px auto;
+            position: relative;
+        }
+        
+        .back-together-line::after {
+            content: "";
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            background-color: var(--gold);
+            transform: translateX(-50%) rotate(45deg);
+        }
+
+        .property-text {
+            position: absolute;
+            top: 195px;
+            left: 20px;
+            width: calc(100% - 40px);
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dark);
+            z-index: 5;
+            line-height: 1.4;
+        }
+
+        .property-text strong {
+            font-weight: 800;
+        }
+
+        .divider-line {
+            position: absolute;
+            top: 245px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 180px;
+            height: 1px;
+            background-color: var(--gold);
+            z-index: 5;
+        }
+
+        .return-text {
+            position: absolute;
+            top: 260px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--dark-green);
+            z-index: 5;
+        }
+
+        .contact-info {
+            position: absolute;
+            top: 285px;
+            left: 35px;
+            width: calc(100% - 70px);
+            z-index: 5;
+        }
+
+        .contact-row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .contact-icon {
+            width: 20px;
+            height: 20px;
+            background-color: var(--dark-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .contact-text {
+            padding-top: 3px;
+            line-height: 1.4;
+        }
+
+        .signature-section {
+            position: absolute;
+            bottom: 110px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .signature-img {
+            height: 40px;
+            margin-bottom: 5px;
+        }
+
+        .signature-line {
+            width: 180px;
+            height: 1px;
+            background-color: var(--text-dark);
+            margin-bottom: 5px;
+        }
+
+        .signature-text {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .bottom-shape-back {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 85px;
+            background-color: var(--dark-green);
+            border-top-left-radius: 50% 30px;
+            border-top-right-radius: 50% 30px;
+            border-top: 4px solid var(--gold);
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-lock-icon {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .back-footer-text {
+            text-align: center;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.4;
+            letter-spacing: 0.5px;
+        }
+
+        .watermark-back {
+            position: absolute;
+            bottom: 60px;
+            right: -30px;
+            width: 250px;
+            opacity: 0.05;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- FRONT CARD -->
+    <div class="card-container">
+        <!-- SVG Watermark inside card -->
+        <svg class="watermark" viewBox="0 0 100 100">
+            <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z" fill="none" stroke="#000" stroke-width="2"/>
+            <path d="M30 60 Q50 90 70 60 Q50 30 30 60 Z" fill="none" stroke="#000" stroke-width="2"/>
+        </svg>
+
+        <div class="top-shape-container">
+            <div class="top-green-swoosh"></div>
+            <div class="top-blue-bg">
+                <div class="header-text">
+                    <h1>AL-IHSAN</h1>
+                    <h2>YOUTHS FORUM</h2>
+                    <div class="ayf-dots"><span>&bull;</span> A.Y.F <span>&bull;</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="logo-container">
+            <div class="logo-placeholder">LOGO<br>HERE</div>
+        </div>
+
+        <div class="subheader">
+            EMPOWERING YOUTH,<br>BUILDING A BETTER TOMORROW
+        </div>
+
+        <div class="center-content">
+            <div class="photo-box"></div>
+            <div class="qr-section">
+                <div class="qr-box">
+                    <!-- Placeholder for QR Code -->
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=AYF2024" alt="QR Code">
+                </div>
+                <div class="scan-verify">
+                    <i class="fa-solid fa-shield-check" style="color: var(--dark-green);"></i>
+                    SCAN TO VERIFY
+                </div>
+            </div>
+        </div>
+
+        <div class="details-section">
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-user"></i></div>
+                <div class="detail-label">FULL NAME</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <div class="detail-label">DATE OF BIRTH</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-droplet"></i></div>
+                <div class="detail-label">BLOOD GROUP</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-flag"></i></div>
+                <div class="detail-label">NATIONALITY</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-phone"></i></div>
+                <div class="detail-label">PHONE</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-icon"><i class="fa-solid fa-envelope"></i></div>
+                <div class="detail-label">EMAIL</div>
+                <div class="detail-colon">:</div>
+                <div class="detail-line"></div>
+            </div>
+        </div>
+
+        <div class="active-member-badge">
+            <div class="icon-circle"><i class="fa-solid fa-user"></i></div>
+            ACTIVE MEMBER
+        </div>
+
+        <div class="bottom-shape-container">
+            <i class="fa-solid fa-shield-halved bottom-icon-left"></i>
+            <div class="member-id-text">MEMBER ID NO.</div>
+            <div class="member-id-input">AYF2024/________</div>
+            <div class="together-we-can">&bull; TOGETHER WE CAN &bull;</div>
+            <i class="fa-solid fa-globe bottom-icon-right"></i>
+        </div>
+    </div>
+
+    <!-- BACK CARD -->
+    <div class="card-container">
+        <!-- SVG Watermark -->
+        <svg class="watermark-back" viewBox="0 0 100 100">
+             <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z" fill="none" stroke="#000" stroke-width="2"/>
+             <path d="M30 60 Q50 90 70 60 Q50 30 30 60 Z" fill="none" stroke="#000" stroke-width="2"/>
+        </svg>
+
+        <div class="top-shape-container">
+            <div class="top-green-swoosh"></div>
+            <div class="top-blue-bg">
+                <div class="header-text">
+                    <h1>AL-IHSAN</h1>
+                    <h2>YOUTHS FORUM</h2>
+                    <div class="ayf-dots"><span>&bull;</span> A.Y.F <span>&bull;</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="logo-container">
+            <div class="logo-placeholder">LOGO<br>HERE</div>
+        </div>
+
+        <div class="back-together-we-can">
+            TOGETHER WE CAN
+            <div class="back-together-line"></div>
+        </div>
+
+        <div class="property-text">
+            This card is the property of<br>
+            <strong>AL-IHSAN YOUTHS FORUM (A.Y.F)</strong><br>
+            and must be presented on request.
+        </div>
+
+        <div class="divider-line"></div>
+
+        <div class="return-text">
+            If found, please return to:
+        </div>
+
+        <div class="contact-info">
+            <div class="contact-row">
+                <div class="contact-icon"><i class="fa-solid fa-location-dot"></i></div>
+                <div class="contact-text">
+                    <strong>AL-IHSAN YOUTHS FORUM (A.Y.F)</strong><br>
+                    12 Youth Avenue, Harmony Estate,<br>
+                    Abuja, Nigeria.
+                </div>
+            </div>
+            <div class="contact-row">
+                <div class="contact-icon"><i class="fa-solid fa-phone"></i></div>
+                <div class="contact-text">+234 902 001 2007</div>
+            </div>
+            <div class="contact-row">
+                <div class="contact-icon"><i class="fa-solid fa-envelope"></i></div>
+                <div class="contact-text">info@alyouthsforum.org</div>
+            </div>
+            <div class="contact-row">
+                <div class="contact-icon"><i class="fa-solid fa-globe"></i></div>
+                <div class="contact-text">www.alyouthsforum.org</div>
+            </div>
+        </div>
+
+        <div class="signature-section">
+            <!-- Simulated Signature -->
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f6/Signature_of_John_Hancock.svg" alt="Signature" class="signature-img" style="opacity: 0.7;">
+            <div class="signature-line"></div>
+            <div class="signature-text">AUTHORIZED SIGNATORY</div>
+        </div>
+
+        <div class="bottom-shape-back">
+            <div class="back-lock-icon"><i class="fa-solid fa-lock"></i></div>
+            <div class="back-footer-text">
+                YOUR MEMBERSHIP<br>
+                OUR COMMITMENT TO EXCELLENCE
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
