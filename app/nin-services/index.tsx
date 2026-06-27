@@ -20,20 +20,24 @@ export default function NINServicesDashboard() {
             <Stack.Screen
                 options={{
                     title: 'NIN Services',
-                    headerStyle: { backgroundColor: '#064e3b' },
-                    headerTintColor: '#C5A059',
-                    headerTitleStyle: { fontWeight: 'black', fontSize: 18 },
+                    headerStyle: { backgroundColor: '#0f172a' }, // Navy blue
+                    headerTintColor: '#C5A059', // Gold
+                    headerTitleStyle: { fontWeight: '900', fontSize: 18 },
                     headerShadowVisible: false
                 }}
             />
             <StatusBar style="light" />
             
-            <View className="bg-[#064e3b] px-6 pt-2 pb-8 rounded-b-[40px] shadow-sm">
+            <View className="bg-[#0f172a] px-6 pt-6 pb-12 rounded-b-[40px] shadow-sm relative overflow-hidden">
+                {/* Gold accent decorations */}
+                <View className="absolute -top-10 -right-10 w-32 h-32 bg-[#C5A059] rounded-full opacity-10" />
+                <View className="absolute bottom-[-20px] -left-8 w-24 h-24 bg-[#C5A059] rounded-full opacity-10" />
+                
                 <Text className="text-white text-2xl font-black mb-1">NIN Services</Text>
-                <Text className="text-emerald-200/80 text-sm">Select a service to proceed</Text>
+                <Text className="text-[#C5A059] text-sm font-semibold">Select a service to proceed</Text>
             </View>
 
-            <ScrollView className="flex-1 px-4 -mt-4" contentContainerStyle={{ paddingBottom: 50 }}>
+            <ScrollView className="flex-1 px-4 -mt-6" contentContainerStyle={{ paddingTop: 10, paddingBottom: 60 }}>
                 <View className="flex-row flex-wrap justify-between">
                     {SERVICES.map((service, index) => (
                         <TouchableOpacity 
