@@ -178,14 +178,14 @@ export default function VerifyNINScreen() {
                                 <TouchableOpacity
                                     key={layout.id}
                                     onPress={() => setSelectedLayout(layout.id)}
-                                    className={`rounded-xl p-2 mr-2 items-center justify-center w-24 ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
+                                    className={`rounded-xl p-2 mr-2 items-center justify-center w-20 ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
                                 >
                                     <Image 
                                         source={layout.image as any} 
-                                        className="w-16 h-10 rounded-sm mb-1 bg-white" 
+                                        className="w-12 h-8 rounded-sm mb-1 bg-white" 
                                         resizeMode="contain" 
                                     />
-                                    <Text className={`text-[9px] font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-slate-600'}`}>{layout.name}</Text>
+                                    <Text className={`text-[8px] font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-slate-600'}`}>{layout.name}</Text>
                                     <Text className={`text-[8px] font-bold ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>₦{layout.price}</Text>
                                 </TouchableOpacity>
                             )
