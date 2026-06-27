@@ -1,5 +1,5 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
@@ -17,10 +17,10 @@ const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
 
 const SLIP_LAYOUTS = [
-    { id: 'premium', name: 'Premium', price: 200, type: 'prem' },
-    { id: 'standard', name: 'Standard', price: 200, type: 'nonprem' },
-    { id: 'regular', name: 'Regular', price: 180, type: 'nonprem' },
-    { id: 'info', name: 'Information', price: 200, type: 'nonprem' },
+    { id: 'premium', name: 'Premium', price: 200, type: 'prem', image: require('../../assets/images/premium.png') },
+    { id: 'standard', name: 'Standard', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png') },
+    { id: 'regular', name: 'Regular', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png') },
+    { id: 'info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png') },
 ];
 
 export default function VerifyNINScreen() {
@@ -77,54 +77,6 @@ export default function VerifyNINScreen() {
         }
     };
 
-    const renderSlipThumbnail = (id: string) => {
-        if (id === 'premium') {
-            return (
-                <View className="w-14 h-9 rounded-sm overflow-hidden mb-1 border border-slate-300">
-                    <LinearGradient colors={['#0d9488', '#0f766e']} className="flex-1 p-1 justify-between">
-                        <View className="w-2 h-2 rounded-full bg-white/50" />
-                        <View className="w-full h-2 bg-white/20 rounded-xs" />
-                    </LinearGradient>
-                </View>
-            );
-        }
-        if (id === 'standard') {
-            return (
-                <View className="w-14 h-9 bg-white rounded-sm overflow-hidden mb-1 border border-slate-300 flex-row p-1">
-                    <View className="flex-1 justify-between">
-                        <View className="w-full h-1 bg-slate-200" />
-                        <View className="w-3 h-3 bg-slate-200" />
-                    </View>
-                    <View className="w-2 h-full border-l border-slate-200 ml-1" />
-                </View>
-            );
-        }
-        if (id === 'regular') {
-            return (
-                <View className="w-14 h-9 bg-[#FAF9F5] rounded-sm overflow-hidden mb-1 border border-slate-300 p-1 justify-between">
-                    <View className="w-full h-1 bg-slate-300" />
-                    <View className="flex-row flex-1 mt-1">
-                        <View className="flex-1 border-r border-slate-300" />
-                        <View className="flex-1 border-r border-slate-300" />
-                        <View className="flex-1" />
-                    </View>
-                </View>
-            );
-        }
-        return (
-            <View className="w-14 h-9 bg-white rounded-sm overflow-hidden mb-1 border border-slate-300 p-1 flex-row">
-                <View className="flex-[1.5] justify-around">
-                    <View className="w-4/5 h-1 bg-slate-200" />
-                    <View className="w-3/5 h-1 bg-slate-200" />
-                    <View className="w-4/5 h-1 bg-slate-200" />
-                </View>
-                <View className="flex-1 items-center justify-center pl-1">
-                    <View className="w-3 h-3 rounded-full bg-slate-200" />
-                </View>
-            </View>
-        );
-    };
-
     if (result) {
         return (
             <View className="flex-1 bg-slate-50">
@@ -137,7 +89,7 @@ export default function VerifyNINScreen() {
                     <Text className="text-slate-300 text-xs">{result.data.firstname} {result.data.surname}</Text>
                 </LinearGradient>
 
-                <ScrollView className="flex-1 px-3 -mt-4" contentContainerStyle={{ paddingBottom: 100 }}>
+                <ScrollView className="flex-1 px-3 mt-4" contentContainerStyle={{ paddingBottom: 100 }}>
                     <View className="mb-4 items-center w-full bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
                         <View className="bg-slate-100 rounded-full px-3 py-1 mb-3">
                             <Text className="font-bold text-slate-500 uppercase text-[9px] tracking-widest">{selectedLayout} Slip Generated</Text>
@@ -159,11 +111,11 @@ export default function VerifyNINScreen() {
             <Stack.Screen options={{ title: 'Verify NIN', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#fff', headerShadowVisible: false }} />
             <StatusBar style="light" />
 
-            <LinearGradient colors={['#060d21', '#0B163A']} className="pt-2 pb-10 px-4">
+            <LinearGradient colors={['#060d21', '#0B163A']} className="pt-2 pb-6 px-4">
                 <Text className="text-white text-lg font-black tracking-tight">Verify Identity</Text>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-3 -mt-6" contentContainerStyle={{ paddingBottom: 80 }}>
+            <ScrollView className="flex-1 px-3 pt-4" contentContainerStyle={{ paddingBottom: 80 }}>
                 {/* 1. SEARCH TYPE */}
                 <View className="bg-white rounded-2xl p-3 shadow-sm mb-3 border border-slate-100">
                     <View className="flex-row items-center mb-2">
@@ -204,9 +156,13 @@ export default function VerifyNINScreen() {
                                 <TouchableOpacity
                                     key={layout.id}
                                     onPress={() => setSelectedLayout(layout.id)}
-                                    className={`rounded-xl p-2 mr-2 items-center justify-center w-20 ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
+                                    className={`rounded-xl p-2 mr-2 items-center justify-center w-24 ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
                                 >
-                                    {renderSlipThumbnail(layout.id)}
+                                    <Image 
+                                        source={layout.image as any} 
+                                        className="w-16 h-10 rounded-sm mb-1 bg-white" 
+                                        resizeMode="contain" 
+                                    />
                                     <Text className={`text-[9px] font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-slate-600'}`}>{layout.name}</Text>
                                     <Text className={`text-[8px] font-bold ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>₦{layout.price}</Text>
                                 </TouchableOpacity>
