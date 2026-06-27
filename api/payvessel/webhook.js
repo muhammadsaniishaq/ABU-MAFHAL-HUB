@@ -1,38 +1,42 @@
-// Wannan file din zai zama "Proxy" don tura sakon Payvessel zuwa Supabase Edge Function 
-// Tunda Payvessel basu yarda a saka URL din Supabase kai tsaye ba.
+export const config = {
+  runtime: 'edge',
+};
 
-export default async function handler(req, res) {
-  // Kawai POST request ake bukata
+export default async function handler(req) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
     const supabaseWebhookUrl = 'https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/payment-webhook';
 
-    // Mun tattara duk headers da Payvessel suka turo
     const headers = new Headers();
-    headers.append("Content-Type", "application/json");
+    headers.set("Content-Type", "application/json");
     
     // Tura Payvessel-Signature idan akwai
-    if (req.headers['payvessel-http-signature']) {
-      headers.append("payvessel-http-signature", req.headers['payvessel-http-signature']);
+    if (req.headers.has('payvessel-http-signature')) {
+      headers.set("payvessel-http-signature", req.headers.get('payvessel-http-signature'));
     }
 
-    // Tura asalin body din da Payvessel suka aiko zuwa Edge Function
+    // Dauki ainihin asalin rubutun da suka aiko (Raw Body) ba tare da an canza shi ba
+    // Wannan shi ne sirrin da zai sa Signature ya yi daidai!
+    const rawBody = await req.text();
+
     const response = await fetch(supabaseWebhookUrl, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify(req.body)
+      body: rawBody
     });
 
     const responseText = await response.text();
 
-    // Tura sakamakon da Edge Function ya bayar (Kamar 200 OK) zuwa Payvessel
-    return res.status(response.status).send(responseText);
+    return new Response(responseText, { 
+        status: response.status,
+        headers: { 'Content-Type': 'text/html' }
+    });
 
   } catch (error) {
     console.error("Proxy Error:", error);
-    return res.status(500).json({ error: "Internal Proxy Error" });
+    return new Response(JSON.stringify({ error: "Internal Proxy Error" }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
