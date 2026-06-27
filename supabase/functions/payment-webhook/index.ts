@@ -363,17 +363,36 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     console.log(`[FundWallet] User Match via ${method}: ${profile.id}`);
 
     // 3. Fund Wallet (Atomic RPC)
+    let finalBalance = 0;
     const { data: newBalance, error: updateError } = await supabaseAdmin.rpc('credit_balance', {
         user_id: profile.id,
         amount: amount
     });
 
     if (updateError) {
-        console.error("[FundWallet] Balance RPC Error:", updateError);
-        throw updateError;
+        console.error("[FundWallet] Balance RPC Error:", updateError.message);
+        console.warn("[FundWallet] Falling back to standard fetch-and-update");
+        // Fallback mechanism
+        const { data: currentProfile, error: fetchErr } = await supabaseAdmin
+            .from('profiles')
+            .select('balance')
+            .eq('id', profile.id)
+            .single();
+            
+        if (fetchErr) throw fetchErr;
+
+        finalBalance = (parseFloat(currentProfile.balance || "0") + amount);
+        const { error: fallbackUpdateErr } = await supabaseAdmin
+            .from('profiles')
+            .update({ balance: finalBalance })
+            .eq('id', profile.id);
+
+        if (fallbackUpdateErr) throw fallbackUpdateErr;
+    } else {
+        finalBalance = newBalance;
     }
 
-    console.log(`[FundWallet] Balance Updated. New Balance: ${newBalance}`);
+    console.log(`[FundWallet] Balance Updated. New Balance: ${finalBalance}`);
 
     // 4. Record Transaction & Log Event (Parallel)
     // We use allSettled so one failure doesn't throw and stop the logic (although we are at the end)

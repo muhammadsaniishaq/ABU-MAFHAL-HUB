@@ -213,17 +213,36 @@ async function handler(req, res) {
     console.log(`[Payvessel Webhook] User matched via ${method}: ${userId}`);
 
     // 7. Update User Balance (Atomic RPC)
+    let finalBalance = 0;
     const { data: newBalance, error: updateError } = await supabaseAdmin.rpc('credit_balance', {
       user_id: userId,
       amount: amount,
     });
 
     if (updateError) {
-      console.error('Database Error updating user balance:', updateError);
-      return res.status(500).json({ error: 'Failed to update balance' });
+      console.error('Database Error updating user balance via RPC:', updateError.message);
+      console.warn('Falling back to standard fetch-and-update');
+      
+      const { data: currentProfile, error: fetchErr } = await supabaseAdmin
+          .from('profiles')
+          .select('balance')
+          .eq('id', userId)
+          .single();
+          
+      if (fetchErr) return res.status(500).json({ error: 'Failed to fetch balance for fallback' });
+
+      finalBalance = (parseFloat(currentProfile.balance || "0") + amount);
+      const { error: fallbackUpdateErr } = await supabaseAdmin
+          .from('profiles')
+          .update({ balance: finalBalance })
+          .eq('id', userId);
+
+      if (fallbackUpdateErr) return res.status(500).json({ error: 'Failed to update balance during fallback' });
+    } else {
+      finalBalance = newBalance;
     }
 
-    console.log(`[Payvessel Webhook] Balance updated successfully. New balance: ${newBalance}`);
+    console.log(`[Payvessel Webhook] Balance updated successfully. New balance: ${finalBalance}`);
 
     // 8. Record the Transaction
     const { error: insertTxError } = await supabaseAdmin
