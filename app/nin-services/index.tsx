@@ -13,6 +13,8 @@ const SERVICES = [
     { id: 'ipe', title: 'IPE Clearance', desc: 'Pre-Employment Clearance', icon: 'briefcase', color: 'bg-indigo-100', iconColor: '#4F46E5', route: '/nin-services/ipe-clearance' },
     { id: 'track', title: 'Card Tracking', desc: 'Check Personalization status', icon: 'card', color: 'bg-orange-100', iconColor: '#EA580C', route: '/nin-services/tracking' },
     { id: 'delink', title: 'Delink Phone', desc: 'Remove phone from NIN', icon: 'cut', color: 'bg-red-100', iconColor: '#DC2626', route: '/nin-services/delink' },
+    { id: 'modify', title: 'Modification', desc: 'Update NIN information', icon: 'create', color: 'bg-yellow-100', iconColor: '#D97706', route: '#' },
+    { id: 'lost', title: 'Lost/Stolen Card', desc: 'Report or block NIN card', icon: 'warning', color: 'bg-rose-100', iconColor: '#E11D48', route: '#' },
 ];
 
 export default function NINServicesScreen() {
@@ -65,6 +67,17 @@ export default function NINServicesScreen() {
                             <Text className="text-slate-500 text-[10px] leading-3">{service.desc}</Text>
                         </TouchableOpacity>
                     ))}
+                </View>
+
+                {/* Support Banner */}
+                <View className="mt-2 mb-6 bg-[#0B163A] rounded-2xl p-4 flex-row items-center justify-between shadow-sm">
+                    <View className="flex-1 mr-4">
+                        <Text className="text-white font-bold text-sm mb-1">Need Help?</Text>
+                        <Text className="text-slate-300 text-[10px] leading-4">Contact NIMC support for issues regarding validation or modification.</Text>
+                    </View>
+                    <TouchableOpacity className="bg-[#f5a623] w-10 h-10 rounded-full items-center justify-center shadow-sm">
+                        <Ionicons name="chatbubbles" size={18} color="#050B14" />
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </View>
