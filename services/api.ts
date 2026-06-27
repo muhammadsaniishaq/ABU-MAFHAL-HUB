@@ -16,8 +16,9 @@ export const API_URL = 'https://api.abumafhal.com.ng/v1';
 const airtimeProvider: AirtimeProvider = ClubKonnectProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
 const dataProvider: DataProvider = ClubKonnectProvider;
-const identityVerifier = AijalonIdentityVerifier; // Live Aijalon API
 const cryptoExchange: CryptoExchange = CoingeckoCryptoExchange;
+import { IdProIdentityVerifier } from './idpro';
+const identityVerifier = IdProIdentityVerifier; // Live IdPro Edge Function
 
 export const api = {
     // --- GENERIC HTTP ---

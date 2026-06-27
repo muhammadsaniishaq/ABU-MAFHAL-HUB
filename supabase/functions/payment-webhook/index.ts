@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://uagcxrtdqttayulvgpwg.supabase.co';
         const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
         const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY');
 
@@ -54,16 +54,14 @@ Deno.serve(async (req: Request) => {
         // --- DEBUG LOGGING ---
         try {
              await supabaseAdmin.from('payment_events').insert({
-                 provider: 'DEBUG_RAW',
                  reference: `req_${Date.now()}`,
                  amount: 0,
-                 currency: 'NGN',
                  status: 'debug',
                  metadata: { 
                      headers: Object.fromEntries(req.headers),
-                     body: rawBody
-                 },
-                 processed_at: new Date().toISOString()
+                     body: rawBody,
+                     provider: 'DEBUG_RAW'
+                 }
              });
         } catch (e) { console.error("Debug log failed", e); }
 
@@ -123,9 +121,19 @@ Deno.serve(async (req: Request) => {
             }
 
             const eventData = JSON.parse(bodyText);
-            console.log("Payvessel Webhook Event:", eventData.event);
+            const eventName = eventData.event || (eventData.transaction ? eventData.transaction.status : 'unknown');
+            console.log("=== NEW WEBHOOK DEPLOY ===");
+            console.log("Payload:", JSON.stringify(eventData));
+            console.log("Payvessel Event:", eventName);
 
-            if (eventData.event === 'transaction.success' || eventData.event === 'reserved_account.credit') {
+            const isSuccess = eventData.event === 'transaction.success' || 
+                              eventData.event === 'reserved_account.credit' || 
+                              eventData.transaction?.status === 'success' || 
+                              eventData.transaction?.status === 'successful' ||
+                              (eventData.transaction && eventData.transaction.reference !== undefined) ||
+                              (eventData.order && eventData.order.amount !== undefined);
+
+            if (isSuccess) {
                 const transactionObj = eventData.transaction || eventData.data || {};
                 const orderObj = eventData.order || eventData.data || {};
                 
@@ -133,20 +141,29 @@ Deno.serve(async (req: Request) => {
                 const rawAmount = orderObj.amount || transactionObj.amount || eventData.amount;
                 const amount = parseFloat(String(rawAmount));
                 const currency = orderObj.currency || transactionObj.currency || eventData.currency || 'NGN';
-                const email = transactionObj.customer_email || transactionObj.customer?.email || eventData.customer_email || eventData.email;
-                const accountNumber = transactionObj.account_number || 
-                                      transactionObj.accountNumber || 
-                                      eventData.account_number || 
+                const email = transactionObj.customer_email || transactionObj.customer?.email || eventData.customer_email || eventData.email || eventData.customer?.email;
+                let accountNumber = eventData.account_number || 
                                       eventData.accountNumber ||
+                                      eventData.order?.description ||
                                       transactionObj.virtual_account?.account_number ||
                                       transactionObj.virtualAccount?.accountNumber ||
-                                      transactionObj.virtualAccount?.account_number ||
-                                      transactionObj.virtual_account?.accountNumber ||
+                                      transactionObj.virtual_account?.account_number ||
+                                      transactionObj.virtualAccount?.accountNumber ||
+                                      transactionObj.virtual_account?.account_number ||
+                                      transactionObj.virtualAccount?.accountNumber ||
                                       transactionObj.customer?.virtual_account_number ||
                                       transactionObj.customer?.virtualAccountNumber ||
                                       eventData.virtual_account?.account_number ||
                                       eventData.virtualAccount?.accountNumber ||
                                       eventData.customer?.virtual_account_number;
+                                      
+                // Payvessel sometimes puts the narration in order.description, which contains the 10-digit account number
+                if (accountNumber && accountNumber.length > 10) {
+                    const match = accountNumber.match(/\b\d{10}\b/);
+                    if (match) {
+                        accountNumber = match[0];
+                    }
+                }
                 
                 console.log(`[Payvessel Webhook] Parsed: Ref=${reference}, Amt=${amount}, Email=${email}, AccNum=${accountNumber}`);
                 
@@ -281,9 +298,8 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     // 1. Check Idempotency
     const { data: existing, error: checkError } = await supabaseAdmin
         .from('payment_events')
-        .select('id')
+        .select('reference')
         .eq('reference', reference)
-        .eq('provider', provider)
         .maybeSingle();
 
     if (checkError) {
@@ -337,6 +353,18 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     }
 
     // C. Fallback to email
+    if (!data && explicitUserId) {
+        // Try to get ANY virtual account for this user so we don't violate NOT NULL constraint
+        const vaResult = await supabaseAdmin
+            .from('virtual_accounts')
+            .select('id')
+            .eq('profile_id', explicitUserId)
+            .maybeSingle();
+        if (vaResult.data) {
+            data = vaResult.data;
+        }
+    }
+
     if (!profile && email) {
         const { data } = await supabaseAdmin.from('profiles').select('id, balance').eq('email', email).single();
         if (data) {
@@ -346,16 +374,14 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     }
 
     if (!profile) {
-        console.error(`[FundWallet] User NOT found. Email: ${email}, ID: ${explicitUserId}, Data: ${JSON.stringify(data)}`);
-        // We SHOULD record the orphaned payment attempt in a separate table or log it well.
+        console.error(`[FundWallet] User NOT found. Email: ${email}, ID: ${explicitUserId}, Ref: ${reference}`);
         await supabaseAdmin.from('payment_events').insert({
-            provider: provider,
             reference: reference,
             amount: amount,
+            provider: provider,
             currency: currency,
             status: 'orphaned',
-            metadata: data,
-            processed_at: new Date().toISOString()
+            metadata: { metadata: data }
         });
         return new Response("User not found", { status: 200 }); // Return 200 to stop retry loops if it's a structural failure
     }
@@ -406,14 +432,14 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
             reference: reference, 
             description: `Deposit via ${provider} (${method}) - Ref: ${reference}`
         }),
+        // Update the payment log with success using reference and metadata
         supabaseAdmin.from('payment_events').insert({
-            provider: provider,
             reference: reference, // Ensure this is unique
             amount: amount,
+            provider: provider,
             currency: currency,
-            status: 'success',
-            metadata: metadata,
-            processed_at: new Date().toISOString()
+            status: 'completed',
+            metadata: { metadata: metadata }
         })
     ]);
 

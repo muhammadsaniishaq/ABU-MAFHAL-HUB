@@ -3,11 +3,56 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import { api } from '../services/api';
+import { ActivityIndicator, Alert } from 'react-native';
 
 export default function BVNServicesScreen() {
     const [bvn, setBvn] = useState('');
     const [view, setView] = useState<'menu' | 'validate' | 'modify' | 'slip'>('menu');
     const [showSlip, setShowSlip] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [slipData, setSlipData] = useState<any>(null);
+
+    const handleValidateBVN = async () => {
+        if (bvn.length !== 11) {
+            Alert.alert('Incomplete', 'Please enter a valid 11-digit BVN');
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.identity.validateBVN(bvn);
+            if (res.isValid) {
+                Alert.alert('Verification Successful', res.message || 'BVN is active and valid.');
+            } else {
+                Alert.alert('Verification Failed', res.message || 'Could not validate BVN.');
+            }
+        } catch (e: any) {
+            Alert.alert('Request Failed', e.message || 'Service unreachable');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePrintSlip = async () => {
+        if (bvn.length !== 11) {
+            Alert.alert('Incomplete', 'Please enter an 11-digit BVN to fetch card data');
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.identity.getBVNCard(bvn);
+            if (res.isValid) {
+                setSlipData(res.data);
+                setShowSlip(true);
+            } else {
+                Alert.alert('Generation Failed', res.message || 'Could not fetch BVN data.');
+            }
+        } catch (e: any) {
+            Alert.alert('Request Failed', e.message || 'Service unreachable');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderSlip = () => (
         <Modal visible={showSlip} animationType="slide" transparent={true}>
@@ -19,21 +64,21 @@ export default function BVNServicesScreen() {
                         <View className="flex-row justify-between mb-4">
                             <View>
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">Full Name</Text>
-                                <Text className="text-slate font-bold">ABU MAFHAL SUB</Text>
+                                <Text className="text-slate font-bold">{slipData?.first_name || slipData?.firstName || ''} {slipData?.last_name || slipData?.lastName || ''}</Text>
                             </View>
                             <View className="items-end">
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">BVN Number</Text>
-                                <Text className="text-slate font-bold">222******89</Text>
+                                <Text className="text-slate font-bold">{slipData?.bvn || bvn}</Text>
                             </View>
                         </View>
                         <View className="flex-row justify-between">
                             <View>
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">Date of Birth</Text>
-                                <Text className="text-slate font-bold">12-JAN-1995</Text>
+                                <Text className="text-slate font-bold">{slipData?.dob || slipData?.dateOfBirth || 'N/A'}</Text>
                             </View>
                             <View className="items-end">
                                 <Text className="text-gray-400 text-[10px] uppercase font-bold">Phone</Text>
-                                <Text className="text-slate font-bold">0803****000</Text>
+                                <Text className="text-slate font-bold">{slipData?.phone || slipData?.phoneNumber || 'N/A'}</Text>
                             </View>
                         </View>
                     </View>
@@ -90,7 +135,7 @@ export default function BVNServicesScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={() => setShowSlip(true)}
+                            onPress={() => setView('slip')}
                             className="bg-white p-5 rounded-2xl mb-4 flex-row items-center shadow-sm border border-gray-100"
                         >
                             <View className="w-12 h-12 rounded-full bg-green-50 items-center justify-center mr-4">
@@ -134,8 +179,43 @@ export default function BVNServicesScreen() {
                             value={bvn}
                             onChangeText={setBvn}
                         />
-                        <TouchableOpacity className="bg-primary h-14 rounded-xl items-center justify-center">
-                            <Text className="text-white font-bold">Proceed Validation</Text>
+                        <TouchableOpacity 
+                            onPress={handleValidateBVN}
+                            disabled={loading || bvn.length !== 11}
+                            className={`h-14 rounded-xl items-center justify-center ${bvn.length === 11 && !loading ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold">Proceed Validation</Text>}
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {view === 'slip' && (
+                    <View>
+                        <TouchableOpacity onPress={() => setView('menu')} className="flex-row items-center mb-6">
+                            <Ionicons name="arrow-back" size={20} color="#0056D2" />
+                            <Text className="text-primary font-bold ml-2">Back to Menu</Text>
+                        </TouchableOpacity>
+                        <Text className="text-slate font-bold text-lg mb-4">Print BVN Slip</Text>
+                        <TextInput
+                            placeholder="Enter 11-digit BVN"
+                            className="bg-white h-14 rounded-xl px-4 border border-gray-200 mb-6"
+                            keyboardType="number-pad"
+                            maxLength={11}
+                            value={bvn}
+                            onChangeText={setBvn}
+                            editable={!loading}
+                        />
+                        <TouchableOpacity 
+                            onPress={handlePrintSlip}
+                            disabled={loading || bvn.length !== 11}
+                            className={`h-14 rounded-xl items-center justify-center flex-row ${bvn.length === 11 && !loading ? 'bg-green-600' : 'bg-gray-300'}`}
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : (
+                                <>
+                                    <Ionicons name="print-outline" size={20} color={bvn.length === 11 ? "white" : "gray"} className="mr-2" />
+                                    <Text className={bvn.length === 11 ? "text-white font-bold ml-2" : "text-gray-500 font-bold ml-2"}>Generate Slip</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 )}
