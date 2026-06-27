@@ -25,8 +25,8 @@ CREATE POLICY "Allow authenticated users to manage service_pricing"
 
 -- Insert default NIN pricing
 INSERT INTO public.service_pricing (id, service_category, name, cost_price, markup_price) VALUES
-('nin_premium', 'nin', 'Premium Slip', 200, 0),
-('nin_standard', 'nin', 'Standard Slip', 200, 0),
-('nin_regular', 'nin', 'Regular Slip', 180, 0),
-('nin_info', 'nin', 'Information Slip', 200, 0)
+('nin_premium', 'nin', 'Premium Slip', 0, 0),
+('nin_standard', 'nin', 'Standard Slip', 0, 0),
+('nin_regular', 'nin', 'Regular Slip', 0, 0),
+('nin_info', 'nin', 'Information Slip', 0, 0)
 ON CONFLICT (id) DO NOTHING;
