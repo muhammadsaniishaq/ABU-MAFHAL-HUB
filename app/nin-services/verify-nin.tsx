@@ -18,10 +18,10 @@ const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
 
 const DEFAULT_LAYOUTS = [
-    { id: 'premium', db_id: 'nin_premium', name: 'Premium', price: 200, type: 'prem' },
-    { id: 'standard', db_id: 'nin_standard', name: 'Standard', price: 200, type: 'nonprem' },
-    { id: 'regular', db_id: 'nin_regular', name: 'Regular', price: 180, type: 'nonprem' },
-    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem' },
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium', price: 200, type: 'prem', image: require('../../assets/images/premium.png') },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png') },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png') },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png') },
 ];
 
 export default function VerifyNINScreen() {
@@ -174,14 +174,7 @@ export default function VerifyNINScreen() {
                     <View className="flex-row justify-between w-full">
                         {layouts.map((layout) => {
                             const isSelected = selectedLayout === layout.id;
-                            let iconName: any = "id-card-outline";
-                            let iconColor = isSelected ? "#38bdf8" : "#94a3b8"; // Light blue when selected, slate when not
-
-                            if(layout.id === 'premium') iconName = "id-card";
-                            if(layout.id === 'standard') iconName = "card";
-                            if(layout.id === 'regular') iconName = "reader-outline";
-                            if(layout.id === 'info') iconName = "information-circle-outline";
-
+                            
                             return (
                                 <TouchableOpacity
                                     key={layout.id}
@@ -189,8 +182,14 @@ export default function VerifyNINScreen() {
                                     className={`rounded-xl p-1 mb-2 items-center justify-center ${isSelected ? 'bg-[#060d21] border-[#060d21]' : 'bg-slate-50 border-slate-200'} border`}
                                     style={{ width: '23%', minHeight: 85 }}
                                 >
-                                    <View className="w-full h-10 mb-1 bg-white rounded items-center justify-center border border-slate-100 shadow-sm">
-                                        <Ionicons name={iconName} size={24} color={iconColor} />
+                                    <View className="w-full h-10 mb-1 bg-white rounded items-center justify-center overflow-hidden border border-slate-100 shadow-sm">
+                                        {(layout as any).image && (
+                                            <Image 
+                                                source={(layout as any).image} 
+                                                style={{ width: '90%', height: '90%' }}
+                                                resizeMode="contain" 
+                                            />
+                                        )}
                                     </View>
                                     <Text className={`text-[9px] font-extrabold mb-0.5 text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`} numberOfLines={2}>{layout.name}</Text>
                                     <Text className={`text-[9px] font-black text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-500'}`}>₦{layout.price}</Text>
