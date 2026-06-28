@@ -174,6 +174,14 @@ export default function VerifyNINScreen() {
                     <View className="flex-row justify-between w-full">
                         {layouts.map((layout) => {
                             const isSelected = selectedLayout === layout.id;
+                            let iconName: any = "id-card-outline";
+                            let iconColor = isSelected ? "#38bdf8" : "#94a3b8"; // Light blue when selected, slate when not
+
+                            if(layout.id === 'premium') iconName = "id-card";
+                            if(layout.id === 'standard') iconName = "card";
+                            if(layout.id === 'regular') iconName = "reader-outline";
+                            if(layout.id === 'info') iconName = "information-circle-outline";
+
                             return (
                                 <TouchableOpacity
                                     key={layout.id}
@@ -182,11 +190,7 @@ export default function VerifyNINScreen() {
                                     style={{ width: '23%', minHeight: 85 }}
                                 >
                                     <View className="w-full h-10 mb-1 bg-white rounded items-center justify-center border border-slate-100 shadow-sm">
-                                        <Image 
-                                            source={layout.image as any} 
-                                            className="w-[90%] h-[90%]" 
-                                            resizeMode="contain" 
-                                        />
+                                        <Ionicons name={iconName} size={24} color={iconColor} />
                                     </View>
                                     <Text className={`text-[9px] font-extrabold mb-0.5 text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`} numberOfLines={2}>{layout.name}</Text>
                                     <Text className={`text-[9px] font-black text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-500'}`}>₦{layout.price}</Text>
