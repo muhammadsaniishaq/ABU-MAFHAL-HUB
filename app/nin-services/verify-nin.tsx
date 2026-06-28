@@ -1,11 +1,15 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 
 // Slip Components
 import { IDCardMockup } from '../../components/IDCardMockup';
@@ -25,13 +29,91 @@ const DEFAULT_LAYOUTS = [
 ];
 
 export default function VerifyNINScreen() {
-    const [searchType, setSearchType] = useState('nin');
     const [selectedLayout, setSelectedLayout] = useState('premium');
     const [nin, setNin] = useState('');
     const [consent, setConsent] = useState(false);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
+    const [isSaving, setIsSaving] = useState(false);
+    const viewShotRef = useRef<any>(null);
+
+    const handleDownloadPng = async () => {
+        if (!viewShotRef.current) return;
+        setIsSaving(true);
+        try {
+            const uri = await viewShotRef.current.capture();
+            if (Platform.OS === 'web') {
+                const link = document.createElement('a');
+                link.href = uri;
+                link.download = `nin_slip_${nin || 'verify'}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Download NIN Slip (PNG)',
+                        UTI: 'public.png'
+                    });
+                } else {
+                    Alert.alert("Error", "Sharing is not available on this device.");
+                }
+            }
+        } catch (e: any) {
+            Alert.alert("Error", "Failed to download PNG: " + e.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDownloadPdf = async () => {
+        if (!viewShotRef.current) return;
+        setIsSaving(true);
+        try {
+            const uri = await viewShotRef.current.capture();
+            
+            let dataUri = uri;
+            if (Platform.OS !== 'web') {
+                const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+                dataUri = `data:image/png;base64,${base64}`;
+            }
+
+            const html = `
+                <html>
+                <head>
+                    <style>
+                        body { margin: 0; padding: 20px; background-color: white; display: flex; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; }
+                        img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${dataUri}" />
+                </body>
+                </html>
+            `;
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri: pdfUri } = await Print.printToFileAsync({ html });
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(pdfUri, {
+                        mimeType: 'application/pdf',
+                        dialogTitle: 'Download NIN Slip (PDF)',
+                        UTI: 'com.adobe.pdf'
+                    });
+                } else {
+                    Alert.alert("Error", "Sharing is not available on this device.");
+                }
+            }
+        } catch (e: any) {
+            Alert.alert("Error", "Failed to download PDF: " + e.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -110,13 +192,39 @@ export default function VerifyNINScreen() {
                     <Text className="text-white font-black text-lg mb-0.5 tracking-tight">Verified Successfully</Text>
                     <Text className="text-slate-300 text-xs">{result.data.firstname} {result.data.surname}</Text>
                 </LinearGradient>
-
                 <ScrollView className="flex-1 px-3 mt-4" contentContainerStyle={{ paddingBottom: 100 }}>
                     <View className="mb-4 items-center w-full bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
                         <View className="bg-slate-100 rounded-full px-3 py-1 mb-3">
                             <Text className="font-bold text-slate-500 uppercase text-[9px] tracking-widest">{selectedLayout} Slip Generated</Text>
                         </View>
-                        {renderSlip()}
+                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%' }}>
+                            {renderSlip()}
+                        </ViewShot>
+                    </View>
+
+                    {/* PNG & PDF Download Buttons */}
+                    <View className="flex-row justify-between mb-4">
+                        <TouchableOpacity 
+                            onPress={handleDownloadPng}
+                            disabled={isSaving}
+                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row mr-2 shadow-sm ${isSaving ? 'bg-sky-600/50' : 'bg-sky-600'}`}
+                        >
+                            <Ionicons name="image" size={16} color="white" />
+                            <Text className="text-white font-bold text-sm ml-2">
+                                {isSaving ? 'Downloading...' : 'Download PNG'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={handleDownloadPdf}
+                            disabled={isSaving}
+                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row ml-2 shadow-sm ${isSaving ? 'bg-emerald-600/50' : 'bg-emerald-600'}`}
+                        >
+                            <Ionicons name="document-text" size={16} color="white" />
+                            <Text className="text-white font-bold text-sm ml-2">
+                                {isSaving ? 'Downloading...' : 'Download PDF'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity onPress={() => setResult(null)} className="bg-[#060d21] h-12 rounded-xl items-center justify-center flex-row">
@@ -138,36 +246,11 @@ export default function VerifyNINScreen() {
             </LinearGradient>
 
             <ScrollView className="flex-1 px-3 -mt-6" contentContainerStyle={{ paddingBottom: 80 }}>
-                {/* 1. SEARCH TYPE */}
+                {/* 1. SLIP LAYOUT */}
                 <View className="bg-white rounded-2xl p-3 shadow-sm mb-3 border border-slate-100">
                     <View className="flex-row items-center mb-2">
                         <View className="bg-[#f5a623] w-5 h-5 rounded-full items-center justify-center mr-2">
                             <Text className="text-[#060d21] font-black text-[10px]">1</Text>
-                        </View>
-                        <Text className="text-slate-800 font-bold text-xs tracking-wider">Search Method</Text>
-                    </View>
-                    <View className="flex-row justify-between">
-                        {['nin', 'phone', 'demo'].map((type) => {
-                            const isSelected = searchType === type;
-                            const labels: Record<string, string> = { nin: 'NIN Num', phone: 'Phone No', demo: 'Demographic' };
-                            return (
-                                <TouchableOpacity 
-                                    key={type}
-                                    onPress={() => setSearchType(type)}
-                                    className={`flex-1 rounded-xl py-2 items-center justify-center border mx-1 ${isSelected ? 'border-[#060d21] bg-slate-50' : 'border-slate-100 bg-white'}`}
-                                >
-                                    <Text className={`text-[10px] font-bold ${isSelected ? 'text-[#060d21]' : 'text-slate-400'}`}>{labels[type]}</Text>
-                                </TouchableOpacity>
-                            )
-                        })}
-                    </View>
-                </View>
-
-                {/* 2. SLIP LAYOUT */}
-                <View className="bg-white rounded-2xl p-3 shadow-sm mb-3 border border-slate-100">
-                    <View className="flex-row items-center mb-2">
-                        <View className="bg-[#f5a623] w-5 h-5 rounded-full items-center justify-center mr-2">
-                            <Text className="text-[#060d21] font-black text-[10px]">2</Text>
                         </View>
                         <Text className="text-slate-800 font-bold text-xs tracking-wider">Slip Layout</Text>
                     </View>
@@ -199,11 +282,11 @@ export default function VerifyNINScreen() {
                     </View>
                 </View>
 
-                {/* 3. SUPPLY ID & VERIFY */}
+                {/* 2. SUPPLY ID & VERIFY */}
                 <View className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
                     <View className="flex-row items-center mb-3">
                         <View className="bg-[#f5a623] w-5 h-5 rounded-full items-center justify-center mr-2">
-                            <Text className="text-[#060d21] font-black text-[10px]">3</Text>
+                            <Text className="text-[#060d21] font-black text-[10px]">2</Text>
                         </View>
                         <Text className="text-slate-800 font-bold text-xs tracking-wider">Enter Details</Text>
                     </View>

@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 
 export const IDCardMockup = ({ data }: { data: any }) => {
-    const getVal = (keys: string[], fallback: string | null = 'N/A') => {
+    const getVal = (keys: string[], fallback: string = 'N/A'): string => {
         for (const k of keys) {
             if (data[k] !== undefined && data[k] !== null && data[k] !== '') {
                 return String(data[k]);
@@ -40,7 +40,7 @@ export const IDCardMockup = ({ data }: { data: any }) => {
     // Format NIN as "0000 0000 0000"
     const formattedNin = nin.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
 
-    const photo = getVal(['photo', 'image', 'picture', 'avatar', 'face_image'], null);
+    const photo = getVal(['photo', 'image', 'picture', 'avatar', 'face_image'], '') || null;
 
     return (
         <View className="w-full bg-white aspect-[1.586] rounded-xl overflow-hidden border border-gray-300 shadow-sm relative">
