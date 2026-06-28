@@ -18,10 +18,10 @@ const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
 
 const DEFAULT_LAYOUTS = [
-    { id: 'premium', db_id: 'nin_premium', name: 'Premium', price: 200, type: 'prem', image: require('../../assets/images/premium.png') },
-    { id: 'standard', db_id: 'nin_standard', name: 'Standard', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png') },
-    { id: 'regular', db_id: 'nin_regular', name: 'Regular', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png') },
-    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png') },
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium', price: 200, type: 'prem' },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard', price: 200, type: 'nonprem' },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular', price: 180, type: 'nonprem' },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem' },
 ];
 
 export default function VerifyNINScreen() {
