@@ -1,6 +1,6 @@
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, ImageBackground } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import QRCode from 'react-native-qrcode-svg';
 
 export const IDCardMockup = ({ data }: { data: any }) => {
     const getVal = (keys: string[], fallback: string | null = 'N/A') => {
@@ -11,70 +11,124 @@ export const IDCardMockup = ({ data }: { data: any }) => {
         }
         return fallback;
     };
-    const firstName = getVal(['first_name', 'firstName', 'firstname', 'first']);
-    const lastName = getVal(['last_name', 'lastName', 'lastname', 'surname', 'last']);
+    
+    const firstName = getVal(['first_name', 'firstName', 'firstname', 'first'], '');
+    const lastName = getVal(['last_name', 'lastName', 'lastname', 'surname', 'last'], '');
     const middleName = getVal(['middle_name', 'middleName', 'middlename', 'middle'], '');
-    const dob = getVal(['dob', 'dateOfBirth', 'date_of_birth', 'birthdate']);
+    const dob = getVal(['dob', 'dateOfBirth', 'date_of_birth', 'birthdate'], '01 OCT 1960');
+    
+    // Format DOB to match "01 OCT 1960" format if it's like "1960-10-01" or "01-10-1960"
+    let formattedDob = dob;
+    try {
+        const parts = dob.split(/[-/]/);
+        if (parts.length === 3) {
+            let y, m, d;
+            if (parts[0].length === 4) { y = parts[0]; m = parts[1]; d = parts[2]; }
+            else { d = parts[0]; m = parts[1]; y = parts[2]; }
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const mIndex = parseInt(m) - 1;
+            if (mIndex >= 0 && mIndex < 12) {
+                formattedDob = `${d.padStart(2, '0')} ${months[mIndex]} ${y}`;
+            }
+        }
+    } catch(e) {}
+
     const genderVal = getVal(['gender', 'sex', 'gender_id'], 'f') || 'f';
-    const gender = genderVal.toUpperCase() === 'M' || genderVal.toLowerCase().startsWith('m') ? 'MALE' : 'FEMALE';
-    const nin = getVal(['nin', 'number', 'nin_number', 'national_id', 'identity_number']);
-    const state = getVal(['state', 'state_of_origin', 'stateOfOrigin'], 'Yobe');
-    const lga = getVal(['lga', 'lga_of_origin', 'lgaOfOrigin'], 'Gashua');
+    const gender = genderVal.toUpperCase().startsWith('M') ? 'M' : 'F';
+    const nin = getVal(['nin', 'number', 'nin_number', 'national_id', 'identity_number'], '0000 0000 0000');
+    
+    // Format NIN as "0000 0000 0000"
+    const formattedNin = nin.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+
     const photo = getVal(['photo', 'image', 'picture', 'avatar', 'face_image'], null);
 
     return (
-        <View className="w-full aspect-[1.586] rounded-3xl overflow-hidden border border-emerald-600/30 shadow-xl mb-6 relative bg-emerald-950">
-            <LinearGradient colors={['#064e3b', '#022c22']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="absolute inset-0" />
-            <View className="absolute inset-0 flex-row opacity-[0.04]">
-                <View className="flex-1 bg-green-500" /><View className="flex-1 bg-white" /><View className="flex-1 bg-green-500" />
+        <View className="w-full bg-white aspect-[1.586] rounded-xl overflow-hidden border border-gray-300 shadow-sm relative">
+            {/* Background Pattern - simulated with absolute elements */}
+            <View className="absolute inset-0 opacity-10">
+                <View className="absolute top-0 w-full h-[60%] border-b border-green-500 rounded-b-full bg-green-50 -ml-[50%] scale-[2.5]" />
+                <View className="absolute bottom-0 w-full h-[40%] border-t border-green-500 rounded-t-full bg-green-50 ml-[50%] scale-[2.5]" />
             </View>
-            <View className="px-5 pt-4 pb-2 border-b border-white/10 flex-row justify-between items-center bg-black/20">
-                <View className="flex-row items-center">
-                    <Ionicons name="shield" size={18} color="#C5A059" />
-                    <View className="ml-2">
-                        <Text className="text-white text-[9px] font-black uppercase tracking-widest leading-3">Federal Republic of Nigeria</Text>
-                        <Text className="text-emerald-400 text-[8px] font-bold uppercase tracking-wider leading-3">National Identity Management Commission</Text>
+            
+            {/* Main Content Container */}
+            <View className="flex-1 p-3 flex-col justify-between">
+                
+                {/* Header Section */}
+                <View className="flex-row justify-between items-start">
+                    {/* Left Header */}
+                    <View className="flex-1 pr-2">
+                        <Text className="text-[#008240] text-[15px] font-black tracking-tight" style={{ lineHeight: 18 }}>
+                            FEDERAL REPUBLIC OF NIGERIA
+                        </Text>
+                        <Text className="text-black text-[12px] font-black tracking-widest mt-0.5">
+                            DIGITAL NIN SLIP
+                        </Text>
+                    </View>
+                    {/* QR Code Placeholder Box */}
+                    <View className="w-16 h-16 bg-white border border-gray-100 p-0.5 items-center justify-center">
+                        <QRCode value={nin || "UNKNOWN"} size={58} backgroundColor="transparent" />
                     </View>
                 </View>
-            </View>
-            <View className="flex-1 flex-row p-4 items-center">
-                <View className="mr-4 items-center justify-center">
-                    <View className="p-0.5 bg-emerald-600/30 rounded-2xl border border-white/25">
+
+                {/* Middle Section */}
+                <View className="flex-row flex-1 mt-3 items-center">
+                    
+                    {/* Photo Placeholder */}
+                    <View className="w-[85px] h-[105px] bg-[#bfbfbf] border border-gray-400 rounded-tl-[40px] rounded-tr-[30px] rounded-bl-[10px] rounded-br-[15px] overflow-hidden items-center justify-center mr-3">
                         {photo && photo.startsWith('http') ? (
-                            <Image source={{ uri: photo }} className="w-[76px] h-[95px] rounded-[14px]" resizeMode="cover" />
+                            <Image source={{ uri: photo }} className="w-full h-full" resizeMode="cover" />
                         ) : (
-                            <View className="w-[76px] h-[95px] bg-emerald-900/60 rounded-[14px] items-center justify-center border border-white/5">
-                                <Ionicons name="person" size={40} color="rgba(255,255,255,0.15)" />
-                            </View>
+                            <Ionicons name="person" size={50} color="#e5e5e5" />
                         )}
                     </View>
-                </View>
-                <View className="flex-1 justify-between h-full py-0.5">
-                    <View>
-                        <View className="flex-row items-center mb-0.5">
-                            <Text className="text-emerald-500 text-[7px] font-bold uppercase w-12">Surname:</Text>
-                            <Text className="text-white text-[11px] font-black uppercase tracking-tight flex-1">{lastName}</Text>
+
+                    {/* Details Column */}
+                    <View className="flex-1 justify-center">
+                        
+                        <View className="mb-2">
+                            <Text className="text-[#7a8c99] text-[9px] font-bold tracking-tight">SURNAME/NOM</Text>
+                            <Text className="text-black text-[11px] font-normal uppercase tracking-wider">{lastName}</Text>
                         </View>
-                        <View className="flex-row items-center mb-0.5">
-                            <Text className="text-emerald-500 text-[7px] font-bold uppercase w-12">First Name:</Text>
-                            <Text className="text-white text-[11px] font-black uppercase tracking-tight flex-1">{firstName} {middleName}</Text>
+                        
+                        <View className="mb-2">
+                            <Text className="text-[#7a8c99] text-[9px] font-bold tracking-tight">GIVEN NAMES/PRÉNOMS</Text>
+                            <Text className="text-black text-[11px] font-normal uppercase tracking-wider">{firstName} {middleName}</Text>
                         </View>
-                        <View className="flex-row justify-between mb-0.5 mr-2">
-                            <View className="flex-row items-center">
-                                <Text className="text-emerald-500 text-[7px] font-bold uppercase w-12">D.O.B:</Text>
-                                <Text className="text-white text-[9px] font-extrabold uppercase tracking-tight">{dob}</Text>
+
+                        <View className="flex-row">
+                            <View className="flex-1">
+                                <Text className="text-[#7a8c99] text-[9px] font-bold tracking-tight">DATE OF BIRTH</Text>
+                                <Text className="text-black text-[11px] font-normal uppercase tracking-wider">{formattedDob}</Text>
                             </View>
-                            <View className="flex-row items-center">
-                                <Text className="text-emerald-500 text-[7px] font-bold uppercase mr-1">Sex:</Text>
-                                <Text className="text-white text-[9px] font-extrabold uppercase tracking-tight">{gender}</Text>
+                            <View className="flex-1">
+                                <Text className="text-[#7a8c99] text-[9px] font-bold tracking-tight">SEX/SEXE</Text>
+                                <Text className="text-black text-[11px] font-normal uppercase tracking-wider">{gender}</Text>
                             </View>
+                        </View>
+
+                    </View>
+
+                    {/* Right column under QR */}
+                    <View className="w-16 items-center justify-start h-full pt-1">
+                        <Text className="text-black text-[22px] font-black tracking-tighter mb-4">NGA</Text>
+                        <View className="items-center">
+                            <Text className="text-black text-[9px] font-bold tracking-tight">ISSUE DATE</Text>
+                            <Text className="text-black text-[10px] font-normal">01 JAN 2021</Text>
                         </View>
                     </View>
-                    <View className="bg-emerald-900/40 border border-emerald-500/20 px-3 py-1 rounded-xl flex-row justify-between items-center mr-2 mt-1">
-                        <Text className="text-emerald-400 text-[8px] font-black uppercase tracking-wider">NIN:</Text>
-                        <Text className="text-[#C5A059] text-[12px] font-black uppercase tracking-[2.5px]">{nin}</Text>
-                    </View>
+
                 </View>
+
+                {/* Bottom Section */}
+                <View className="mt-1">
+                    <Text className="text-black text-[11px] font-bold text-center mb-0.5">
+                        National Identification Number (NIN)
+                    </Text>
+                    <Text className="text-black text-[28px] font-normal tracking-[4px] text-center" style={{ fontFamily: 'monospace' }}>
+                        {formattedNin}
+                    </Text>
+                </View>
+
             </View>
         </View>
     );
