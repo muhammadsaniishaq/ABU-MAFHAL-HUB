@@ -133,11 +133,11 @@ export default function VerifyNINScreen() {
             <Stack.Screen options={{ title: 'Verify NIN', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#fff', headerShadowVisible: false }} />
             <StatusBar style="light" />
 
-            <LinearGradient colors={['#060d21', '#0B163A']} className="pt-2 pb-6 px-4">
-                <Text className="text-white text-lg font-black tracking-tight">Verify Identity</Text>
+            <LinearGradient colors={['#060d21', '#0B163A']} className="pt-2 pb-10 px-4 rounded-b-[24px]">
+                <Text className="text-white text-xl font-black tracking-tight">Verify Identity</Text>
             </LinearGradient>
 
-            <ScrollView className="flex-1 px-3 pt-4" contentContainerStyle={{ paddingBottom: 80 }}>
+            <ScrollView className="flex-1 px-3 -mt-6" contentContainerStyle={{ paddingBottom: 80 }}>
                 {/* 1. SEARCH TYPE */}
                 <View className="bg-white rounded-2xl p-3 shadow-sm mb-3 border border-slate-100">
                     <View className="flex-row items-center mb-2">
