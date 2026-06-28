@@ -171,23 +171,25 @@ export default function VerifyNINScreen() {
                         </View>
                         <Text className="text-slate-800 font-bold text-xs tracking-wider">Slip Layout</Text>
                     </View>
-                    <View className="flex-row flex-wrap justify-between">
+                    <View className="flex-row justify-between w-full">
                         {layouts.map((layout) => {
                             const isSelected = selectedLayout === layout.id;
                             return (
                                 <TouchableOpacity
                                     key={layout.id}
                                     onPress={() => setSelectedLayout(layout.id)}
-                                    className={`rounded-lg p-1.5 mb-2 items-center justify-center ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
-                                    style={{ width: '23%' }}
+                                    className={`rounded-xl p-2 items-center justify-between ${isSelected ? 'bg-[#060d21] border-[#060d21]' : 'bg-slate-50 border-slate-200'} border`}
+                                    style={{ width: '23%', minHeight: 90 }}
                                 >
-                                    <Image 
-                                        source={layout.image as any} 
-                                        className="w-full h-6 rounded-sm mb-1 bg-white" 
-                                        resizeMode="contain" 
-                                    />
-                                    <Text className={`text-[7px] font-bold mb-0.5 text-center ${isSelected ? 'text-white' : 'text-slate-600'}`} numberOfLines={1}>{layout.name}</Text>
-                                    <Text className={`text-[7px] font-bold text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>₦{layout.price}</Text>
+                                    <View className="w-full aspect-[1.5] mb-2 bg-white rounded-md items-center justify-center p-1 border border-slate-100 shadow-sm">
+                                        <Image 
+                                            source={layout.image as any} 
+                                            className="w-full h-full" 
+                                            resizeMode="contain" 
+                                        />
+                                    </View>
+                                    <Text className={`text-[9px] font-extrabold mb-1 text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`} numberOfLines={2}>{layout.name}</Text>
+                                    <Text className={`text-[10px] font-black text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-500'}`}>₦{layout.price}</Text>
                                 </TouchableOpacity>
                             )
                         })}
