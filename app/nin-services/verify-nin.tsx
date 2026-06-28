@@ -178,18 +178,18 @@ export default function VerifyNINScreen() {
                                 <TouchableOpacity
                                     key={layout.id}
                                     onPress={() => setSelectedLayout(layout.id)}
-                                    className={`rounded-xl p-2 items-center justify-between ${isSelected ? 'bg-[#060d21] border-[#060d21]' : 'bg-slate-50 border-slate-200'} border`}
-                                    style={{ width: '23%', minHeight: 90 }}
+                                    className={`rounded-xl p-1 mb-2 items-center justify-center ${isSelected ? 'bg-[#060d21] border-[#060d21]' : 'bg-slate-50 border-slate-200'} border`}
+                                    style={{ width: '23%', minHeight: 85 }}
                                 >
-                                    <View className="w-full aspect-[1.5] mb-2 bg-white rounded-md items-center justify-center p-1 border border-slate-100 shadow-sm">
+                                    <View className="w-full h-10 mb-1 bg-white rounded items-center justify-center border border-slate-100 shadow-sm">
                                         <Image 
                                             source={layout.image as any} 
-                                            className="w-full h-full" 
+                                            className="w-[90%] h-[90%]" 
                                             resizeMode="contain" 
                                         />
                                     </View>
-                                    <Text className={`text-[9px] font-extrabold mb-1 text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`} numberOfLines={2}>{layout.name}</Text>
-                                    <Text className={`text-[10px] font-black text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-500'}`}>₦{layout.price}</Text>
+                                    <Text className={`text-[9px] font-extrabold mb-0.5 text-center leading-tight ${isSelected ? 'text-white' : 'text-slate-700'}`} numberOfLines={2}>{layout.name}</Text>
+                                    <Text className={`text-[9px] font-black text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-500'}`}>₦{layout.price}</Text>
                                 </TouchableOpacity>
                             )
                         })}
