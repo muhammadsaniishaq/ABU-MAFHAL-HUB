@@ -171,26 +171,27 @@ export default function VerifyNINScreen() {
                         </View>
                         <Text className="text-slate-800 font-bold text-xs tracking-wider">Slip Layout</Text>
                     </View>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View className="flex-row flex-wrap justify-between">
                         {layouts.map((layout) => {
                             const isSelected = selectedLayout === layout.id;
                             return (
                                 <TouchableOpacity
                                     key={layout.id}
                                     onPress={() => setSelectedLayout(layout.id)}
-                                    className={`rounded-xl p-2 mr-2 items-center justify-center w-20 ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
+                                    className={`rounded-lg p-1.5 mb-2 items-center justify-center ${isSelected ? 'bg-[#060d21]' : 'bg-slate-50 border border-slate-200'}`}
+                                    style={{ width: '23%' }}
                                 >
                                     <Image 
                                         source={layout.image as any} 
-                                        className="w-12 h-8 rounded-sm mb-1 bg-white" 
+                                        className="w-full h-6 rounded-sm mb-1 bg-white" 
                                         resizeMode="contain" 
                                     />
-                                    <Text className={`text-[8px] font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-slate-600'}`}>{layout.name}</Text>
-                                    <Text className={`text-[8px] font-bold ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>₦{layout.price}</Text>
+                                    <Text className={`text-[7px] font-bold mb-0.5 text-center ${isSelected ? 'text-white' : 'text-slate-600'}`} numberOfLines={1}>{layout.name}</Text>
+                                    <Text className={`text-[7px] font-bold text-center ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>₦{layout.price}</Text>
                                 </TouchableOpacity>
                             )
                         })}
-                    </ScrollView>
+                    </View>
                 </View>
 
                 {/* 3. SUPPLY ID & VERIFY */}
