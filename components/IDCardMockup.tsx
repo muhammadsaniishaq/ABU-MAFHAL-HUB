@@ -1,6 +1,7 @@
-import { View, Text, Image, ImageBackground } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
+import Svg, { Circle } from 'react-native-svg';
 
 export const IDCardMockup = ({ data }: { data: any }) => {
     const getVal = (keys: string[], fallback: string = 'N/A'): string => {
@@ -35,19 +36,40 @@ export const IDCardMockup = ({ data }: { data: any }) => {
 
     const genderVal = getVal(['gender', 'sex', 'gender_id'], 'f') || 'f';
     const gender = genderVal.toUpperCase().startsWith('M') ? 'M' : 'F';
-    const nin = getVal(['nin', 'number', 'nin_number', 'national_id', 'identity_number'], '0000 0000 0000');
+    const nin = getVal(['nin', 'number', 'nin_number', 'national_id', 'identity_number'], '00000000000');
+    const formattedNinNoSpace = nin.replace(/\D/g, '');
     
-    // Format NIN as "0000 0000 0000"
-    const formattedNin = nin.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+    // Format NIN as "0000 000 0000" (4-3-4 grouping)
+    const formattedNin = formattedNinNoSpace.length === 11
+        ? `${formattedNinNoSpace.slice(0, 4)} ${formattedNinNoSpace.slice(4, 7)} ${formattedNinNoSpace.slice(7)}`
+        : formattedNinNoSpace.replace(/(.{4})/g, '$1 ').trim();
 
     const photo = getVal(['photo', 'image', 'picture', 'avatar', 'face_image'], '') || null;
 
     return (
         <View className="w-full bg-white aspect-[1.586] rounded-xl overflow-hidden border border-gray-300 shadow-sm relative">
-            {/* Background Pattern - simulated with absolute elements */}
-            <View className="absolute inset-0 opacity-10">
-                <View className="absolute top-0 w-full h-[60%] border-b border-green-500 rounded-b-full bg-green-50 -ml-[50%] scale-[2.5]" />
-                <View className="absolute bottom-0 w-full h-[40%] border-t border-green-500 rounded-t-full bg-green-50 ml-[50%] scale-[2.5]" />
+            
+            {/* Background Concentric SVG Security waves */}
+            <View className="absolute inset-0 overflow-hidden opacity-[0.14]">
+                <Svg className="absolute -top-[100px] -left-[100px]" width="400" height="400">
+                    {[50, 80, 110, 140, 170, 200, 230, 260, 290, 320, 350, 380, 410, 440].map((r, i) => (
+                        <Circle key={`top-${i}`} cx="100" cy="100" r={r} stroke="#008240" strokeWidth="0.8" fill="none" />
+                    ))}
+                </Svg>
+                <Svg className="absolute -bottom-[120px] -right-[120px]" width="400" height="400">
+                    {[50, 80, 110, 140, 170, 200, 230, 260, 290, 320, 350, 380, 410, 440].map((r, i) => (
+                        <Circle key={`bot-${i}`} cx="300" cy="300" r={r} stroke="#008240" strokeWidth="0.8" fill="none" />
+                    ))}
+                </Svg>
+            </View>
+
+            {/* Background Watermark - Central faint Coat of Arms */}
+            <View className="absolute inset-0 opacity-[0.07] items-center justify-center">
+                <Image 
+                    source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/1024px-Coat_of_arms_of_Nigeria.svg.png" }} 
+                    className="w-[180px] h-[180px]" 
+                    resizeMode="contain" 
+                />
             </View>
             
             {/* Main Content Container */}
@@ -64,8 +86,8 @@ export const IDCardMockup = ({ data }: { data: any }) => {
                             DIGITAL NIN SLIP
                         </Text>
                     </View>
-                    {/* QR Code Placeholder Box */}
-                    <View className="w-16 h-16 bg-white border border-gray-100 p-0.5 items-center justify-center">
+                    {/* QR Code Box */}
+                    <View className="w-16 h-16 bg-white border border-gray-200 p-0.5 items-center justify-center">
                         <QRCode value={nin || "UNKNOWN"} size={58} backgroundColor="transparent" />
                     </View>
                 </View>

@@ -523,7 +523,7 @@ export default function Dashboard() {
 
             <View style={s.promoRight}>
               <Image 
-                source={require('../../assets/images/referral_gift.png')}
+                source={require('../../assets/images/referral_gift.jpg')}
                 style={s.promoGiftImage}
                 resizeMode="contain" 
               />
