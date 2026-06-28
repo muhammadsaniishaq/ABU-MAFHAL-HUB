@@ -220,17 +220,17 @@ export default function VerifyNINScreen() {
                     </View>
 
                     {/* Simple Checkbox area */}
-                    <View className="flex-row items-center mb-4 px-1">
+                    <View className="flex-row items-center mb-5 px-2 mt-2">
                         <BouncyCheckbox
-                            size={16}
-                            fillColor="#059669"
+                            size={18}
+                            fillColor="#060d21"
                             unFillColor="#FFFFFF"
                             iconStyle={{ borderColor: "#cbd5e1", borderRadius: 4 }}
                             innerIconStyle={{ borderWidth: 1, borderRadius: 4 }}
                             onPress={(isChecked: boolean) => { setConsent(isChecked) }}
                         />
-                        <Text className="text-slate-600 text-[9px] flex-1 font-medium ml-2">
-                            I have consent to verify this identity.
+                        <Text className="text-slate-700 text-[10px] flex-1 font-semibold ml-2 leading-tight">
+                            I confirm that I have obtained consent to verify this identity.
                         </Text>
                     </View>
 
