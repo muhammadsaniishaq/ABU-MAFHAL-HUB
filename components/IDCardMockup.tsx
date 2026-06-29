@@ -1,66 +1,86 @@
+/**
+ * IDCardMockup — Premium NIN Slip
+ * Pixel-faithful replica of the Nigerian Digital NIN Slip.
+ * Uses StyleSheet + SVG for security patterns; handles base64 & URL photos.
+ */
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import Svg, { Circle, Line, Path, Ellipse, G } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Ellipse, G, Defs, Pattern, Rect } from 'react-native-svg';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const getVal = (data: any, keys: string[], fallback = 'N/A'): string => {
+const getVal = (data: any, keys: string[], fallback = ''): string => {
     for (const k of keys) {
-        if (data[k] !== undefined && data[k] !== null && String(data[k]).trim() !== '') {
-            return String(data[k]);
-        }
+        const v = data?.[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
     }
     return fallback;
 };
 
-const formatDob = (dob: string): string => {
-    if (!dob || dob === 'N/A') return dob;
-    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const formatDob = (raw: string): string => {
+    if (!raw || raw === 'N/A') return raw;
+    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     try {
-        // Try "YYYY-MM-DD" or "DD-MM-YYYY" or "DD/MM/YYYY"
-        const parts = dob.split(/[-/]/);
+        const parts = raw.split(/[-/]/);
         if (parts.length === 3) {
             let y: string, m: string, d: string;
-            if (parts[0].length === 4) { [y, m, d] = parts; }
-            else { [d, m, y] = parts; }
-            const mIdx = parseInt(m, 10) - 1;
-            if (mIdx >= 0 && mIdx < 12) {
-                return `${d.padStart(2,'0')} ${months[mIdx]} ${y}`;
-            }
+            if (parts[0].length === 4) { [y, m, d] = parts; } else { [d, m, y] = parts; }
+            const idx = parseInt(m, 10) - 1;
+            if (idx >= 0 && idx < 12) return `${d.padStart(2,'0')} ${MONTHS[idx]} ${y}`;
         }
     } catch (_) {}
-    return dob.toUpperCase();
+    return raw.toUpperCase();
 };
 
-// ─── Security Guild / Lathe background ──────────────────────────────────────
-const SecurityBackground = () => (
-    <Svg style={StyleSheet.absoluteFillObject} viewBox="0 0 860 542">
-        {/* Left concentric circles */}
-        {[40,70,100,130,160,190,220,250,280,310,340,370,400].map((r, i) => (
-            <Circle key={`lc-${i}`} cx="0" cy="271" r={r} stroke="#00732e" strokeWidth="0.6" fill="none" opacity="0.25" />
-        ))}
-        {/* Right concentric circles */}
-        {[40,70,100,130,160,190,220,250,280,310,340,370,400].map((r, i) => (
-            <Circle key={`rc-${i}`} cx="860" cy="271" r={r} stroke="#00732e" strokeWidth="0.6" fill="none" opacity="0.25" />
-        ))}
-        {/* Top concentric semicircles */}
-        {[50,90,130,170,210,250,290,330].map((r, i) => (
-            <Circle key={`tc-${i}`} cx="430" cy="0" r={r} stroke="#00732e" strokeWidth="0.5" fill="none" opacity="0.18" />
-        ))}
-        {/* Bottom concentric semicircles */}
-        {[50,90,130,170,210,250,290,330].map((r, i) => (
-            <Circle key={`bc-${i}`} cx="430" cy="542" r={r} stroke="#00732e" strokeWidth="0.5" fill="none" opacity="0.18" />
-        ))}
-        {/* Fine horizontal ruling lines */}
-        {Array.from({ length: 28 }).map((_, i) => (
-            <Line key={`hl-${i}`} x1="0" y1={i * 20} x2="860" y2={i * 20} stroke="#00732e" strokeWidth="0.3" opacity="0.12" />
-        ))}
-    </Svg>
-);
+/** Resolve photo to a usable Image URI.
+ *  IDPro returns raw base64 (no prefix). URLs and data URIs also handled. */
+const resolvePhoto = (photo: string | undefined | null): string | null => {
+    if (!photo || photo.trim() === '') return null;
+    if (photo.startsWith('data:')) return photo;                        // already data URI
+    if (photo.startsWith('http://') || photo.startsWith('https://')) return photo; // URL
+    // Assume raw base64 JPEG (IDPro standard)
+    return `data:image/jpeg;base64,${photo}`;
+};
 
-// ─── Coat of Arms watermark ─────────────────────────────────────────────────
-const CoatWatermark = () => (
-    <View style={s.coatWrap}>
+// ─── Security Background SVG ─────────────────────────────────────────────────
+// Mirrors the concentric-circle guild pattern on a real NIN slip
+const SecurityBG = ({ w, h }: { w: number; h: number }) => {
+    const radii = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420];
+    const hLines = Array.from({ length: Math.ceil(h / 14) }, (_, i) => i * 14);
+    return (
+        <Svg width={w} height={h} style={StyleSheet.absoluteFillObject}>
+            {/* Horizontal ruling lines — very faint */}
+            {hLines.map((y, i) => (
+                <Line key={`h${i}`} x1="0" y1={y} x2={w} y2={y}
+                    stroke="#1a7a3c" strokeWidth="0.35" opacity="0.18" />
+            ))}
+            {/* Left concentric circles */}
+            {radii.map((r, i) => (
+                <Circle key={`lc${i}`} cx={0} cy={h / 2} r={r}
+                    stroke="#1a7a3c" strokeWidth="0.6" fill="none" opacity="0.28" />
+            ))}
+            {/* Right concentric circles */}
+            {radii.map((r, i) => (
+                <Circle key={`rc${i}`} cx={w} cy={h / 2} r={r}
+                    stroke="#1a7a3c" strokeWidth="0.6" fill="none" opacity="0.28" />
+            ))}
+            {/* Top-center fan */}
+            {[40, 80, 120, 160, 200, 240].map((r, i) => (
+                <Circle key={`tc${i}`} cx={w / 2} cy={0} r={r}
+                    stroke="#1a7a3c" strokeWidth="0.4" fill="none" opacity="0.15" />
+            ))}
+            {/* Bottom-center fan */}
+            {[40, 80, 120, 160, 200, 240].map((r, i) => (
+                <Circle key={`bc${i}`} cx={w / 2} cy={h} r={r}
+                    stroke="#1a7a3c" strokeWidth="0.4" fill="none" opacity="0.15" />
+            ))}
+        </Svg>
+    );
+};
+
+// ─── Coat of Arms Watermark ──────────────────────────────────────────────────
+const CoatWM = () => (
+    <View style={s.coatWrap} pointerEvents="none">
         <Image
             source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/512px-Coat_of_arms_of_Nigeria.svg.png' }}
             style={s.coatImg}
@@ -69,334 +89,264 @@ const CoatWatermark = () => (
     </View>
 );
 
-// ─── Main component ─────────────────────────────────────────────────────────
-export const IDCardMockup = ({ data }: { data: any }) => {
-    const firstName  = getVal(data, ['firstname','first_name','firstName','first'], '');
-    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last'], '');
-    const middleName = getVal(data, ['middlename','middle_name','middleName','middle'], '');
-    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth'], '01 OCT 1960');
-    const formattedDob = formatDob(rawDob);
-    const rawGender  = getVal(data, ['gender','sex','gender_id'], 'f');
-    const gender     = rawGender.trim().toUpperCase().startsWith('M') ? 'M' : 'F';
-    const rawNin     = getVal(data, ['nin','number','nin_number','national_id','identity_number'], '00000000000');
-    const cleanNin   = rawNin.replace(/\D/g, '');
-    const fmtNin     = cleanNin.length === 11
-        ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
-        : cleanNin;
-    const photo = getVal(data, ['photo','image','picture','avatar','face_image'], '');
-    // Issue date from data or default
-    const issueDate = getVal(data, ['issueDate','issue_date'], '01 JAN 2021');
+// ─── Person Silhouette (when no photo) ──────────────────────────────────────
+const Silhouette = () => (
+    <Svg viewBox="0 0 80 100" style={{ width: '100%', height: '100%' }}>
+        <Ellipse cx="40" cy="28" rx="18" ry="20" fill="#a8b4be" />
+        <Path d="M6,96 Q6,58 40,58 Q74,58 74,96 Z" fill="#a8b4be" />
+    </Svg>
+);
 
-    const givenNames = [firstName, middleName].filter(Boolean).join(', ');
+// ─── Main Component ──────────────────────────────────────────────────────────
+export const IDCardMockup = ({ data }: { data: any }) => {
+    // --- field extraction ---
+    const firstName  = getVal(data, ['firstname','first_name','firstName','first']);
+    const lastName   = getVal(data, ['surname','last_name','lastName','lastname','last'], 'RESIDENT');
+    const middleName = getVal(data, ['middlename','middle_name','middleName','middle']);
+    const rawDob     = getVal(data, ['birthdate','dob','dateOfBirth','date_of_birth'], '01-OCT-1960');
+    const rawGender  = getVal(data, ['gender','sex','gender_id'], 'f');
+    const rawNin     = getVal(data, ['nin','number','nin_number','national_id'], '00000000000');
+    const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image']);
+    const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date'], '');
+
+    const dob      = formatDob(rawDob);
+    const gender   = rawGender.trim().toUpperCase().startsWith('M') ? 'M' : 'F';
+    const cleanNin = rawNin.replace(/\D/g, '');
+    const fmtNin   = cleanNin.length === 11
+        ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
+        : cleanNin || '0000 000 0000';
+    const givenNames = [firstName, middleName].filter(Boolean).join(', ') || 'PROUD, NIGERIAN';
+    const photoUri = resolvePhoto(rawPhoto);
+    // Format issue date or default
+    const issueDate = rawIssue ? formatDob(rawIssue) : '01 JAN 2021';
 
     return (
         <View style={s.card}>
-            {/* ── Background Security Pattern ── */}
-            <SecurityBackground />
-
-            {/* ── Green gradient top bar ── */}
-            <View style={s.topBar} />
-
-            {/* ── Green gradient bottom bar ── */}
-            <View style={s.bottomBar} />
+            {/* ── Security Pattern Background ── */}
+            <View style={StyleSheet.absoluteFillObject}>
+                <SecurityBG w={500} h={315} />
+            </View>
 
             {/* ── Coat of Arms Watermark ── */}
-            <CoatWatermark />
+            <CoatWM />
 
-            {/* ── Card Content ── */}
+            {/* ── Green accent bars ── */}
+            <View style={s.topBar} />
+            <View style={s.bottomBar} />
+
+            {/* ════════════ CARD CONTENT ════════════ */}
             <View style={s.content}>
 
-                {/* ── TOP ROW: Header + QR + NGA ── */}
-                <View style={s.topRow}>
-
-                    {/* Left header block */}
-                    <View style={s.headerBlock}>
-                        <Text style={s.fedTitle}>FEDERAL REPUBLIC OF NIGERIA</Text>
-                        <Text style={s.ninSlipLabel}>DIGITAL NIN SLIP</Text>
+                {/* ─── ROW 1: Header | QR | NGA ─── */}
+                <View style={s.row1}>
+                    {/* Header text */}
+                    <View style={s.headerTxt}>
+                        <Text style={s.fedRepTxt}>FEDERAL REPUBLIC OF NIGERIA</Text>
+                        <Text style={s.ninSlipTxt}>DIGITAL NIN SLIP</Text>
                     </View>
 
-                    {/* QR Code box */}
-                    <View style={s.qrBox}>
-                        <QRCode
-                            value={cleanNin || 'UNKNOWN'}
-                            size={70}
-                            backgroundColor="white"
-                            color="black"
-                        />
+                    {/* QR code in white bordered box */}
+                    <View style={s.qrOuter}>
+                        <View style={s.qrInner}>
+                            <QRCode
+                                value={cleanNin.length > 0 ? cleanNin : 'UNKNOWN'}
+                                size={62}
+                                backgroundColor="white"
+                                color="#000"
+                            />
+                        </View>
                     </View>
 
-                    {/* NGA + Issue Date */}
+                    {/* NGA + issue date */}
                     <View style={s.ngaBlock}>
-                        <Text style={s.ngaText}>NGA</Text>
-                        <Text style={s.issueLbl}>ISSUE DATE</Text>
-                        <Text style={s.issueDt}>{issueDate}</Text>
+                        <Text style={s.ngaTxt}>NGA</Text>
+                        <Text style={s.issLbl}>ISSUE DATE</Text>
+                        <Text style={s.issVal}>{issueDate}</Text>
                     </View>
                 </View>
 
-                {/* ── MIDDLE ROW: Photo + Details ── */}
-                <View style={s.midRow}>
-
+                {/* ─── ROW 2: Photo | Details ─── */}
+                <View style={s.row2}>
                     {/* Photo */}
                     <View style={s.photoBox}>
-                        {photo && (photo.startsWith('http') || photo.startsWith('data:')) ? (
-                            <Image source={{ uri: photo }} style={s.photoImg} resizeMode="cover" />
+                        {photoUri ? (
+                            <Image
+                                source={{ uri: photoUri }}
+                                style={s.photoImg}
+                                resizeMode="cover"
+                            />
                         ) : (
-                            <View style={s.photoPlaceholder}>
-                                {/* Silhouette SVG */}
-                                <Svg viewBox="0 0 100 120" style={{ width: 60, height: 72 }}>
-                                    <Ellipse cx="50" cy="32" rx="22" ry="24" fill="#b0b8c1" />
-                                    <Path d="M10,110 Q10,72 50,72 Q90,72 90,110 Z" fill="#b0b8c1" />
-                                </Svg>
-                            </View>
+                            <Silhouette />
                         )}
                     </View>
 
-                    {/* Personal Details */}
-                    <View style={s.detailsBlock}>
-                        <View style={s.detailRow}>
-                            <Text style={s.detailLbl}>SURNAME/NOM</Text>
-                            <Text style={s.detailVal}>{lastName || 'RESIDENT'}</Text>
+                    {/* Personal details */}
+                    <View style={s.details}>
+                        <View style={s.detailBlock}>
+                            <Text style={s.dLbl}>SURNAME/NOM</Text>
+                            <Text style={s.dVal}>{lastName.toUpperCase()}</Text>
+                        </View>
+                        <View style={s.detailBlock}>
+                            <Text style={s.dLbl}>GIVEN NAMES/PRÉNOMS</Text>
+                            <Text style={s.dVal}>{givenNames.toUpperCase()}</Text>
                         </View>
                         <View style={s.detailRow}>
-                            <Text style={s.detailLbl}>GIVEN NAMES/PRÉNOMS</Text>
-                            <Text style={s.detailVal}>{givenNames || 'PROUD, NIGERIAN'}</Text>
-                        </View>
-                        <View style={s.detailRowHalf}>
                             <View style={s.halfCell}>
-                                <Text style={s.detailLbl}>DATE OF BIRTH</Text>
-                                <Text style={s.detailVal}>{formattedDob}</Text>
+                                <Text style={s.dLbl}>DATE OF BIRTH</Text>
+                                <Text style={s.dVal}>{dob}</Text>
                             </View>
                             <View style={s.halfCell}>
-                                <Text style={s.detailLbl}>SEX/SEXE</Text>
-                                <Text style={s.detailVal}>{gender}</Text>
+                                <Text style={s.dLbl}>SEX/SEXE</Text>
+                                <Text style={s.dVal}>{gender}</Text>
                             </View>
                         </View>
                     </View>
                 </View>
 
-                {/* ── BOTTOM MOTTO BAR ── */}
-                <View style={s.mottoBar}>
-                    <Text style={s.mottoText}>UNITY AND FAITH, PEACE AND PROGRESS</Text>
+                {/* ─── Motto ─── */}
+                <View style={s.mottoRow}>
+                    <Text style={s.mottoTxt}>UNITY AND FAITH, PEACE AND PROGRESS</Text>
                 </View>
 
-                {/* ── NIN SECTION ── */}
-                <View style={s.ninSection}>
-                    <Text style={s.ninLabel}>National Identification Number (NIN)</Text>
-                    <Text style={s.ninNumber}>{fmtNin}</Text>
+                {/* ─── NIN ─── */}
+                <View style={s.ninRow}>
+                    <Text style={s.ninLbl}>National Identification Number (NIN)</Text>
+                    <Text style={s.ninNum}>{fmtNin}</Text>
                 </View>
             </View>
         </View>
     );
 };
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
-// Card is credit-card ratio: 85.6mm × 54mm ≈ 1.586
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
     card: {
         width: '100%',
-        aspectRatio: 1.586,
-        backgroundColor: '#f5f9f0',  // Very light green-white, like the real card
+        aspectRatio: 1.586,          // ISO credit-card ratio 85.6 × 54 mm
+        backgroundColor: '#eef6e4',  // light green-white, matches real slip
         borderRadius: 10,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#c8d8c0',
+        borderWidth: 1.2,
+        borderColor: '#b8d4a0',
         position: 'relative',
+        elevation: 5,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
     },
     topBar: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 6,
+        position: 'absolute', top: 0, left: 0, right: 0, height: 7,
         backgroundColor: '#006633',
     },
     bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 5,
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 6,
         backgroundColor: '#006633',
     },
     coatWrap: {
         position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: [{ translateX: -70 }, { translateY: -70 }],
-        opacity: 0.06,
-        width: 140,
-        height: 140,
+        top: '20%', left: '30%',
+        width: '40%', height: '60%',
+        opacity: 0.07,
     },
-    coatImg: {
-        width: 140,
-        height: 140,
-    },
+    coatImg: { width: '100%', height: '100%' },
+
+    // ── content
     content: {
         flex: 1,
-        paddingHorizontal: 12,
-        paddingTop: 10,
-        paddingBottom: 4,
+        paddingTop: 12,
+        paddingBottom: 6,
+        paddingHorizontal: 10,
         justifyContent: 'space-between',
     },
 
-    // Top row
-    topRow: {
+    // ── row 1
+    row1: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        marginBottom: 4,
+        marginBottom: 2,
     },
-    headerBlock: {
-        flex: 1,
-        paddingRight: 6,
-    },
-    fedTitle: {
+    headerTxt: { flex: 1, paddingRight: 4 },
+    fedRepTxt: {
         color: '#006633',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '900',
-        letterSpacing: 0.2,
+        letterSpacing: 0.1,
         lineHeight: 13,
     },
-    ninSlipLabel: {
+    ninSlipTxt: {
         color: '#111',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '900',
-        letterSpacing: 1.5,
-        marginTop: 1,
+        letterSpacing: 1.8,
+        marginTop: 2,
     },
-    qrBox: {
-        width: 74,
-        height: 74,
-        backgroundColor: '#fff',
+    qrOuter: {
         borderWidth: 1,
-        borderColor: '#ddd',
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderColor: '#ccc',
+        padding: 2,
+        backgroundColor: '#fff',
+        marginRight: 4,
+    },
+    qrInner: {
+        backgroundColor: '#fff',
         padding: 1,
     },
     ngaBlock: {
-        width: 52,
+        width: 48,
         alignItems: 'center',
-        paddingLeft: 4,
         paddingTop: 2,
     },
-    ngaText: {
+    ngaTxt: {
         color: '#111',
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '900',
         letterSpacing: -0.5,
+        lineHeight: 20,
     },
-    issueLbl: {
-        color: '#555',
-        fontSize: 6.5,
-        fontWeight: '700',
-        marginTop: 4,
-        letterSpacing: 0.3,
-    },
-    issueDt: {
-        color: '#111',
-        fontSize: 7.5,
-        fontWeight: '600',
-        letterSpacing: 0.2,
-    },
+    issLbl: { color: '#555', fontSize: 5.5, fontWeight: '700', marginTop: 5, letterSpacing: 0.2 },
+    issVal: { color: '#111', fontSize: 7, fontWeight: '600' },
 
-    // Middle row
-    midRow: {
+    // ── row 2
+    row2: {
         flexDirection: 'row',
-        flex: 1,
         alignItems: 'center',
+        flex: 1,
         marginVertical: 2,
     },
     photoBox: {
-        width: 70,
-        height: 90,
-        borderRadius: 3,
-        backgroundColor: '#c5cdd4',
+        width: 68,
+        height: 85,
+        backgroundColor: '#c0c9d0',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 20,
+        borderBottomLeftRadius: 5,
+        borderBottomRightRadius: 8,
         overflow: 'hidden',
         marginRight: 10,
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 22,
-        borderBottomLeftRadius: 6,
-        borderBottomRightRadius: 8,
         borderWidth: 1,
-        borderColor: '#aab4be',
+        borderColor: '#aab0b8',
         alignItems: 'center',
         justifyContent: 'flex-end',
     },
-    photoPlaceholder: {
-        width: '100%',
-        height: '100%',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        backgroundColor: '#c5cdd4',
-        overflow: 'hidden',
-    },
-    photoImg: {
-        width: '100%',
-        height: '100%',
-    },
-    detailsBlock: {
-        flex: 1,
-        justifyContent: 'center',
-        gap: 5,
-    },
-    detailRow: {
-        marginBottom: 4,
-    },
-    detailRowHalf: {
-        flexDirection: 'row',
-    },
-    halfCell: {
-        flex: 1,
-    },
-    detailLbl: {
-        color: '#7a8e99',
-        fontSize: 7,
-        fontWeight: '700',
-        letterSpacing: 0.2,
-        textTransform: 'uppercase',
-    },
-    detailVal: {
-        color: '#111',
-        fontSize: 9.5,
-        fontWeight: '400',
-        letterSpacing: 0.8,
-        textTransform: 'uppercase',
-    },
+    photoImg: { width: '100%', height: '100%' },
+    details: { flex: 1, justifyContent: 'center', gap: 4 },
+    detailBlock: { marginBottom: 3 },
+    detailRow: { flexDirection: 'row' },
+    halfCell: { flex: 1 },
+    dLbl: { color: '#6a8090', fontSize: 6.5, fontWeight: '700', letterSpacing: 0.2, textTransform: 'uppercase' },
+    dVal: { color: '#111', fontSize: 9, fontWeight: '400', letterSpacing: 0.9, textTransform: 'uppercase' },
 
-    // Motto bar
-    mottoBar: {
-        alignItems: 'center',
-        marginVertical: 2,
-    },
-    mottoText: {
-        color: '#555',
-        fontSize: 6,
-        fontWeight: '600',
-        letterSpacing: 0.8,
-        fontStyle: 'italic',
-    },
+    // ── motto
+    mottoRow: { alignItems: 'center', marginVertical: 1 },
+    mottoTxt: { color: '#555', fontSize: 5.5, fontWeight: '600', fontStyle: 'italic', letterSpacing: 0.6 },
 
-    // NIN section
-    ninSection: {
-        alignItems: 'center',
-        paddingBottom: 4,
-    },
-    ninLabel: {
-        color: '#111',
-        fontSize: 7.5,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-        marginBottom: 1,
-    },
-    ninNumber: {
+    // ── NIN
+    ninRow: { alignItems: 'center', paddingBottom: 2 },
+    ninLbl: { color: '#111', fontSize: 7, fontWeight: '700', letterSpacing: 0.2, marginBottom: 1 },
+    ninNum: {
         color: '#000',
-        fontSize: 22,
+        fontSize: 21,
         fontWeight: '300',
         letterSpacing: 5,
         fontFamily: 'monospace',
