@@ -62,7 +62,7 @@ serve(async (req: Request) => {
     // We need to use a transaction-like approach or just update if balance >= FEE_AMOUNT
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('wallet_balance')
+      .select('balance')
       .eq('id', user.id)
       .single()
 
@@ -73,7 +73,9 @@ serve(async (req: Request) => {
       })
     }
 
-    if ((profile.wallet_balance || 0) < FEE_AMOUNT) {
+    const currentBalance = parseFloat(profile.balance?.toString() || '0');
+
+    if (currentBalance < FEE_AMOUNT) {
       return new Response(JSON.stringify({ error: 'Insufficient wallet balance' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -81,10 +83,10 @@ serve(async (req: Request) => {
     }
 
     // Deduct the balance
-    const newBalance = profile.wallet_balance - FEE_AMOUNT;
+    const newBalance = currentBalance - FEE_AMOUNT;
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
-      .update({ wallet_balance: newBalance })
+      .update({ balance: newBalance })
       .eq('id', user.id)
 
     if (updateError) {
@@ -96,10 +98,10 @@ serve(async (req: Request) => {
 
     // Record the transaction for the deduction
     await supabaseAdmin.from('transactions').insert({
-        profile_id: user.id,
+        user_id: user.id,
         amount: FEE_AMOUNT,
-        type: 'debit',
-        status: 'completed',
+        type: 'payment',
+        status: 'success',
         reference: `id_verify_${searchType}_${Date.now()}`,
         description: `Verification Fee (${searchType.toUpperCase()})`
     });
@@ -257,22 +259,23 @@ async function refundUser(supabaseAdmin: any, userId: string, amount: number, re
     // Fetch current balance
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('wallet_balance')
+      .select('balance')
       .eq('id', userId)
       .single()
       
     if (profile) {
-        const newBalance = profile.wallet_balance + amount;
+        const currentBalance = parseFloat(profile.balance?.toString() || '0');
+        const newBalance = currentBalance + amount;
         await supabaseAdmin
           .from('profiles')
-          .update({ wallet_balance: newBalance })
+          .update({ balance: newBalance })
           .eq('id', userId)
           
         await supabaseAdmin.from('transactions').insert({
-            profile_id: userId,
+            user_id: userId,
             amount: amount,
-            type: 'credit',
-            status: 'completed',
+            type: 'deposit',
+            status: 'success',
             reference: `refund_${Date.now()}`,
             description: reason
         });
