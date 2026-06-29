@@ -13,7 +13,7 @@ const SERVICES = [
     { id: 'ipe', title: 'IPE Clearance', desc: 'Pre-Employment Clearance', icon: 'briefcase', color: 'bg-indigo-100', iconColor: '#4F46E5', route: '/nin-services/ipe-clearance' },
     { id: 'track', title: 'Card Tracking', desc: 'Check Personalization status', icon: 'card', color: 'bg-orange-100', iconColor: '#EA580C', route: '/nin-services/tracking' },
     { id: 'delink', title: 'Delink Phone', desc: 'Remove phone from NIN', icon: 'cut', color: 'bg-red-100', iconColor: '#DC2626', route: '/nin-services/delink' },
-    { id: 'modify', title: 'Modification', desc: 'Update NIN information', icon: 'create', color: 'bg-yellow-100', iconColor: '#D97706', route: '#' },
+    { id: 'history', title: 'NIN History', desc: 'View past verifications & reprints', icon: 'time', color: 'bg-yellow-100', iconColor: '#D97706', route: '/nin-services/history' },
 ];
 
 export default function NINServicesScreen() {

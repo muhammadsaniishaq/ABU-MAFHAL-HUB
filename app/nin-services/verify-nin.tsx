@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform, Modal } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
@@ -31,6 +31,7 @@ const DEFAULT_LAYOUTS = [
 ];
 
 export default function VerifyNINScreen() {
+    const { reprintId } = useLocalSearchParams();
     const [selectedLayout, setSelectedLayout] = useState('premium');
     const [nin, setNin] = useState('');
     const [consent, setConsent] = useState(false);
@@ -299,6 +300,28 @@ export default function VerifyNINScreen() {
         fetchPrices();
         loadHistory();
     }, []);
+
+    useEffect(() => {
+        if (reprintId) {
+            const loadReprint = async () => {
+                try {
+                    const stored = await AsyncStorage.getItem('recent_nin_verifications');
+                    if (stored) {
+                        const list = JSON.parse(stored);
+                        const item = list.find((x: any) => x.id === reprintId);
+                        if (item) {
+                            setSelectedLayout(item.layout);
+                            setNin(item.nin);
+                            setResult({ status: 'success', data: item.data });
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load reprint', e);
+                }
+            };
+            loadReprint();
+        }
+    }, [reprintId]);
 
     const handleVerify = async () => {
         if (nin.length !== 11) {
