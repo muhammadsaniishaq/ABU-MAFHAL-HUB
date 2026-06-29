@@ -6,6 +6,7 @@ import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { api } from '../../services/api';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -85,12 +86,126 @@ export default function VerifyNINScreen() {
                 <html>
                 <head>
                     <style>
-                        body { margin: 0; padding: 20px; background-color: white; display: flex; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; }
-                        img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                        body { 
+                            margin: 0; 
+                            padding: 0; 
+                            background-color: white; 
+                            display: flex; 
+                            flex-direction: column;
+                            align-items: center; 
+                            justify-content: center; 
+                            height: 100vh; 
+                            font-family: Arial, sans-serif;
+                            box-sizing: border-box; 
+                        }
+                        .page-container {
+                            width: 100%;
+                            max-width: 600px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        .header-text {
+                            text-align: center;
+                            font-size: 13px;
+                            color: #333;
+                            margin-bottom: 25px;
+                            line-height: 1.5;
+                        }
+                        .card-front {
+                            width: 450px;
+                            height: 284px;
+                            border: 1px dashed #ccc;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            margin-bottom: 15px;
+                        }
+                        .card-back {
+                            width: 450px;
+                            height: 284px;
+                            border: 1px dashed #000;
+                            border-radius: 8px;
+                            padding: 20px;
+                            box-sizing: border-box;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            background-color: white;
+                            transform: rotate(180deg);
+                        }
+                        .disclaimer-title {
+                            margin: 0 0 6px 0;
+                            font-size: 12px;
+                            font-weight: bold;
+                            color: #000;
+                            text-align: center;
+                            letter-spacing: 0.5px;
+                        }
+                        .disclaimer-text {
+                            margin: 0;
+                            font-size: 9px;
+                            color: #333;
+                            line-height: 1.3;
+                            text-align: center;
+                        }
+                        .caution-title {
+                            margin: 0 0 6px 0;
+                            font-size: 12px;
+                            font-weight: bold;
+                            color: #d32f2f;
+                            text-align: center;
+                            letter-spacing: 0.5px;
+                        }
+                        .caution-text {
+                            margin: 0;
+                            font-size: 9px;
+                            color: #333;
+                            line-height: 1.3;
+                            text-align: center;
+                        }
+                        .footer-text {
+                            text-align: center;
+                            font-style: italic;
+                            font-size: 9px;
+                            color: #666;
+                        }
                     </style>
                 </head>
                 <body>
-                    <img src="${dataUri}" />
+                    <div class="page-container">
+                        <div class="header-text">
+                            <p style="margin: 0; font-weight: bold;">Please find below your new High Resolution NIN Slip</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">You may cut it out of the paper, fold and laminate as desired.</p>
+                        </div>
+                        
+                        <div class="card-front">
+                            <img src="${dataUri}" style="width: 100%; height: 100%; object-fit: cover;" />
+                        </div>
+                        
+                        <div class="card-back">
+                            <div>
+                                <h2 class="disclaimer-title">DISCLAIMER</h2>
+                                <p class="disclaimer-text">
+                                    Kindly ensure each time this ID is presented, that you verify the credentials using a Government-APPROVED verification resource.<br/>
+                                    The details on the front of this NIN Slip must EXACTLY match the verification result.
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <h2 class="caution-title">CAUTION!</h2>
+                                <p class="caution-text">
+                                    If this NIN was not issued to the person on the front of this document, please DO NOT attempt to scan, photocopy or replicate the personal data contained herein.<br/>
+                                    You are only permitted to scan the barcode for the purpose of identity verification.<br/>
+                                    The FEDERAL GOVERNMENT of NIGERIA assumes no responsibility if you accept any variance in the scan result or do not scan the 2D barcode overleaf.
+                                </p>
+                            </div>
+                            
+                            <div class="footer-text">
+                                Trust, but verify
+                            </div>
+                        </div>
+                    </div>
                 </body>
                 </html>
             `;
@@ -144,28 +259,17 @@ export default function VerifyNINScreen() {
             return Alert.alert('Consent Required', 'You must agree that the owner of the ID has granted you consent.');
         }
 
-        const layoutConfig = layouts.find(l => l.id === selectedLayout) || layouts[0];
-
         setLoading(true);
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${API_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ number: nin, type: layoutConfig.type })
-            });
-
-            const json = await response.json();
+            const response = await api.identity.validateNIN(nin);
             
-            if (json.status === 'success') {
-                setResult(json);
+            if (response.isValid && response.data) {
+                setResult({ status: 'success', data: response.data });
             } else {
-                Alert.alert('Verification Failed', json.message || 'Unable to verify NIN');
+                Alert.alert('Verification Failed', response.message || 'Unable to verify NIN');
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message);
+            Alert.alert('Network Error', e.message || 'An error occurred during verification');
         } finally {
             setLoading(false);
         }
