@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Image, Platform, Modal } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
@@ -36,6 +36,7 @@ export default function VerifyNINScreen() {
     const [result, setResult] = useState<any>(null);
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const viewShotRef = useRef<any>(null);
 
     const handleDownloadPng = async () => {
@@ -274,36 +275,73 @@ export default function VerifyNINScreen() {
                         </ViewShot>
                     </View>
 
-                    {/* PNG & PDF Download Buttons */}
-                    <View className="flex-row justify-between mb-4">
-                        <TouchableOpacity 
-                            onPress={handleDownloadPng}
-                            disabled={isSaving}
-                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row mr-2 shadow-sm ${isSaving ? 'bg-[#f5a623]/60' : 'bg-[#f5a623]'}`}
-                        >
-                            <Ionicons name="image" size={16} color="#060d21" />
-                            <Text className="text-[#060d21] font-black text-sm ml-2">
-                                {isSaving ? 'Processing...' : 'Download PNG'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={handleDownloadPdf}
-                            disabled={isSaving}
-                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row ml-2 shadow-sm ${isSaving ? 'bg-[#060d21]/60' : 'bg-[#060d21]'}`}
-                        >
-                            <Ionicons name="document-text" size={16} color="white" />
-                            <Text className="text-white font-bold text-sm ml-2">
-                                {isSaving ? 'Processing...' : 'Download PDF'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Download Slip Button */}
+                    <TouchableOpacity 
+                        onPress={() => setIsDownloadModalOpen(true)}
+                        disabled={isSaving}
+                        className={`w-full h-12 rounded-xl items-center justify-center flex-row mb-4 shadow-sm ${isSaving ? 'bg-[#f5a623]/60' : 'bg-[#f5a623]'}`}
+                    >
+                        <Ionicons name="download" size={16} color="#060d21" />
+                        <Text className="text-[#060d21] font-black text-sm ml-2">
+                            {isSaving ? 'Processing...' : 'Download Slip'}
+                        </Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => setResult(null)} className="border border-slate-200 bg-white h-12 rounded-xl items-center justify-center flex-row">
                         <Ionicons name="arrow-back" size={16} color="#475569" className="mr-2" />
                         <Text className="text-[#475569] font-bold text-sm ml-1">Verify Another ID</Text>
                     </TouchableOpacity>
                 </ScrollView>
+
+                {/* Download Format Picker Modal */}
+                <Modal
+                    visible={isDownloadModalOpen}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setIsDownloadModalOpen(false)}
+                >
+                    <View className="flex-1 bg-black/50 items-center justify-center px-4">
+                        <View className="bg-white rounded-[24px] p-6 w-full max-w-[300px] items-center shadow-xl">
+                            
+                            <Text className="text-slate-800 font-black text-base mt-2">Download slip as</Text>
+                            <Text className="text-slate-400 font-bold text-xs mt-1 mb-6">Choose a format</Text>
+
+                            <View className="flex-row justify-between w-full px-1">
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        setIsDownloadModalOpen(false);
+                                        setTimeout(handleDownloadPdf, 400);
+                                    }}
+                                    className="flex-1 border border-slate-100 rounded-2xl p-4 items-center justify-center bg-slate-50/50 mr-2"
+                                    style={{ aspectRatio: 1.1 }}
+                                >
+                                    <Ionicons name="document-text" size={32} color="#e11d48" />
+                                    <Text className="text-slate-600 font-black text-xs mt-2">PDF</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        setIsDownloadModalOpen(false);
+                                        setTimeout(handleDownloadPng, 400);
+                                    }}
+                                    className="flex-1 border border-slate-100 rounded-2xl p-4 items-center justify-center bg-slate-50/50 ml-2"
+                                    style={{ aspectRatio: 1.1 }}
+                                >
+                                    <Ionicons name="image" size={32} color="#f5a623" />
+                                    <Text className="text-slate-600 font-black text-xs mt-2">Image</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity 
+                                onPress={() => setIsDownloadModalOpen(false)} 
+                                className="mt-6 py-2"
+                            >
+                                <Text className="text-slate-400 font-bold text-sm">Cancel</Text>
+                            </TouchableOpacity>
+
+                        </View>
+                    </View>
+                </Modal>
             </View>
         );
     }
