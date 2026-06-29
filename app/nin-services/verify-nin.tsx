@@ -184,18 +184,90 @@ export default function VerifyNINScreen() {
     if (result) {
         return (
             <View className="flex-1 bg-slate-50">
-                <Stack.Screen options={{ title: 'Verification Result', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#fff', headerShadowVisible: false }} />
-                <LinearGradient colors={['#060d21', '#0B163A']} className="pt-4 pb-8 px-4 rounded-b-[30px] shadow-sm items-center">
-                    <View className="w-12 h-12 bg-emerald-500/20 rounded-full items-center justify-center mb-2">
-                        <Ionicons name="checkmark-done" size={24} color="#34d399" />
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#fff', headerShadowVisible: false }} />
+                
+                {/* Header Banner */}
+                <LinearGradient colors={['#060d21', '#121F42']} className="pt-6 pb-16 px-4 items-center relative">
+                    <View className="flex-row items-center">
+                        <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
+                        <Text className="text-white font-black text-sm ml-1.5 uppercase tracking-wider">Verification Details</Text>
                     </View>
-                    <Text className="text-white font-black text-lg mb-0.5 tracking-tight">Verified Successfully</Text>
-                    <Text className="text-slate-300 text-xs">{result.data.firstname} {result.data.surname}</Text>
+                    <Text className="text-slate-300 text-[10px] tracking-widest uppercase mt-0.5">VNIN - NIN</Text>
                 </LinearGradient>
-                <ScrollView className="flex-1 px-3 mt-4" contentContainerStyle={{ paddingBottom: 100 }}>
-                    <View className="mb-4 items-center w-full bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
+
+                <ScrollView className="flex-1 px-4 -mt-10" contentContainerStyle={{ paddingBottom: 100 }}>
+                    
+                    {/* Profile & Name Card */}
+                    <View className="bg-white rounded-2xl p-5 items-center shadow-sm border border-slate-100 mb-4">
+                        <View className="relative w-24 h-24 -mt-16 bg-slate-200 border-4 border-white rounded-2xl shadow overflow-hidden items-center justify-center">
+                            {result.data.photo || result.data.image ? (
+                                <Image source={{ uri: result.data.photo || result.data.image }} className="w-full h-full" resizeMode="cover" />
+                            ) : (
+                                <Ionicons name="person" size={48} color="#cbd5e1" />
+                            )}
+                            {/* Small green verified badge on bottom right corner */}
+                            <View className="absolute bottom-1 right-1 bg-emerald-500 w-5 h-5 rounded-full items-center justify-center border border-white">
+                                <Ionicons name="checkmark" size={10} color="white" />
+                            </View>
+                        </View>
+                        
+                        <Text className="text-[#060d21] font-black text-base text-center mt-3 tracking-tight uppercase">
+                            {result.data.firstname} {result.data.middlename ? `${result.data.middlename} ` : ''}{result.data.surname}
+                        </Text>
+                        
+                        <View className="bg-emerald-50 border border-emerald-100 rounded-full px-3 py-0.5 mt-2 flex-row items-center">
+                            <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                            <Text className="text-[#10b981] font-black text-[9px] uppercase tracking-widest ml-1">Verified</Text>
+                        </View>
+                    </View>
+
+                    {/* Details Table */}
+                    <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+                        <View className="flex-row justify-between items-center p-3.5 border-b border-slate-100">
+                            <Text className="text-slate-400 font-extrabold text-[10px] tracking-wider uppercase">Report ID</Text>
+                            <Text className="text-slate-800 font-bold text-xs">
+                                {result.data.trackingId || `073043-${Math.random().toString(36).substring(2, 10).toUpperCase()}`}
+                            </Text>
+                        </View>
+
+                        <View className="flex-row justify-between items-center p-3.5 border-b border-slate-100">
+                            <Text className="text-slate-400 font-extrabold text-[10px] tracking-wider uppercase">NIN Number</Text>
+                            <Text className="text-slate-800 font-bold text-xs tracking-wider">
+                                {result.data.nin || result.data.number || 'N/A'}
+                            </Text>
+                        </View>
+
+                        <View className="flex-row justify-between items-center p-3.5 border-b border-slate-100">
+                            <Text className="text-slate-400 font-extrabold text-[10px] tracking-wider uppercase">Report Type</Text>
+                            <View className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                <Text className="text-blue-600 font-black text-[9px] uppercase tracking-widest">NIN</Text>
+                            </View>
+                        </View>
+
+                        <View className="flex-row justify-between items-center p-3.5 border-b border-slate-100">
+                            <Text className="text-slate-400 font-extrabold text-[10px] tracking-wider uppercase">Slip</Text>
+                            <Text className="text-slate-800 font-black text-xs uppercase">
+                                {selectedLayout}
+                            </Text>
+                        </View>
+
+                        <View className="flex-row justify-between items-center p-3.5">
+                            <Text className="text-slate-400 font-extrabold text-[10px] tracking-wider uppercase">Date & Time</Text>
+                            <Text className="text-slate-800 font-bold text-xs">
+                                {(() => {
+                                    const d = new Date();
+                                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                    const pad = (n: number) => n.toString().padStart(2, '0');
+                                    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                                })()}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Generated NIN Slip Preview */}
+                    <View className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 mb-4 items-center">
                         <View className="bg-slate-100 rounded-full px-3 py-1 mb-3">
-                            <Text className="font-bold text-slate-500 uppercase text-[9px] tracking-widest">{selectedLayout} Slip Generated</Text>
+                            <Text className="font-bold text-slate-500 uppercase text-[9px] tracking-widest">Generated NIN Slip Preview</Text>
                         </View>
                         <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%' }}>
                             {renderSlip()}
@@ -207,29 +279,29 @@ export default function VerifyNINScreen() {
                         <TouchableOpacity 
                             onPress={handleDownloadPng}
                             disabled={isSaving}
-                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row mr-2 shadow-sm ${isSaving ? 'bg-sky-600/50' : 'bg-sky-600'}`}
+                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row mr-2 shadow-sm ${isSaving ? 'bg-[#f5a623]/60' : 'bg-[#f5a623]'}`}
                         >
-                            <Ionicons name="image" size={16} color="white" />
-                            <Text className="text-white font-bold text-sm ml-2">
-                                {isSaving ? 'Downloading...' : 'Download PNG'}
+                            <Ionicons name="image" size={16} color="#060d21" />
+                            <Text className="text-[#060d21] font-black text-sm ml-2">
+                                {isSaving ? 'Processing...' : 'Download PNG'}
                             </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
                             disabled={isSaving}
-                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row ml-2 shadow-sm ${isSaving ? 'bg-emerald-600/50' : 'bg-emerald-600'}`}
+                            className={`flex-1 h-12 rounded-xl items-center justify-center flex-row ml-2 shadow-sm ${isSaving ? 'bg-[#060d21]/60' : 'bg-[#060d21]'}`}
                         >
                             <Ionicons name="document-text" size={16} color="white" />
                             <Text className="text-white font-bold text-sm ml-2">
-                                {isSaving ? 'Downloading...' : 'Download PDF'}
+                                {isSaving ? 'Processing...' : 'Download PDF'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => setResult(null)} className="bg-[#060d21] h-12 rounded-xl items-center justify-center flex-row">
-                        <Ionicons name="refresh" size={16} color="white" className="mr-2" />
-                        <Text className="text-white font-bold text-sm ml-1">Verify Another ID</Text>
+                    <TouchableOpacity onPress={() => setResult(null)} className="border border-slate-200 bg-white h-12 rounded-xl items-center justify-center flex-row">
+                        <Ionicons name="arrow-back" size={16} color="#475569" className="mr-2" />
+                        <Text className="text-[#475569] font-bold text-sm ml-1">Verify Another ID</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
