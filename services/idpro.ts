@@ -11,18 +11,45 @@ export const IdProIdentityVerifier = {
             if (error) {
                 return { isValid: false, message: error.message || 'Verification Error' };
             }
-            if (data?.error) {
+            if (!data) {
+                return { isValid: false, message: 'No response received from server' };
+            }
+
+            // Handle explicit error from Edge Function
+            if (data.error) {
                 return { isValid: false, message: data.error, data: data.details };
             }
-            if (data?.data) {
-                return { 
-                    isValid: true, 
-                    message: data.data.message || 'Verification Successful', 
-                    data: data.data.data || data.data
+
+            // Edge Function wraps IDPro response as: { data: idproResponse }
+            // IDPro response is: { status: "success", data: { firstname, surname, ... } }
+            // So: data.data = idproResponse, data.data.data = person fields
+            const idproResponse = data.data;
+            if (!idproResponse) {
+                return { isValid: false, message: 'Invalid response structure from server' };
+            }
+
+            // Check IDPro status
+            const idproStatus = idproResponse.status || '';
+            if (idproStatus === 'success' || idproStatus === 'pending' || idproStatus === 'Pending') {
+                // Person data is inside idproResponse.data
+                const personData = idproResponse.data ?? idproResponse;
+                return {
+                    isValid: true,
+                    message: idproResponse.message || 'Verification Successful',
+                    data: personData,
+                };
+            }
+
+            // Fallback: if data.data has person fields directly
+            if (idproResponse.firstname || idproResponse.surname || idproResponse.nin) {
+                return {
+                    isValid: true,
+                    message: 'Verification Successful',
+                    data: idproResponse,
                 };
             }
             
-            return { isValid: false, message: 'Unknown Response from Provider' };
+            return { isValid: false, message: idproResponse.message || 'Verification failed. Please check the NIN and try again.' };
         } catch (e: any) {
             return { isValid: false, message: e.message || 'Network Error' };
         }

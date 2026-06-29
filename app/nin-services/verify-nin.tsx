@@ -325,10 +325,10 @@ export default function VerifyNINScreen() {
 
     const handleVerify = async () => {
         if (nin.length !== 11) {
-            return Alert.alert('Error', 'Please enter a valid 11-digit NIN');
+            return Alert.alert('NIN Invalid', 'Please enter a valid 11-digit NIN number.');
         }
         if (!consent) {
-            return Alert.alert('Consent Required', 'You must agree that the owner of the ID has granted you consent.');
+            return Alert.alert('Consent Required', 'You must tick the consent checkbox before verifying.');
         }
 
         setLoading(true);
@@ -336,13 +336,22 @@ export default function VerifyNINScreen() {
             const response = await api.identity.validateNIN(nin);
             
             if (response.isValid && response.data) {
-                setResult({ status: 'success', data: response.data });
-                await saveHistoryItem(response.data);
+                // Flatten nested data if needed (IDPro returns { data: { firstname, ... } } sometimes)
+                const personData = response.data?.data ?? response.data;
+                setResult({ status: 'success', data: personData });
+                await saveHistoryItem(personData);
             } else {
-                Alert.alert('Verification Failed', response.message || 'Unable to verify NIN');
+                const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
+                if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+                    Alert.alert('Insufficient Balance', 'Your wallet balance is too low. Please fund your wallet and try again.');
+                } else if (msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('auth')) {
+                    Alert.alert('Session Expired', 'Please log out and log in again, then retry.');
+                } else {
+                    Alert.alert('Verification Failed', msg);
+                }
             }
         } catch (e: any) {
-            Alert.alert('Network Error', e.message || 'An error occurred during verification');
+            Alert.alert('Network Error', e.message || 'A network error occurred. Please check your connection and try again.');
         } finally {
             setLoading(false);
         }
@@ -612,11 +621,14 @@ export default function VerifyNINScreen() {
                     {/* Verify Button */}
                     <TouchableOpacity 
                         onPress={handleVerify} 
-                        disabled={loading || nin.length !== 11} 
-                        className={`h-12 rounded-xl items-center justify-center flex-row ${loading || nin.length !== 11 ? 'bg-[#060d21]/50' : 'bg-[#060d21]'}`}
+                        disabled={loading || nin.length !== 11 || !consent} 
+                        className={`h-12 rounded-xl items-center justify-center flex-row ${loading || nin.length !== 11 || !consent ? 'bg-[#060d21]/50' : 'bg-[#060d21]'}`}
                     >
                         {loading ? <ActivityIndicator color="#f5a623" size="small" /> : (
-                            <Text className="font-bold text-white text-sm tracking-wide">VERIFY</Text>
+                            <>
+                                <Text className="font-bold text-white text-sm tracking-wide">VERIFY NIN</Text>
+                                {!consent && <Text className="text-white/50 text-[9px] ml-2">(tick consent first)</Text>}
+                            </>
                         )}
                     </TouchableOpacity>
                 </View>
