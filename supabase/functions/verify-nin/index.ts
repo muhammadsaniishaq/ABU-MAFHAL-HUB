@@ -6,8 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper: Always return 200 so Supabase SDK can read the body.
-// Use { error: "..." } for failures and { data: ... } for success.
+// Always return HTTP 200 so SDK can read actual error body
 const jsonOk = (body: object) =>
   new Response(JSON.stringify(body), {
     status: 200,
@@ -15,42 +14,45 @@ const jsonOk = (body: object) =>
   });
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
+    // Use Service Role admin client — reliable JWT verification without RLS issues
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get the user from the auth token
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message)
-      return jsonOk({ error: 'Unauthorized: Please log in again to continue.' })
+    // Extract JWT from Authorization header
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const jwt = authHeader.replace('Bearer ', '').trim()
+
+    if (!jwt) {
+      console.error('No Authorization header received')
+      return jsonOk({ error: 'No auth token provided. Please log in and try again.' })
     }
+
+    // Verify the JWT using the admin client
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
+
+    if (authError || !user) {
+      console.error('Auth verification failed:', authError?.message, '| JWT (first 20 chars):', jwt.substring(0, 20))
+      return jsonOk({ error: `Auth failed: ${authError?.message || 'Invalid token'}. Please log out and log in again.` })
+    }
+
+    console.log('Auth OK for user:', user.id)
 
     const requestData = await req.json()
     const { type, value, firstname, lastname, dob, gender } = requestData
 
-    // Ensure backwards compatibility with old payload (searchType/searchValue)
     const searchType = requestData.searchType || type
     const searchValue = requestData.searchValue || value
 
     if (!searchType) {
       return jsonOk({ error: 'Missing search type' })
     }
-
-    // Initialize Supabase Admin client to bypass RLS for balance update
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
 
 
     let FEE_AMOUNT = 100; // Deduct 100 NGN by default
