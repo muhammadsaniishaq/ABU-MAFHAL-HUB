@@ -11,6 +11,7 @@ import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Slip Components
 import { IDCardMockup } from '../../components/IDCardMockup';
@@ -38,7 +39,54 @@ export default function VerifyNINScreen() {
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
     const [isSaving, setIsSaving] = useState(false);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [historyList, setHistoryList] = useState<any[]>([]);
     const viewShotRef = useRef<any>(null);
+
+    const loadHistory = async () => {
+        try {
+            const stored = await AsyncStorage.getItem('recent_nin_verifications');
+            if (stored) {
+                setHistoryList(JSON.parse(stored));
+            }
+        } catch (e) {
+            console.warn('Failed to load history', e);
+        }
+    };
+
+    const saveHistoryItem = async (verifiedData: any) => {
+        try {
+            const name = `${verifiedData.firstname || ''} ${verifiedData.surname || ''}`.trim() || 'Unknown Name';
+            const newItem = {
+                id: `verify_${Date.now()}`,
+                nin: verifiedData.nin || nin || 'N/A',
+                name,
+                layout: selectedLayout,
+                date: (() => {
+                    const d = new Date();
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const pad = (n: number) => n.toString().padStart(2, '0');
+                    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                })(),
+                data: verifiedData
+            };
+            
+            const updated = [newItem, ...historyList.filter(item => item.nin !== newItem.nin)].slice(0, 50);
+            setHistoryList(updated);
+            await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
+        } catch (e) {
+            console.warn('Failed to save history item', e);
+        }
+    };
+
+    const deleteHistoryItem = async (itemId: string) => {
+        try {
+            const updated = historyList.filter(item => item.id !== itemId);
+            setHistoryList(updated);
+            await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
+        } catch (e) {
+            console.warn('Failed to delete history item', e);
+        }
+    };
 
     const handleDownloadPng = async () => {
         if (!viewShotRef.current) return;
@@ -249,6 +297,7 @@ export default function VerifyNINScreen() {
             }
         };
         fetchPrices();
+        loadHistory();
     }, []);
 
     const handleVerify = async () => {
@@ -265,6 +314,7 @@ export default function VerifyNINScreen() {
             
             if (response.isValid && response.data) {
                 setResult({ status: 'success', data: response.data });
+                await saveHistoryItem(response.data);
             } else {
                 Alert.alert('Verification Failed', response.message || 'Unable to verify NIN');
             }
@@ -547,6 +597,49 @@ export default function VerifyNINScreen() {
                         )}
                     </TouchableOpacity>
                 </View>
+
+                {/* 3. RECENT VERIFICATIONS */}
+                {historyList.length > 0 && (
+                    <View className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 mt-3">
+                        <View className="flex-row items-center mb-3">
+                            <Ionicons name="time" size={16} color="#f5a623" style={{ marginRight: 6 }} />
+                            <Text className="text-slate-800 font-bold text-xs tracking-wider">Recent Prints (Reprint)</Text>
+                        </View>
+
+                        <View className="divide-y divide-slate-100">
+                            {historyList.map((item) => (
+                                <View key={item.id} className="flex-row items-center justify-between py-2.5">
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setSelectedLayout(item.layout);
+                                            setNin(item.nin);
+                                            setResult({ status: 'success', data: item.data });
+                                        }}
+                                        className="flex-1 flex-row items-center mr-2"
+                                    >
+                                        <View className="bg-slate-50 w-8 h-8 rounded-lg items-center justify-center mr-3 border border-slate-100">
+                                            <Ionicons name="document-text" size={16} color="#060d21" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-slate-800 font-black text-xs">{item.name}</Text>
+                                            <Text className="text-slate-400 font-bold text-[10px]">NIN: {item.nin} • {item.layout.toUpperCase()}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    <View className="flex-row items-center">
+                                        <Text className="text-slate-400 font-bold text-[9px] mr-3">{item.date.split(',')[0]}</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => deleteHistoryItem(item.id)}
+                                            className="p-1.5 rounded-lg bg-red-50"
+                                        >
+                                            <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
 
             </ScrollView>
         </View>
