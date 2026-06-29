@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper: Always return 200 so Supabase SDK can read the body.
+// Use { error: "..." } for failures and { data: ... } for success.
+const jsonOk = (body: object) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -23,10 +31,8 @@ serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      console.error('Auth error:', authError?.message)
+      return jsonOk({ error: 'Unauthorized: Please log in again to continue.' })
     }
 
     const requestData = await req.json()
@@ -37,10 +43,7 @@ serve(async (req: Request) => {
     const searchValue = requestData.searchValue || value
 
     if (!searchType) {
-      return new Response(JSON.stringify({ error: 'Missing search type' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonOk({ error: 'Missing search type' })
     }
 
     // Initialize Supabase Admin client to bypass RLS for balance update
@@ -48,6 +51,7 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
 
     let FEE_AMOUNT = 100; // Deduct 100 NGN by default
     
@@ -67,19 +71,14 @@ serve(async (req: Request) => {
       .single()
 
     if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch user profile' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      console.error('Profile fetch error:', profileError?.message)
+      return jsonOk({ error: 'Failed to fetch user profile. Please try again.' })
     }
 
     const currentBalance = parseFloat(profile.balance?.toString() || '0');
 
     if (currentBalance < FEE_AMOUNT) {
-      return new Response(JSON.stringify({ error: 'Insufficient wallet balance' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT} but have ₦${currentBalance.toFixed(2)}.` })
     }
 
     // Deduct the balance
@@ -90,10 +89,8 @@ serve(async (req: Request) => {
       .eq('id', user.id)
 
     if (updateError) {
-      return new Response(JSON.stringify({ error: 'Failed to deduct wallet balance' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      console.error('Balance update error:', updateError.message)
+      return jsonOk({ error: 'Failed to deduct wallet balance. Please try again.' })
     }
 
     // Record the transaction for the deduction
@@ -122,11 +119,9 @@ serve(async (req: Request) => {
 
     if (!IDPRO_API_KEY) {
         // If API key is missing, refund the user
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Service unavailable`);
-        return new Response(JSON.stringify({ error: 'Service configuration error' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: IDPRO API key not configured`);
+        console.error('IDPRO_API_KEY is not set in environment or system_secrets table')
+        return jsonOk({ error: 'Verification service is not configured. Please contact support.' })
     }
 
     let endpoint = 'https://idpro.ng/api/v1/nin';
@@ -201,10 +196,7 @@ serve(async (req: Request) => {
             break;
         default:
             await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid verification type`);
-            return new Response(JSON.stringify({ error: 'Invalid verification type' }), {
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            })
+            return jsonOk({ error: `Invalid verification type: ${searchType}` })
     }
 
     try {
@@ -222,36 +214,26 @@ serve(async (req: Request) => {
         const responseData = await apiResponse.json();
         
         // Handle IDPro statuses: "success", "pending" (for tracking/ipe), "failed"
-        if (responseData.status !== 'success' && responseData.status !== 'pending' && responseData.status !== 'Pending') {
+        const idproStatus = (responseData.status || '').toLowerCase();
+        if (idproStatus !== 'success' && idproStatus !== 'pending') {
             console.error('IDPRO API Error:', responseData);
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Verification failed - ${responseData.message || 'Unknown error'}`);
-            return new Response(JSON.stringify({ error: 'Verification failed', details: responseData }), {
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            })
+            const idproMsg = responseData.message || 'NIN not found or verification failed';
+            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: ${idproMsg}`);
+            return jsonOk({ error: idproMsg, details: responseData })
         }
 
-        return new Response(JSON.stringify({ data: responseData }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return jsonOk({ data: responseData })
 
-    } catch (apiError) {
+    } catch (apiError: any) {
         console.error('IDPRO Fetch Error:', apiError);
         // Refund on network error
         await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Network error during verification`);
-        return new Response(JSON.stringify({ error: 'Failed to communicate with verification provider' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return jsonOk({ error: 'Failed to reach verification provider. Please try again.' })
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unexpected error:', error)
-    return new Response(JSON.stringify({ error: 'An unexpected error occurred' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonOk({ error: `An unexpected error occurred: ${error?.message || 'Unknown'}` })
   }
 })
 
