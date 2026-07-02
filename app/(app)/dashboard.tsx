@@ -214,7 +214,6 @@ export default function Dashboard() {
 
   const handleActionPress = (action: any) => {
     const featureMap: Record<string, string> = {
-      '/(app)/wallet': 'wallet_deposit_card',
       '/transfer': 'feature_transfer',
       '/airtime': 'feature_airtime',
       '/data': 'feature_data',

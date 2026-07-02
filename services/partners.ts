@@ -95,23 +95,10 @@ export const FlutterwaveAirtimeProvider: AirtimeProvider = {
             console.log(`[FLW-LIVE] Paying ${amount} to ${phone} on ${networkCode}`);
 
             // To actually work from client side (unsafe) or proxy (safe), the fetch is:
-            /*
-            const response = await fetch('https://api.flutterwave.com/v3/bills', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${process.env.EXPO_PUBLIC_PAYSTACK_SECRET_KEY || 'FLW-SECRET-KEY'}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    country: 'NG',
-                    customer: '08012345678', // Sender
-                    amount: amount,
-                    recurrence: 'ONCE',
-                    type: 'AIRTIME',
-                    reference: `TXN-${Date.now()}`
-                })
-            });
-            */
+            // This now needs to go through a Supabase Edge Function to avoid exposing API keys.
+            // const response = await supabase.functions.invoke('flutterwave-airtime', {
+            //     body: { network, phone, amount }
+            // });
 
             // Simulating the Network Delay and Success of that API call
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -182,23 +169,11 @@ export const FlutterwaveDataProvider: DataProvider = {
         try {
             console.log(`[FLW-LIVE] Purchasing Data Plan ${planId} for ${phone} on ${networkCode}`);
             // Logic similar to Airtime: 
-            /*
-            const response = await fetch('https://api.flutterwave.com/v3/bills', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${process.env.EXPO_PUBLIC_FLW_PUBLIC_KEY || 'FLW-SECRET-KEY'}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    country: 'NG',
-                    customer: phone,
-                    amount: 500, // Should look up price based on planId
-                    recurrence: 'ONCE',
-                    type: 'DATA', // or specific biller code
-                    reference: `TXN-${Date.now()}`
-                })
-            });
-            */
+            // To actually work from client side (unsafe) or proxy (safe), the fetch is:
+            // This now needs to go through a Supabase Edge Function to avoid exposing API keys.
+            // const response = await supabase.functions.invoke('flutterwave-data', {
+            //     body: { network, phone, planId, amount }
+            // });
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -510,7 +485,9 @@ export const BinanceCryptoExchange: CryptoExchange = {
     trade: async ({ type, asset, amount, price }) => {
         // Real Trading Logic with API Key
         try {
-            const apiKey = process.env.EXPO_PUBLIC_CRYPTO_EXCHANGE_KEY;
+            // In a secure architecture, the API key should not be in the frontend.
+            // This should route through an Edge Function.
+            const apiKey = 'hidden-for-security'; // Removed from frontend. Use Supabase edge functions instead.
             console.log(`[BINANCE-LIVE] Executing ${type} Order: ${amount} ${asset} using Key: ${apiKey?.substring(0, 5)}...`);
 
             // Simulation of execution 

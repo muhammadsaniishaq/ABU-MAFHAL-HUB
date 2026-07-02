@@ -21,7 +21,7 @@ export const ClubKonnectProvider: AirtimeProvider & DataProvider & EducationProv
         // Construct the Real URL for debugging/logging
         const urlParams = new URLSearchParams({
             UserID: 'CK_USER_ID', // Replace with Env Var in prod
-            APIKey: 'CK_API_KEY', // Replace with Env Var in prod
+            APIKey: 'hidden-for-security', // Moved to Edge Functions
             MobileNetwork: networkCode,
             MobileNumber: params.phone,
             RequestID: `CK_${Date.now()}`,
@@ -144,7 +144,7 @@ export const ClubKonnectProvider: AirtimeProvider & DataProvider & EducationProv
 
         // Construct Real URL
         const userID = 'CK_USER_ID'; 
-        const apiKey = 'CK_API_KEY'; 
+        const apiKey = 'hidden-for-security'; 
         const requestID = `EDU_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         
         const queryParams = new URLSearchParams({
@@ -205,7 +205,7 @@ export const ClubKonnectProvider: AirtimeProvider & DataProvider & EducationProv
 
     verifyProfile: async (params) => {
         const userID = 'CK_USER_ID';
-        const apiKey = 'CK_API_KEY';
+        const apiKey = 'hidden-for-security';
         
         // Only JAMB supports verification via this endpoint usually
         if (!params.examType.toLowerCase().includes('jamb') && !params.examType.toLowerCase().includes('utme') && params.examType !== 'de') {

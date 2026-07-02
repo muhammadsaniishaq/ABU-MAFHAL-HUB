@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVN Card Verification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-200 p-8 flex justify-center items-center min-h-screen">
+
+    <div class="bg-white w-[640px] h-[400px] border-[3px] border-black rounded-[20px] p-6 relative flex flex-col shadow-2xl">
+        
+        <!-- Top Section -->
+        <div class="flex justify-between items-start h-32">
+            <!-- Logo & Title -->
+            <div class="flex items-center gap-2">
+                <!-- Shield Logo -->
+                <div class="w-16 h-16 relative flex items-center justify-center">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Check_green_icon.svg/1200px-Check_green_icon.svg.png" class="w-10 h-10 absolute z-10 opacity-80 mix-blend-multiply" alt="Check">
+                    <svg class="w-16 h-16 text-blue-900" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                    </svg>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-[7px] transform -rotate-90 text-blue-900 font-bold whitespace-nowrap -ml-4 mr-1 uppercase">Financial Industry</span>
+                    <h1 class="text-blue-900 font-bold text-2xl leading-tight tracking-tight">Bank<br>Verification<br>Number</h1>
+                </div>
+            </div>
+
+            <!-- Thumbs up -->
+            <div class="mt-4 mr-10">
+                <svg class="w-14 h-14 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
+                </svg>
+            </div>
+
+            <!-- Right Fingerprint & NGA -->
+            <div class="flex flex-col items-center mr-2">
+                <!-- Large Fingerprint Placeholder (Using a radial pattern for effect) -->
+                <div class="w-20 h-24 rounded-[40px] border-4 border-black border-dashed flex items-center justify-center opacity-80">
+                    <div class="w-16 h-20 rounded-[30px] border-4 border-black border-dotted"></div>
+                </div>
+                <div class="text-green-600 font-black text-[22px] mt-1 tracking-wider">NGA</div>
+            </div>
+        </div>
+
+        <!-- Middle Section (Photo + Details) -->
+        <div class="flex mt-2 relative w-full h-36">
+            <!-- Portrait & small fingerprint -->
+            <div class="relative w-28 h-36 flex-shrink-0 flex flex-col justify-end items-center ml-2">
+                <!-- Person Graphic Placeholder -->
+                <div class="w-[90px] h-[120px] bg-[#f0c8a0] rounded-t-[40px] absolute top-0 z-10 flex flex-col items-center justify-end overflow-hidden">
+                    <div class="w-full h-8 bg-gray-800 rounded-t-[50%]"></div>
+                </div>
+                <!-- small fingerprint overlay -->
+                <div class="absolute -bottom-6 w-[70px] h-[70px] bg-white rounded-full z-20 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+                     <div class="w-[60px] h-[60px] rounded-full border-[3px] border-black border-dashed opacity-80"></div>
+                </div>
+            </div>
+
+            <!-- Details -->
+            <div class="flex-1 flex flex-col justify-start pl-8 space-y-3 -mt-2">
+                <div>
+                    <div class="text-xs text-gray-800 font-bold uppercase">SURNAME</div>
+                    <div class="text-xl font-bold text-black leading-tight mt-0.5">RESIDENT</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-800 font-bold uppercase">FIRST NAME/OTHER NAME</div>
+                    <div class="text-xl font-bold text-black leading-tight mt-0.5">PROUD, NIGERIA</div>
+                </div>
+                <div class="flex w-full">
+                    <div class="w-1/2">
+                        <div class="text-xs text-gray-800 font-bold uppercase">DATE OF BIRTH</div>
+                        <div class="text-xl font-bold text-black leading-tight mt-0.5">01 AUG 1960</div>
+                    </div>
+                    <div class="w-1/4">
+                        <div class="text-xs text-gray-800 font-bold uppercase">GENDER</div>
+                        <div class="text-xl font-bold text-black leading-tight mt-0.5">M</div>
+                    </div>
+                    <!-- Issue Date moved to align under NGA -->
+                    <div class="w-1/4 flex flex-col items-center absolute right-2">
+                        <div class="text-xs text-gray-800 font-bold uppercase">ISSUE DATE</div>
+                        <div class="text-xl font-bold text-black leading-tight mt-0.5">01 AUG 2024</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="mt-8 text-center flex flex-col items-center">
+            <p class="text-lg text-black font-bold uppercase tracking-tight">Bank Verification Number (BVN)</p>
+            <p class="text-[44px] font-black text-black tracking-[0.1em] leading-none mt-1">0000 000 0000</p>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -70,6 +70,7 @@ const modules = {
     redZone: [
         { title: 'Security', icon: 'shield-checkmark-outline', route: '/manage/security', color: '#3B82F6' },
         { title: 'Forensics', icon: 'finger-print-outline', route: '/manage/forensics', color: '#8B5CF6' },
+        { title: 'API Vault', icon: 'key-outline', route: '/manage/secrets', color: '#EF4444', dark: true },
         { title: 'Logs', icon: 'list-outline', route: '/manage/logs', color: '#64748B' },
         { title: 'Map', icon: 'earth-outline', route: '/manage/map', color: '#06B6D4' },
         { title: 'Settings', icon: 'settings-outline', route: '/manage/settings', color: '#475569' },

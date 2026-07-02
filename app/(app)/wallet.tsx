@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Alert, ActivityIndicator, Image, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Alert, ActivityIndicator, Image, Dimensions, StyleSheet, TextInput, Platform } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import PaystackPayment from '../../components/PaystackPayment';
 
 const T = {
   navy:    '#0d1b3e',
@@ -33,6 +34,15 @@ export default function WalletScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const { settings, loading: settingsLoading } = useAppSettings();
     const [showBalance, setShowBalance] = useState(!settings?.hide_user_balances);
+    const [fundModalVisible, setFundModalVisible] = useState(false);
+    const [fundMethod, setFundMethod] = useState<'transfer'|'card'|null>('transfer');
+    
+    // Paystack States
+    const [fundAmount, setFundAmount] = useState('');
+    const [paystackVisible, setPaystackVisible] = useState(false);
+    const [paystackKey, setPaystackKey] = useState('');
+    const [userEmail, setUserEmail] = useState('');
+    
     const hasLoadedOnce = useRef(false);
 
     useEffect(() => {
@@ -63,6 +73,14 @@ export default function WalletScreen() {
                 supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_type', 'funding_fee_value', 'funding_fee_percentage'])
             ]);
+
+            setUserEmail(user.email || '');
+
+            // Use the bundled public key from environment variables
+            const envKey = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY;
+            if (envKey) {
+                setPaystackKey(envKey);
+            }
 
             // 1. Profile Balance
             if (profileRes.data) {
@@ -272,7 +290,7 @@ export default function WalletScreen() {
 
                 <View style={s.cardRight}>
                   <TouchableOpacity 
-                    onPress={() => Alert.alert("How to Fund Wallet", "To fund your wallet, simply make a bank transfer to your Dedicated Account shown below. Your balance will be credited instantly!\n\nIf you don't have a dedicated account number yet, please complete your Tier 2 KYC Verification.")}
+                    onPress={() => setFundModalVisible(true)}
                     style={s.fundBtn}
                     activeOpacity={0.85}
                   >
@@ -304,64 +322,66 @@ export default function WalletScreen() {
                 
                 {/* 3. Dedicated Account Box */}
                 <View style={s.section}>
-                  <View style={s.cardSection}>
-                    <View className="flex-row items-center justify-between mb-4">
-                        <View className="flex-row items-center gap-2">
-                            <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center">
-                                <Ionicons name="card" size={16} color="#0056D2" />
-                            </View>
-                            <Text style={s.sectionTitleText}>Dedicated Account</Text>
-                        </View>
-                        <View className="bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                            <Text className="text-emerald-600 text-[8px] font-bold uppercase">Auto-Credited</Text>
-                        </View>
+                    <View style={s.sectionHeader}>
+                        <Text style={s.sectionTitle}>Automated Funding</Text>
                     </View>
-
+                    
                     {virtualAccount ? (
-                        <View style={s.virtualAccountBox}>
-                            <View className="flex-row justify-between items-center mb-1">
-                                <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">{virtualAccount.bank_name}</Text>
-                                <TouchableOpacity 
-                                    onPress={() => copyToClipboard(virtualAccount.account_number)}
-                                    className="flex-row items-center gap-1 bg-white px-2.5 py-1 rounded-full border border-slate-100 shadow-sm"
-                                >
-                                    <Ionicons name="copy-outline" size={12} color="#0056D2" />
-                                    <Text style={{ color: '#0056D2', fontSize: 10, fontWeight: 'bold' }}>Copy</Text>
-                                </TouchableOpacity>
-                            </View>
-                            
-                            <Text style={s.virtualAccountNumber}>
-                                {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
-                            </Text>
-                            
-                            <Text style={s.virtualAccountName}>
-                                {virtualAccount.account_name}
-                            </Text>
-                            
-                            {parseFloat(fundingFeeValue) > 0 && (
-                                <View style={{ marginTop: 10, backgroundColor: '#f0f4f8', padding: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="information-circle-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
-                                    <Text style={{ fontSize: 10, color: '#64748b', flex: 1 }}>
-                                        Note: A {fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`} fee applies to all wallet deposits.
-                                    </Text>
+                        <View style={s.acctCard}>
+                            <View style={s.acctCircleTop} />
+                            <View style={s.acctCircleBottom} />
+                            <View style={s.acctHeader}>
+                                <View style={s.acctBankPill}>
+                                    <Text style={s.acctBankTxt}>{virtualAccount.bank_name}</Text>
                                 </View>
-                            )}
+                                <Ionicons name="card" size={24} color="rgba(255,255,255,0.7)" />
+                            </View>
+
+                            <View style={{ marginBottom: 16 }}>
+                                <Text style={s.acctNumLabel}>Account Number</Text>
+                                <View style={s.acctNumRow}>
+                                    <Text style={s.acctNum}>
+                                        {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => copyToClipboard(virtualAccount.account_number)} style={s.acctCopyBtn} activeOpacity={0.7}>
+                                        <Ionicons name="copy-outline" size={16} color="#f5a623" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View>
+                                <Text style={s.acctNameLabel}>Account Name</Text>
+                                <Text style={s.acctName} numberOfLines={1}>{virtualAccount.account_name}</Text>
+                            </View>
                         </View>
                     ) : (
-                        <View style={s.virtualAccountEmpty}>
-                            <Ionicons name="alert-circle-outline" size={32} color="#94a3b8" />
-                            <Text className="text-slate-400 text-xs font-semibold mt-2 mb-3">No dedicated account active</Text>
+                        <View style={s.acctEmpty}>
+                            <View style={s.acctEmptyIcon}>
+                                <Ionicons name="shield-checkmark" size={24} color="#64748b" />
+                            </View>
+                            <Text style={s.acctEmptyTitle}>No Dedicated Account</Text>
+                            <Text style={s.acctEmptySub}>
+                                Verify your identity to get a dedicated automated funding account.
+                            </Text>
                             <TouchableOpacity 
                                 onPress={() => router.push('/kyc')}
-                                className="bg-[#0d1b3e] px-4 py-2 rounded-xl"
+                                style={s.acctVerifyBtn}
+                                activeOpacity={0.8}
                             >
-                                <Text className="text-white font-bold text-[11px]">Verify Identity to Activate</Text>
+                                <Text style={s.acctVerifyTxt}>Verify Identity (KYC)</Text>
                             </TouchableOpacity>
                         </View>
                     )}
-                  </View>
-                </View>
 
+                    {parseFloat(fundingFeeValue) > 0 && (
+                        <View style={[s.feeWarningBox, { marginTop: 16 }]}>
+                            <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginTop: 2 }} />
+                            <Text style={s.feeWarningText}>
+                                A standard banking fee of <Text style={{ fontWeight: 'bold' }}>{fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`}</Text> applies to all deposits via this method. This fee is charged directly by the payment processor.
+                            </Text>
+                        </View>
+                    )}
+                </View>
                 {/* 4. Stats Row */}
                 <View style={s.statsRow}>
                   {/* Income */}
@@ -450,6 +470,170 @@ export default function WalletScreen() {
                   )}
                 </View>
             </ScrollView>
+
+            {/* FUND WALLET OVERLAY (Replaced Modal with Absolute View) */}
+            {fundModalVisible && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2, 6, 23, 0.6)', justifyContent: 'flex-end', zIndex: 999 }]}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => setFundModalVisible(false)} activeOpacity={1} />
+                    
+                    <View style={s.modalContainer}>
+                        {/* Drag Handle */}
+                        <View style={s.modalDragHandle} />
+                        
+                        <View style={s.modalHeaderRow}>
+                            <Text style={s.modalTitle}>Fund Wallet</Text>
+                            <TouchableOpacity onPress={() => setFundModalVisible(false)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={18} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Method Selector */}
+                        <View style={s.methodTabs}>
+                            <TouchableOpacity 
+                                onPress={() => setFundMethod('transfer')}
+                                style={[s.methodTab, fundMethod === 'transfer' && s.methodTabActive]}
+                            >
+                                <Text style={[s.methodTabText, fundMethod === 'transfer' && s.methodTabTextActive]}>Bank Transfer</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => setFundMethod('card')}
+                                style={[s.methodTab, fundMethod === 'card' && s.methodTabActive]}
+                            >
+                                <Text style={[s.methodTabText, fundMethod === 'card' && s.methodTabTextActive]}>Card / USSD</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Content Area */}
+                        {fundMethod === 'transfer' ? (
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                                <Text style={s.modalSubtitle}>
+                                    Transfer to your dedicated account below. Your wallet will be credited instantly once the transfer is successful.
+                                </Text>
+
+                                {virtualAccount ? (
+                                    <View style={s.acctCard}>
+                                        <View style={s.acctCircleTop} />
+                                        <View style={s.acctCircleBottom} />
+                                        <View style={s.acctHeader}>
+                                            <View style={s.acctBankPill}>
+                                                <Text style={s.acctBankTxt}>{virtualAccount.bank_name}</Text>
+                                            </View>
+                                            <Ionicons name="card" size={24} color="rgba(255,255,255,0.7)" />
+                                        </View>
+
+                                        <View style={{ marginBottom: 16 }}>
+                                            <Text style={s.acctNumLabel}>Account Number</Text>
+                                            <View style={s.acctNumRow}>
+                                                <Text style={s.acctNum}>
+                                                    {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
+                                                </Text>
+                                                <TouchableOpacity onPress={() => copyToClipboard(virtualAccount.account_number)} style={s.acctCopyBtn} activeOpacity={0.7}>
+                                                    <Ionicons name="copy-outline" size={16} color="#f5a623" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        <View>
+                                            <Text style={s.acctNameLabel}>Account Name</Text>
+                                            <Text style={s.acctName} numberOfLines={1}>{virtualAccount.account_name}</Text>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View style={s.acctEmpty}>
+                                        <View style={s.acctEmptyIcon}>
+                                            <Ionicons name="shield-checkmark" size={24} color="#64748b" />
+                                        </View>
+                                        <Text style={s.acctEmptyTitle}>No Dedicated Account</Text>
+                                        <Text style={s.acctEmptySub}>
+                                            Verify your identity to get a dedicated automated funding account.
+                                        </Text>
+                                        <TouchableOpacity 
+                                            onPress={() => { setFundModalVisible(false); router.push('/kyc'); }}
+                                            style={s.acctVerifyBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={s.acctVerifyTxt}>Verify Identity (KYC)</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {parseFloat(fundingFeeValue) > 0 && (
+                                    <View style={s.feeWarningBox}>
+                                        <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginTop: 2 }} />
+                                        <Text style={s.feeWarningText}>
+                                            A standard banking fee of <Text style={{ fontWeight: 'bold' }}>{fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`}</Text> applies to all deposits via this method. This fee is charged directly by the payment processor.
+                                        </Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                                <Text style={s.modalSubtitle}>
+                                    Fund your wallet instantly using your Debit or Credit card via Paystack.
+                                </Text>
+                                
+                                <View style={s.amountInputBox}>
+                                    <Text style={s.amountInputLabel}>Amount to Fund</Text>
+                                    <View style={s.amountInputRow}>
+                                        <Text style={s.amountInputSymbol}>₦</Text>
+                                        <TextInput
+                                            value={fundAmount}
+                                            onChangeText={setFundAmount}
+                                            keyboardType="numeric"
+                                            placeholder="0.00"
+                                            placeholderTextColor="#94a3b8"
+                                            style={s.amountInput}
+                                        />
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) < 100) {
+                                            Alert.alert("Invalid Amount", "Please enter an amount of at least ₦100.");
+                                            return;
+                                        }
+                                        if (!paystackKey) {
+                                            Alert.alert("Error", "Payment system is currently unavailable. Please use Bank Transfer.");
+                                            return;
+                                        }
+                                        setPaystackVisible(true);
+                                        setFundModalVisible(false);
+                                    }}
+                                    style={s.payBtn}
+                                >
+                                    <Text style={s.payBtnText}>Pay ₦{fundAmount || '0.00'}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            )}
+
+            {/* PAYSTACK PAYMENT COMPONENT */}
+            {paystackVisible && paystackKey && (
+                <PaystackPayment
+                    visible={paystackVisible}
+                    amount={Number(fundAmount)}
+                    email={userEmail || 'user@example.com'}
+                    publicKey={paystackKey}
+                    onSuccess={(res) => {
+                        Alert.alert("Payment Successful", "Your wallet will be credited shortly after verification.");
+                        setFundAmount('');
+                        // Trigger a refresh after a few seconds to let webhook process
+                        setTimeout(() => {
+                            fetchWalletData();
+                        }, 3000);
+                    }}
+                    onCancel={() => {
+                        Alert.alert("Payment Cancelled", "You cancelled the payment process.");
+                    }}
+                    onClose={() => {
+                        setPaystackVisible(false);
+                    }}
+                />
+            )}
+
         </View>
     );
 }
@@ -461,6 +645,296 @@ const s = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  
+  // Wallet Modal
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    height: '75%',
+  },
+  modalDragHandle: {
+    width: 48,
+    height: 6,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: -0.5,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  methodTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    padding: 4,
+    borderRadius: 12,
+    marginBottom: 24,
+  },
+  methodTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  methodTabActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  methodTabText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  methodTabTextActive: {
+    color: '#4f46e5',
+  },
+  modalSubtitle: {
+    color: '#64748b',
+    fontSize: 11,
+    marginBottom: 16,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    lineHeight: 16,
+  },
+  feeWarningBox: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: 'rgba(253, 230, 138, 0.5)',
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  feeWarningText: {
+    color: '#92400e',
+    fontSize: 10.5,
+    lineHeight: 16,
+    flex: 1,
+  },
+  amountInputBox: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  amountInputLabel: {
+    color: '#475569',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  amountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#cbd5e1',
+    paddingBottom: 8,
+  },
+  amountInputSymbol: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#1e293b',
+    marginRight: 4,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  payBtn: {
+    backgroundColor: '#4f46e5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#4f46e5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  payBtnText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  
+  // Dedicated Account Card
+  acctCard: {
+    backgroundColor: '#0d1b3e', // T.navy
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#0d1b3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 4,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  acctCircleTop: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  acctCircleBottom: {
+    position: 'absolute',
+    bottom: -30,
+    left: -30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  acctHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  acctBankPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  acctBankTxt: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  acctNumLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  acctNumRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  acctNum: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  acctCopyBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 6,
+    borderRadius: 8,
+  },
+  acctNameLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  acctName: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  acctEmpty: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acctEmptyIcon: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  acctEmptyTitle: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  acctEmptySub: {
+    color: '#64748b',
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    lineHeight: 16,
+  },
+  acctVerifyBtn: {
+    backgroundColor: '#4f46e5',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#4f46e5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  acctVerifyTxt: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 12,
   },
   
   // curved header

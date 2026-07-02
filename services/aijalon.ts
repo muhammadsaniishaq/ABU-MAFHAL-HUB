@@ -8,7 +8,7 @@
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 
 const AIJALON_BASE_URL = 'https://aijalon.ng/api';
-const AIJALON_TOKEN = 'lv_Aijalon_r63b1dtk84qu1mz31pws59j0oax86c59';
+const AIJALON_TOKEN = 'hidden-for-security'; // Use Edge functions for real requests
 
 const aijalonHeaders = {
     'Authorization': `Bearer ${AIJALON_TOKEN}`,

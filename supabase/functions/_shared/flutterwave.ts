@@ -1,11 +1,4 @@
-
-
-const FLW_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY');
-if (!FLW_KEY) {
-    console.error("Missing FLUTTERWAVE_SECRET_KEY environment variable");
-}
-export const FLUTTERWAVE_SECRET_KEY = FLW_KEY ?? '';
-
+import { getSystemSecret } from './secrets.ts';
 
 export interface FlutterwaveDVAResponse {
     status: string;
@@ -26,10 +19,6 @@ export interface FlutterwaveDVAResponse {
     } | null;
 }
 
-
-
-
-
 export async function createFlutterwaveDVA(
     email: string,
     bvn: string,
@@ -42,19 +31,15 @@ export async function createFlutterwaveDVA(
     console.log(`Creating Flutterwave DVA for ${email} (BVN: ${bvn})`);
     
     try {
-        // 1. Prepare User Data
-        // Reverted to simple email-based flow. No need to pre-create customer via API if using /virtual-account-numbers?
-        // Actually, /virtual-account-numbers might auto-create customer or just link by email.
+        const FLUTTERWAVE_SECRET_KEY = await getSystemSecret('FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_SECRET_KEY');
+        if (!FLUTTERWAVE_SECRET_KEY) {
+            throw new Error('FLUTTERWAVE_SECRET_KEY is not configured in system_secrets');
+        }
 
         const phone = phoneNumber || '08000000000';
         
         console.log(`Skipping explicit Customer ID creation. Using Email: ${email}`);
 
-
-        // 2. Create Virtual Account
-        // Reverting to Standard V3 Endpoint: /virtual-account-numbers which uses EMAIL
-        // The /virtual-accounts endpoint with customer_id seems to be for a different product set or version not active on standard base URL.
-        
         const payload = {
             email, 
             is_permanent: true,
@@ -95,7 +80,6 @@ export async function createFlutterwaveDVA(
     }
 }
 
-
 // Basic interface for KYC responses
 interface KYCResponse {
     status: string;
@@ -104,6 +88,11 @@ interface KYCResponse {
 }
 
 export async function verifyBVN(bvn: string): Promise<KYCResponse> {
+    const FLUTTERWAVE_SECRET_KEY = await getSystemSecret('FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_SECRET_KEY');
+    if (!FLUTTERWAVE_SECRET_KEY) {
+        throw new Error('FLUTTERWAVE_SECRET_KEY is not configured in system_secrets');
+    }
+
     const response = await fetch(`https://api.flutterwave.com/v3/kyc/bvns/${bvn}`, {
         method: 'GET',
         headers: {
@@ -116,6 +105,11 @@ export async function verifyBVN(bvn: string): Promise<KYCResponse> {
 
 // Note: NIN verification logic can vary based on the specific FW endpoint version enabled
 export async function verifyNIN(nin: string): Promise<KYCResponse> {
+    const FLUTTERWAVE_SECRET_KEY = await getSystemSecret('FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_SECRET_KEY');
+    if (!FLUTTERWAVE_SECRET_KEY) {
+        throw new Error('FLUTTERWAVE_SECRET_KEY is not configured in system_secrets');
+    }
+
     const response = await fetch(`https://api.flutterwave.com/v3/kyc/nin`, {
         method: 'POST',
         headers: {

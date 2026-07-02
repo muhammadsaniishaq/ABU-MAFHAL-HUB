@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Modal, TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, ActivityIndicator, StyleSheet, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -96,8 +96,10 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
         }
     };
 
+    if (!visible) return null;
+
     return (
-        <Modal visible={visible} animationType="slide" transparent>
+        <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
             <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: 'white', zIndex: 10 }}>
                     <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#1E293B' }}>Complete Payment</Text>

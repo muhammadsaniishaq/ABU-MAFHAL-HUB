@@ -1,5 +1,4 @@
-
-export const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+import { getSystemSecret } from './secrets.ts';
 
 export interface PaystackDVAResponse {
     status: boolean;
@@ -29,6 +28,11 @@ export async function createPaystackDVA(
     phone: string
 ): Promise<PaystackDVAResponse> {
     try {
+        const PAYSTACK_SECRET_KEY = await getSystemSecret('PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY');
+        if (!PAYSTACK_SECRET_KEY) {
+            throw new Error('PAYSTACK_SECRET_KEY is not configured in system_secrets');
+        }
+
         // 1. Create or Get Customer
         const customerResponse = await fetch('https://api.paystack.co/customer', {
             method: 'POST',
@@ -61,7 +65,7 @@ export async function createPaystackDVA(
                 });
                 const existingCustomer = await fetchCustomer.json();
                 if (existingCustomer.status) {
-                    return await assignDVA(existingCustomer.data.customer_code);
+                    return await assignDVA(existingCustomer.data.customer_code, PAYSTACK_SECRET_KEY);
                 }
             }
 
@@ -69,7 +73,7 @@ export async function createPaystackDVA(
         }
 
         const customerCode = customerData.data.customer_code;
-        return await assignDVA(customerCode);
+        return await assignDVA(customerCode, PAYSTACK_SECRET_KEY);
     } catch (error: unknown) {
         console.error("CreatePaystackDVA Wrapper Error:", error);
         const errorMessage = error instanceof Error ? error.message : "Failed to communicate with Paystack";
@@ -81,17 +85,15 @@ export async function createPaystackDVA(
     }
 }
 
-async function assignDVA(customerCode: string): Promise<PaystackDVAResponse> {
+async function assignDVA(customerCode: string, secretKey: string): Promise<PaystackDVAResponse> {
     const response = await fetch('https://api.paystack.co/dedicated_account', {
         method: 'POST',
         headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            Authorization: `Bearer ${secretKey}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
             customer: customerCode,
-             // Removed preferred_bank to allow Paystack to assign any available bank
-             // preferred_bank: 'wema-bank', 
         }),
     });
 
@@ -113,6 +115,11 @@ export interface PaystackBVNResponse {
 }
 
 export async function resolveBVN(bvn: string): Promise<PaystackBVNResponse> {
+    const PAYSTACK_SECRET_KEY = await getSystemSecret('PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY');
+    if (!PAYSTACK_SECRET_KEY) {
+        throw new Error('PAYSTACK_SECRET_KEY is not configured in system_secrets');
+    }
+
     const response = await fetch(`https://api.paystack.co/bank/resolve_bvn/${bvn}`, {
         method: 'GET',
         headers: {
