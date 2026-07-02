@@ -272,18 +272,36 @@ export default function BVNVerificationScreen() {
     };
 
     const handleDownloadPng = async () => {
-        if (!viewShotRef.current) return;
         try {
             setIsSaving(true);
-            const uri = await viewShotRef.current.capture();
             if (Platform.OS === 'web') {
-                const link = document.createElement('a');
-                link.href = uri;
-                link.download = `bvn_slip_${inputValue || 'verify'}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                await new Promise<void>((resolve) => {
+                    const node = document.getElementById('slip-preview-container');
+                    if (!node) return resolve();
+                    
+                    const generatePng = () => {
+                        // @ts-ignore
+                        window.html2canvas(node, { useCORS: true, scale: 2 }).then((canvas) => {
+                            const link = document.createElement('a');
+                            link.download = `bvn_slip_${inputValue || 'verify'}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            resolve();
+                        }).catch(() => resolve());
+                    };
+
+                    if ((window as any).html2canvas) {
+                        generatePng();
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                        script.onload = generatePng;
+                        document.head.appendChild(script);
+                    }
+                });
             } else {
+                if (!viewShotRef.current) return;
+                const uri = await viewShotRef.current.capture();
                 if (await Sharing.isAvailableAsync()) {
                     await Sharing.shareAsync(uri, {
                         mimeType: 'image/png',
@@ -696,8 +714,39 @@ export default function BVNVerificationScreen() {
             }
 
             if (Platform.OS === 'web') {
-                showAlert("Saving PDF", "The browser print window will open. Please select 'Save as PDF' to download.", "success");
-                await Print.printAsync({ html: finalHtml, width: printWidth, height: printHeight });
+                await new Promise<void>((resolve) => {
+                    const generatePdf = () => {
+                        const container = document.createElement('div');
+                        container.innerHTML = finalHtml;
+                        container.style.position = 'absolute';
+                        container.style.top = '-9999px';
+                        document.body.appendChild(container);
+                        
+                        // @ts-ignore
+                        window.html2pdf().set({
+                            margin: 0,
+                            filename: `bvn_slip.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true },
+                            jsPDF: { unit: 'px', format: [printWidth, printHeight], orientation: printWidth > printHeight ? 'landscape' : 'portrait' }
+                        }).from(container).save().then(() => {
+                            document.body.removeChild(container);
+                            resolve();
+                        }).catch(() => {
+                            document.body.removeChild(container);
+                            resolve();
+                        });
+                    };
+
+                    if ((window as any).html2pdf) {
+                        generatePdf();
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                        script.onload = generatePdf;
+                        document.head.appendChild(script);
+                    }
+                });
             } else {
                 const { uri: pdfUri } = await Print.printToFileAsync({ html: finalHtml, width: printWidth, height: printHeight });
                 if (await Sharing.isAvailableAsync()) {
@@ -741,65 +790,67 @@ export default function BVNVerificationScreen() {
 
                 <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: 40 }} contentContainerStyle={{ paddingBottom: 80 }}>
                     {/* Gorgeous ID card preview wrapped in ViewShot for sharing/download */}
-                    <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }}>
-                        <View style={{ backgroundColor: '#ffffff', width: '100%', aspectRatio: 520/320, borderRadius: 16, borderWidth: 1, borderColor: '#d1d5db', padding: 16, overflow: 'hidden', position: 'relative', elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: {width:0, height:4}, shadowRadius: 10 }}>
-                            {/* Header */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Image source={{ uri: 'https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg' }} style={{ width: 32, height: 32, borderRadius: 16 }} />
-                                    <View style={{ borderLeftWidth: 2, borderLeftColor: '#1e3a8a', paddingLeft: 6, marginLeft: 8 }}>
-                                        <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 10, lineHeight: 11 }}>Bank{'\n'}Verification{'\n'}Number</Text>
-                                    </View>
-                                </View>
-                                <Ionicons name="finger-print" size={24} color="#1e40af" />
-                            </View>
-
-                            {/* Profile Info */}
-                            <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                                <View style={{ position: 'relative' }}>
-                                    <Image source={{ uri: photoUrl }} style={{ width: 60, height: 74, borderWidth: 1, borderColor: '#9ca3af', objectFit: 'cover' }} />
-                                    <View style={{ position: 'absolute', bottom: -6, left: -6, width: 28, height: 28, backgroundColor: '#e5e7eb', borderRadius: 14, borderWidth: 1, borderColor: '#9ca3af', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Text style={{ fontSize: 5, fontWeight: 'bold', color: '#374151' }}>Print</Text>
-                                    </View>
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 12, justifyContent: 'space-between' }}>
-                                    <View>
-                                        <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>SURNAME</Text>
-                                        <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.lastName || result.last_name || '—'}</Text>
-                                    </View>
-                                    <View style={{ marginTop: 4 }}>
-                                        <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>FIRST NAME/OTHER NAME</Text>
-                                        <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{[result.firstName || result.first_name, result.middleName || result.middle_name].filter(Boolean).join(' ') || '—'}</Text>
-                                    </View>
-                                    <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                                        <View style={{ marginRight: 24 }}>
-                                            <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>DATE OF BIRTH</Text>
-                                            <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.dateOfBirth || result.dob || '—'}</Text>
+                    <View nativeID="slip-preview-container" style={{ width: '100%', overflow: 'hidden' }}>
+                        <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }}>
+                            <View style={{ backgroundColor: '#ffffff', width: '100%', aspectRatio: 520/320, borderRadius: 16, borderWidth: 1, borderColor: '#d1d5db', padding: 16, overflow: 'hidden', position: 'relative', elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: {width:0, height:4}, shadowRadius: 10 }}>
+                                {/* Header */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Image source={{ uri: 'https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg' }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                                        <View style={{ borderLeftWidth: 2, borderLeftColor: '#1e3a8a', paddingLeft: 6, marginLeft: 8 }}>
+                                            <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 10, lineHeight: 11 }}>Bank{'\n'}Verification{'\n'}Number</Text>
                                         </View>
+                                    </View>
+                                    <Ionicons name="finger-print" size={24} color="#1e40af" />
+                                </View>
+
+                                {/* Profile Info */}
+                                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                                    <View style={{ position: 'relative' }}>
+                                        <Image source={{ uri: photoUrl }} style={{ width: 60, height: 74, borderWidth: 1, borderColor: '#9ca3af', objectFit: 'cover' }} />
+                                        <View style={{ position: 'absolute', bottom: -6, left: -6, width: 28, height: 28, backgroundColor: '#e5e7eb', borderRadius: 14, borderWidth: 1, borderColor: '#9ca3af', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ fontSize: 5, fontWeight: 'bold', color: '#374151' }}>Print</Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12, justifyContent: 'space-between' }}>
                                         <View>
-                                            <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>GENDER</Text>
-                                            <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.gender || '—'}</Text>
+                                            <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>SURNAME</Text>
+                                            <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.lastName || result.last_name || '—'}</Text>
+                                        </View>
+                                        <View style={{ marginTop: 4 }}>
+                                            <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>FIRST NAME/OTHER NAME</Text>
+                                            <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{[result.firstName || result.first_name, result.middleName || result.middle_name].filter(Boolean).join(' ') || '—'}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                                            <View style={{ marginRight: 24 }}>
+                                                <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>DATE OF BIRTH</Text>
+                                                <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.dateOfBirth || result.dob || '—'}</Text>
+                                            </View>
+                                            <View>
+                                                <Text style={{ fontSize: 6, color: '#4b5563', fontWeight: 'bold' }}>GENDER</Text>
+                                                <Text style={{ fontSize: 9, color: '#000', fontWeight: 'bold', textTransform: 'uppercase' }}>{result.gender || '—'}</Text>
+                                            </View>
                                         </View>
                                     </View>
                                 </View>
-                            </View>
 
-                            {/* BVN Number */}
-                            <View style={{ marginTop: 12 }}>
-                                <Text style={{ fontSize: 6, color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>Bank Verification Number (BVN)</Text>
-                                <Text style={{ fontSize: 18, fontWeight: '900', color: '#172554', letterSpacing: 3 }}>{result.number || result.bvn || inputValue}</Text>
-                            </View>
+                                {/* BVN Number */}
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={{ fontSize: 6, color: '#6b7280', fontWeight: 'bold', textTransform: 'uppercase' }}>Bank Verification Number (BVN)</Text>
+                                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#172554', letterSpacing: 3 }}>{result.number || result.bvn || inputValue}</Text>
+                                </View>
 
-                            {/* Watermark Fingerprint */}
-                            <View style={{ position: 'absolute', top: 32, right: 12, width: 64, height: 76, opacity: fingerprintUrl ? 0.15 : 0.15, alignItems: 'center', justifyContent: 'center' }}>
-                                {fingerprintUrl ? (
-                                    <Image source={{ uri: fingerprintUrl }} style={{ width: '100%', height: '100%', opacity: 0.15, resizeMode: 'contain', tintColor: '#3b82f6' }} />
-                                ) : (
-                                    <Ionicons name="finger-print" size={64} color="#3b82f6" style={{ opacity: 0.8 }} />
-                                )}
+                                {/* Watermark Fingerprint */}
+                                <View style={{ position: 'absolute', top: 32, right: 12, width: 64, height: 76, opacity: fingerprintUrl ? 0.15 : 0.15, alignItems: 'center', justifyContent: 'center' }}>
+                                    {fingerprintUrl ? (
+                                        <Image source={{ uri: fingerprintUrl }} style={{ width: '100%', height: '100%', opacity: 0.15, resizeMode: 'contain', tintColor: '#3b82f6' }} />
+                                    ) : (
+                                        <Ionicons name="finger-print" size={64} color="#3b82f6" style={{ opacity: 0.8 }} />
+                                    )}
+                                </View>
                             </View>
-                        </View>
-                    </ViewShot>
+                        </ViewShot>
+                    </View>
 
                     {/* Full details table */}
                     <View style={styles.detailsCard}>
@@ -830,25 +881,23 @@ export default function BVNVerificationScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
-                            style={[styles.actionBtn, { flex: 1, marginRight: Platform.OS !== 'web' ? 8 : 0, backgroundColor: '#060d21' }]}
+                            style={[styles.actionBtn, { flex: 1, marginRight: 8, backgroundColor: '#060d21' }]}
                             activeOpacity={0.8}
                             disabled={isSaving}
                         >
                             <Ionicons name="document-text" size={18} color="#fff" style={{ marginRight: 8 }} />
-                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : (Platform.OS === 'web' ? 'Print / Save PDF' : 'Download PDF')}</Text>
+                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download PDF'}</Text>
                         </TouchableOpacity>
 
-                        {Platform.OS !== 'web' && (
-                            <TouchableOpacity 
-                                onPress={handleDownloadPng}
-                                style={[styles.actionBtn, { flex: 1, marginLeft: 8, backgroundColor: '#10b981' }]}
-                                activeOpacity={0.8}
-                                disabled={isSaving}
-                            >
-                                <Ionicons name="image" size={18} color="#fff" style={{ marginRight: 8 }} />
-                                <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download Image'}</Text>
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                            onPress={handleDownloadPng}
+                            style={[styles.actionBtn, { flex: 1, marginLeft: 8, backgroundColor: '#10b981' }]}
+                            activeOpacity={0.8}
+                            disabled={isSaving}
+                        >
+                            <Ionicons name="image" size={18} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download Image'}</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Back Button */}

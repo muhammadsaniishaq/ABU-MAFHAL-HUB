@@ -166,18 +166,36 @@ export default function VerifyNINScreen() {
     };
 
     const handleDownloadPng = async () => {
-        if (!viewShotRef.current) return;
         setIsSaving(true);
         try {
-            const uri = await viewShotRef.current.capture();
             if (Platform.OS === 'web') {
-                const link = document.createElement('a');
-                link.href = uri;
-                link.download = `nin_slip_${nin || 'verify'}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                await new Promise<void>((resolve) => {
+                    const node = document.getElementById('slip-preview-container');
+                    if (!node) return resolve();
+                    
+                    const generatePng = () => {
+                        // @ts-ignore
+                        window.html2canvas(node, { useCORS: true, scale: 2 }).then((canvas) => {
+                            const link = document.createElement('a');
+                            link.download = `nin_slip_${nin || 'verify'}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            resolve();
+                        }).catch(() => resolve());
+                    };
+
+                    if ((window as any).html2canvas) {
+                        generatePng();
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                        script.onload = generatePng;
+                        document.head.appendChild(script);
+                    }
+                });
             } else {
+                if (!viewShotRef.current) return;
+                const uri = await viewShotRef.current.capture();
                 if (await Sharing.isAvailableAsync()) {
                     await Sharing.shareAsync(uri, {
                         mimeType: 'image/png',
@@ -1815,8 +1833,39 @@ export default function VerifyNINScreen() {
             }
 
             if (Platform.OS === 'web') {
-                showAlert("Saving PDF", "The browser print window will open. Please select 'Save as PDF' to download.", "success");
-                await Print.printAsync({ html });
+                await new Promise<void>((resolve) => {
+                    const generatePdf = () => {
+                        const container = document.createElement('div');
+                        container.innerHTML = html;
+                        container.style.position = 'absolute';
+                        container.style.top = '-9999px';
+                        document.body.appendChild(container);
+                        
+                        // @ts-ignore
+                        window.html2pdf().set({
+                            margin: 0,
+                            filename: `nin_slip.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true },
+                            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                        }).from(container).save().then(() => {
+                            document.body.removeChild(container);
+                            resolve();
+                        }).catch(() => {
+                            document.body.removeChild(container);
+                            resolve();
+                        });
+                    };
+
+                    if ((window as any).html2pdf) {
+                        generatePdf();
+                    } else {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                        script.onload = generatePdf;
+                        document.head.appendChild(script);
+                    }
+                });
             } else {
                 const { uri: pdfUri } = await Print.printToFileAsync({ html });
                 if (await Sharing.isAvailableAsync()) {
@@ -1967,9 +2016,11 @@ export default function VerifyNINScreen() {
                             <Text style={{ fontWeight: '800', color: '#64748b', textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 }}>NIN Slip Preview</Text>
                         </View>
                         
-                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%' }}>
-                            {renderSlip()}
-                        </ViewShot>
+                        <View nativeID="slip-preview-container" style={{ width: '100%' }}>
+                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%' }}>
+                                {renderSlip()}
+                            </ViewShot>
+                        </View>
                     </View>
 
                     {/* Direct Download Buttons (Mobile First, No Modal needed) */}
@@ -1977,22 +2028,20 @@ export default function VerifyNINScreen() {
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: Platform.OS !== 'web' ? 6 : 0, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: 6, elevation: 1 }}
                         >
                             <Ionicons name="document-text-outline" size={18} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>{Platform.OS === 'web' ? 'Print / Save PDF' : 'Download PDF'}</Text>
+                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PDF</Text>
                         </TouchableOpacity>
 
-                        {Platform.OS !== 'web' && (
-                            <TouchableOpacity 
-                                onPress={handleDownloadPng}
-                                disabled={isSaving}
-                                style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
-                            >
-                                <Ionicons name="image-outline" size={18} color="#060d21" />
-                                <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                            onPress={handleDownloadPng}
+                            disabled={isSaving}
+                            style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
+                        >
+                            <Ionicons name="image-outline" size={18} color="#060d21" />
+                            <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Compact Details Table */}
