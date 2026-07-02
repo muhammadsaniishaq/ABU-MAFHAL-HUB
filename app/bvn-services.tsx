@@ -276,13 +276,22 @@ export default function BVNVerificationScreen() {
         try {
             setIsSaving(true);
             const uri = await viewShotRef.current.capture();
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                    mimeType: 'image/png',
-                    dialogTitle: 'Download BVN Card (PNG)'
-                });
+            if (Platform.OS === 'web') {
+                const link = document.createElement('a');
+                link.href = uri;
+                link.download = `bvn_slip_${inputValue || 'verify'}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             } else {
-                showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Download BVN Card (PNG)'
+                    });
+                } else {
+                    showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                }
             }
         } catch (e: any) {
             showAlert("PNG Download Failed", e.message, "error");

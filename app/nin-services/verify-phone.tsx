@@ -224,14 +224,23 @@ export default function VerifyPhoneScreen() {
         setIsSaving(true);
         try {
             const uri = await viewShotRef.current.capture();
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                    mimeType: 'image/png',
-                    dialogTitle: 'Download NIN Slip (PNG)',
-                    UTI: 'public.png'
-                });
+            if (Platform.OS === 'web') {
+                const link = document.createElement('a');
+                link.href = uri;
+                link.download = `nin_slip_phone_${phone || 'verify'}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             } else {
-                showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Download NIN Slip (PNG)',
+                        UTI: 'public.png'
+                    });
+                } else {
+                    showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                }
             }
         } catch (e: any) {
             showAlert("PNG Download Failed", e.message, "error");
