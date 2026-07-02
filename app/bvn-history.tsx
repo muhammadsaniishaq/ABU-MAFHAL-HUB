@@ -1,49 +1,25 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Modal, StyleSheet, Image } from 'react-native';
-import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Modal, StyleSheet } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function NINHistoryScreen() {
+export default function BVNHistoryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { tab } = useLocalSearchParams();
-
-    // Tab state: 'nin' | 'ipe' | 'validation' | 'personalization'
-    const [activeTab, setActiveTab] = useState<'nin' | 'ipe' | 'validation' | 'personalization' | 'bvn'>('nin');
-    
     const [historyList, setHistoryList] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState<any>(null);
 
-    // Sync tab param if provided
-    useEffect(() => {
-        if (tab && ['nin', 'ipe', 'validation', 'personalization', 'bvn'].includes(tab as string)) {
-            setActiveTab(tab as any);
-        }
-    }, [tab]);
-
-    const getStorageKeyForTab = (t: string) => {
-        switch (t) {
-            case 'ipe': return 'recent_ipe_requests';
-            case 'validation': return 'recent_validation_requests';
-            case 'personalization': return 'recent_personalization_requests';
-            case 'bvn': return 'recent_bvn_requests';
-            case 'nin':
-            default:
-                return 'recent_nin_verifications';
-        }
-    };
-
-    const loadHistory = async (targetTab = activeTab) => {
+    const loadHistory = async () => {
         setLoading(true);
         try {
-            const key = getStorageKeyForTab(targetTab);
-            const stored = await AsyncStorage.getItem(key);
+            const stored = await AsyncStorage.getItem('recent_bvn_requests');
             setHistoryList(stored ? JSON.parse(stored) : []);
         } catch (e) {
             console.warn('Failed to load history', e);
@@ -52,11 +28,10 @@ export default function NINHistoryScreen() {
         }
     };
 
-    // Load history when tab changes or screen gains focus
     useFocusEffect(
         useCallback(() => {
-            loadHistory(activeTab);
-        }, [activeTab])
+            loadHistory();
+        }, [])
     );
 
     const deleteHistoryItem = async (itemId: string, name: string) => {
@@ -72,8 +47,7 @@ export default function NINHistoryScreen() {
                         try {
                             const updated = historyList.filter(item => item.id !== itemId);
                             setHistoryList(updated);
-                            const key = getStorageKeyForTab(activeTab);
-                            await AsyncStorage.setItem(key, JSON.stringify(updated));
+                            await AsyncStorage.setItem('recent_bvn_requests', JSON.stringify(updated));
                         } catch {
                             Alert.alert('Error', 'Failed to delete record');
                         }
@@ -84,10 +58,9 @@ export default function NINHistoryScreen() {
     };
 
     const clearAllHistory = async () => {
-        const catName = activeTab === 'nin' ? 'NIN Slips' : activeTab === 'ipe' ? 'IPE Clearance' : activeTab === 'validation' ? 'Validation' : activeTab === 'personalization' ? 'Personalization' : 'BVN';
         Alert.alert(
             'Clear History',
-            `Permanently clear all ${catName} history? This cannot be undone.`,
+            `Permanently clear all BVN history? This cannot be undone.`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -95,8 +68,7 @@ export default function NINHistoryScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const key = getStorageKeyForTab(activeTab);
-                            await AsyncStorage.removeItem(key);
+                            await AsyncStorage.removeItem('recent_bvn_requests');
                             setHistoryList([]);
                         } catch {
                             Alert.alert('Error', 'Failed to clear history');
@@ -110,10 +82,9 @@ export default function NINHistoryScreen() {
     const filteredList = historyList.filter(item => {
         const q = searchQuery.toLowerCase().trim();
         if (!q) return true;
-        // Search by target/NIN/Name
-        const name = item.name || item.data?.name || item.data?.fullName || [item.data?.firstname, item.data?.lastname].filter(Boolean).join(' ') || '';
-        const target = item.target || item.nin || '';
-        const slip = item.slip || item.layout || '';
+        const name = item.data?.firstName || item.data?.first_name || item.data?.name || item.data?.fullName || [item.data?.firstname, item.data?.lastname].filter(Boolean).join(' ') || '';
+        const target = item.target || item.bvn || item.data?.bvn || item.data?.phoneNumber1 || '';
+        const slip = item.slip || '';
         return (
             name.toLowerCase().includes(q) ||
             target.toLowerCase().includes(q) ||
@@ -138,7 +109,7 @@ export default function NINHistoryScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>Reprint Center</Text>
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>BVN History</Text>
                 {historyList.length > 0 ? (
                     <TouchableOpacity onPress={clearAllHistory} style={{ padding: 4 }}>
                         <Ionicons name="trash-outline" size={24} color="#ef4444" />
@@ -148,7 +119,6 @@ export default function NINHistoryScreen() {
                 )}
             </View>
 
-            {/* Custom Modern Alert / Detail view Modal */}
             <Modal
                 transparent
                 visible={!!selectedHistoryItem}
@@ -162,12 +132,12 @@ export default function NINHistoryScreen() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
                                         <View style={s.detailHeaderIconBox}>
-                                            <Ionicons name="document-text" size={18} color="#060d21" />
+                                            <Ionicons name="finger-print" size={18} color="#060d21" />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={s.detailHeaderSubtitle}>REPRINT REQUEST</Text>
+                                            <Text style={s.detailHeaderSubtitle}>BVN VERIFICATION</Text>
                                             <Text style={s.detailHeaderTitle} numberOfLines={1}>
-                                                {selectedHistoryItem.name || selectedHistoryItem.data?.name || selectedHistoryItem.data?.fullName || [selectedHistoryItem.data?.firstname, selectedHistoryItem.data?.lastname].filter(Boolean).join(' ') || 'RECORD'}
+                                                {[selectedHistoryItem.data?.firstName || selectedHistoryItem.data?.first_name, selectedHistoryItem.data?.lastName || selectedHistoryItem.data?.last_name].filter(Boolean).join(' ') || selectedHistoryItem.data?.name || 'RECORD HOLDER'}
                                             </Text>
                                         </View>
                                     </View>
@@ -185,7 +155,7 @@ export default function NINHistoryScreen() {
                                         <Text style={s.detailBadgeText}>Completed</Text>
                                     </View>
                                     <View style={s.detailBadgeSlip}>
-                                        <Text style={s.detailBadgeText}>{(selectedHistoryItem.slip || selectedHistoryItem.layout || 'Service').toUpperCase()}</Text>
+                                        <Text style={s.detailBadgeText}>{(selectedHistoryItem.slip || 'Verification').toUpperCase()}</Text>
                                     </View>
                                 </View>
                             </LinearGradient>
@@ -194,25 +164,25 @@ export default function NINHistoryScreen() {
                                 <View style={s.detailFieldFull}>
                                     <Text style={s.detailFieldLabel}>FULL NAME</Text>
                                     <Text style={s.detailFieldVal}>
-                                        {selectedHistoryItem.name || selectedHistoryItem.data?.name || selectedHistoryItem.data?.fullName || [selectedHistoryItem.data?.firstname, selectedHistoryItem.data?.lastname].filter(Boolean).join(' ') || 'MUHAMMAD SANI ISYAKU'}
+                                        {[selectedHistoryItem.data?.firstName || selectedHistoryItem.data?.first_name, selectedHistoryItem.data?.middleName || selectedHistoryItem.data?.middle_name, selectedHistoryItem.data?.lastName || selectedHistoryItem.data?.last_name].filter(Boolean).join(' ') || selectedHistoryItem.data?.name || '—'}
                                     </Text>
                                 </View>
 
                                 <View style={s.detailRow}>
                                     <View style={s.detailFieldHalf}>
                                         <Text style={s.detailFieldLabel}>DATE OF BIRTH</Text>
-                                        <Text style={s.detailFieldVal}>{selectedHistoryItem.data?.dob || selectedHistoryItem.data?.birthdate || '—'}</Text>
+                                        <Text style={s.detailFieldVal}>{selectedHistoryItem.data?.dateOfBirth || selectedHistoryItem.data?.dob || '—'}</Text>
                                     </View>
                                     <View style={s.detailFieldHalf}>
-                                        <Text style={s.detailFieldLabel}>NIN / TARGET</Text>
-                                        <Text style={s.detailFieldVal}>{selectedHistoryItem.target || selectedHistoryItem.nin || '—'}</Text>
+                                        <Text style={s.detailFieldLabel}>SEARCH TARGET</Text>
+                                        <Text style={s.detailFieldVal}>{selectedHistoryItem.target || '—'}</Text>
                                     </View>
                                 </View>
 
                                 <View style={s.detailRow}>
                                     <View style={s.detailFieldHalf}>
-                                        <Text style={s.detailFieldLabel}>SERVICE CATEGORY</Text>
-                                        <Text style={s.detailFieldVal}>{activeTab.toUpperCase()}</Text>
+                                        <Text style={s.detailFieldLabel}>VERIFIED BVN</Text>
+                                        <Text style={s.detailFieldVal}>{selectedHistoryItem.data?.bvn || selectedHistoryItem.data?.number || '—'}</Text>
                                     </View>
                                     <View style={s.detailFieldHalf}>
                                         <Text style={s.detailFieldLabel}>AMOUNT PAID</Text>
@@ -221,20 +191,10 @@ export default function NINHistoryScreen() {
                                 </View>
 
                                 <View style={s.detailMessageRow}>
-                                    <Ionicons name="chatbubble-outline" size={14} color="#64748b" style={{ marginRight: 8, marginTop: 1 }} />
-                                    <Text style={s.detailMessageText}>Completed and stored locally inside your mobile terminal memory.</Text>
+                                    <Ionicons name="information-circle-outline" size={14} color="#64748b" style={{ marginRight: 8, marginTop: 1 }} />
+                                    <Text style={s.detailMessageText}>This record is stored securely on your device.</Text>
                                 </View>
 
-                                <TouchableOpacity 
-                                    style={s.detailDownloadBtn}
-                                    onPress={() => {
-                                        Alert.alert('Download Started', 'Reprinting document and downloading to your local storage...');
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="download-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                    <Text style={s.detailDownloadBtnText}>Download Slip</Text>
-                                </TouchableOpacity>
                             </ScrollView>
                         </View>
                     )}
@@ -242,58 +202,11 @@ export default function NINHistoryScreen() {
             </Modal>
 
 
-            {/* Category Tabs */}
-            <View style={s.tabContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('nin')}
-                        style={[s.tabButton, activeTab === 'nin' && s.tabButtonActive, { paddingHorizontal: 16, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="document-text" size={13} color={activeTab === 'nin' ? '#ffffff' : '#64748b'} />
-                        <Text style={[s.tabText, activeTab === 'nin' && s.tabTextActive]}>NIN Slips</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('ipe')}
-                        style={[s.tabButton, activeTab === 'ipe' && s.tabButtonActive, { paddingHorizontal: 16, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="shield-checkmark" size={13} color={activeTab === 'ipe' ? '#ffffff' : '#64748b'} />
-                        <Text style={[s.tabText, activeTab === 'ipe' && s.tabTextActive]}>IPE</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('validation')}
-                        style={[s.tabButton, activeTab === 'validation' && s.tabButtonActive, { paddingHorizontal: 16, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="checkmark-circle" size={13} color={activeTab === 'validation' ? '#ffffff' : '#64748b'} />
-                        <Text style={[s.tabText, activeTab === 'validation' && s.tabTextActive]}>Validation</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('personalization')}
-                        style={[s.tabButton, activeTab === 'personalization' && s.tabButtonActive, { paddingHorizontal: 16, marginRight: 4 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="sparkles" size={13} color={activeTab === 'personalization' ? '#ffffff' : '#64748b'} />
-                        <Text style={[s.tabText, activeTab === 'personalization' && s.tabTextActive]}>Personalize</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        onPress={() => setActiveTab('bvn')}
-                        style={[s.tabButton, activeTab === 'bvn' && s.tabButtonActive, { paddingHorizontal: 16 }]}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="finger-print" size={13} color={activeTab === 'bvn' ? '#ffffff' : '#64748b'} />
-                        <Text style={[s.tabText, activeTab === 'bvn' && s.tabTextActive]}>BVN</Text>
-                    </TouchableOpacity>
-                </ScrollView>
-            </View>
-
             <View style={s.body}>
-                {/* Search Bar */}
                 <View style={s.searchBox}>
                     <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
                     <TextInput
-                        placeholder="Search by Name or NIN..."
+                        placeholder="Search by Name or Number..."
                         placeholderTextColor="#94a3b8"
                         style={s.searchInput}
                         value={searchQuery}
@@ -318,60 +231,54 @@ export default function NINHistoryScreen() {
                         <Text style={s.emptyTitle}>No Records Found</Text>
                         <Text style={s.emptySub}>
                             {searchQuery.length > 0
-                                ? 'No past verifications match your search.'
-                                : "You haven't run any transactions in this category yet."}
+                                ? 'No verifications match your search.'
+                                : "You haven't run any BVN verifications yet."}
                         </Text>
                     </View>
                 ) : (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                        <View style={{ minWidth: '100%', backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', alignSelf: 'flex-start' }}>
-                            {/* Table Header */}
-                            <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
-                                <Text style={{ width: 70, fontSize: 10, fontWeight: '800', color: '#64748b' }}>ACTION</Text>
-                                <Text style={{ width: 70, fontSize: 10, fontWeight: '800', color: '#64748b' }}>AVATAR</Text>
-                                <Text style={{ flex: 2, minWidth: 120, fontSize: 10, fontWeight: '800', color: '#64748b' }}>NAME</Text>
-                                <Text style={{ flex: 1.5, minWidth: 100, fontSize: 10, fontWeight: '800', color: '#64748b' }}>NIN/TARGET</Text>
-                                <Text style={{ flex: 1, minWidth: 80, fontSize: 10, fontWeight: '800', color: '#64748b' }}>STATUS</Text>
-                                <Text style={{ flex: 1, minWidth: 70, fontSize: 10, fontWeight: '800', color: '#64748b' }}>TYPE</Text>
-                                <Text style={{ flex: 1.5, minWidth: 90, fontSize: 10, fontWeight: '800', color: '#64748b' }}>DATE</Text>
-                                <Text style={{ width: 60, fontSize: 10, fontWeight: '800', color: '#64748b', textAlign: 'center' }}>DELETE</Text>
-                            </View>
+                    <ScrollView style={s.list} contentContainerStyle={{ paddingBottom: 60 }}>
+                        <View style={s.listCard}>
+                            {filteredList.map((item, idx) => {
+                                const recordName = [item.data?.firstName || item.data?.first_name, item.data?.lastName || item.data?.last_name].filter(Boolean).join(' ') || item.data?.name || 'RECORD';
+                                const recordTarget = item.target || '—';
+                                return (
+                                    <View
+                                        key={item.id}
+                                        style={[s.listRow, idx < filteredList.length - 1 && s.listRowBorder]}
+                                    >
+                                        <TouchableOpacity
+                                            onPress={() => setSelectedHistoryItem(item)}
+                                            style={s.listLeft}
+                                        >
+                                            <View style={s.listIcon}>
+                                                <Ionicons name="finger-print" size={18} color="#060d21" />
+                                            </View>
+                                            <View style={s.listInfo}>
+                                                <Text style={s.listName} numberOfLines={1}>
+                                                    {recordName}
+                                                </Text>
+                                                <Text style={s.listMeta}>
+                                                    {recordTarget} •{' '}
+                                                    <Text style={s.listLayout}>{(item.slip || 'Verification').toUpperCase()}</Text>
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
 
-                            {/* Table Body */}
-                            <View>
-                                {filteredList.map((item, idx) => {
-                                    const recordName = item.name || item.data?.name || item.data?.fullName || [item.data?.firstname, item.data?.lastname].filter(Boolean).join(' ') || 'RECORD';
-                                    const recordTarget = item.target || item.nin || '—';
-                                    return (
-                                        <View key={item.id} style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: idx === filteredList.length - 1 ? 0 : 1, borderColor: '#f1f5f9', alignItems: 'center' }}>
-                                            <View style={{ width: 70 }}>
-                                                <TouchableOpacity onPress={() => setSelectedHistoryItem(item)} style={{ backgroundColor: '#eff6ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start' }}>
-                                                    <Text style={{ color: '#0284c7', fontSize: 10, fontWeight: '800' }}>VIEW</Text>
-                                                </TouchableOpacity>
+                                        <View style={s.listRight}>
+                                            <View style={s.listDateCol}>
+                                                <Text style={s.listDate}>{(item.date || '').split(',')[0]}</Text>
+                                                <Text style={s.listTime}>{(item.date || '').split(',')[1]?.trim() || ''}</Text>
                                             </View>
-                                            <View style={{ width: 70 }}>
-                                                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Ionicons name="document-text" size={14} color="#94a3b8" />
-                                                </View>
-                                            </View>
-                                            <Text style={{ flex: 2, minWidth: 120, fontSize: 12, fontWeight: '700', color: '#1e293b' }} numberOfLines={1}>{recordName}</Text>
-                                            <Text style={{ flex: 1.5, minWidth: 100, fontSize: 12, color: '#475569', fontWeight: '600' }}>{recordTarget}</Text>
-                                            <View style={{ flex: 1, minWidth: 80 }}>
-                                                <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, alignSelf: 'flex-start' }}>
-                                                    <Text style={{ color: '#10b981', fontSize: 9, fontWeight: '800' }}>DONE</Text>
-                                                </View>
-                                            </View>
-                                            <Text style={{ flex: 1, minWidth: 70, fontSize: 11, color: '#64748b', fontWeight: '700' }}>{(item.slip || item.layout || 'REGULAR').toUpperCase()}</Text>
-                                            <Text style={{ flex: 1.5, minWidth: 90, fontSize: 11, color: '#64748b' }}>{(item.date || '').split(',')[0]}</Text>
-                                            <View style={{ width: 60, alignItems: 'center' }}>
-                                                <TouchableOpacity onPress={() => deleteHistoryItem(item.id, recordName)} style={{ padding: 4 }}>
-                                                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                                                </TouchableOpacity>
-                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => deleteHistoryItem(item.id, recordName)}
+                                                style={s.deleteBtn}
+                                            >
+                                                <Ionicons name="trash-outline" size={13} color="#DC2626" />
+                                            </TouchableOpacity>
                                         </View>
-                                    );
-                                })}
-                            </View>
+                                    </View>
+                                );
+                            })}
                         </View>
                     </ScrollView>
                 )}
@@ -382,68 +289,6 @@ export default function NINHistoryScreen() {
 
 const s = StyleSheet.create({
     root: { flex: 1, backgroundColor: '#f4f6fb' },
-    customHeader: {
-        paddingHorizontal: 16,
-        paddingTop: 50,
-        paddingBottom: 16,
-        backgroundColor: '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    headerIconContainer: {
-        width: 38,
-        height: 38,
-        borderRadius: 11,
-        backgroundColor: '#060d21',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerMainTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#0d1b3e',
-    },
-    headerSubTitle: {
-        fontSize: 11,
-        color: '#64748b',
-        fontWeight: '600',
-        marginTop: 2,
-    },
-    tabContainer: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 4,
-        marginHorizontal: 16,
-        marginTop: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        height: 48,
-        justifyContent: 'center',
-    },
-    tabButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 38,
-        borderRadius: 12,
-    },
-    tabButtonActive: {
-        backgroundColor: '#060d21',
-    },
-    tabText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#64748b',
-        marginLeft: 6,
-    },
-    tabTextActive: {
-        color: '#ffffff',
-    },
     body: { flex: 1, paddingHorizontal: 16, marginTop: 16 },
     headerBtn: { marginRight: 8, padding: 4 },
 
@@ -661,25 +506,5 @@ const s = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         lineHeight: 16,
-    },
-    detailDownloadBtn: {
-        backgroundColor: '#060d21',
-        height: 48,
-        borderRadius: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        shadowColor: '#060d21',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 3,
-        marginBottom: 12,
-    },
-    detailDownloadBtnText: {
-        color: '#ffffff',
-        fontWeight: '900',
-        fontSize: 14,
     },
 });

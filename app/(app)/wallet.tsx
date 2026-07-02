@@ -2,10 +2,11 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Alert, Activi
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 const T = {
   navy:    '#0d1b3e',
@@ -26,10 +27,19 @@ export default function WalletScreen() {
     const [totalIn, setTotalIn] = useState(0);
     const [totalOut, setTotalOut] = useState(0);
     const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+    const [fundingFeeType, setFundingFeeType] = useState('percentage');
+    const [fundingFeeValue, setFundingFeeValue] = useState('0');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [showBalance, setShowBalance] = useState(true);
+    const { settings, loading: settingsLoading } = useAppSettings();
+    const [showBalance, setShowBalance] = useState(!settings?.hide_user_balances);
     const hasLoadedOnce = useRef(false);
+
+    useEffect(() => {
+        if (!settingsLoading) {
+            setShowBalance(!settings.hide_user_balances);
+        }
+    }, [settingsLoading, settings.hide_user_balances]);
 
     useFocusEffect(
         useCallback(() => {
@@ -46,11 +56,12 @@ export default function WalletScreen() {
             if (!user) return;
 
             // Fetch all required data in parallel using Promise.all to cut network latency by ~75%
-            const [profileRes, vAccountRes, statsRes, recentRes] = await Promise.all([
+            const [profileRes, vAccountRes, statsRes, recentRes, settingsRes] = await Promise.all([
                 supabase.from('profiles').select('balance').eq('id', user.id).single(),
                 supabase.from('virtual_accounts').select('bank_name, account_number, account_name').eq('user_id', user.id).maybeSingle(),
                 supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success'),
-                supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4)
+                supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
+                supabase.from('app_settings').select('key, value').in('key', ['funding_fee_type', 'funding_fee_value', 'funding_fee_percentage'])
             ]);
 
             // 1. Profile Balance
@@ -84,6 +95,16 @@ export default function WalletScreen() {
 
             // 4. Recent Transactions
             setRecentTransactions(recentRes.data || []);
+            
+            // 5. Settings
+            if (settingsRes.data) {
+                const typeSetting = settingsRes.data.find(s => s.key === 'funding_fee_type');
+                if (typeSetting) setFundingFeeType(typeSetting.value);
+                
+                let valSetting = settingsRes.data.find(s => s.key === 'funding_fee_value');
+                if (!valSetting) valSetting = settingsRes.data.find(s => s.key === 'funding_fee_percentage');
+                if (valSetting) setFundingFeeValue(valSetting.value);
+            }
 
             hasLoadedOnce.current = true;
         } catch (error) {
@@ -251,7 +272,7 @@ export default function WalletScreen() {
 
                 <View style={s.cardRight}>
                   <TouchableOpacity 
-                    onPress={() => router.push('/fund-wallet')}
+                    onPress={() => Alert.alert("How to Fund Wallet", "To fund your wallet, simply make a bank transfer to your Dedicated Account shown below. Your balance will be credited instantly!\n\nIf you don't have a dedicated account number yet, please complete your Tier 2 KYC Verification.")}
                     style={s.fundBtn}
                     activeOpacity={0.85}
                   >
@@ -316,6 +337,15 @@ export default function WalletScreen() {
                             <Text style={s.virtualAccountName}>
                                 {virtualAccount.account_name}
                             </Text>
+                            
+                            {parseFloat(fundingFeeValue) > 0 && (
+                                <View style={{ marginTop: 10, backgroundColor: '#f0f4f8', padding: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="information-circle-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
+                                    <Text style={{ fontSize: 10, color: '#64748b', flex: 1 }}>
+                                        Note: A {fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`} fee applies to all wallet deposits.
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     ) : (
                         <View style={s.virtualAccountEmpty}>

@@ -21,7 +21,7 @@ const KNOWLEDGE_BASE = [
   { 
       keywords: ['fund', 'deposit', 'money', 'wallet', 'add', 'kudi', 'sa kudi'], 
       response: "To fund your wallet (Sa Kudi):\nUse **Monnify** for instant funding or **Manual Transfer**. Click below to start adding money to your balance of {{balance}}.",
-      action: { label: "Fund Wallet / Sa Kudi", route: "/fund-wallet" }
+      action: { label: "Fund Wallet / Sa Kudi", route: "/(app)/wallet" }
   },
   { 
       keywords: ['data', 'bundle', 'internet', 'browsing', 'mtn', 'glo', 'siyan data'], 

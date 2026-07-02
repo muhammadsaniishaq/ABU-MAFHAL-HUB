@@ -6,6 +6,7 @@ import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ export default function Signup() {
     const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
 
     const router = useRouter();
+    const { settings, loading: settingsLoading } = useAppSettings();
 
     // Real-time Username Check
     useEffect(() => {
@@ -313,12 +315,37 @@ export default function Signup() {
                                         <Ionicons name="person-add" size={24 * scale} color="#0056D2" />
                                     </View>
 
-                                    <Text style={[s.cardTitle, { fontSize: 24 * scale }]}>
-                                        Join <Text style={{ color: '#d97706' }}>Mafhal Sub</Text>
-                                    </Text>
-                                    <Text style={[s.cardSubtitle, { fontSize: 12 * scale, marginBottom: 20 * scale }]}>Enter your details to get started</Text>
+                                    {settingsLoading ? (
+                                        <ActivityIndicator size="large" color="#0056D2" style={{ marginVertical: 40 }} />
+                                    ) : !settings.allow_registrations ? (
+                                        <View style={{ alignItems: 'center', paddingVertical: 40 * scale }}>
+                                            <Ionicons name="lock-closed" size={48 * scale} color="#94a3b8" />
+                                            <Text style={[s.cardTitle, { fontSize: 24 * scale, marginTop: 16 * scale }]}>
+                                                Registrations Closed
+                                            </Text>
+                                            <Text style={[s.cardSubtitle, { fontSize: 13 * scale, marginTop: 8 * scale }]}>
+                                                We are currently not accepting new registrations. Please try again later.
+                                            </Text>
+                                            <TouchableOpacity 
+                                                onPress={() => router.push('/(auth)/login')}
+                                                style={[s.loginButton, { marginTop: 24 * scale, borderRadius: 12 * scale }]}
+                                            >
+                                                <LinearGradient
+                                                    colors={['#0056D2', '#0043A8']}
+                                                    style={[s.loginButtonGradient, { height: 46 * scale }]}
+                                                >
+                                                    <Text style={[s.loginButtonText, { fontSize: 15 * scale }]}>Back to Login</Text>
+                                                </LinearGradient>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <Text style={[s.cardTitle, { fontSize: 24 * scale }]}>
+                                                Join <Text style={{ color: '#d97706' }}>Mafhal Sub</Text>
+                                            </Text>
+                                            <Text style={[s.cardSubtitle, { fontSize: 12 * scale, marginBottom: 20 * scale }]}>Enter your details to get started</Text>
 
-                                    {/* Input: Full Name */}
+                                            {/* Input: Full Name */}
                                     <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
                                         <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Full Name</Text>
                                         <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale }]}>
@@ -539,6 +566,8 @@ export default function Signup() {
                                             <Text style={[s.signupFooterLink, { fontSize: 13 * scale }]}>Sign In</Text>
                                         </TouchableOpacity>
                                     </View>
+                                    </>
+                                    )}
                                 </View>
                             </View>
                         </View>

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -18,7 +18,12 @@ export default function DelinkScreen() {
             const res = await api.identity.delinkAndRetrieve(delinkNIN);
             setResult(res);
         } catch (e: any) {
-            Alert.alert('Request Failed', e.message);
+            const errM = e.message || '';
+            if (errM.toLowerCase().includes('not found') || errM.toLowerCase().includes('no record') || errM.toLowerCase().includes('does not exist') || errM.toLowerCase().includes('not exist') || errM.toLowerCase().includes('invalid or not found')) {
+                Alert.alert('No Record Found', 'The record or identity you entered does not exist or has no record. Please check the details and try again.');
+            } else {
+                Alert.alert('Request Failed', errM || 'An error occurred. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -26,7 +31,7 @@ export default function DelinkScreen() {
 
     if (result) {
         return (
-            <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 24, paddingBottom: 50 }}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.content}>
                 <Stack.Screen options={{ title: 'Delink Result' }} />
                 <StatusResult result={result} title="Delink Request Status" />
             </ScrollView>
@@ -34,24 +39,95 @@ export default function DelinkScreen() {
     }
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={styles.container}>
             <Stack.Screen options={{ title: 'Delink Phone', headerStyle: { backgroundColor: '#DC2626' }, headerTintColor: '#fff' }} />
             <StatusBar style="light" />
-            <View className="p-6 pt-8 flex-1">
-                <View className="bg-red-50 border border-red-100 p-5 rounded-3xl mb-6 items-center">
+            <View style={styles.formContainer}>
+                <View style={styles.infoBox}>
                     <Ionicons name="cut" size={32} color="#EF4444" />
-                    <Text className="text-red-900 font-bold mt-2">Delink Phone from NIN</Text>
-                    <Text className="text-red-700 text-xs text-center mt-1">Submit a request to safely detach a phone number from a NIN record.</Text>
+                    <Text style={styles.infoTitle}>Delink Phone from NIN</Text>
+                    <Text style={styles.infoDesc}>Submit a request to safely detach a phone number from a NIN record.</Text>
                 </View>
                 <TextInput
                     placeholder="Enter NIN to Delink"
-                    className="bg-white border border-slate-200 rounded-2xl px-4 h-16 mb-4 text-slate-800 font-bold"
-                    keyboardType="number-pad" maxLength={11} value={delinkNIN} onChangeText={setDelinkNIN} editable={!loading}
+                    placeholderTextColor="#94a3b8"
+                    style={styles.input}
+                    keyboardType="number-pad" 
+                    maxLength={11} 
+                    value={delinkNIN} 
+                    onChangeText={setDelinkNIN} 
+                    editable={!loading}
                 />
-                <TouchableOpacity onPress={handleVerify} disabled={loading} className="h-16 rounded-2xl items-center justify-center bg-red-600 shadow-md">
-                    {loading ? <ActivityIndicator color="white" /> : <Text className="font-bold text-white text-base">Submit Delink Request</Text>}
+                <TouchableOpacity onPress={handleVerify} disabled={loading} style={styles.button} activeOpacity={0.8}>
+                    {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Submit Delink Request</Text>}
                 </TouchableOpacity>
             </View>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+    },
+    content: {
+        padding: 24,
+        paddingBottom: 50,
+    },
+    formContainer: {
+        padding: 20,
+        paddingTop: 24,
+        flex: 1,
+    },
+    infoBox: {
+        backgroundColor: '#fef2f2',
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fee2e2',
+    },
+    infoTitle: {
+        color: '#991b1b',
+        fontWeight: '700',
+        marginTop: 8,
+        fontSize: 15,
+    },
+    infoDesc: {
+        color: '#b91c1c',
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    input: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        height: 54,
+        marginBottom: 20,
+        color: '#1e293b',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+    button: {
+        backgroundColor: '#dc2626',
+        height: 54,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    buttonText: {
+        color: '#ffffff',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+});

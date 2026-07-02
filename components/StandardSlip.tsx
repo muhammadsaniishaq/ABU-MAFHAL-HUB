@@ -1,12 +1,10 @@
 /**
  * StandardSlip Component
- * Uses StyleSheet (no NativeWind className) for robust rendering in ViewShot and PDF.
+ * Uses StyleSheet only (no NativeWind className) for robust rendering in ViewShot and PDF.
  * Correctly resolves raw base64 and HTTP photos.
  */
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import QRCode from 'react-native-qrcode-svg';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 
 const getVal = (data: any, keys: string[], fallback = ''): string => {
@@ -40,9 +38,9 @@ const resolvePhoto = (photo: string | undefined | null): string | null => {
 };
 
 const Silhouette = () => (
-    <Svg viewBox="0 0 80 100" style={{ width: '100%', height: '100%' }}>
-        <Ellipse cx="40" cy="28" rx="18" ry="20" fill="#cbd5e1" />
-        <Path d="M6,96 Q6,58 40,58 Q74,58 74,96 Z" fill="#cbd5e1" />
+    <Svg viewBox="0 0 80 100" style={{ width: '100%', height: '100%', marginTop: 24, transform: [{ scale: 1.1 }] }}>
+        <Ellipse cx="40" cy="28" rx="18" ry="20" fill="#e2e8f0" />
+        <Path d="M6,96 Q6,58 40,58 Q74,58 74,96 Z" fill="#e2e8f0" />
     </Svg>
 );
 
@@ -54,100 +52,103 @@ export const StandardSlip = ({ data }: { data: any }) => {
     const rawNin     = getVal(data, ['nin','number','nin_number','national_id'], '00000000000');
     const rawPhoto   = getVal(data, ['photo','image','picture','avatar','face_image']);
     const rawIssue   = getVal(data, ['issueDate','issue_date','issuance_date'], '');
-
-    const dob      = formatDob(rawDob);
+ 
+    const dob = formatDob(rawDob);
     const cleanNin = rawNin.replace(/\D/g, '');
-    const fmtNin   = cleanNin.length === 11
-        ? `${cleanNin.slice(0, 4)} ${cleanNin.slice(4, 7)} ${cleanNin.slice(7)}`
+    const fmtNin = cleanNin.length === 11
+        ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
         : cleanNin || '0000 000 0000';
-    const givenNames = [firstName, middleName].filter(Boolean).join(', ') || 'PROUD, NIGERIAN';
+    
+    // Spaced out 4-3-4 representation
+    const displayNin = cleanNin.length === 11
+        ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
+        : '0000 000 0000';
+
+    const givenNames = [firstName, middleName].filter(Boolean).join(' ') || 'PROUD NIGERIAN';
     const photoUri = resolvePhoto(rawPhoto);
     const issueDate = rawIssue ? formatDob(rawIssue) : '01 JAN 2021';
+    
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=NIN-${cleanNin}-Token-${lastName.replace(/\s+/g, '-')}-Token-${firstName.replace(/\s+/g, '-')}&color=000000&margin=1`;
 
     return (
         <View style={s.card}>
-            {/* Background Watermark Coat of Arms */}
-            <View style={s.coatWrap}>
-                <Image 
-                    source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/512px-Coat_of_arms_of_Nigeria.svg.png" }} 
-                    style={s.coatImg} 
-                    resizeMode="contain" 
+            {/* Faint Background Coat of Arms Watermark */}
+            <View style={s.faintWatermarkWrap}>
+                <Image
+                    source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" }}
+                    style={s.faintWatermark}
+                    resizeMode="contain"
                 />
             </View>
-            
-            {/* Main Content Container */}
-            <View style={s.content}>
-                
-                {/* Header Section */}
-                <View style={s.header}>
-                    <View style={s.headerCoat}>
-                        <Image 
-                            source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/512px-Coat_of_arms_of_Nigeria.svg.png" }} 
-                            style={s.headerCoatImg} 
-                            resizeMode="contain" 
-                        />
-                    </View>
-                </View>
 
-                {/* Middle Section */}
-                <View style={s.mid}>
-                    
-                    {/* Photo */}
-                    <View style={s.photoBox}>
+            {/* Slanted text watermarks */}
+            <View style={s.securityWatermarkContainer}>
+                <Text style={s.watermarkLeft1}>{cleanNin.length === 11 ? cleanNin.slice(4, 7) : '000'}</Text>
+                <Text style={s.watermarkLeft2}>{cleanNin}</Text>
+                <Text style={s.watermarkRight1}>{cleanNin}</Text>
+                <Text style={s.watermarkRight2}>{cleanNin}</Text>
+            </View>
+
+            {/* Official Coat of Arms Top Center */}
+            <View style={s.topCoatWrap}>
+                <Image
+                    source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" }}
+                    style={s.topCoat}
+                    resizeMode="contain"
+                />
+            </View>
+
+            {/* Grid layout */}
+            <View style={s.grid}>
+                {/* Column 4 - Photo */}
+                <View style={s.colPhoto}>
+                    <View style={s.photoPlaceholder}>
                         {photoUri ? (
                             <Image source={{ uri: photoUri }} style={s.photoImg} resizeMode="cover" />
                         ) : (
                             <Silhouette />
                         )}
                     </View>
-
-                    {/* Details Column */}
-                    <View style={s.details}>
-                        <View style={s.detailBlock}>
-                            <Text style={s.dLbl}>Surname/Nom</Text>
-                            <Text style={s.dVal}>{lastName.toUpperCase()}</Text>
-                        </View>
-                        
-                        <View style={s.detailBlock}>
-                            <Text style={s.dLbl}>Given Names/Prénoms</Text>
-                            <Text style={s.dVal}>{givenNames.toUpperCase()}</Text>
-                        </View>
-
-                        <View style={s.detailBlock}>
-                            <Text style={s.dLbl}>Date of Birth</Text>
-                            <Text style={s.dVal}>{dob}</Text>
-                        </View>
-                    </View>
-
-                    {/* Right column: NGA, QR Code & Issue Date */}
-                    <View style={s.rightBlock}>
-                        <View style={s.ngaBlock}>
-                            <Text style={s.ngaTxt}>NGA</Text>
-                            <Text style={s.ninMeta} numberOfLines={1}>{cleanNin}</Text>
-                        </View>
-                        
-                        <View style={s.qrOuter}>
-                            <QRCode value={cleanNin || "UNKNOWN"} size={52} backgroundColor="transparent" />
-                        </View>
-                        
-                        <View style={s.issBlock}>
-                            <Text style={s.issLbl}>ISSUE DATE</Text>
-                            <Text style={s.issVal}>{issueDate}</Text>
-                        </View>
-                    </View>
-
                 </View>
 
-                {/* Bottom Section */}
-                <View style={s.bottom}>
-                    <Text style={s.ninLbl}>
-                        National Identification Number (NIN)
-                    </Text>
-                    <Text style={s.ninNum}>
-                        {fmtNin}
-                    </Text>
+                {/* Column 5 - Info */}
+                <View style={s.colInfo}>
+                    <View style={s.infoGroup}>
+                        <Text style={s.infoLabel}>Surname/Nom</Text>
+                        <Text style={s.infoValue} numberOfLines={1}>{lastName.toUpperCase()}</Text>
+                    </View>
+                    <View style={s.infoGroup}>
+                        <Text style={s.infoLabel}>Given Names/Prénoms</Text>
+                        <Text style={s.infoValue} numberOfLines={1}>{givenNames.toUpperCase()}</Text>
+                    </View>
+                    <View style={s.infoGroup}>
+                        <Text style={s.infoLabel}>Date of Birth</Text>
+                        <Text style={s.infoValue}>{dob}</Text>
+                    </View>
                 </View>
 
+                {/* Column 3 - Right Panel */}
+                <View style={s.colRight}>
+                    <View style={s.ngaContainer}>
+                        <Text style={s.ngaText}>NGA</Text>
+                        <Text style={s.ngaSub}>{cleanNin}</Text>
+                    </View>
+
+                    <View style={s.qrWrap}>
+                        <Image source={{ uri: qrCodeUrl }} style={s.qrImg} resizeMode="contain" />
+                    </View>
+
+                    <View style={s.issueContainer}>
+                        <Text style={s.issueLabel}>ISSUE DATE</Text>
+                        <Text style={s.issueVal}>{issueDate}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Bottom Row */}
+            <View style={s.bottomRow}>
+                <Text style={s.ninTitle}>National Identification Number (NIN)</Text>
+                <Text style={s.ninVal}>{displayNin}</Text>
             </View>
         </View>
     );
@@ -156,135 +157,214 @@ export const StandardSlip = ({ data }: { data: any }) => {
 const s = StyleSheet.create({
     card: {
         width: '100%',
-        aspectRatio: 1.586,
+        aspectRatio: 535 / 330,
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        overflow: 'hidden',
-        borderWidth: 1.2,
-        borderColor: '#bbb',
-        position: 'relative',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-    },
-    coatWrap: {
-        position: 'absolute',
-        top: '20%', left: '30%',
-        width: '40%', height: '60%',
-        opacity: 0.04,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    coatImg: { width: 140, height: 140 },
-
-    content: {
-        flex: 1,
-        padding: 10,
-        justifyContent: 'space-between',
-    },
-
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: 38,
-    },
-    headerCoat: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerCoatImg: {
-        width: 38,
-        height: 38,
-    },
-
-    mid: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        marginVertical: 4,
-    },
-    photoBox: {
-        width: 68,
-        height: 85,
-        backgroundColor: '#e2e8f0',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 20,
-        borderBottomLeftRadius: 6,
-        borderBottomRightRadius: 8,
-        overflow: 'hidden',
-        marginRight: 12,
         borderWidth: 1,
-        borderColor: '#cbd5e1',
+        borderColor: '#d1d5db',
+        borderRadius: 8,
+        padding: 14,
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    faintWatermarkWrap: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: 0.04,
+        zIndex: 0,
+    },
+    faintWatermark: {
+        width: '72%',
+        height: '72%',
+    },
+    securityWatermarkContainer: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        opacity: 0.22,
+        zIndex: 0,
+    },
+    watermarkLeft1: {
+        position: 'absolute',
+        bottom: '22%',
+        left: '-5%',
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#9ca3af',
+        transform: [{ rotate: '-40deg' }],
+        letterSpacing: 2,
+    },
+    watermarkLeft2: {
+        position: 'absolute',
+        bottom: '10%',
+        left: '-3%',
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#9ca3af',
+        transform: [{ rotate: '-40deg' }],
+        letterSpacing: 2,
+    },
+    watermarkRight1: {
+        position: 'absolute',
+        top: '15%',
+        right: '5%',
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#9ca3af',
+        transform: [{ rotate: '-35deg' }],
+        letterSpacing: 2,
+    },
+    watermarkRight2: {
+        position: 'absolute',
+        bottom: '10%',
+        right: '-3%',
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#9ca3af',
+        transform: [{ rotate: '-35deg' }],
+        letterSpacing: 2,
+    },
+    topCoatWrap: {
+        position: 'absolute',
+        top: 8,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    topCoat: {
+        width: 58,
+        height: 58,
+    },
+    grid: {
+        flexDirection: 'row',
+        flex: 1,
+        alignItems: 'flex-end',
+        zIndex: 10,
+        marginBottom: 8,
+        marginTop: 45,
+    },
+    colPhoto: {
+        width: '32%',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-end',
+        paddingBottom: 2,
+    },
+    photoPlaceholder: {
+        width: 96,
+        height: 118,
+        backgroundColor: '#929497',
+        borderWidth: 1,
+        borderColor: '#9ca3af',
+        borderRadius: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    photoImg: {
+        width: '100%',
+        height: '100%',
+    },
+    colInfo: {
+        width: '43%',
+        paddingLeft: 4,
+        justifyContent: 'flex-end',
+        gap: 10,
+        paddingBottom: 2,
+    },
+    infoGroup: {
+        marginBottom: 2,
+    },
+    infoLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#6b7280',
+        textTransform: 'uppercase',
+        marginBottom: 1,
+        letterSpacing: -0.2,
+    },
+    infoValue: {
+        fontSize: 12.5,
+        fontWeight: '700',
+        color: '#000',
+        letterSpacing: 0.2,
+    },
+    colRight: {
+        width: '25%',
         alignItems: 'center',
         justifyContent: 'flex-end',
     },
-    photoImg: { width: '100%', height: '100%' },
-
-    details: {
-        flex: 1,
-        justifyContent: 'center',
-        gap: 3,
-    },
-    detailBlock: {
+    ngaContainer: {
+        alignItems: 'center',
         marginBottom: 2,
+        width: '100%',
     },
-    dLbl: { color: '#64748b', fontSize: 6.5, fontWeight: 'bold', letterSpacing: 0.2, textTransform: 'uppercase' },
-    dVal: { color: '#000000', fontSize: 9.5, fontWeight: 'bold', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 0.5 },
-
-    rightBlock: {
-        width: 60,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: '100%',
-        paddingVertical: 2,
-    },
-    ngaBlock: {
-        alignItems: 'center',
-    },
-    ngaTxt: {
+    ngaText: {
+        fontSize: 22,
+        fontWeight: '800',
         color: '#000',
-        fontSize: 18,
-        fontWeight: 'bold',
-        letterSpacing: -0.5,
-        lineHeight: 18,
+        lineHeight: 22,
     },
-    ninMeta: {
-        color: '#888',
-        fontSize: 5.5,
+    ngaSub: {
+        fontSize: 10,
         fontWeight: '700',
-        marginTop: 1,
+        color: '#cbd5e1',
+        lineHeight: 10,
+        marginTop: 3,
+        letterSpacing: 0.5,
     },
-    qrOuter: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 1,
+    qrWrap: {
+        padding: 1.5,
         backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#000',
+        marginBottom: 4,
     },
-    issBlock: {
-        alignItems: 'center',
+    qrImg: {
+        width: 68,
+        height: 68,
     },
-    issLbl: { color: '#888', fontSize: 5.5, fontWeight: '700', letterSpacing: 0.2 },
-    issVal: { color: '#000', fontSize: 7, fontWeight: 'bold' },
-
-    bottom: {
+    issueContainer: {
         alignItems: 'center',
+        width: '100%',
+    },
+    issueLabel: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: '#000',
+        lineHeight: 9,
+    },
+    issueVal: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#000',
+        lineHeight: 10,
+        marginTop: 2,
+    },
+    bottomRow: {
+        alignItems: 'center',
+        zIndex: 10,
         paddingBottom: 2,
     },
-    ninLbl: {
-        color: '#111',
-        fontSize: 7.5,
-        fontWeight: 'bold',
-        letterSpacing: 0.2,
-        marginBottom: 1,
-    },
-    ninNum: {
+    ninTitle: {
+        fontSize: 11,
+        fontWeight: '800',
         color: '#000',
-        fontSize: 22,
-        fontWeight: 'bold',
-        letterSpacing: 4,
-        fontFamily: 'monospace',
+        marginBottom: 3,
+    },
+    ninVal: {
+        fontSize: 28,
+        fontWeight: '600',
+        color: '#000',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        letterSpacing: 0.8,
+        lineHeight: 28,
     },
 });

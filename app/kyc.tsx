@@ -11,12 +11,14 @@ import * as Speech from 'expo-speech';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { BlurView } from 'expo-blur';
+import { useAppSettings } from '../hooks/useAppSettings';
 
 const NAVY = '#0d1b3e';
 const GOLD = '#f5a623';
 
 export default function KYC() {
     const router = useRouter();
+    const { settings } = useAppSettings();
 
     const [loading, setLoading] = useState(true);
     const [tier, setTier] = useState(0);
@@ -117,7 +119,8 @@ export default function KYC() {
                 fileUrl = publicUrlData.publicUrl;
             }
 
-            const isAutoApprove = docType === 'bvn' || docType === 'nin' || docType === 'liveness';
+            const isAutoApproveSetting = settings?.auto_approve_kyc !== false;
+            const isAutoApprove = isAutoApproveSetting && (docType === 'bvn' || docType === 'nin' || docType === 'liveness');
             const status = isAutoApprove ? 'approved' : 'pending';
 
             const { error: dbError } = await supabase.from('kyc_requests').insert({

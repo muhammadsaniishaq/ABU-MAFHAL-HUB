@@ -55,15 +55,7 @@ serve(async (req: Request) => {
     }
 
 
-    let FEE_AMOUNT = 100; // Deduct 100 NGN by default
-    
-    if(searchType === 'demographic'){
-        FEE_AMOUNT = 200; // Higher fee for demographic
-    } else if(searchType === 'bvn'){
-        FEE_AMOUNT = 150;
-    } else if(searchType === 'bvn-card'){
-        FEE_AMOUNT = 300;
-    }
+    let FEE_AMOUNT = 0; // Set to 0 for development testing/bypassing insufficient balance
 
     // We need to use a transaction-like approach or just update if balance >= FEE_AMOUNT
     const { data: profile, error: profileError } = await supabaseAdmin

@@ -1,12 +1,13 @@
 /**
  * IDCardMockup — Premium NIN Slip
- * Pixel-faithful replica of the Nigerian Digital NIN Slip.
- * Uses StyleSheet + SVG for security patterns; handles base64 & URL photos.
+ * High-fidelity pixel-faithful replica of the Nigerian Digital NIN Slip.
+ * Matches the sunburst, rosettes, watermarks, and font weights of the official template.
  */
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Svg, { Circle, Line, Path, Ellipse } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const getVal = (data: any, keys: string[], fallback = ''): string => {
@@ -39,33 +40,59 @@ const resolvePhoto = (photo: string | undefined | null): string | null => {
     return `data:image/jpeg;base64,${photo}`;
 };
 
-// ─── Security Background SVG ─────────────────────────────────────────────────
+// ─── Guilloché Security Pattern SVG ──────────────────────────────────────────
 const SecurityBG = () => {
-    const w = 500;
-    const h = 315;
-    const radii = [25, 45, 65, 85, 105, 125, 145, 165, 185, 205, 225, 245, 265, 285, 305, 325, 345, 365, 385, 405, 425, 445, 465, 485];
-    const hLines = Array.from({ length: Math.ceil(h / 12) }, (_, i) => i * 12);
+    const w = 535;
+    const h = 330;
+    // Lines radiating from center (267, 165)
+    const lines = [
+        [0,0], [60,0], [120,0], [180,0], [240,0], [300,0], [360,0], [420,0], [480,0], [535,0],
+        [535,55], [535,110], [535,165], [535,220], [535,275], [535,330],
+        [480,330], [420,330], [360,330], [300,330], [240,330], [180,330], [120,330], [60,330], [0,330],
+        [0,275], [0,220], [0,165], [0,110], [0,55]
+    ];
+    const leftRadii = [30, 50, 70, 90, 110, 130];
+    const rightRadii = [40, 65, 90, 115];
+    
     return (
         <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} style={StyleSheet.absoluteFillObject}>
-            {/* Fine horizontal ruling lines */}
-            {hLines.map((y, i) => (
-                <Line key={`h${i}`} x1="0" y1={y} x2={w} y2={y}
-                    stroke="#10b981" strokeWidth="0.3" opacity="0.14" />
+            {/* Sunburst Lines */}
+            {lines.map(([x, y], idx) => (
+                <Line
+                    key={`sun-${idx}`}
+                    x1={267}
+                    y1={165}
+                    x2={x}
+                    y2={y}
+                    stroke="rgba(0, 135, 81, 0.05)"
+                    strokeWidth={0.75}
+                />
             ))}
-            {/* Left radiating arcs */}
-            {radii.map((r, i) => (
-                <Circle key={`lc${i}`} cx={0} cy={h / 2} r={r}
-                    stroke="#10b981" strokeWidth="0.5" fill="none" opacity="0.22" />
+
+            {/* Rosette Left */}
+            {leftRadii.map((r, idx) => (
+                <Circle
+                    key={`rl-${idx}`}
+                    cx={40}
+                    cy={290}
+                    r={r}
+                    fill="none"
+                    stroke={`rgba(0, 135, 81, ${0.07 - idx * 0.005})`}
+                    strokeWidth={0.75}
+                />
             ))}
-            {/* Right radiating arcs */}
-            {radii.map((r, i) => (
-                <Circle key={`rc${i}`} cx={w} cy={h / 2} r={r}
-                    stroke="#10b981" strokeWidth="0.5" fill="none" opacity="0.22" />
-            ))}
-            {/* Center overlapping wavy arcs */}
-            {radii.map((r, i) => (
-                <Circle key={`cc${i}`} cx={w / 2} cy={h / 2} r={r}
-                    stroke="#10b981" strokeWidth="0.3" fill="none" opacity="0.12" />
+
+            {/* Rosette Right */}
+            {rightRadii.map((r, idx) => (
+                <Circle
+                    key={`rr-${idx}`}
+                    cx={480}
+                    cy={60}
+                    r={r}
+                    fill="none"
+                    stroke={`rgba(0, 135, 81, ${0.06 - idx * 0.005})`}
+                    strokeWidth={0.75}
+                />
             ))}
         </Svg>
     );
@@ -75,7 +102,7 @@ const SecurityBG = () => {
 const CoatWM = () => (
     <View style={s.coatWrap} pointerEvents="none">
         <Image
-            source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/512px-Coat_of_arms_of_Nigeria.svg.png' }}
+            source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTIKo551M65-TWEyZQ7BolTDwvb-VN6b5XQ4WEsmhRyEQ&s=10' }}
             style={s.coatImg}
             resizeMode="contain"
         />
@@ -107,21 +134,37 @@ export const IDCardMockup = ({ data }: { data: any }) => {
     const fmtNin   = cleanNin.length === 11
         ? `${cleanNin.slice(0,4)} ${cleanNin.slice(4,7)} ${cleanNin.slice(7)}`
         : cleanNin || '0000 000 0000';
-    const givenNames = [firstName, middleName].filter(Boolean).join(', ') || 'PROUD, NIGERIAN';
+    const givenNames = [firstName, middleName].filter(Boolean).join(' ') || 'PROUD NIGERIAN';
     const photoUri = resolvePhoto(rawPhoto);
     const issueDate = rawIssue ? formatDob(rawIssue) : '01 JAN 2021';
 
+    // Watermark texts
+    const watermarkText = cleanNin.length === 11
+        ? `${cleanNin.slice(0, 4)} ${cleanNin.slice(4)}`
+        : cleanNin;
+    const photoWatermark = cleanNin.length === 11 ? cleanNin.slice(4) : '';
+
     return (
         <View style={s.card}>
+            {/* Radial Gradient Background simulation */}
+            <LinearGradient
+                colors={['rgba(255,255,255,0.9)', 'rgba(246,253,249,0.7)', '#d5f2de']}
+                start={{ x: 0.5, y: 0.5 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+            />
+
             {/* ── Security Pattern Background ── */}
             <SecurityBG />
 
             {/* ── Coat of Arms Watermark ── */}
             <CoatWM />
 
-            {/* ── Green accent bars ── */}
-            <View style={s.topBar} />
-            <View style={s.bottomBar} />
+            {/* ── Watermark Slanted Texts ── */}
+            <View style={s.watermarkLayer} pointerEvents="none">
+                <Text style={[s.watermarkText, { bottom: '15%', left: -25 }]}>{watermarkText}</Text>
+                <Text style={[s.watermarkText, { top: '30%', right: -15 }]}>{watermarkText}</Text>
+            </View>
 
             {/* ════════════ CARD CONTENT ════════════ */}
             <View style={s.content}>
@@ -132,30 +175,11 @@ export const IDCardMockup = ({ data }: { data: any }) => {
                         <Text style={s.fedRepTxt}>FEDERAL REPUBLIC OF NIGERIA</Text>
                         <Text style={s.ninSlipTxt}>DIGITAL NIN SLIP</Text>
                     </View>
-
-                    {/* QR code */}
-                    <View style={s.qrOuter}>
-                        <View style={s.qrInner}>
-                            <QRCode
-                                value={cleanNin.length > 0 ? cleanNin : 'UNKNOWN'}
-                                size={56}
-                                backgroundColor="white"
-                                color="#000"
-                            />
-                        </View>
-                    </View>
-
-                    {/* NGA + issue date */}
-                    <View style={s.ngaBlock}>
-                        <Text style={s.ngaTxt}>NGA</Text>
-                        <Text style={s.issLbl}>ISSUE DATE</Text>
-                        <Text style={s.issVal}>{issueDate}</Text>
-                    </View>
                 </View>
 
-                {/* ─── ROW 2: Photo | Details ─── */}
+                {/* ─── ROW 2: Photo | Details | QR ─── */}
                 <View style={s.row2}>
-                    {/* Photo */}
+                    {/* Photo Box */}
                     <View style={s.photoBox}>
                         {photoUri ? (
                             <Image
@@ -166,9 +190,11 @@ export const IDCardMockup = ({ data }: { data: any }) => {
                         ) : (
                             <Silhouette />
                         )}
+                        {/* Photo Watermark */}
+                        <Text style={s.photoWatermark}>{photoWatermark}</Text>
                     </View>
 
-                    {/* Personal details (Labels small & grey, Values large, bold & black) */}
+                    {/* Personal Details */}
                     <View style={s.details}>
                         <View style={s.detailBlock}>
                             <Text style={s.dLbl}>SURNAME/NOM</Text>
@@ -189,11 +215,23 @@ export const IDCardMockup = ({ data }: { data: any }) => {
                             </View>
                         </View>
                     </View>
-                </View>
 
-                {/* ─── Motto ─── */}
-                <View style={s.mottoRow}>
-                    <Text style={s.mottoTxt}>UNITY AND FAITH, PEACE AND PROGRESS</Text>
+                    {/* QR Code and NGA Block */}
+                    <View style={s.rightCol}>
+                        <View style={s.qrOuter}>
+                            <QRCode
+                                value={`NIN-${cleanNin}-${lastName.replace(/\s+/g, '-')}-${firstName.replace(/\s+/g, '-')}`}
+                                size={54}
+                                backgroundColor="white"
+                                color="#000"
+                            />
+                        </View>
+                        <View style={s.ngaBlock}>
+                            <Text style={s.ngaTxt}>NGA</Text>
+                            <Text style={s.issLbl}>ISSUE DATE</Text>
+                            <Text style={s.issVal}>{issueDate}</Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* ─── NIN ─── */}
@@ -202,6 +240,14 @@ export const IDCardMockup = ({ data }: { data: any }) => {
                     <Text style={s.ninNum}>{fmtNin}</Text>
                 </View>
             </View>
+
+            {/* Bottom green accent line */}
+            <LinearGradient
+                colors={['#166534', '#059669', '#166534']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.bottomLine}
+            />
         </View>
     );
 };
@@ -210,38 +256,44 @@ export const IDCardMockup = ({ data }: { data: any }) => {
 const s = StyleSheet.create({
     card: {
         width: '100%',
-        aspectRatio: 1.586,
-        backgroundColor: '#ffffff',  // Pure white card body, pattern lines provide the green look
-        borderRadius: 10,
+        aspectRatio: 1.62,
+        backgroundColor: '#ffffff',
+        borderRadius: 2,
         overflow: 'hidden',
         borderWidth: 1.2,
-        borderColor: '#008240',
+        borderColor: '#cbd5e1',
         position: 'relative',
-        elevation: 4,
+        elevation: 3,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-    },
-    topBar: {
-        position: 'absolute', top: 0, left: 0, right: 0, height: 7,
-        backgroundColor: '#008240',
-    },
-    bottomBar: {
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 6,
-        backgroundColor: '#008240',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     coatWrap: {
         position: 'absolute',
         top: '20%', left: '30%',
         width: '40%', height: '60%',
-        opacity: 0.12,  // Made slightly more visible
+        opacity: 0.14,
     },
     coatImg: { width: '100%', height: '100%' },
 
+    watermarkLayer: {
+        ...StyleSheet.absoluteFillObject,
+        overflow: 'hidden',
+    },
+    watermarkText: {
+        position: 'absolute',
+        fontSize: 10.5,
+        fontWeight: 'bold',
+        color: '#166534',
+        opacity: 0.18,
+        transform: [{ rotate: '-28deg' }],
+        letterSpacing: 1,
+    },
+
     content: {
         flex: 1,
-        paddingTop: 14,
+        paddingTop: 12,
         paddingBottom: 8,
         paddingHorizontal: 12,
         justifyContent: 'space-between',
@@ -250,48 +302,23 @@ const s = StyleSheet.create({
     row1: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 2,
+        marginBottom: 4,
     },
-    headerTxt: { flex: 1, paddingRight: 4 },
+    headerTxt: { flex: 1 },
     fedRepTxt: {
-        color: '#008240',
-        fontSize: 11,
-        fontWeight: 'bold',
+        color: '#008751',
+        fontSize: 14,
+        fontWeight: '900',
         letterSpacing: 0.1,
-        lineHeight: 13,
+        lineHeight: 16,
     },
     ninSlipTxt: {
         color: '#000000',
-        fontSize: 9,
-        fontWeight: 'bold',
-        letterSpacing: 1.5,
-        marginTop: 2,
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 1,
+        marginTop: 1,
     },
-    qrOuter: {
-        borderWidth: 1,
-        borderColor: '#bbb',
-        padding: 2,
-        backgroundColor: '#fff',
-        marginRight: 4,
-        marginTop: -2,
-    },
-    qrInner: {
-        backgroundColor: '#fff',
-    },
-    ngaBlock: {
-        width: 48,
-        alignItems: 'center',
-        paddingTop: 0,
-    },
-    ngaTxt: {
-        color: '#000',
-        fontSize: 18,
-        fontWeight: 'bold',
-        letterSpacing: -0.5,
-        lineHeight: 18,
-    },
-    issLbl: { color: '#666', fontSize: 5.5, fontWeight: '700', marginTop: 4, letterSpacing: 0.2 },
-    issVal: { color: '#000', fontSize: 7.5, fontWeight: 'bold' },
 
     row2: {
         flexDirection: 'row',
@@ -300,38 +327,75 @@ const s = StyleSheet.create({
         marginVertical: 4,
     },
     photoBox: {
-        width: 68,
-        height: 85,
-        backgroundColor: '#cbd5e1',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 20,
-        borderBottomLeftRadius: 6,
-        borderBottomRightRadius: 8,
-        overflow: 'hidden',
-        marginRight: 12,
+        width: 80,
+        height: 98,
+        backgroundColor: '#e2e8f0',
         borderWidth: 1,
         borderColor: '#94a3b8',
+        borderRadius: 1,
+        position: 'relative',
+        marginRight: 10,
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
     },
     photoImg: { width: '100%', height: '100%' },
+    photoWatermark: {
+        position: 'absolute',
+        bottom: 12,
+        fontSize: 7.5,
+        fontWeight: 'bold',
+        color: 'rgba(255, 255, 255, 0.4)',
+        transform: [{ rotate: '-28deg' }],
+    },
+
     details: { flex: 1, justifyContent: 'center', gap: 3 },
-    detailBlock: { marginBottom: 2 },
+    detailBlock: { marginBottom: 1 },
     detailRow: { flexDirection: 'row' },
     halfCell: { flex: 1 },
-    dLbl: { color: '#64748b', fontSize: 6.5, fontWeight: 'bold', letterSpacing: 0.2, textTransform: 'uppercase' },
-    dVal: { color: '#000000', fontSize: 9.5, fontWeight: 'bold', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 0.5 },
+    dLbl: { color: '#6b7280', fontSize: 7.5, fontWeight: '700', letterSpacing: 0.1, textTransform: 'uppercase' },
+    dVal: { color: '#000000', fontSize: 11.5, fontWeight: '900', fontFamily: 'monospace', textTransform: 'uppercase', marginTop: 0.5 },
 
-    mottoRow: { alignItems: 'center', marginVertical: 1 },
-    mottoTxt: { color: '#008240', fontSize: 6, fontWeight: 'bold', fontStyle: 'italic', letterSpacing: 0.6 },
+    rightCol: {
+        width: 68,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+    },
+    qrOuter: {
+        borderWidth: 1,
+        borderColor: '#000',
+        padding: 2,
+        backgroundColor: '#fff',
+    },
+    ngaBlock: {
+        alignItems: 'center',
+        width: '100%',
+    },
+    ngaTxt: {
+        color: '#000',
+        fontSize: 16,
+        fontWeight: '900',
+        lineHeight: 16,
+    },
+    issLbl: { color: '#6b7280', fontSize: 6, fontWeight: '800', marginTop: 2 },
+    issVal: { color: '#000', fontSize: 8, fontWeight: '800', fontFamily: 'monospace' },
 
     ninRow: { alignItems: 'center', paddingBottom: 2 },
-    ninLbl: { color: '#000', fontSize: 7.5, fontWeight: 'bold', letterSpacing: 0.2, marginBottom: 1 },
+    ninLbl: { color: '#000', fontSize: 8, fontWeight: '700', letterSpacing: 0.1, marginBottom: 1 },
     ninNum: {
         color: '#000',
         fontSize: 22,
         fontWeight: 'bold',
         letterSpacing: 4,
         fontFamily: 'monospace',
+    },
+
+    bottomLine: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        opacity: 0.6,
     },
 });

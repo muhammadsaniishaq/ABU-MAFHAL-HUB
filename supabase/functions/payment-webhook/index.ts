@@ -388,11 +388,43 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     
     console.log(`[FundWallet] User Match via ${method}: ${profile.id}`);
 
+    // 2.5 Fetch Funding Fee
+    let feeAmount = 0;
+    let feeValue = 0;
+    let feeType = 'percentage';
+    const { data: feeSettings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['funding_fee_value', 'funding_fee_type', 'funding_fee_percentage']);
+        
+    if (feeSettings) {
+        const typeSetting = feeSettings.find(s => s.key === 'funding_fee_type');
+        if (typeSetting) feeType = typeSetting.value;
+        
+        let valSetting = feeSettings.find(s => s.key === 'funding_fee_value');
+        if (!valSetting) valSetting = feeSettings.find(s => s.key === 'funding_fee_percentage');
+        
+        if (valSetting && valSetting.value) {
+            feeValue = parseFloat(valSetting.value);
+            if (!isNaN(feeValue) && feeValue > 0) {
+                if (feeType === 'fixed') {
+                    feeAmount = feeValue;
+                    console.log(`[FundWallet] Applying fixed fee: ${feeAmount} deducted from ${amount}`);
+                } else {
+                    feeAmount = amount * (feeValue / 100);
+                    console.log(`[FundWallet] Applying ${feeValue}% fee: ${feeAmount} deducted from ${amount}`);
+                }
+            }
+        }
+    }
+    
+    const creditedAmount = amount - feeAmount;
+
     // 3. Fund Wallet (Atomic RPC)
     let finalBalance = 0;
     const { data: newBalance, error: updateError } = await supabaseAdmin.rpc('credit_balance', {
         user_id: profile.id,
-        amount: amount
+        amount: creditedAmount
     });
 
     if (updateError) {
@@ -407,7 +439,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
             
         if (fetchErr) throw fetchErr;
 
-        finalBalance = (parseFloat(currentProfile.balance || "0") + amount);
+        finalBalance = (parseFloat(currentProfile.balance || "0") + creditedAmount);
         const { error: fallbackUpdateErr } = await supabaseAdmin
             .from('profiles')
             .update({ balance: finalBalance })
@@ -421,17 +453,33 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     console.log(`[FundWallet] Balance Updated. New Balance: ${finalBalance}`);
 
     // 4. Record Transaction & Log Event (Parallel)
-    // We use allSettled so one failure doesn't throw and stop the logic (although we are at the end)
-    const metadata = data; // use full data object
-    const results = await Promise.allSettled([
-        supabaseAdmin.from('transactions').insert({
+    // We use allSettled so one failure doesn't throw and stop the logic
+    const metadata = data; 
+    
+    const transactionsToInsert = [
+        {
             user_id: profile.id,
             type: 'deposit',
             amount: amount,
             status: 'success',
             reference: reference, 
             description: `Deposit via ${provider} (${method}) - Ref: ${reference}`
-        }),
+        }
+    ];
+
+    if (feeAmount > 0) {
+        transactionsToInsert.push({
+            user_id: profile.id,
+            type: 'fee',
+            amount: feeAmount,
+            status: 'success',
+            reference: `${reference}-fee`, 
+            description: `Funding Fee Deducted (${feeType === 'fixed' ? '₦'+feeValue : feeValue+'%'})`
+        });
+    }
+
+    const results = await Promise.allSettled([
+        supabaseAdmin.from('transactions').insert(transactionsToInsert),
         // Update the payment log with success using reference and metadata
         supabaseAdmin.from('payment_events').insert({
             reference: reference, // Ensure this is unique

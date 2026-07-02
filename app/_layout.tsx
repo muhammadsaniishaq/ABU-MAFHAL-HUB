@@ -32,6 +32,11 @@ import '../global.css';
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
 
+import GlobalAnnouncementModal from '../components/GlobalAnnouncementModal';
+import { useAppSettings } from '../hooks/useAppSettings';
+import MaintenanceScreen from '../components/MaintenanceScreen';
+import UpdateScreen from '../components/UpdateScreen';
+
 export default function RootLayout() {
     const colorScheme = useColorScheme();
     const [loaded] = useFonts({
@@ -42,6 +47,7 @@ export default function RootLayout() {
     const [initialized, setInitialized] = useState(false);
     const router = useRouter();
     const segments = useSegments();
+    const { settings, loading: settingsLoading } = useAppSettings();
 
     const fetchUserRole = async (userId: string) => {
         try {
@@ -157,9 +163,19 @@ export default function RootLayout() {
         }
     }, [session, userRole, initialized, segments, loaded]);
 
-    if (!loaded || !initialized) {
+    if (!loaded || !initialized || settingsLoading) {
         // Return nothing instead of a spinner, keep the native splash screen visible
         return null;
+    }
+
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+    if (settings.force_app_update) {
+        return <UpdateScreen />;
+    }
+
+    if (settings.maintenance_mode && !isAdmin) {
+        return <MaintenanceScreen />;
     }
 
     return (
@@ -172,6 +188,7 @@ export default function RootLayout() {
                     <Stack.Screen name="education" options={{ headerShown: false }} />
                     <Stack.Screen name="crypto" options={{ headerShown: false }} />
                 </Stack>
+                <GlobalAnnouncementModal />
                 <StatusBar style="auto" />
             </ThemeProvider>
         </SafeAreaProvider>

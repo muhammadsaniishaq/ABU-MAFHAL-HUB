@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 cssInterop(LinearGradient, { className: 'style' });
 
-const CACHE_KEY = '@profile_data_v1';
+const CACHE_KEY = '@profile_data_v2';
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<{ 
@@ -45,9 +45,18 @@ export default function ProfileScreen() {
             const cachedStr = await AsyncStorage.getItem(CACHE_KEY);
             if (cachedStr) {
                 const cached = JSON.parse(cachedStr);
+                
+                // Stale check (1 hour limit)
+                const cacheAgeMs = Date.now() - (cached.updatedAt || 0);
+                const IS_CACHE_STALE = cacheAgeMs > 60 * 60 * 1000;
+                
                 if (cached.profile) setProfile(cached.profile);
                 if (cached.txCount !== undefined) setTxCount(cached.txCount);
-                if (cached.kycStatus) setKycStatus(cached.kycStatus);
+                
+                if (!IS_CACHE_STALE) {
+                    if (cached.kycStatus) setKycStatus(cached.kycStatus);
+                }
+                
                 setLoading(false); // Instantly ready
             }
         } catch (e) {
@@ -59,7 +68,7 @@ export default function ProfileScreen() {
         try {
             const currentCacheStr = await AsyncStorage.getItem(CACHE_KEY);
             const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
-            const newCache = { ...currentCache, ...data };
+            const newCache = { ...currentCache, ...data, updatedAt: Date.now() };
             await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
         } catch (e) {
             console.warn("Cache write error:", e);

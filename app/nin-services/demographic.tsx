@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -7,6 +7,7 @@ import { api } from '../../services/api';
 import { IDCardMockup } from '../../components/IDCardMockup';
 
 export default function DemographicScreen() {
+    const router = useRouter();
     const [firstname, setFirstname] = useState('');
     const [lastname, setLastname] = useState('');
     const [dob, setDob] = useState('');
@@ -47,7 +48,17 @@ export default function DemographicScreen() {
 
     return (
         <View className="flex-1 bg-slate-50">
-            <Stack.Screen options={{ title: 'Demographic Search', headerStyle: { backgroundColor: '#581c87' }, headerTintColor: '#fff' }} />
+            <Stack.Screen options={{ 
+                title: 'Demographic Search', 
+                headerStyle: { backgroundColor: '#060d21' }, 
+                headerTintColor: '#fff',
+                headerShadowVisible: false,
+                headerRight: () => (
+                    <TouchableOpacity onPress={() => router.push('/nin-services/history?tab=nin')} style={{ marginRight: 8 }}>
+                        <Ionicons name="time-outline" size={22} color="#fff" />
+                    </TouchableOpacity>
+                )
+            }} />
             <StatusBar style="light" />
             <View className="p-6 pt-8 flex-1">
                 <TextInput placeholder="First Name" className="bg-white border border-slate-200 rounded-xl px-4 h-14 mb-3" value={firstname} onChangeText={setFirstname} />

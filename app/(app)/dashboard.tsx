@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 const { width: W } = Dimensions.get('window');
 
@@ -23,11 +24,19 @@ const T = {
   indigo:  '#4F46E5',
 };
 
-const CACHE_KEY = '@dashboard_data_v1';
+const CACHE_KEY = '@dashboard_data_v2';
 
 export default function Dashboard() {
-  const [showBalance, setShowBalance] = useState(true);
   const [userData, setUserData] = useState<{ full_name: string; balance: number; role?: string; avatar_url?: string; kyc_tier?: number; bvn?: string | null } | null>(null);
+  const { settings, loading: settingsLoading } = useAppSettings();
+  const [showBalance, setShowBalance] = useState(!settings?.hide_user_balances);
+
+  // Sync hide_user_balances to showBalance when settings load
+  useEffect(() => {
+    if (!settingsLoading) {
+      setShowBalance(!settings.hide_user_balances);
+    }
+  }, [settingsLoading, settings.hide_user_balances]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,10 +60,21 @@ export default function Dashboard() {
       const cachedStr = await AsyncStorage.getItem(CACHE_KEY);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
+        
+        // Stale checking (1 hour limit) to avoid displaying old/outdated configuration when offline or slow
+        const cacheAgeMs = Date.now() - (cached.updatedAt || 0);
+        const IS_CACHE_STALE = cacheAgeMs > 60 * 60 * 1000;
+        
         if (cached.userData) setUserData(cached.userData);
         if (cached.transactions) setTransactions(cached.transactions);
-        if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
-        if (cached.logoUrl) setLogoUrl(cached.logoUrl);
+        
+        if (!IS_CACHE_STALE) {
+          if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
+          if (cached.logoUrl) setLogoUrl(cached.logoUrl);
+        } else {
+          console.log("Cached feature flags are stale (older than 1 hour). Skipping cache load for flags.");
+        }
+        
         setLoading(false); // UI instantly ready!
       }
     } catch (e) {
@@ -66,7 +86,7 @@ export default function Dashboard() {
     try {
       const currentCacheStr = await AsyncStorage.getItem(CACHE_KEY);
       const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
-      const newCache = { ...currentCache, ...data };
+      const newCache = { ...currentCache, ...data, updatedAt: Date.now() };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newCache));
     } catch (e) {
       console.warn("Cache write error:", e);
@@ -194,7 +214,7 @@ export default function Dashboard() {
 
   const handleActionPress = (action: any) => {
     const featureMap: Record<string, string> = {
-      '/fund-wallet': 'wallet_deposit_card',
+      '/(app)/wallet': 'wallet_deposit_card',
       '/transfer': 'feature_transfer',
       '/airtime': 'feature_airtime',
       '/data': 'feature_data',
@@ -429,7 +449,7 @@ export default function Dashboard() {
 
             <View style={s.cardRight}>
               <TouchableOpacity 
-                onPress={() => handleActionPress({ route: '/fund-wallet', label: 'Top Up' })}
+                onPress={() => handleActionPress({ route: '/(app)/wallet', label: 'Top Up' })}
                 style={s.fundBtn}
                 activeOpacity={0.85}
               >

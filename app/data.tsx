@@ -1203,7 +1203,7 @@ export default function DataScreen() {
                 </View>
             </KeyboardAvoidingView>
 
-            <BeneficiaryModal />
+            {BeneficiaryModal()}
 
             <TransactionConfirmationModal
                 visible={showConfirmation}
@@ -1239,7 +1239,7 @@ export default function DataScreen() {
                 requiredFor="purchase"
             />
             
-            <PlanTypeModal />
+            {PlanTypeModal()}
         </View>
     );
 

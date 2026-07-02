@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -51,6 +52,7 @@ export default function Login() {
     const [loadingGoogle, setLoadingGoogle] = useState(false);
     const router = useRouter();
     const { redirectTo } = useLocalSearchParams<{ redirectTo?: string }>();
+    const { settings } = useAppSettings();
 
     const handleLogin = async () => {
         if (!identifier || !password) {
@@ -79,6 +81,14 @@ export default function Login() {
             }
 
             if (data.user) {
+                if (settings.require_email_verif && !data.user.email_confirmed_at && isEmail) {
+                    router.push({
+                        pathname: '/(auth)/otp',
+                        params: { email: identifier.trim(), type: 'signup' }
+                    });
+                    return;
+                }
+
                 let ip = "Unknown IP";
                 try {
                     const res = await fetch('https://api.ipify.org?format=json');

@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
+import { useAppSettings } from '../hooks/useAppSettings';
 
 export default function TransferScreen() {
     const [bank, setBank] = useState('');
@@ -15,6 +16,7 @@ export default function TransferScreen() {
     const [userBalance, setUserBalance] = useState<number>(0);
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
+    const { settings } = useAppSettings();
 
     useEffect(() => {
         fetchUserBalance();
@@ -68,6 +70,34 @@ export default function TransferScreen() {
         if (transferAmount > userBalance) {
             Alert.alert("Insufficient Balance", `You only have ₦${userBalance.toLocaleString()} in your wallet.`);
             return;
+        }
+
+        const minWithdrawal = parseFloat(settings?.min_withdrawal || '0');
+        if (minWithdrawal > 0 && transferAmount < minWithdrawal) {
+            Alert.alert("Minimum Limit", `The minimum transfer amount is ₦${minWithdrawal.toLocaleString()}`);
+            return;
+        }
+
+        const dailyLimit = parseFloat(settings?.daily_withdrawal_limit || '0');
+        if (dailyLimit > 0) {
+            // Check daily limit
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const { data: todayTx } = await supabase
+                    .from('transactions')
+                    .select('amount')
+                    .eq('user_id', user.id)
+                    .eq('type', 'transfer')
+                    .gte('created_at', today.toISOString());
+                
+                const totalToday = todayTx?.reduce((sum, tx) => sum + parseFloat(tx.amount || '0'), 0) || 0;
+                if (totalToday + transferAmount > dailyLimit) {
+                    Alert.alert("Daily Limit Exceeded", `Your daily transfer limit is ₦${dailyLimit.toLocaleString()}. You have already transferred ₦${totalToday.toLocaleString()} today.`);
+                    return;
+                }
+            }
         }
 
         Alert.alert(

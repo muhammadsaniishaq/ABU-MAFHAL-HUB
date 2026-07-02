@@ -2,20 +2,25 @@ import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native'
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useAppSettings } from '../hooks/useAppSettings';
 
 export default function SupportScreen() {
+    const { settings } = useAppSettings();
 
     const handleContact = (type: 'whatsapp' | 'email' | 'phone') => {
         let url = '';
+        const whatsappNumber = settings.support_whatsapp || '2348145853539';
+        const emailAddress = settings.support_email || 'admin@abumafhal.com.ng';
+        
         switch (type) {
             case 'whatsapp':
-                url = 'whatsapp://send?phone=2348145853539';
+                url = `whatsapp://send?phone=${whatsappNumber}`;
                 break;
             case 'email':
-                url = 'mailto:admin@abumafhal.com.ng';
+                url = `mailto:${emailAddress}`;
                 break;
             case 'phone':
-                url = 'tel:+2348145853539';
+                url = `tel:+${whatsappNumber}`;
                 break;
         }
         Linking.openURL(url).catch(() => {
