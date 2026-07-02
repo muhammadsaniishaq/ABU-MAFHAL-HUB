@@ -50,11 +50,35 @@ export const forceSignOut = async () => {
         console.warn("Standard signOut failed, proceeding to manual wipe", e);
     }
     
-    // Clear AsyncStorage for both Web and Native
+    // Clear AsyncStorage selectively to preserve NIN history, transaction PIN, and biometrics setup
     try {
-        await AsyncStorage.clear();
+        const allKeys = await AsyncStorage.getAllKeys();
+        const preservedKeys = [
+            'recent_nin_verifications',
+            'recent_phone_verifications',
+            'biometrics_setup_completed',
+            'biometrics_enabled',
+            'user_transaction_pin',
+            'data_favorites'
+        ];
+        const keysToRemove = allKeys.filter(k => {
+            const isExplicitlyPreserved = preservedKeys.includes(k);
+            const isPatternPreserved = k.includes('recent_') || 
+                                       k.includes('history') || 
+                                       k.includes('favorite') || 
+                                       k.includes('saved');
+            return !(isExplicitlyPreserved || isPatternPreserved);
+        });
+        await AsyncStorage.multiRemove(keysToRemove);
+        console.log('Cleared session and cache keys, preserving all app history & security settings.');
     } catch(e) {
-        console.error("AsyncStorage clear failed", e);
+        console.error("AsyncStorage partial clear failed", e);
+        // Fallback to clear if multiRemove fails
+        try {
+            await AsyncStorage.clear();
+        } catch (innerErr) {
+            console.error("AsyncStorage fallback clear failed", innerErr);
+        }
     }
 
     if (Platform.OS === 'web') {
