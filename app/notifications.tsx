@@ -266,7 +266,7 @@ export default function NotificationsScreen() {
                 headerTintColor: '#1E293B',
                 headerTransparent: true,
                 headerBlurEffect: 'regular',
-                headerBackground: () => <BlurView intensity={80} tint="light" className="flex-1 bg-white/70" />,
+                headerBackground: () => <BlurView intensity={80} tint="light" style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.7)' }} />,
                 headerRight: () => (
                     <View className="flex-row items-center gap-3">
                         <TouchableOpacity onPress={markAllAsRead}>

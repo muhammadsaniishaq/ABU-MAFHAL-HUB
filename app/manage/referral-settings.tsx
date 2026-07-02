@@ -246,7 +246,7 @@ export default function ReferralSettings() {
                         
                         {/* Stats Overview */}
                         <View className="flex-row gap-3 mb-6">
-                            <LinearGradient colors={['#4F46E5', '#4338ca']} className="flex-1 p-4 rounded-2xl shadow-sm">
+                            <LinearGradient colors={['#4F46E5', '#4338ca']} style={{ flex: 1, padding: 16, borderRadius: 16 }}>
                                 <Text className="text-indigo-200 text-xs font-bold uppercase">Total Referrals</Text>
                                 <Text className="text-white text-2xl font-black mt-1">{stats.totalReferrals}</Text>
                             </LinearGradient>
@@ -427,7 +427,7 @@ export default function ReferralSettings() {
 
                     {/* Action Modal */}
                     <Modal visible={!!selectedReferral} transparent animationType="fade" onRequestClose={() => setSelectedReferral(null)}>
-                        <BlurView intensity={20} className="flex-1 justify-end">
+                        <BlurView intensity={20} style={{ flex: 1, justifyContent: 'flex-end' }}>
                             <TouchableOpacity className="flex-1" onPress={() => setSelectedReferral(null)} />
                             <View className="bg-white rounded-t-3xl p-6 pb-12 shadow-2xl">
                                 <View className="items-center mb-6">

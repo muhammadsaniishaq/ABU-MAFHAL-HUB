@@ -225,7 +225,7 @@ export default function CotexAIChat() {
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
             {/* GLASSMORPHISM HEADER */}
             <View className="absolute top-0 left-0 right-0 z-20 overflow-hidden rounded-b-3xl">
-                <BlurView intensity={80} tint="dark" className="px-4 pb-4 pt-2">
+                <BlurView intensity={80} tint="dark" style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 }}>
                      <SafeAreaView edges={['top']}>
                         <View className="flex-row items-center justify-between mt-2">
                             <View className="flex-row items-center gap-3">
@@ -235,7 +235,7 @@ export default function CotexAIChat() {
                                 <View className="relative">
                                     <LinearGradient
                                         colors={['#6366f1', '#a855f7']}
-                                        className="w-10 h-10 rounded-full items-center justify-center border-2 border-white/20"
+                                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' }}
                                     >
                                         <Ionicons name="sparkles" size={20} color="white" />
                                     </LinearGradient>
@@ -272,7 +272,7 @@ export default function CotexAIChat() {
                                 {!isUser && (
                                     <LinearGradient
                                         colors={['#e0e7ff', '#c7d2fe']}
-                                        className="w-8 h-8 rounded-full items-center justify-center mr-2 mt-1 shadow-sm"
+                                        style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 }}
                                     >
                                         <Ionicons name="logo-android" size={16} color="#4f46e5" />
                                     </LinearGradient>

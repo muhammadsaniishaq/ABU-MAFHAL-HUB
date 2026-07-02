@@ -22,7 +22,7 @@ export default function GeoMap() {
             }} />
 
             {/* World Map Placeholder (Using a dark gradient for abstract feel) */}
-            <LinearGradient colors={['#0F172A', '#1E293B', '#020617']} className="absolute inset-0 z-0">
+            <LinearGradient colors={['#0F172A', '#1E293B', '#020617']} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 0 }}>
                 {/* Grid Lines for style */}
                 <View className="absolute inset-0 opacity-10">
                     {Array.from({ length: 10 }).map((_, i) => (

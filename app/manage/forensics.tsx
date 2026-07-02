@@ -50,7 +50,7 @@ export default function ForensicsScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             
             {/* Cyber Header */}
-            <LinearGradient colors={['#0F172A', '#020617']} className="pt-14 pb-6 px-6 border-b border-slate-800">
+            <LinearGradient colors={['#0F172A', '#020617']} style={{ paddingTop: 56, paddingBottom: 24, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: '#1e293b' }}>
                 <View className="flex-row items-center justify-between mb-4">
                     <TouchableOpacity onPress={() => router.back()} className="bg-slate-800 p-2 rounded-lg border border-slate-700">
                         <Ionicons name="arrow-back" size={24} color="#94A3B8" />

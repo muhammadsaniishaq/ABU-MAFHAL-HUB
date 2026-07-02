@@ -233,7 +233,7 @@ function HomeView({ assets, loading, permission, requestPermission }: { assets: 
                         <Text className="text-emerald-500 text-2xl font-black">Greed</Text>
                         <Text className="text-slate-400 text-xs font-bold mb-2">Index: {sentimentIndex}/100</Text>
                         <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <LinearGradient colors={['#ef4444', '#eab308', '#22c55e']} start={{x:0, y:0}} end={{x:1, y:0}} className="flex-1" />
+                            <LinearGradient colors={['#ef4444', '#eab308', '#22c55e']} start={{x:0, y:0}} end={{x:1, y:0}} style={{ flex: 1 }} />
                             <View className="absolute top-0 bottom-0 bg-slate-800 w-1" style={{ left: `${sentimentIndex}%` }} />
                         </View>
                     </View>

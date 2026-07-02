@@ -1266,7 +1266,7 @@ Metadata:
 
             {/* Bulk Action Bar - Sticky Bottom */}
             {isSelectionMode && (
-                <BlurView intensity={90} tint="light" className="absolute bottom-0 left-0 right-0 z-50 p-5 pb-10 border-t border-[#D4AF37]/50/10/50 flex-row justify-around shadow-2xl">
+                <BlurView intensity={90} tint="light" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50, padding: 20, paddingBottom: 40, borderTopWidth: 1, borderTopColor: 'rgba(212,175,55,0.05)', flexDirection: 'row', justifyContent: 'space-around' }}>
                     <TouchableOpacity onPress={() => executeBulkAction('block')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
                          <Ionicons name="ban" size={24} color="#E11D48" className="mb-1" />
                         <Text className="text-[10px] font-black uppercase tracking-widest text-rose-600 mt-1">Suspend</Text>

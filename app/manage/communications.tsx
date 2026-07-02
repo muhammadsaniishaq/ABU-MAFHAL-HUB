@@ -293,11 +293,11 @@ export default function CommunicationManager() {
 
     const renderAiModal = () => (
         <Modal visible={showAiModal} transparent animationType="fade" onRequestClose={() => setShowAiModal(false)}>
-            <BlurView intensity={90} tint="dark" className="flex-1 justify-center px-6">
+            <BlurView intensity={90} tint="dark" style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
                 <View className="bg-white rounded-2xl p-6 shadow-2xl">
                     <View className="flex-row justify-between items-center mb-4">
                         <View className="flex-row items-center gap-2">
-                            <LinearGradient colors={['#818CF8', '#6366F1']} className="w-8 h-8 rounded-full items-center justify-center">
+                            <LinearGradient colors={['#818CF8', '#6366F1']} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
                                 <Ionicons name="sparkles" size={16} color="white" />
                             </LinearGradient>
                             <Text className="text-lg font-black text-slate-800">Cortex AI Writer</Text>
@@ -342,7 +342,7 @@ export default function CommunicationManager() {
             <Stack.Screen options={{ headerShown: false }} />
             
             {/* Header */}
-            <LinearGradient colors={['#1E1B4B', '#312E81']} start={{x:0, y:0}} end={{x:1, y:1}} className="pt-36 pb-6 px-6 rounded-b-[30px] z-20">
+            <LinearGradient colors={['#1E1B4B', '#312E81']} start={{x:0, y:0}} end={{x:1, y:1}} style={{ paddingTop: 144, paddingBottom: 24, paddingHorizontal: 24, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, zIndex: 20 }}>
                 <View className="flex-row justify-between items-center mb-6">
                     <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-white/10 rounded-full items-center justify-center">
                         <Ionicons name="arrow-back" size={24} color="white" />
@@ -523,7 +523,7 @@ export default function CommunicationManager() {
             
             {/* Preview Modal */}
             <Modal visible={showPreview} transparent animationType="slide" onRequestClose={() => setShowPreview(false)}>
-                 <BlurView intensity={90} tint="dark" className="flex-1 justify-center px-6">
+                 <BlurView intensity={90} tint="dark" style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
                     <View className="bg-white rounded-3xl overflow-hidden shadow-2xl">
                         <View className="bg-indigo-600 p-4 flex-row justify-between items-center">
                             <Text className="text-white font-bold text-lg">Message Preview</Text>
