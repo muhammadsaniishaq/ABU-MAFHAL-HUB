@@ -729,6 +729,7 @@ export default function VerifyPhoneScreen() {
             }
 
             if (Platform.OS === 'web') {
+                showAlert("Saving PDF", "The browser print window will open. Please select 'Save as PDF' to download.", "success");
                 await Print.printAsync({ html });
             } else {
                 const { uri: pdfUri } = await Print.printToFileAsync({ html });
@@ -819,20 +820,22 @@ export default function VerifyPhoneScreen() {
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: 6, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: Platform.OS !== 'web' ? 6 : 0, elevation: 1 }}
                         >
                             <Ionicons name="document-text-outline" size={18} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PDF</Text>
+                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>{Platform.OS === 'web' ? 'Print / Save PDF' : 'Download PDF'}</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            onPress={handleDownloadPng}
-                            disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
-                        >
-                            <Ionicons name="image-outline" size={18} color="#060d21" />
-                            <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
-                        </TouchableOpacity>
+                        {Platform.OS !== 'web' && (
+                            <TouchableOpacity 
+                                onPress={handleDownloadPng}
+                                disabled={isSaving}
+                                style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
+                            >
+                                <Ionicons name="image-outline" size={18} color="#060d21" />
+                                <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {/* Compact Details Table */}

@@ -696,6 +696,7 @@ export default function BVNVerificationScreen() {
             }
 
             if (Platform.OS === 'web') {
+                showAlert("Saving PDF", "The browser print window will open. Please select 'Save as PDF' to download.", "success");
                 await Print.printAsync({ html: finalHtml, width: printWidth, height: printHeight });
             } else {
                 const { uri: pdfUri } = await Print.printToFileAsync({ html: finalHtml, width: printWidth, height: printHeight });
@@ -829,23 +830,25 @@ export default function BVNVerificationScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
-                            style={[styles.actionBtn, { flex: 1, marginRight: 8, backgroundColor: '#060d21' }]}
+                            style={[styles.actionBtn, { flex: 1, marginRight: Platform.OS !== 'web' ? 8 : 0, backgroundColor: '#060d21' }]}
                             activeOpacity={0.8}
                             disabled={isSaving}
                         >
                             <Ionicons name="document-text" size={18} color="#fff" style={{ marginRight: 8 }} />
-                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download PDF'}</Text>
+                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : (Platform.OS === 'web' ? 'Print / Save PDF' : 'Download PDF')}</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            onPress={handleDownloadPng}
-                            style={[styles.actionBtn, { flex: 1, marginLeft: 8, backgroundColor: '#10b981' }]}
-                            activeOpacity={0.8}
-                            disabled={isSaving}
-                        >
-                            <Ionicons name="image" size={18} color="#fff" style={{ marginRight: 8 }} />
-                            <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download Image'}</Text>
-                        </TouchableOpacity>
+                        {Platform.OS !== 'web' && (
+                            <TouchableOpacity 
+                                onPress={handleDownloadPng}
+                                style={[styles.actionBtn, { flex: 1, marginLeft: 8, backgroundColor: '#10b981' }]}
+                                activeOpacity={0.8}
+                                disabled={isSaving}
+                            >
+                                <Ionicons name="image" size={18} color="#fff" style={{ marginRight: 8 }} />
+                                <Text style={styles.actionBtnText}>{isSaving ? 'Processing...' : 'Download Image'}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {/* Back Button */}
