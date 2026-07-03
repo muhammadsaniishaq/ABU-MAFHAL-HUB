@@ -98,26 +98,43 @@ export default function SocialBoostScreen() {
     const totalPrice = calculatePrice();
 
     const handleSubmit = async () => {
-        if (!selectedService) return Alert.alert("Error", "Please select a service");
-        if (!link.trim()) return Alert.alert("Error", "Please enter a valid link");
+        if (!selectedService) {
+            Platform.OS === 'web' ? alert("Please select a service") : Alert.alert("Error", "Please select a service");
+            return;
+        }
+        if (!link.trim()) {
+            Platform.OS === 'web' ? alert("Please enter a valid link") : Alert.alert("Error", "Please enter a valid link");
+            return;
+        }
         
         const q = parseInt(quantity);
         if (isNaN(q) || q < parseInt(String(selectedService.min)) || q > parseInt(String(selectedService.max))) {
-            return Alert.alert("Error", `Quantity must be between ${selectedService.min} and ${selectedService.max}`);
+            const msg = `Quantity must be between ${selectedService.min} and ${selectedService.max}`;
+            Platform.OS === 'web' ? alert(msg) : Alert.alert("Error", msg);
+            return;
         }
 
         if (walletBalance < totalPrice) {
-            return Alert.alert("Insufficient Balance", "Please fund your wallet to place this order.");
+            const msg = "Please fund your wallet to place this order.";
+            Platform.OS === 'web' ? alert(msg) : Alert.alert("Insufficient Balance", msg);
+            return;
         }
 
-        Alert.alert(
-            "Confirm Order",
-            `Are you sure you want to place this order for ₦${totalPrice.toLocaleString()}?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Proceed", style: "default", onPress: placeOrder }
-            ]
-        );
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm(`Are you sure you want to place this order for ₦${totalPrice.toLocaleString()}?`);
+            if (confirmed) {
+                placeOrder();
+            }
+        } else {
+            Alert.alert(
+                "Confirm Order",
+                `Are you sure you want to place this order for ₦${totalPrice.toLocaleString()}?`,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Proceed", style: "default", onPress: placeOrder }
+                ]
+            );
+        }
     };
 
     const placeOrder = async () => {
@@ -136,18 +153,25 @@ export default function SocialBoostScreen() {
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
 
-            Alert.alert(
-                "Success!",
-                `Your order has been placed successfully. Order ID: ${data.order}`,
-                [{ text: "OK", onPress: () => router.push('/social-orders') }]
-            );
+            const msg = `Your order has been placed successfully. Order ID: ${data.order}`;
+            if (Platform.OS === 'web') {
+                alert(msg);
+                router.push('/social-orders');
+            } else {
+                Alert.alert(
+                    "Success!",
+                    msg,
+                    [{ text: "OK", onPress: () => router.push('/social-orders') }]
+                );
+            }
             
             setLink('');
             setQuantity('');
             setSelectedService(null);
             setWalletBalance(prev => prev - totalPrice);
         } catch (error: any) {
-            Alert.alert("Failed", error.message || "Could not place order");
+            const msg = error.message || "Could not place order";
+            Platform.OS === 'web' ? alert(msg) : Alert.alert("Failed", msg);
         } finally {
             setIsSubmitting(false);
         }
