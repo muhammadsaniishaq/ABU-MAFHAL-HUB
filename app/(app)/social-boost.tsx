@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Theme Configuration matching the rest of the app
 const T = {
@@ -51,15 +52,22 @@ export default function SocialBoostScreen() {
 
     const fetchData = async () => {
         try {
-            setLoading(true);
+            // First load from cache for instant display
+            const cachedServices = await AsyncStorage.getItem('smm_services_cache');
+            if (cachedServices) {
+                setServices(JSON.parse(cachedServices));
+                setLoading(false); // Make it fast immediately
+            }
+
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Not authenticated");
 
-            // Fetch Wallet Balance
-            const { data: profile } = await supabase.from('profiles').select('balance').eq('id', session.user.id).single();
-            if (profile) setWalletBalance(profile.balance || 0);
+            // Fetch Wallet Balance in background
+            supabase.from('profiles').select('balance').eq('id', session.user.id).single()
+                .then(({ data }) => { if (data) setWalletBalance(data.balance || 0); })
+                .catch(err => console.error("Balance fetch error:", err));
 
-            // Fetch Services from Edge Function
+            // Fetch Services from Edge Function in background to get latest prices
             const { data, error } = await supabase.functions.invoke('smm-api', {
                 body: { action: 'services' }
             });
@@ -67,10 +75,16 @@ export default function SocialBoostScreen() {
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
 
-            setServices(data.services || []);
+            if (data.services && data.services.length > 0) {
+                setServices(data.services);
+                await AsyncStorage.setItem('smm_services_cache', JSON.stringify(data.services));
+            }
         } catch (error: any) {
             console.error("Error fetching services:", error);
-            Alert.alert("Error", error.message || "Failed to load services");
+            // Only show alert if we also don't have cached data
+            if (services.length === 0) {
+                Alert.alert("Error", error.message || "Failed to load services");
+            }
         } finally {
             setLoading(false);
         }
