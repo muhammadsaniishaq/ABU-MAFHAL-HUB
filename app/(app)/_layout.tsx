@@ -87,6 +87,8 @@ export default function AppLayout() {
                 <Tabs.Screen name="history" options={{ title: 'History' }} />
                 <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
                 <Tabs.Screen name="referrals" options={{ href: null }} />
+                <Tabs.Screen name="social-boost" options={{ href: null }} />
+                <Tabs.Screen name="social-orders" options={{ href: null }} />
             </Tabs>
         </View>
     );
@@ -94,6 +96,11 @@ export default function AppLayout() {
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
     const router = useRouter();
+
+    const activeRoute = state.routes[state.index];
+    if (['referrals', 'social-boost', 'social-orders'].includes(activeRoute.name)) {
+        return null;
+    }
 
     return (
         <View style={s.tabBarContainer}>
@@ -109,7 +116,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                     const { options } = descriptors[route.key];
 
                     // Hide referrals or screens with href: null
-                    if (options.href === null || route.name === 'referrals') return null;
+                    if (options?.href === null || route.name === 'referrals' || route.name === 'social-boost' || route.name === 'social-orders') return null;
 
                     const isFocused = state.index === index;
 

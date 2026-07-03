@@ -352,16 +352,17 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
         }
     }
 
-    // C. Fallback to email
-    if (!data && explicitUserId) {
-        // Try to get ANY virtual account for this user so we don't violate NOT NULL constraint
+    // C. Fallback for missing data with explicit ID
+    let finalMetadata = data;
+    if (explicitUserId) {
+        // Try to get ANY virtual account for this user so we don't violate NOT NULL constraint if applicable
         const vaResult = await supabaseAdmin
             .from('virtual_accounts')
             .select('id')
-            .eq('profile_id', explicitUserId)
+            .eq('user_id', explicitUserId)
             .maybeSingle();
-        if (vaResult.data) {
-            data = vaResult.data;
+        if (vaResult.data && !finalMetadata) {
+            finalMetadata = vaResult.data as any;
         }
     }
 
@@ -454,7 +455,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
 
     // 4. Record Transaction & Log Event (Parallel)
     // We use allSettled so one failure doesn't throw and stop the logic
-    const metadata = data; 
+    const metadata = finalMetadata; 
     
     const transactionsToInsert = [
         {

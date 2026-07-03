@@ -295,6 +295,7 @@ export default function Dashboard() {
     { icon: 'flash-outline', label: 'Electricity', color: '#f5a623', route: '/bills' },
     { icon: 'globe-outline', label: 'Internet', color: '#ec4899', route: '/bills' },
     { icon: 'school-outline', label: 'Education', color: '#06b6d4', route: '/education' },
+    { icon: 'rocket-outline', label: 'Social Boost', color: '#ec4899', route: '/social-boost' },
     // Remaining actions shown when expanded
     { icon: 'card-outline', label: 'Cards', color: '#8B5CF6', route: '/virtual-cards' },
     { icon: 'wallet-outline', label: 'Savings', color: '#107C10', route: '/savings' },

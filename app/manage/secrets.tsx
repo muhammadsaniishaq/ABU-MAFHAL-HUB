@@ -1,9 +1,12 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Clipboard } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Clipboard, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width } = Dimensions.get('window');
 
 interface SystemSecret {
     key: string;
@@ -27,7 +30,8 @@ const REQUIRED_SECRETS = [
     { key: 'PAYVESSEL_API_SECRET', desc: 'PayVessel Secret Key', provider: 'PayVessel' },
     { key: 'PAYVESSEL_API_KEY', desc: 'PayVessel API Key', provider: 'PayVessel' },
     { key: 'OPENAI_API_KEY', desc: 'OpenAI Secret Key for Cortex AI', provider: 'AI & Misc' },
-    { key: 'CRYPTO_EXCHANGE_KEY', desc: 'CoinMarketCap API Key', provider: 'AI & Misc' }
+    { key: 'CRYPTO_EXCHANGE_KEY', desc: 'CoinMarketCap API Key', provider: 'AI & Misc' },
+    { key: 'NINE_BOOST_API_KEY', desc: '9Boost API Key for Social Media Panel', provider: '9Boost' }
 ];
 
 export default function SecretsManager() {
@@ -38,6 +42,7 @@ export default function SecretsManager() {
     const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedProvider, setSelectedProvider] = useState<string>('All');
+    const insets = useSafeAreaInsets();
     
     const providers = ['All', ...Array.from(new Set(REQUIRED_SECRETS.map(s => s.provider)))];
 
@@ -118,147 +123,162 @@ export default function SecretsManager() {
     };
 
     return (
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            className="flex-1 bg-slate-50"
-        >
+        <View className="flex-1 bg-[#f4f6fb]">
             <Stack.Screen options={{ headerShown: false }} />
             
-            {/* Header */}
-            <LinearGradient colors={['#ffffff', '#f8fafc']} style={{ paddingTop: 40, paddingBottom: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
-                <View className="flex-row items-center justify-between mb-2">
-                    <TouchableOpacity onPress={() => router.back()} className="bg-slate-100 p-2 rounded-lg border border-slate-200">
-                        <Ionicons name="arrow-back" size={18} color="#475569" />
-                    </TouchableOpacity>
-                    <View className="flex-row items-center gap-2">
-                        <TouchableOpacity onPress={toggleAllVisibility} className="bg-slate-100 px-2 py-1.5 rounded-lg border border-slate-200 flex-row items-center gap-1">
-                            <Ionicons name={REQUIRED_SECRETS.every(s => visibleKeys[s.key]) ? "eye-off" : "eye"} size={14} color="#475569" />
-                            <Text className="text-slate-600 font-medium text-[10px] uppercase">Toggle All</Text>
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                className="flex-1"
+            >
+                {/* Premium Header */}
+                <LinearGradient 
+                    colors={['#0d1b3e', '#142258']} 
+                    style={{ paddingTop: insets.top + 10, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <View className="flex-row items-center justify-between mb-4">
+                        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-white/10 items-center justify-center">
+                            <Ionicons name="arrow-back" size={20} color="#ffffff" />
                         </TouchableOpacity>
-                        <View className="bg-rose-50 px-2 py-1.5 rounded-lg border border-rose-200 flex-row items-center gap-1">
-                            <Ionicons name="shield-checkmark" size={12} color="#e11d48" />
-                            <Text className="text-rose-600 font-bold text-[10px] uppercase tracking-wider">Vault</Text>
+                        
+                        <View className="flex-row items-center gap-2">
+                            <TouchableOpacity onPress={toggleAllVisibility} className="bg-white/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-white/5">
+                                <Ionicons name={REQUIRED_SECRETS.every(s => visibleKeys[s.key]) ? "eye-off" : "eye"} size={14} color="#ffffff" />
+                                <Text className="text-white font-semibold text-xs tracking-wide">Toggle All</Text>
+                            </TouchableOpacity>
+                            <View className="bg-rose-500/20 px-3 py-1.5 rounded-full border border-rose-500/30 flex-row items-center gap-1.5">
+                                <Ionicons name="shield-checkmark" size={14} color="#f43f5e" />
+                                <Text className="text-rose-400 font-bold text-xs uppercase tracking-widest">Vault</Text>
+                            </View>
                         </View>
                     </View>
-                </View>
-                
-                <Text className="text-slate-900 text-xl font-black tracking-tight mb-1">API Security</Text>
-                
-                {/* Search Bar - Compact */}
-                <View className="flex-row items-center bg-white rounded-lg border border-slate-200 px-3 h-9 mt-2 shadow-sm">
-                    <Ionicons name="search" size={16} color="#94a3b8" />
-                    <TextInput
-                        className="flex-1 ml-2 text-slate-900 font-medium text-xs"
-                        placeholder="Search keys..."
-                        placeholderTextColor="#94a3b8"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={14} color="#94a3b8" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </LinearGradient>
-
-            {/* Providers Filter - Compact */}
-            <View className="border-b border-slate-200 bg-white">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-2 px-4" contentContainerStyle={{ gap: 6, paddingRight: 32 }}>
-                    {providers.map(provider => (
-                        <TouchableOpacity 
-                            key={provider} 
-                            onPress={() => setSelectedProvider(provider)}
-                            className={`px-3 py-1.5 rounded-full border ${selectedProvider === provider ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}
-                        >
-                            <Text className={`${selectedProvider === provider ? 'text-indigo-600 font-bold' : 'text-slate-500 font-medium'} text-[11px] tracking-wide`}>
-                                {provider}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            <ScrollView className="flex-1 px-3 pt-4" contentContainerStyle={{ paddingBottom: 100 }}>
-                {loading ? (
-                    <ActivityIndicator size="large" color="#6366f1" className="mt-10" />
-                ) : filteredSecrets.length === 0 ? (
-                    <View className="items-center justify-center mt-10">
-                        <Ionicons name="search-outline" size={32} color="#94a3b8" />
-                        <Text className="text-slate-500 mt-2 text-xs font-medium">No API keys found.</Text>
+                    
+                    <Text className="text-white text-2xl font-black tracking-tight mb-2">API Security</Text>
+                    <Text className="text-indigo-200 text-xs mb-4">Manage your provider keys and application secrets securely.</Text>
+                    
+                    {/* Search Bar */}
+                    <View className="flex-row items-center bg-white/10 rounded-xl px-4 h-12 border border-white/5">
+                        <Ionicons name="search" size={18} color="#94a3b8" />
+                        <TextInput
+                            className="flex-1 ml-3 text-white font-medium text-sm"
+                            placeholder="Search keys or descriptions..."
+                            placeholderTextColor="#94a3b8"
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                <Ionicons name="close-circle" size={18} color="#94a3b8" />
+                            </TouchableOpacity>
+                        )}
                     </View>
-                ) : (
-                    filteredSecrets.map((item, index) => {
-                        const isSaved = !!originalSecrets[item.key];
-                        const modified = isModified(item.key);
-                        
-                        return (
-                            <View key={item.key} className="bg-white p-3.5 rounded-2xl mb-3 border border-slate-200 shadow-sm relative overflow-hidden">
-                                {/* Decorative subtle gradient */}
-                                <View className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full" />
-                                
-                                <View className="flex-row justify-between items-start mb-2">
-                                    <View className="flex-1">
-                                        <Text className="text-slate-800 font-bold text-sm tracking-wide">{item.key}</Text>
-                                        <Text className="text-slate-500 text-[10px] mt-0.5">{item.desc}</Text>
-                                    </View>
-                                    <View className="flex-row gap-1 items-center">
-                                        {isSaved && !modified && (
-                                            <View className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                                <Text className="text-emerald-600 text-[8px] font-bold uppercase">Configured</Text>
+                </LinearGradient>
+
+                {/* Providers Filter */}
+                <View className="bg-white border-b border-slate-200 shadow-sm z-10 pb-1">
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="py-3 px-5" contentContainerStyle={{ gap: 8, paddingRight: 40 }}>
+                        {providers.map(provider => (
+                            <TouchableOpacity 
+                                key={provider} 
+                                onPress={() => setSelectedProvider(provider)}
+                                className={`px-4 py-2 rounded-full border ${selectedProvider === provider ? 'bg-indigo-600 border-indigo-600' : 'bg-slate-50 border-slate-200'}`}
+                            >
+                                <Text className={`${selectedProvider === provider ? 'text-white font-bold' : 'text-slate-600 font-medium'} text-xs tracking-wide`}>
+                                    {provider}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {/* Content */}
+                <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: 100 }}>
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#4F46E5" className="mt-10" />
+                    ) : filteredSecrets.length === 0 ? (
+                        <View className="items-center justify-center mt-12 bg-white rounded-3xl py-10 border border-slate-100 shadow-sm">
+                            <View className="w-16 h-16 rounded-full bg-slate-50 items-center justify-center mb-3">
+                                <Ionicons name="search-outline" size={28} color="#94a3b8" />
+                            </View>
+                            <Text className="text-slate-500 font-semibold text-sm">No API keys found.</Text>
+                        </View>
+                    ) : (
+                        filteredSecrets.map((item, index) => {
+                            const isSaved = !!originalSecrets[item.key];
+                            const modified = isModified(item.key);
+                            
+                            return (
+                                <View key={item.key} className="bg-white p-4 rounded-2xl mb-4 border border-slate-100 shadow-sm shadow-slate-200/50 relative overflow-hidden">
+                                    {/* Decorative Blob */}
+                                    <View className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-50/50 rounded-full blur-2xl" />
+                                    
+                                    <View className="flex-row justify-between items-start mb-3">
+                                        <View className="flex-1 mr-3">
+                                            <Text className="text-slate-800 font-bold text-sm tracking-wide">{item.key}</Text>
+                                            <Text className="text-slate-500 text-xs mt-1 leading-5">{item.desc}</Text>
+                                        </View>
+                                        <View className="flex-col gap-1.5 items-end">
+                                            <View className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                                                <Text className="text-slate-600 text-[9px] font-bold uppercase tracking-wider">{item.provider}</Text>
                                             </View>
-                                        )}
-                                        {modified && (
-                                            <View className="bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                                                <Text className="text-amber-600 text-[8px] font-bold uppercase">Unsaved</Text>
-                                            </View>
-                                        )}
-                                        <View className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 ml-1">
-                                            <Text className="text-slate-600 text-[8px] font-bold uppercase">{item.provider}</Text>
+                                            {isSaved && !modified && (
+                                                <View className="bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                                                    <Text className="text-emerald-600 text-[9px] font-bold uppercase tracking-wider">Configured</Text>
+                                                </View>
+                                            )}
+                                            {modified && (
+                                                <View className="bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
+                                                    <Text className="text-amber-600 text-[9px] font-bold uppercase tracking-wider">Unsaved</Text>
+                                                </View>
+                                            )}
                                         </View>
                                     </View>
-                                </View>
-                                
-                                <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 px-3 h-10 mb-3 relative z-10">
-                                    <TextInput
-                                        className="flex-1 text-slate-900 font-mono text-[11px]"
-                                        placeholder="Enter key..."
-                                        placeholderTextColor="#94a3b8"
-                                        secureTextEntry={!visibleKeys[item.key]}
-                                        value={secrets[item.key] || ''}
-                                        onChangeText={(val) => setSecrets({ ...secrets, [item.key]: val })}
-                                    />
-                                    <View className="flex-row gap-1 border-l border-slate-200 pl-2 ml-2">
-                                        <TouchableOpacity onPress={() => copyToClipboard(secrets[item.key])} className="p-1.5 bg-white rounded-md border border-slate-200 shadow-sm">
-                                            <Ionicons name="copy-outline" size={14} color="#64748b" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => toggleVisibility(item.key)} className="p-1.5 bg-white rounded-md border border-slate-200 shadow-sm">
-                                            <Ionicons name={visibleKeys[item.key] ? "eye-off" : "eye"} size={14} color="#64748b" />
-                                        </TouchableOpacity>
+                                    
+                                    <View className="flex-row items-center bg-[#f8fafc] rounded-xl border border-slate-200 px-3 h-12 mb-4 relative z-10">
+                                        <Ionicons name="key-outline" size={16} color="#94a3b8" />
+                                        <TextInput
+                                            className="flex-1 ml-2 text-slate-900 font-mono text-sm h-full"
+                                            placeholder="Enter secure key..."
+                                            placeholderTextColor="#cbd5e1"
+                                            secureTextEntry={!visibleKeys[item.key]}
+                                            value={secrets[item.key] || ''}
+                                            onChangeText={(val) => setSecrets({ ...secrets, [item.key]: val })}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <View className="flex-row gap-1 border-l border-slate-200 pl-2 ml-2">
+                                            <TouchableOpacity onPress={() => copyToClipboard(secrets[item.key])} className="w-8 h-8 bg-white rounded-lg border border-slate-200 items-center justify-center shadow-sm">
+                                                <Ionicons name="copy-outline" size={14} color="#64748b" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => toggleVisibility(item.key)} className="w-8 h-8 bg-white rounded-lg border border-slate-200 items-center justify-center shadow-sm">
+                                                <Ionicons name={visibleKeys[item.key] ? "eye-off" : "eye"} size={14} color="#64748b" />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-                                </View>
 
-                                <TouchableOpacity 
-                                    onPress={() => handleSave(item.key, secrets[item.key] || '', item.desc)}
-                                    disabled={saving === item.key || (!modified && isSaved)}
-                                    className={`h-9 rounded-xl items-center justify-center flex-row gap-1.5 ${saving === item.key ? 'bg-indigo-400' : (!modified && isSaved ? 'bg-slate-100 border border-slate-200' : 'bg-indigo-600')}`}
-                                >
-                                    {saving === item.key ? (
-                                        <ActivityIndicator size="small" color="#fff" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name={!modified && isSaved ? "checkmark-circle" : "lock-closed"} size={14} color={!modified && isSaved ? "#64748b" : "white"} />
-                                            <Text className={`${!modified && isSaved ? "text-slate-500" : "text-white"} font-bold text-xs`}>
-                                                {!modified && isSaved ? 'Saved' : 'Save Key'}
-                                            </Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        );
-                    })
-                )}
-            </ScrollView>
-        </KeyboardAvoidingView>
+                                    <TouchableOpacity 
+                                        onPress={() => handleSave(item.key, secrets[item.key] || '', item.desc)}
+                                        disabled={saving === item.key || (!modified && isSaved)}
+                                        className={`h-12 rounded-xl items-center justify-center flex-row gap-2 ${saving === item.key ? 'bg-indigo-400' : (!modified && isSaved ? 'bg-slate-100 border border-slate-200' : 'bg-indigo-600 shadow-sm shadow-indigo-600/30')}`}
+                                    >
+                                        {saving === item.key ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name={!modified && isSaved ? "checkmark-circle" : "lock-closed"} size={16} color={!modified && isSaved ? "#64748b" : "white"} />
+                                                <Text className={`${!modified && isSaved ? "text-slate-500" : "text-white"} font-bold text-sm tracking-wide`}>
+                                                    {!modified && isSaved ? 'Saved & Secure' : 'Save Secure Key'}
+                                                </Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })
+                    )}
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
