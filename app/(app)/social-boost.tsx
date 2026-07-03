@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, FlatList } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -378,21 +378,27 @@ export default function SocialBoostScreen() {
                                 <Ionicons name="close" size={18} color="#64748b" />
                             </TouchableOpacity>
                         </View>
-                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                            {filteredServices.map((srv, i) => (
+                        <FlatList 
+                            data={filteredServices}
+                            keyExtractor={(item, index) => item.service.toString() + index.toString()}
+                            initialNumToRender={15}
+                            maxToRenderPerBatch={10}
+                            windowSize={5}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 20 }}
+                            renderItem={({ item }) => (
                                 <TouchableOpacity 
-                                    key={i} 
                                     className="py-3 border-b border-slate-100 flex-row justify-between items-center"
                                     onPress={() => {
-                                        setSelectedService(srv);
+                                        setSelectedService(item);
                                         setServiceModal(false);
                                     }}
                                 >
-                                    <Text className="text-slate-600 text-xs font-medium flex-1 mr-3 leading-5">{srv.name}</Text>
-                                    <Text className="text-[#0F172A] font-black text-xs">₦{parseFloat(srv.rate).toLocaleString()}</Text>
+                                    <Text className="text-slate-600 text-xs font-medium flex-1 mr-3 leading-5">{item.name}</Text>
+                                    <Text className="text-[#0F172A] font-black text-xs">₦{parseFloat(item.rate).toLocaleString()}</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                            )}
+                        />
                     </View>
                 </View>
             </Modal>
