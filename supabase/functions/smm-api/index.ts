@@ -149,7 +149,18 @@ Deno.serve(async (req) => {
             const orderResult = await orderRes.json();
 
             if (orderResult.error) {
-                return new Response(JSON.stringify({ error: `API Error: ${orderResult.error}` }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                let errorMsg = orderResult.error;
+                const lowerError = String(errorMsg).toLowerCase();
+                
+                if (lowerError.includes('insufficient balance') || lowerError.includes('balance') || lowerError.includes('funds') || lowerError.includes('child panel')) {
+                    errorMsg = "Service is currently undergoing maintenance. Please try again later.";
+                } else if (lowerError.includes('invalid') || lowerError.includes('link')) {
+                    errorMsg = "The link you provided seems to be invalid. Please check and try again.";
+                } else {
+                    errorMsg = "We are temporarily unable to process this order. Please try again later.";
+                }
+
+                return new Response(JSON.stringify({ error: errorMsg }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
 
             // 4. Deduct Balance & Log Transaction
