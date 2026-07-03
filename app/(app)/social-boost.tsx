@@ -63,9 +63,14 @@ export default function SocialBoostScreen() {
             if (!session) throw new Error("Not authenticated");
 
             // Fetch Wallet Balance in background
-            supabase.from('profiles').select('balance').eq('id', session.user.id).single()
-                .then(({ data }) => { if (data) setWalletBalance(data.balance || 0); })
-                .catch(err => console.error("Balance fetch error:", err));
+            (async () => {
+                try {
+                    const { data } = await supabase.from('profiles').select('balance').eq('id', session.user.id).single();
+                    if (data) setWalletBalance(data.balance || 0);
+                } catch (err: any) {
+                    console.error("Balance fetch error:", err);
+                }
+            })();
 
             // Fetch Services from Edge Function in background to get latest prices
             const { data, error } = await supabase.functions.invoke('smm-api', {
