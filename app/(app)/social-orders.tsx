@@ -29,6 +29,8 @@ interface OrderTx {
 export default function SocialOrdersScreen() {
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState<OrderTx[]>([]);
+    const [liveStatusMap, setLiveStatusMap] = useState<Record<string, any>>({});
+    const [checkingMap, setCheckingMap] = useState<Record<string, boolean>>({});
     const insets = useSafeAreaInsets();
 
     useEffect(() => {
@@ -58,8 +60,9 @@ export default function SocialOrdersScreen() {
         }
     };
 
-    const checkStatus = async (reference: string) => {
+    const checkStatus = async (orderIdKey: string, reference: string) => {
         try {
+            setCheckingMap(prev => ({...prev, [orderIdKey]: true}));
             const parts = reference.split('-');
             if (parts.length < 2) return;
             const orderId = parts[1];
@@ -71,13 +74,25 @@ export default function SocialOrdersScreen() {
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
 
-            Alert.alert(
-                "Live Status",
-                `Status: ${data.status}\nRemains: ${data.remains}\nCharge: ${data.charge}`
-            );
+            setLiveStatusMap(prev => ({
+                ...prev,
+                [orderIdKey]: data
+            }));
+
         } catch (error: any) {
             Alert.alert("Error", error.message || "Failed to check status");
+        } finally {
+            setCheckingMap(prev => ({...prev, [orderIdKey]: false}));
         }
+    };
+
+    const getStatusStyle = (statusStr: string) => {
+        const s = statusStr?.toLowerCase() || '';
+        if (s === 'completed' || s === 'success' || s === 'successful') return { bg: '#dcfce7', txt: '#166534' };
+        if (s === 'pending') return { bg: '#fef3c7', txt: '#92400e' };
+        if (s === 'in progress' || s === 'processing') return { bg: '#dbeafe', txt: '#1e40af' };
+        if (s === 'canceled' || s === 'partial' || s === 'fail') return { bg: '#fee2e2', txt: '#991b1b' };
+        return { bg: '#f1f5f9', txt: '#475569' };
     };
 
     return (
@@ -107,32 +122,50 @@ export default function SocialOrdersScreen() {
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-                    {orders.map((order) => (
-                        <View key={order.id} style={s.card}>
-                            <View style={s.cardHeader}>
-                                <Text style={s.cardTitle} numberOfLines={2}>{order.description}</Text>
-                                <Text style={s.cardAmount}>₦{order.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-                            </View>
-                            
-                            <View style={s.cardRow}>
-                                <View style={s.dateBox}>
-                                    <Ionicons name="calendar-outline" size={14} color={T.textLight} />
-                                    <Text style={s.dateTxt}>{new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={[s.badge, { backgroundColor: '#dcfce7' }]}>
-                                    <Text style={[s.badgeTxt, { color: '#166534' }]}>{order.status}</Text>
-                                </View>
-                            </View>
+                    {orders.map((order) => {
+                        const liveData = liveStatusMap[order.id];
+                        const displayStatus = liveData ? liveData.status : "Placed";
+                        const stStyle = getStatusStyle(displayStatus);
 
-                            <TouchableOpacity 
-                                style={s.checkBtn}
-                                onPress={() => checkStatus(order.reference)}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={s.checkBtnTxt}>Check Live Status</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ))}
+                        return (
+                            <View key={order.id} style={s.card}>
+                                <View style={s.cardHeader}>
+                                    <Text style={s.cardTitle} numberOfLines={2}>{order.description}</Text>
+                                    <Text style={s.cardAmount}>₦{order.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                </View>
+                                
+                                <View style={s.cardRow}>
+                                    <View style={s.dateBox}>
+                                        <Ionicons name="calendar-outline" size={14} color={T.textLight} />
+                                        <Text style={s.dateTxt}>{new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString()}</Text>
+                                    </View>
+                                    <View style={[s.badge, { backgroundColor: stStyle.bg }]}>
+                                        <Text style={[s.badgeTxt, { color: stStyle.txt }]}>{displayStatus}</Text>
+                                    </View>
+                                </View>
+
+                                {liveData && liveData.remains !== undefined && (
+                                    <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+                                        <Text style={{ fontSize: 11, color: T.textLight, fontWeight: '600' }}>Remains: </Text>
+                                        <Text style={{ fontSize: 11, color: T.text, fontWeight: '700' }}>{liveData.remains}</Text>
+                                    </View>
+                                )}
+
+                                <TouchableOpacity 
+                                    style={s.checkBtn}
+                                    onPress={() => checkStatus(order.id, order.reference)}
+                                    activeOpacity={0.8}
+                                    disabled={checkingMap[order.id]}
+                                >
+                                    {checkingMap[order.id] ? (
+                                        <ActivityIndicator size="small" color={T.navy} />
+                                    ) : (
+                                        <Text style={s.checkBtnTxt}>Check Live Status</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    })}
                     <View style={{ height: 40 }} />
                 </ScrollView>
             )}
