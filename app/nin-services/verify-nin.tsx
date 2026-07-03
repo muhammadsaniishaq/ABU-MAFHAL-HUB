@@ -15,6 +15,14 @@ import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Helper to safely load external images on Web for canvas rendering
+const getSafeImageUrl = (url: string) => {
+    if (Platform.OS === 'web' && url.startsWith('http')) {
+        return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+};
+
 // Slip Components
 import { IDCardMockup } from '../../components/IDCardMockup';
 import { StandardSlip } from '../../components/StandardSlip';
@@ -999,7 +1007,7 @@ export default function VerifyNINScreen() {
 
                   <div class="card-container">
                     <div class="faint-wm">
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" alt="Faint Watermark">
+                      <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png')}" alt="Faint Watermark">
                     </div>
 
                     <div class="secure-wm-container">
@@ -1012,7 +1020,7 @@ export default function VerifyNINScreen() {
                     </div>
 
                     <div class="top-coat">
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" alt="Official Coat of Arms">
+                      <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png')}" alt="Official Coat of Arms">
                     </div>
 
                     <div class="grid-12">
@@ -1301,13 +1309,13 @@ export default function VerifyNINScreen() {
 
                     <div class="nin-slip-container" id="nin-slip">
                         <div class="header">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" alt="Coat of Arms of Nigeria" class="header-logo">
+                            <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png')}" alt="Coat of Arms of Nigeria" class="header-logo">
                             <div class="header-center">
                                 <h1>National Identity Management System</h1>
                                 <p style="font-size: 16px;">Federal Republic of Nigeria</p>
                                 <p style="font-size: 14px; color: #374151;">National Identification Number Slip (NINS)</p>
                             </div>
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png" alt="NIMC Logo" class="header-nimc">
+                            <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png')}" alt="NIMC Logo" class="header-nimc">
                         </div>
 
                         <div class="grid-layout">
@@ -1638,14 +1646,14 @@ export default function VerifyNINScreen() {
                             <!-- Header -->
                             <div class="header-row">
                                 <div class="logo-coat">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" alt="Coat of Arms of Nigeria">
+                                    <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png')}" alt="Coat of Arms of Nigeria">
                                 </div>
                                 <div class="header-center">
                                     <h1>Federal Republic of Nigeria</h1>
                                     <h2>Verified NIN Details</h2>
                                 </div>
                                 <div class="logo-nimc">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png" alt="NIMC Logo">
+                                    <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png')}" alt="NIMC Logo">
                                 </div>
                             </div>
 

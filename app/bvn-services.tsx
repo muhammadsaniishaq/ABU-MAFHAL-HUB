@@ -13,6 +13,14 @@ import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Helper to safely load external images on Web for canvas rendering
+const getSafeImageUrl = (url: string) => {
+    if (Platform.OS === 'web' && url.startsWith('http')) {
+        return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+};
+
 const DEFAULT_PRICES = {
     bvn_num_basic: 200,
     bvn_num_advanced: 250,
@@ -420,7 +428,7 @@ export default function BVNVerificationScreen() {
     <div class="card">
         <div class="flex-between">
             <div class="flex-center gap-2">
-                <img src="https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg" class="logo-img">
+                <img src="${getSafeImageUrl('https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg')}" class="logo-img">
                 <div class="title-box">
                     <h1 class="title-text">Bank<br>Verification<br>Number</h1>
                 </div>
@@ -460,7 +468,7 @@ export default function BVNVerificationScreen() {
     <!-- BACK CARD -->
     <div class="card flex-col-center" style="margin-top: 16px;">
         <div class="flex-center gap-4" style="margin-bottom: 24px;">
-            <img src="https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg" class="logo-img-lg">
+            <img src="${getSafeImageUrl('https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg')}" class="logo-img-lg">
             <h1 class="title-text-lg">Bank<br>Verification<br>Number</h1>
         </div>
         <div class="flex-center gap-6">
@@ -551,7 +559,7 @@ export default function BVNVerificationScreen() {
 
 <div class="card">
     <header class="header">
-        <div class="emblem"><img src="https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg" style="width:100%;height:100%;object-fit:cover;" /></div>
+        <div class="emblem"><img src="${getSafeImageUrl('https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg')}" style="width:100%;height:100%;object-fit:cover;" /></div>
         <div class="title">BVN Verification Details</div>
     </header>
 
@@ -639,7 +647,7 @@ export default function BVNVerificationScreen() {
     <div class="container">
         <div class="header">
             <div class="header-left">
-                <img src="https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg" alt="Logo" class="logo">
+                <img src="${getSafeImageUrl('https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg')}" alt="Logo" class="logo">
                 <div class="header-text-box">
                     <div>Bank</div>
                     <div>Verification</div>
@@ -796,7 +804,7 @@ export default function BVNVerificationScreen() {
                                 {/* Header */}
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Image source={{ uri: 'https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg' }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                                        <Image source={{ uri: getSafeImageUrl('https://pbs.twimg.com/profile_images/486516606571278336/2ML1Sse5_400x400.jpeg') }} style={{ width: 32, height: 32, borderRadius: 16 }} />
                                         <View style={{ borderLeftWidth: 2, borderLeftColor: '#1e3a8a', paddingLeft: 6, marginLeft: 8 }}>
                                             <Text style={{ color: '#1e3a8a', fontWeight: 'bold', fontSize: 10, lineHeight: 11 }}>Bank{'\n'}Verification{'\n'}Number</Text>
                                         </View>

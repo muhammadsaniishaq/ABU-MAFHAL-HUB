@@ -13,6 +13,14 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 
+// Helper to safely load external images on Web for canvas rendering
+const getSafeImageUrl = (url: string) => {
+    if (Platform.OS === 'web' && url.startsWith('http')) {
+        return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+};
+
 // Slip Components
 import { IDCardMockup } from '../../components/IDCardMockup';
 
@@ -287,7 +295,7 @@ export default function VerifyPhoneScreen() {
             const rawPhoto = result.data.photo || result.data.image || '';
 
             // Handle base64 photo formatting
-            let photoUrl = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+            let photoUrl = getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png');
             if (rawPhoto) {
                 photoUrl = rawPhoto.startsWith('data:') ? rawPhoto : `data:image/jpeg;base64,${rawPhoto}`;
             }
@@ -552,14 +560,14 @@ export default function VerifyPhoneScreen() {
                             <!-- Header -->
                             <div class="header-row">
                                 <div class="logo-coat">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png" alt="Coat of Arms of Nigeria">
+                                    <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Coat_of_arms_of_Nigeria.svg/320px-Coat_of_arms_of_Nigeria.svg.png')}" alt="Coat of Arms of Nigeria">
                                 </div>
                                 <div class="header-center">
                                     <h1>Federal Republic of Nigeria</h1>
                                     <h2>Verified NIN Details</h2>
                                 </div>
                                 <div class="logo-nimc">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png" alt="NIMC Logo">
+                                    <img src="${getSafeImageUrl('https://upload.wikimedia.org/wikipedia/commons/e/e4/Logo_for_NIMC.png')}" alt="NIMC Logo">
                                 </div>
                             </div>
 
