@@ -237,7 +237,7 @@ export default function VerifyPhoneScreen() {
                     
                     const generatePng = () => {
                         // @ts-ignore
-                        window.html2canvas(node, { useCORS: true, scale: 2 }).then((canvas) => {
+                        window.html2canvas(node, { useCORS: true, scale: 5 }).then((canvas) => {
                             const link = document.createElement('a');
                             link.download = `nin_slip_phone_${phone || 'verify'}.png`;
                             link.href = canvas.toDataURL('image/png');
@@ -767,8 +767,8 @@ export default function VerifyPhoneScreen() {
                         window.html2pdf().set({
                             margin: 0,
                             filename: `nin_slip_phone.pdf`,
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2, useCORS: true },
+                            image: { type: 'jpeg', quality: 1.0 },
+                            html2canvas: { scale: 5, useCORS: true },
                             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
                         }).from(container).save().then(() => {
                             document.body.removeChild(container);
