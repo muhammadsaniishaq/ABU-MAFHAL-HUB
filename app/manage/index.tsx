@@ -29,6 +29,7 @@ const modules = {
         { title: 'KYC Queue', icon: 'scan-outline', route: '/manage/kyc', color: '#8B5CF6', badge: 0 },
         { title: 'NIN Pricing', icon: 'pricetag-outline', route: '/manage/nin-pricing', color: '#059669' },
         { title: 'SMM Pricing', icon: 'thumbs-up-outline', route: '/manage/smm-pricing', color: '#8B5CF6' },
+        { title: 'Bills Pricing', icon: 'flash-outline', route: '/manage/bills-pricing', color: '#f5a623' },
         { title: 'Help Desk', icon: 'chatbubbles-outline', route: '/manage/tickets', color: '#EC4899', badge: 0 },
         { title: 'Content', icon: 'images-outline', route: '/manage/cms', color: '#6366F1' },
         { title: 'Data Plans', icon: 'wifi-outline', route: '/manage/data-plans', color: '#0EA5E9' },
