@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, TouchableOpacity, Text, ActivityIndicator, StyleSheet, Modal } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, TouchableOpacity, Text, ActivityIndicator, StyleSheet, Modal, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -58,10 +58,18 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
                             currency: 'NGN',
                             ref: 'PAY-' + Math.floor((Math.random() * 1000000000) + 1),
                             callback: function(response) {
-                                window.ReactNativeWebView.postMessage(JSON.stringify({type: 'success', data: response}));
+                                if (window.ReactNativeWebView) {
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'success', data: response}));
+                                } else {
+                                    window.parent.postMessage(JSON.stringify({type: 'success', data: response}), '*');
+                                }
                             },
                             onClose: function() {
-                                window.ReactNativeWebView.postMessage(JSON.stringify({type: 'cancel'}));
+                                if (window.ReactNativeWebView) {
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'cancel'}));
+                                } else {
+                                    window.parent.postMessage(JSON.stringify({type: 'cancel'}), '*');
+                                }
                             }
                         });
                         handler.openIframe();
@@ -78,6 +86,29 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
         </body>
       </html>
     `;
+
+    useEffect(() => {
+        if (Platform.OS === 'web' && visible) {
+            const handleWebMessage = (event: MessageEvent) => {
+                try {
+                    if (typeof event.data === 'string') {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'success') {
+                            onSuccess(data.data);
+                            onClose();
+                        } else if (data.type === 'cancel') {
+                            onCancel();
+                            onClose();
+                        }
+                    }
+                } catch (e) {
+                    // Ignore parsing errors for non-JSON messages
+                }
+            };
+            window.addEventListener('message', handleWebMessage);
+            return () => window.removeEventListener('message', handleWebMessage);
+        }
+    }, [visible, onSuccess, onCancel, onClose]);
 
     const handleMessage = (event: any) => {
         try {
@@ -107,27 +138,36 @@ export default function PaystackPayment({ visible, amount, email, publicKey, onS
                         <Ionicons name="close" size={24} color="#333" />
                     </TouchableOpacity>
                 </View>
-                <WebView
-                    ref={webViewRef}
-                    originWhitelist={['*']}
-                    source={{ html: paystackHtml, baseUrl: 'https://standard.paystack.co' }}
-                    scalesPageToFit={false}
-                    onMessage={handleMessage}
-                    startInLoadingState={true}
-                    javaScriptEnabled={true}
-                    domStorageEnabled={true}
-                    mixedContentMode="always"
-                    allowFileAccess={true}
-                    onError={(syntheticEvent) => {
-                        const { nativeEvent } = syntheticEvent;
-                        console.warn('WebView error: ', nativeEvent);
-                    }}
-                    renderLoading={() => (
-                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
-                            <ActivityIndicator size="large" color="#0056D2" />
-                        </View>
-                    )}
-                />
+                
+                {Platform.OS === 'web' ? (
+                    <iframe 
+                        srcDoc={paystackHtml}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    />
+                ) : (
+                    <WebView
+                        ref={webViewRef}
+                        originWhitelist={['*']}
+                        source={{ html: paystackHtml, baseUrl: 'https://standard.paystack.co' }}
+                        scalesPageToFit={false}
+                        onMessage={handleMessage}
+                        startInLoadingState={true}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        mixedContentMode="always"
+                        allowFileAccess={true}
+                        onError={(syntheticEvent) => {
+                            const { nativeEvent } = syntheticEvent;
+                            console.warn('WebView error: ', nativeEvent);
+                        }}
+                        renderLoading={() => (
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
+                                <ActivityIndicator size="large" color="#0056D2" />
+                            </View>
+                        )}
+                    />
+                )}
             </SafeAreaView>
         </Modal>
     );
