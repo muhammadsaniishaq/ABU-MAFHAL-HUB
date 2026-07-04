@@ -9,8 +9,8 @@ import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../../services/supabase';
-import { api } from '../../../services/api';
+import { supabase } from '../../services/supabase';
+import { api } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Helper to safely load external images on Web for canvas rendering

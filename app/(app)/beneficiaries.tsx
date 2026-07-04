@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../services/supabase';
+import { supabase } from '../../services/supabase';
 
 export default function BeneficiariesScreen() {
     const [beneficiaries, setBeneficiaries] = useState<any[]>([]);

@@ -4,10 +4,10 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../../../services/api';
-import { supabase } from '../../../services/supabase';
-import SecurityModal from '../../../components/SecurityModal';
-import TransactionConfirmationModal from '../../../components/TransactionConfirmationModal';
+import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
+import SecurityModal from '../../components/SecurityModal';
+import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 
 // Network Assets & Data
 const NETWORK_LOGOS: Record<string, any> = {

@@ -5,10 +5,10 @@ import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../../../services/supabase';
-import { api } from '../../../../services/api';
+import { supabase } from '../../../services/supabase';
+import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StatusResult } from '../../../../components/StatusResult';
+import { StatusResult } from '../../../components/StatusResult';
 
 const DEFAULT_STATUS_TYPES = [
     { id: 'ipe_inprocessing', db_id: 'ipe_inprocessing', name: 'InProcessing Error', price: 700 },

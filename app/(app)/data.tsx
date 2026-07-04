@@ -6,11 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import { api } from '../../../services/api';
-import { supabase } from '../../../services/supabase';
-import { DataPlan } from '../../../services/partners';
-import SecurityModal from '../../../components/SecurityModal';
-import TransactionConfirmationModal from '../../../components/TransactionConfirmationModal';
+import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
+import { DataPlan } from '../../services/partners';
+import SecurityModal from '../../components/SecurityModal';
+import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 
 const parseVolumeToGB = (volume: any, name: string): number => {
     const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();

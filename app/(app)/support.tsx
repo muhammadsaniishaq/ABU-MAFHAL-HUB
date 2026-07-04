@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native'
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useAppSettings } from '../../../hooks/useAppSettings';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 export default function SupportScreen() {
     const { settings } = useAppSettings();

@@ -7,8 +7,8 @@ import { useState, useEffect, useRef } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../../../services/supabase';
-import { api } from '../../../../services/api';
+import { supabase } from '../../../services/supabase';
+import { api } from '../../../services/api';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -24,10 +24,10 @@ const getSafeImageUrl = (url: string) => {
 };
 
 // Slip Components
-import { IDCardMockup } from '../../../../components/IDCardMockup';
-import { StandardSlip } from '../../../../components/StandardSlip';
-import { RegularSlip } from '../../../../components/RegularSlip';
-import { InformationSlip } from '../../../../components/InformationSlip';
+import { IDCardMockup } from '../../../components/IDCardMockup';
+import { StandardSlip } from '../../../components/StandardSlip';
+import { RegularSlip } from '../../../components/RegularSlip';
+import { InformationSlip } from '../../../components/InformationSlip';
 
 // Simulated API Call
 const API_URL = "https://idpro.ng/api/v1/nin";

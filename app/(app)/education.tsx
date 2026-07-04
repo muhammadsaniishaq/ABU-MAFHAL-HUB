@@ -2,8 +2,8 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityInd
 import { useState, useEffect } from 'react';
 import { useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { api } from '../../../services/api';
-import { supabase } from '../../../services/supabase';
+import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';

@@ -5,8 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../../../services/supabase';
-import { api } from '../../../../services/api';
+import { supabase } from '../../../services/supabase';
+import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -22,11 +22,11 @@ const getSafeImageUrl = (url: string) => {
 };
 
 // Slip Components
-import { IDCardMockup } from '../../../../components/IDCardMockup';
+import { IDCardMockup } from '../../../components/IDCardMockup';
 
-import { StandardSlip } from '../../../../components/StandardSlip';
-import { RegularSlip } from '../../../../components/RegularSlip';
-import { InformationSlip } from '../../../../components/InformationSlip';
+import { StandardSlip } from '../../../components/StandardSlip';
+import { RegularSlip } from '../../../components/RegularSlip';
+import { InformationSlip } from '../../../components/InformationSlip';
 
 const DEFAULT_LAYOUTS = [
     { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
