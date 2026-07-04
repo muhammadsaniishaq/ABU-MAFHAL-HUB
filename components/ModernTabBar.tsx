@@ -29,8 +29,8 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
                 {state.routes.map((route: any, index: number) => {
                     const { options } = descriptors[route.key];
 
-                    // IMPORTANT: We skip rendering tabs for screens with href: null 
-                    if (options?.href === null) return null;
+                    const allowedTabs = ['dashboard', 'wallet', 'pay', 'history', 'profile'];
+                    if (!allowedTabs.includes(route.name)) return null;
 
                     const isFocused = state.index === index;
 
