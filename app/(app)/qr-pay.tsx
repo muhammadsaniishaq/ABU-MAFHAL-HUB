@@ -848,7 +848,7 @@ export default function QRPayScreen() {
             {activeTab === 'scan' ? (
                 <View style={{ flex: 1, marginTop: -16 }}>
                     {!cameraActive ? (
-                        <ScrollView contentContainerStyle={s.scanDashboardContainer} className="flex-1 px-6 pt-8 pb-12">
+                        <ScrollView contentContainerStyle={s.scanDashboardContainer} className="flex-1 px-6 pt-6 pb-12">
                             {/* Glassmorphic card for QR options */}
                             <LinearGradient
                                 colors={['#102258', '#0b163a']}
@@ -923,7 +923,7 @@ export default function QRPayScreen() {
                             </LinearGradient>
 
                             {/* Info Section */}
-                            <View className="mt-8 bg-white p-5 rounded-2xl border border-slate-100 flex-row items-start">
+                            <View className="mt-6 bg-white p-4 rounded-2xl border border-slate-100 flex-row items-start">
                                 <Ionicons name="shield-checkmark" size={20} color="#0056D2" style={{ marginTop: 2, marginRight: 10 }} />
                                 <View className="flex-1">
                                     <Text className="text-slate-800 font-bold text-sm mb-1">Secure Payments</Text>
@@ -1842,7 +1842,7 @@ const s = StyleSheet.create({
   },
   dashboardCard: {
     borderRadius: 24,
-    padding: 24,
+    padding: 20,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#0d1b3e',
@@ -1853,15 +1853,15 @@ const s = StyleSheet.create({
   },
   dashboardCardHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
     paddingBottom: 20,
   },
   dashboardIconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1886,16 +1886,16 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
+    padding: 14,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   optionIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#0056D2',
     alignItems: 'center',
     justifyContent: 'center',
