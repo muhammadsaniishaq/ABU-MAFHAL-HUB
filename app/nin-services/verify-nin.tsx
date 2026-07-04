@@ -141,6 +141,12 @@ export default function VerifyNINScreen() {
     const saveHistoryItem = async (verifiedData: any) => {
         try {
             const name = `${verifiedData.firstname || ''} ${verifiedData.surname || ''}`.trim() || 'Unknown Name';
+            
+            // Remove huge base64 images so AsyncStorage never crashes/clears
+            const dataToSave = { ...verifiedData };
+            delete dataToSave.photo;
+            delete dataToSave.signature;
+
             const newItem = {
                 id: `verify_${Date.now()}`,
                 nin: verifiedData.nin || nin || 'N/A',
@@ -152,10 +158,13 @@ export default function VerifyNINScreen() {
                     const pad = (n: number) => n.toString().padStart(2, '0');
                     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
                 })(),
-                data: verifiedData
+                data: dataToSave
             };
             
-            const updated = [newItem, ...historyList.filter(item => item.nin !== newItem.nin)].slice(0, 500);
+            const stored = await AsyncStorage.getItem('recent_nin_verifications');
+            const historyList = stored ? JSON.parse(stored) : [];
+            const updated = [newItem, ...historyList.filter((item: any) => item.nin !== newItem.nin)].slice(0, 5000);
+            
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
         } catch (e) {

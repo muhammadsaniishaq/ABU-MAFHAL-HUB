@@ -169,8 +169,15 @@ export default function BVNVerificationScreen() {
     const saveHistoryItem = async (verifiedData: any) => {
         try {
             const amount = getSelectedPrice();
+            
+            // Remove huge base64 images so AsyncStorage never crashes/clears
+            const dataToSave = { ...verifiedData };
+            delete dataToSave.base64Image;
+            delete dataToSave.image;
+            delete dataToSave.photo;
+
             const newItem = {
-                id: `bvn_${Date.now()}`,
+                id: Date.now().toString(),
                 target: inputValue.trim(),
                 status: 'Completed',
                 slip: searchType === 'card' 
@@ -184,12 +191,12 @@ export default function BVNVerificationScreen() {
                     const pad = (n: number) => n.toString().padStart(2, '0');
                     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 })(),
-                data: verifiedData
+                data: dataToSave
             };
             
             const stored = await AsyncStorage.getItem('recent_bvn_requests');
             const historyList = stored ? JSON.parse(stored) : [];
-            const updated = [newItem, ...historyList.filter((item: any) => item.target !== newItem.target)].slice(0, 500);
+            const updated = [newItem, ...historyList.filter((item: any) => item.target !== newItem.target)].slice(0, 5000);
             await AsyncStorage.setItem('recent_bvn_requests', JSON.stringify(updated));
             setHistoryList(updated);
         } catch (e) {
