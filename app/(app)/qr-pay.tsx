@@ -1061,10 +1061,10 @@ export default function QRPayScreen() {
                                             {currentUser.avatar_url ? (
                                                 <Image 
                                                     source={{ uri: currentUser.avatar_url }} 
-                                                    style={{ width: '100%', height: '100%', borderRadius: 32 }}
+                                                    style={{ width: '100%', height: '100%', borderRadius: 24 }}
                                                 />
                                             ) : (
-                                                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#0F172A' }}>
+                                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0F172A' }}>
                                                     {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
                                                 </Text>
                                             )}
@@ -1081,7 +1081,7 @@ export default function QRPayScreen() {
                                         <View style={s.qrWrapper}>
                                             <Image
                                                 source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(myCodePayload)}&color=0F172A&margin=0` }}
-                                                style={{ width: 180, height: 180 }}
+                                                style={{ width: 140, height: 140 }}
                                                 resizeMode="contain"
                                             />
                                         </View>
@@ -1486,7 +1486,7 @@ const s = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     borderRadius: 36,
-    padding: 32,
+    padding: 24,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 24 },
@@ -1511,17 +1511,17 @@ const s = StyleSheet.create({
   },
   myCodeHeader: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
     zIndex: 1,
   },
   avatarWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1555,7 +1555,7 @@ const s = StyleSheet.create({
   },
   qrWrapperContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
     width: '100%',
   },
   qrWrapper: {
