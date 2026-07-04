@@ -1053,32 +1053,65 @@ export default function QRPayScreen() {
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
                                 >
+                                    {/* Watermark decorations */}
                                     <View style={s.myCodeWatermark}>
                                         <Image source={require('../../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.05 }} resizeMode="contain" />
                                     </View>
+                                    <View style={s.decorativeCircle1} />
+                                    <View style={s.decorativeCircle2} />
 
                                     <View style={s.myCodeHeader}>
                                         <View style={s.avatarWrapper}>
-                                            <Ionicons name="person" size={24} color="#0056D2" />
+                                            {currentUser.avatar_url ? (
+                                                <Image 
+                                                    source={{ uri: currentUser.avatar_url }} 
+                                                    style={{ width: '100%', height: '100%', borderRadius: 24 }}
+                                                />
+                                            ) : (
+                                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0b163a' }}>
+                                                    {currentUser.full_name ? currentUser.full_name[0].toUpperCase() : 'U'}
+                                                </Text>
+                                            )}
                                         </View>
-                                        <View style={{ marginLeft: 12 }}>
-                                            <Text style={s.myCodeName}>{currentUser.full_name}</Text>
-                                            <Text style={s.myCodeEmail}>{currentUser.email}</Text>
+                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
+                                                <Ionicons name="checkmark-circle" size={14} color="#f5a623" style={{ marginLeft: 4 }} />
+                                            </View>
+                                            <Text style={s.myCodeEmail} numberOfLines={1}>{currentUser.email}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={s.cardInfoRow}>
+                                        <View>
+                                            <Text style={s.cardInfoLabel}>WALLET ID</Text>
+                                            <Text style={s.cardInfoValue}>MAF-{currentUser.id.substring(0, 8).toUpperCase()}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={s.cardInfoLabel}>ISSUED</Text>
+                                            <Text style={s.cardInfoValue}>{new Date().toLocaleDateString('en-GB')}</Text>
                                         </View>
                                     </View>
 
                                     {/* Live QR Code Box */}
-                                    <View style={s.qrWrapper}>
-                                        <Image
-                                            source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(myCodePayload)}&color=0d1b3e&margin=2` }}
-                                            style={{ width: 170, height: 170 }}
-                                            resizeMode="contain"
-                                        />
+                                    <View style={s.qrWrapperContainer}>
+                                        <View style={s.qrWrapper}>
+                                            <Image
+                                                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(myCodePayload)}&color=0d1b3e&margin=1` }}
+                                                style={{ width: 150, height: 150 }}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
                                     </View>
 
                                     <Text style={s.qrHintText}>
                                         Scan this code to send money to this wallet instantly.
                                     </Text>
+                                    
+                                    <View style={s.verifiedFooter}>
+                                        <Ionicons name="shield-checkmark" size={12} color="#4ade80" />
+                                        <Text style={s.verifiedFooterText}>Verified by Mafhal Sub</Text>
+                                    </View>
                                 </LinearGradient>
                             </ViewShot>
 
@@ -1475,61 +1508,65 @@ const s = StyleSheet.create({
     maxWidth: 340,
     borderRadius: 30,
     padding: 24,
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: '#0d1b3e',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'stretch',
+    shadowColor: '#0b163a',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   myCodeWatermark: {
-    position: 'absolute',
-    right: -20,
-    bottom: -20,
-    width: 150,
-    height: 150,
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 0,
+    padding: 40,
   },
   myCodeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'stretch',
     marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    paddingBottom: 16,
+    zIndex: 1,
   },
   avatarWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: T.gold,
   },
   myCodeName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: 'white',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   myCodeEmail: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '600',
-    marginTop: 1,
+    color: '#cbd5e1',
+    fontWeight: '500',
+    marginTop: 2,
   },
   qrWrapper: {
-    padding: 16,
+    padding: 12,
     backgroundColor: 'white',
-    borderRadius: 24,
-    marginBottom: 20,
+    borderRadius: 20,
     shadowColor: 'black',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 3,
+    borderColor: T.gold,
+    alignSelf: 'center',
   },
   qrHintText: {
     fontSize: 9,
@@ -1542,11 +1579,65 @@ const s = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 13,
   },
+  decorativeCircle1: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    bottom: -30,
+    left: -40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(245, 166, 35, 0.05)',
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    paddingTop: 12,
+  },
+  cardInfoLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#a0aec0',
+    letterSpacing: 0.5,
+  },
+  cardInfoValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: T.white,
+    marginTop: 2,
+  },
+  qrWrapperContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  verifiedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    gap: 4,
+  },
+  verifiedFooterText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4ade80',
+  },
   shareBtn: {
-    width: '100%',
-    backgroundColor: T.gold,
-    paddingVertical: 12,
-    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    height: 48,
+    borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
