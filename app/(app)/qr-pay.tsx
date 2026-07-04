@@ -4,10 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect, useRef } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import SecurityModal from '../components/SecurityModal';
+import SecurityModal from '../../../components/SecurityModal';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
@@ -405,7 +405,7 @@ export default function QRPayScreen() {
         // 1. Download logo asset locally for rendering inside the document
         let logoSrc = '';
         try {
-            const logoAsset = Asset.fromModule(require('../assets/images/logo.png'));
+            const logoAsset = Asset.fromModule(require('../../assets/images/logo.png'));
             await logoAsset.downloadAsync();
             logoSrc = logoAsset.localUri || logoAsset.uri;
         } catch (logoErr) {
@@ -1062,7 +1062,7 @@ export default function QRPayScreen() {
                             end={{ x: 1, y: 1 }}
                         >
                             <View style={s.myCodeWatermark}>
-                                <Image source={require('../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.05 }} resizeMode="contain" />
+                                <Image source={require('../../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.05 }} resizeMode="contain" />
                             </View>
 
                             <View style={s.myCodeHeader}>

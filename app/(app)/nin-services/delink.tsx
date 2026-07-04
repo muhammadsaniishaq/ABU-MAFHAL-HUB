@@ -2,8 +2,8 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator,
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { api } from '../../services/api';
-import { StatusResult } from '../../components/StatusResult';
+import { api } from '../../../../services/api';
+import { StatusResult } from '../../../../components/StatusResult';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DelinkScreen() {

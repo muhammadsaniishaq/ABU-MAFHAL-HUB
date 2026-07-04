@@ -17,7 +17,7 @@ export default function VirtualCardsScreen() {
                     {/* Card Visual */}
                     <View className="w-full aspect-[1.586] bg-black rounded-3xl p-8 relative overflow-hidden mb-10 shadow-2xl shadow-indigo-500/30 border border-white/10">
                         <Image
-                            source={require('../assets/images/logo-icon.png')}
+                            source={require('../../assets/images/logo-icon.png')}
                             className="absolute right-0 bottom-0 w-64 h-64 opacity-10 -mr-10 -mb-10"
                             resizeMode="contain"
                         />

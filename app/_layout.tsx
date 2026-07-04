@@ -185,8 +185,6 @@ export default function RootLayout() {
                     <Stack.Screen name="manage" />
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(app)" />
-                    <Stack.Screen name="education" options={{ headerShown: false }} />
-                    <Stack.Screen name="crypto" options={{ headerShown: false }} />
                 </Stack>
                 <GlobalAnnouncementModal />
                 <StatusBar style="auto" />

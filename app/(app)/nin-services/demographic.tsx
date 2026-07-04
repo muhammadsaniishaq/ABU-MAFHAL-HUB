@@ -3,8 +3,8 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { api } from '../../services/api';
-import { IDCardMockup } from '../../components/IDCardMockup';
+import { api } from '../../../../services/api';
+import { IDCardMockup } from '../../../../components/IDCardMockup';
 
 export default function DemographicScreen() {
     const router = useRouter();

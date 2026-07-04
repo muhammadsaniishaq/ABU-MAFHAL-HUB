@@ -6,11 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import { api } from '../services/api';
-import { supabase } from '../services/supabase';
-import { DataPlan } from '../services/partners';
-import SecurityModal from '../components/SecurityModal';
-import TransactionConfirmationModal from '../components/TransactionConfirmationModal';
+import { api } from '../../../services/api';
+import { supabase } from '../../../services/supabase';
+import { DataPlan } from '../../../services/partners';
+import SecurityModal from '../../../components/SecurityModal';
+import TransactionConfirmationModal from '../../../components/TransactionConfirmationModal';
 
 const parseVolumeToGB = (volume: any, name: string): number => {
     const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();
@@ -33,10 +33,10 @@ const parseVolumeToGB = (volume: any, name: string): number => {
 
 // Network Logos
 const NETWORK_LOGOS: Record<string, any> = {
-    mtn: require('../assets/images/mtn.png'),
-    glo: require('../assets/images/glo.png'),
-    airtel: require('../assets/images/airtel.png'),
-    '9mobile': require('../assets/images/9mobile.png'),
+    mtn: require('../../assets/images/mtn.png'),
+    glo: require('../../assets/images/glo.png'),
+    airtel: require('../../assets/images/airtel.png'),
+    '9mobile': require('../../assets/images/9mobile.png'),
 };
 
 const NETWORKS_DATA = [

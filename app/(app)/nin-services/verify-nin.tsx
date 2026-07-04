@@ -7,8 +7,8 @@ import { useState, useEffect, useRef } from 'react';
 import BouncyCheckbox from "react-native-bouncy-checkbox";
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../services/supabase';
-import { api } from '../../services/api';
+import { supabase } from '../../../../services/supabase';
+import { api } from '../../../../services/api';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -24,20 +24,20 @@ const getSafeImageUrl = (url: string) => {
 };
 
 // Slip Components
-import { IDCardMockup } from '../../components/IDCardMockup';
-import { StandardSlip } from '../../components/StandardSlip';
-import { RegularSlip } from '../../components/RegularSlip';
-import { InformationSlip } from '../../components/InformationSlip';
+import { IDCardMockup } from '../../../../components/IDCardMockup';
+import { StandardSlip } from '../../../../components/StandardSlip';
+import { RegularSlip } from '../../../../components/RegularSlip';
+import { InformationSlip } from '../../../../components/InformationSlip';
 
 // Simulated API Call
 const API_URL = "https://idpro.ng/api/v1/nin";
 const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
 
 const DEFAULT_LAYOUTS = [
-    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../assets/images/premium.png'), badge: 'Digital ID' },
-    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 200, type: 'nonprem', image: require('../../assets/images/standard.png'), badge: 'Color Card' },
-    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 180, type: 'nonprem', image: require('../../assets/images/regular.png'), badge: 'B&W Slip' },
-    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../assets/images/info.png'), badge: 'Full Sheet' },
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 200, type: 'nonprem', image: require('../../../assets/images/standard.png'), badge: 'Color Card' },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 180, type: 'nonprem', image: require('../../../assets/images/regular.png'), badge: 'B&W Slip' },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../../assets/images/info.png'), badge: 'Full Sheet' },
 ];
 
 const formatDob = (raw: string): string => {

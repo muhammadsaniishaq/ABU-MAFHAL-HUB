@@ -5,40 +5,27 @@ import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../services/supabase';
-import { api } from '../../services/api';
+import { supabase } from '../../../../services/supabase';
+import { api } from '../../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StatusResult } from '../../components/StatusResult';
-
-const DEFAULT_STATUS_TYPES = [
-    { id: 'val_no_record', db_id: 'val_no_record', name: 'No Record Found', price: 900 },
-    { id: 'val_update_record', db_id: 'val_update_record', name: 'Update Record', price: 900 },
-    { id: 'val_validate_modification', db_id: 'val_validate_modification', name: 'Validate Modification', price: 900 },
-    { id: 'val_vnin_validation', db_id: 'val_vnin_validation', name: 'V-NIN Validation', price: 900 },
-    { id: 'val_photo_error', db_id: 'val_photo_error', name: 'Photograph Error', price: 900 },
-    { id: 'val_bypass_nin', db_id: 'val_bypass_nin', name: 'Bypass NIN', price: 900 }
-];
+import { StatusResult } from '../../../../components/StatusResult';
 
 const DEFAULT_SLIP_TYPES = [
-    { id: 'val_slip_none', db_id: 'val_slip_none', name: 'No Slip', price: 0, image: null },
-    { id: 'val_slip_premium', db_id: 'val_slip_premium', name: 'Premium Slip', price: 150, image: require('../../assets/images/premium.png') }
+    { id: 'pers_status', db_id: 'pers_status', name: 'Personalization', price: 250, image: require('../../../assets/images/premium.png') }
 ];
 
-export default function ValidationScreen() {
+export default function TrackingScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     
     // Selection States
-    const [selectedStatus, setSelectedStatus] = useState('val_no_record');
-    const [selectedSlip, setSelectedSlip] = useState('val_slip_none');
-    
-    const [nin, setNin] = useState('');
+    const [selectedSlip, setSelectedSlip] = useState('pers_status');
+    const [trackingID, setTrackingID] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [isAgreed, setIsAgreed] = useState(false);
 
     // Dynamic Prices
-    const [statusTypes, setStatusTypes] = useState(DEFAULT_STATUS_TYPES);
     const [slipTypes, setSlipTypes] = useState(DEFAULT_SLIP_TYPES);
 
     // Premium States
@@ -72,7 +59,7 @@ export default function ValidationScreen() {
 
     const loadHistory = async () => {
         try {
-            const stored = await AsyncStorage.getItem('recent_validation_requests');
+            const stored = await AsyncStorage.getItem('recent_personalization_requests');
             if (stored) {
                 setHistoryList(JSON.parse(stored));
             }
@@ -83,27 +70,25 @@ export default function ValidationScreen() {
 
     const saveHistoryItem = async (verifiedData: any) => {
         try {
-            const statusPrice = statusTypes.find(s => s.id === selectedStatus)?.price || 0;
             const slipPrice = slipTypes.find(s => s.id === selectedSlip)?.price || 0;
-            const totalPrice = statusPrice + slipPrice;
 
             const newItem = {
-                id: `val_${Date.now()}`,
-                target: nin.trim(),
+                id: `pers_${Date.now()}`,
+                target: trackingID.trim(),
                 status: 'Completed',
-                slip: slipTypes.find(s => s.id === selectedSlip)?.name || 'No Slip',
-                amount: totalPrice,
+                slip: 'Personalization',
+                amount: slipPrice,
                 date: (() => {
                     const d = new Date();
                     const pad = (n: number) => n.toString().padStart(2, '0');
-                    return `${d.getFullYear()}-\$${pad(d.getMonth() + 1)}-\$${pad(d.getDate())}`;
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 })(),
                 data: verifiedData
             };
             
             const updated = [newItem, ...historyList.filter(item => item.target !== newItem.target)].slice(0, 500);
             setHistoryList(updated);
-            await AsyncStorage.setItem('recent_validation_requests', JSON.stringify(updated));
+            await AsyncStorage.setItem('recent_personalization_requests', JSON.stringify(updated));
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
@@ -122,7 +107,7 @@ export default function ValidationScreen() {
                         try {
                             const updated = historyList.filter(item => item.id !== itemId);
                             setHistoryList(updated);
-                            await AsyncStorage.setItem('recent_validation_requests', JSON.stringify(updated));
+                            await AsyncStorage.setItem('recent_personalization_requests', JSON.stringify(updated));
                         } catch (e) {
                             console.warn('Failed to delete history item', e);
                         }
@@ -148,17 +133,9 @@ export default function ValidationScreen() {
 
     const fetchPrices = async () => {
         try {
-            const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'validation');
+            const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'personalization');
             if (error || !data) return;
             
-            setStatusTypes(prev => prev.map(item => {
-                const dbPrice = data.find(d => d.id === item.db_id);
-                if (dbPrice) {
-                    return { ...item, price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price) };
-                }
-                return item;
-            }));
-
             setSlipTypes(prev => prev.map(item => {
                 const dbPrice = data.find(d => d.id === item.db_id);
                 if (dbPrice) {
@@ -178,18 +155,16 @@ export default function ValidationScreen() {
     }, []);
 
     const getSelectedTotalPrice = () => {
-        const statusPrice = statusTypes.find(s => s.id === selectedStatus)?.price || 0;
-        const slipPrice = slipTypes.find(s => s.id === selectedSlip)?.price || 0;
-        return statusPrice + slipPrice;
+        return slipTypes.find(s => s.id === selectedSlip)?.price || 0;
     };
 
     const handleVerify = async () => {
-        const cleanNin = nin.trim();
-        if (!cleanNin) {
-            return showAlert('Tracking ID / NIN Required', 'Please enter a valid Tracking ID or NIN.', 'warning');
+        const cleanID = trackingID.trim();
+        if (!cleanID) {
+            return showAlert('Tracking ID Required', 'Please enter a valid Tracking ID.', 'warning');
         }
         if (!isAgreed) {
-            return showAlert('Consent Required', 'You must confirm obtaining consent before running validation.', 'warning');
+            return showAlert('Consent Required', 'You must confirm obtaining consent before running personalization tracking.', 'warning');
         }
 
         const totalPrice = getSelectedTotalPrice();
@@ -199,7 +174,7 @@ export default function ValidationScreen() {
 
         setLoading(true);
         try {
-            const res = await api.identity.validateIdentity(cleanNin, 'nin');
+            const res = await api.identity.getPersonalization(cleanID);
             setResult(res);
             await saveHistoryItem(res);
             await fetchWalletBalance(); // Update balance
@@ -209,9 +184,9 @@ export default function ValidationScreen() {
             if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
                 showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
             } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
-                showAlert('No Record Found', 'The record or identity you entered does not exist or has no validation history.', 'error');
+                showAlert('No Record Found', 'The record or identity you entered does not exist or has no personalization history.', 'error');
             } else {
-                showAlert('Validation Failed', errM || 'An error occurred during validation checks.', 'error');
+                showAlert('Tracking Failed', errM || 'An error occurred during personalization checks.', 'error');
             }
         } finally {
             setLoading(false);
@@ -219,9 +194,9 @@ export default function ValidationScreen() {
     };
 
     const faqs = [
-        { q: 'Menene Validation?', a: 'NIN Validation wani tsari ne na daidaitawa da kuma tabbatar da ingancin lambar NIN dinka a kan uwar garken hukumar NIMC lokacin da ta samu wata matsala ko aka canza mata wani bayani.' },
-        { q: 'Yaya ake biyan kuɗin wannan sabis?', a: 'Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing validation.' },
-        { q: 'Zan iya sake duba validation na baya?', a: 'Ee, tarihin dukan validation ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya.' }
+        { q: 'Menene Personalization?', a: 'Personalization wani tsari ne na kamala katin NIN da kuma buga ainihin katin wanda hukumar NIMC ke gudanarwa.' },
+        { q: 'Yaya ake biyan kuɗin wannan sabis?', a: 'Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing personalization check.' },
+        { q: 'Zan iya sake duba personalization na baya?', a: 'Ee, tarihin dukan personalization ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya.' }
     ];
 
     const filteredHistory = historyList.filter(item => {
@@ -238,12 +213,12 @@ export default function ValidationScreen() {
         return (
             <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
                 <Stack.Screen options={{ 
-                    title: 'Validation Status', 
+                    title: 'Personalization Status', 
                     headerStyle: { backgroundColor: '#060d21' }, 
                     headerTintColor: '#fff', 
                     headerShadowVisible: false,
                     headerRight: () => (
-                        <TouchableOpacity onPress={() => router.push('/nin-services/history?tab=validation')} style={{ marginRight: 8 }}>
+                        <TouchableOpacity onPress={() => router.push('/nin-services/history?tab=personalization')} style={{ marginRight: 8 }}>
                             <Ionicons name="time-outline" size={22} color="#fff" />
                         </TouchableOpacity>
                     )
@@ -253,14 +228,14 @@ export default function ValidationScreen() {
                 <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Validation Details</Text>
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Personalization Details</Text>
                     </View>
-                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>NIN Validation Completed</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>Personalization Completed</Text>
                 </LinearGradient>
 
                 <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: -32 }} contentContainerStyle={{ paddingBottom: 80 }}>
                     <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, marginBottom: 16 }}>
-                        <StatusResult result={result} title="Validation Status Report" />
+                        <StatusResult result={result} title="Personalization Report" />
                     </View>
 
                     {/* Back Button */}
@@ -269,7 +244,7 @@ export default function ValidationScreen() {
                         style={{ height: 48, borderRadius: 12, backgroundColor: '#060d21', alignItems: 'center', justifyContent: 'center', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }}
                         activeOpacity={0.8}
                     >
-                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>RUN ANOTHER VALIDATION</Text>
+                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>RUN ANOTHER CHECK</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
@@ -279,7 +254,7 @@ export default function ValidationScreen() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ 
-                title: 'Validation', 
+                title: 'Personalization', 
                 headerStyle: { backgroundColor: '#060d21' }, 
                 headerTintColor: '#fff', 
                 headerShadowVisible: false,
@@ -297,7 +272,7 @@ export default function ValidationScreen() {
                     <View style={styles.loaderOverlay}>
                         <View style={styles.loaderCard}>
                             <ActivityIndicator size="large" color="#f5a623" />
-                            <Text style={styles.loaderTitle}>Processing Validation</Text>
+                            <Text style={styles.loaderTitle}>Checking Status</Text>
                             <Text style={styles.loaderSub}>Contacting Verification Registry...</Text>
                         </View>
                     </View>
@@ -364,7 +339,7 @@ export default function ValidationScreen() {
                                             <Ionicons name="document-text" size={18} color="#060d21" />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.detailHeaderSubtitle}>VALIDATION REQUEST</Text>
+                                            <Text style={styles.detailHeaderSubtitle}>TRACKING ID REQUEST</Text>
                                             <Text style={styles.detailHeaderTitle} numberOfLines={1}>
                                                 {selectedHistoryItem.data?.name || selectedHistoryItem.data?.fullName || [selectedHistoryItem.data?.firstname, selectedHistoryItem.data?.lastname].filter(Boolean).join(' ') || 'MUHAMMAD SANI ISYAKU'}
                                             </Text>
@@ -386,7 +361,7 @@ export default function ValidationScreen() {
                                         <Text style={styles.detailBadgeText}>Completed</Text>
                                     </View>
                                     <View style={styles.detailBadgeSlip}>
-                                        <Text style={styles.detailBadgeText}>{selectedHistoryItem.slip || 'No Slip'}</Text>
+                                        <Text style={styles.detailBadgeText}>{selectedHistoryItem.slip || 'Personalization'}</Text>
                                     </View>
                                 </View>
                             </LinearGradient>
@@ -413,7 +388,7 @@ export default function ValidationScreen() {
 
                                 <View style={styles.detailRow}>
                                     <View style={styles.detailFieldHalf}>
-                                        <Text style={styles.detailFieldLabel}>TRACKING ID / NIN</Text>
+                                        <Text style={styles.detailFieldLabel}>TRACKING ID</Text>
                                         <Text style={styles.detailFieldVal}>{selectedHistoryItem.target}</Text>
                                     </View>
                                     <View style={styles.detailFieldHalf}>
@@ -425,7 +400,7 @@ export default function ValidationScreen() {
                                 <View style={styles.detailRow}>
                                     <View style={styles.detailFieldHalf}>
                                         <Text style={styles.detailFieldLabel}>AMOUNT</Text>
-                                        <Text style={styles.detailFieldVal}>₦{(selectedHistoryItem.amount || 900).toLocaleString()}</Text>
+                                        <Text style={styles.detailFieldVal}>₦{(selectedHistoryItem.amount || 250).toLocaleString()}</Text>
                                     </View>
                                     <View style={styles.detailFieldHalf}>
                                         <Text style={styles.detailFieldLabel}>REFUND</Text>
@@ -442,7 +417,7 @@ export default function ValidationScreen() {
                                 <TouchableOpacity 
                                     style={styles.detailDownloadBtn}
                                     onPress={() => {
-                                        Alert.alert('Download Started', 'Validation slip is downloading to your storage.');
+                                        Alert.alert('Download Started', 'Personalization slip is downloading to your storage.');
                                     }}
                                     activeOpacity={0.8}
                                 >
@@ -459,11 +434,11 @@ export default function ValidationScreen() {
             <View style={[styles.customHeader, { paddingTop: insets.top > 0 ? insets.top + 8 : 16 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View style={styles.headerIconContainer}>
-                        <Ionicons name="shield-checkmark" size={22} color="#ffffff" />
+                        <Ionicons name="sparkles" size={22} color="#ffffff" />
                     </View>
                     <View style={{ marginLeft: 12 }}>
-                        <Text style={styles.headerMainTitle}>Validation</Text>
-                        <Text style={styles.headerSubTitle}>NIN validation request</Text>
+                        <Text style={styles.headerMainTitle}>Personalization</Text>
+                        <Text style={styles.headerSubTitle}>Enter the Tracking ID — we check its status, like IPE</Text>
                     </View>
                 </View>
             </View>
@@ -474,7 +449,7 @@ export default function ValidationScreen() {
                 <View style={styles.processingTimeBadge}>
                     <Ionicons name="time-outline" size={14} color="#d97706" style={{ marginRight: 6 }} />
                     <Text style={styles.processingTimeText}>
-                        Processing time: <Text style={{ fontWeight: '800' }}>24h to 48h</Text>
+                        Processing time: <Text style={{ fontWeight: '800' }}>10 minutes to 24 hours</Text>
                     </Text>
                 </View>
 
@@ -499,47 +474,13 @@ export default function ValidationScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* 1. DETAILS NEEDED */}
+                {/* 1. SLIP LAYOUT */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>1</Text>
                         </View>
-                        <Text style={styles.cardTitle}>DETAILS NEEDED</Text>
-                    </View>
-                    
-                    <View style={styles.statusGrid}>
-                        {statusTypes.map((item) => {
-                            const isSelected = selectedStatus === item.id;
-                            return (
-                                <TouchableOpacity 
-                                    key={item.id}
-                                    onPress={() => setSelectedStatus(item.id)}
-                                    style={[
-                                        styles.statusCardCell,
-                                        isSelected ? styles.statusCardSelected : styles.statusCardUnselected
-                                    ]}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={[styles.statusPrice, isSelected ? styles.textSelected : styles.textUnselected]}>
-                                        ₦{item.price.toFixed(2)}
-                                    </Text>
-                                    <Text style={[styles.statusLabel, isSelected ? styles.textSelected : styles.textUnselected]} numberOfLines={2}>
-                                        {item.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            )
-                        })}
-                    </View>
-                </View>
-
-                {/* 2. SLIP TYPE */}
-                <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.stepBadge}>
-                            <Text style={styles.stepBadgeText}>2</Text>
-                        </View>
-                        <Text style={styles.cardTitle}>SLIP TYPE</Text>
+                        <Text style={styles.cardTitle}>SLIP LAYOUT</Text>
                     </View>
 
                     <View style={styles.slipGrid}>
@@ -556,7 +497,7 @@ export default function ValidationScreen() {
                                     activeOpacity={0.8}
                                 >
                                     <Text style={[styles.slipPrice, isSelected ? styles.textSelected : styles.textUnselected]}>
-                                        {item.price > 0 ? `+` : ''}₦{item.price.toFixed(2)}
+                                        ₦{item.price.toFixed(2)}
                                     </Text>
                                     <View style={styles.slipImageBox}>
                                         {item.image === null ? (
@@ -574,30 +515,33 @@ export default function ValidationScreen() {
                     </View>
                 </View>
 
-                {/* 3. SUPPLY TRACKING / NIN */}
+                {/* 2. SUPPLY TRACKING ID */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
-                            <Text style={styles.stepBadgeText}>3</Text>
+                            <Text style={styles.stepBadgeText}>2</Text>
                         </View>
-                        <Text style={styles.cardTitle}>SUPPLY TRACKING / NIN</Text>
+                        <Text style={styles.cardTitle}>SUPPLY TRACKING ID</Text>
                     </View>
                     
                     <View style={{ marginBottom: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                             <Ionicons name="card-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
-                            <Text style={styles.labelHeader}>Tracking ID / NIN</Text>
+                            <Text style={styles.labelHeader}>Tracking ID</Text>
                         </View>
                         <View style={styles.inputContainer}>
                             <TextInput
-                                placeholder="Enter Tracking ID / NIN"
+                                placeholder="ENTER TRACKING ID"
                                 placeholderTextColor="#94a3b8"
                                 style={styles.inputStyleCentered}
-                                value={nin} 
-                                onChangeText={setNin} 
+                                value={trackingID} 
+                                onChangeText={setTrackingID} 
                                 editable={!loading}
                             />
                         </View>
+                        <Text style={styles.inputHelperText}>
+                            Enter the enrollment tracking ID — we'll check its personalization status.
+                        </Text>
                     </View>
 
                     {/* Consent Checkbox */}
@@ -620,17 +564,17 @@ export default function ValidationScreen() {
                     {/* Submit Button */}
                     <TouchableOpacity 
                         onPress={handleVerify} 
-                        disabled={loading || !nin.trim() || !isAgreed} 
+                        disabled={loading || !trackingID.trim() || !isAgreed} 
                         style={[
                             styles.verifyButton,
-                            (loading || !nin.trim() || !isAgreed) ? styles.verifyButtonDisabled : styles.verifyButtonActive
+                            (loading || !trackingID.trim() || !isAgreed) ? styles.verifyButtonDisabled : styles.verifyButtonActive
                         ]}
                         activeOpacity={0.8}
                     >
                         {loading ? <ActivityIndicator color="#ffffff" size="small" /> : (
                             <>
-                                <Ionicons name="shield-checkmark" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                <Text style={styles.verifyButtonText}>Submit</Text>
+                                <Ionicons name="sparkles" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                <Text style={styles.verifyButtonText}>Personalize</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -666,105 +610,7 @@ export default function ValidationScreen() {
                     })}
                 </View>
 
-                {/* RECENT LOOKUPS / HISTORY TABLE */}
-                <View style={styles.card}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="time" size={18} color="#060d21" style={{ marginRight: 6 }} />
-                            <Text style={styles.tableHeaderTitle}>HISTORY</Text>
-                        </View>
-                        
-                        {/* Search Input on the right */}
-                        <View style={styles.tableSearchBox}>
-                            <TextInput
-                                placeholder="Search NIN..."
-                                placeholderTextColor="#94a3b8"
-                                style={styles.tableSearchInput}
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
-                            <TouchableOpacity style={styles.tableSearchBtn} activeOpacity={0.8}>
-                                <Ionicons name="search" size={12} color="#ffffff" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                    
-                    <Text style={styles.tableSubtitle}>Check the status after 5 to 10 minutes.</Text>
 
-                    {filteredHistory.length === 0 ? (
-                        <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                            <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600' }}>No past validation records found.</Text>
-                        </View>
-                    ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableHorizontalScroll}>
-                            <View style={{ flexDirection: 'column' }}>
-                                {/* Table Header Row */}
-                                <View style={styles.tableHeaderRow}>
-                                    <Text style={[styles.thCell, { width: 140 }]}>ACTION</Text>
-                                    <Text style={[styles.thCell, { width: 110, textAlign: 'center' }]}>STATUS</Text>
-                                    <Text style={[styles.thCell, { width: 160 }]}>NIN</Text>
-                                    <Text style={[styles.thCell, { width: 100 }]}>SLIP</Text>
-                                    <Text style={[styles.thCell, { width: 110 }]}>AMOUNT</Text>
-                                    <Text style={[styles.thCell, { width: 110 }]}>DATE</Text>
-                                </View>
-
-                                {/* Table Body Rows */}
-                                {filteredHistory.map((item) => {
-                                    const recordName = item.data?.name || item.data?.fullName || [item.data?.firstname, item.data?.lastname].filter(Boolean).join(' ') || item.target;
-                                    return (
-                                        <View key={item.id} style={styles.tableBodyRow}>
-                                            {/* ACTIONS (View / Delete) */}
-                                            <View style={[styles.tbCell, { width: 140, flexDirection: 'row', alignItems: 'center' }]}>
-                                                <TouchableOpacity 
-                                                    onPress={() => setSelectedHistoryItem(item)}
-                                                    style={styles.actionViewBtn}
-                                                    activeOpacity={0.7}
-                                                >
-                                                    <Ionicons name="eye-outline" size={13} color="#64748b" style={{ marginRight: 4 }} />
-                                                    <Text style={styles.actionViewBtnText}>View</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity 
-                                                    onPress={() => deleteHistoryItem(item.id, recordName)}
-                                                    style={styles.actionDeleteBtn}
-                                                    activeOpacity={0.7}
-                                                >
-                                                    <Ionicons name="trash-outline" size={13} color="#DC2626" />
-                                                </TouchableOpacity>
-                                            </View>
-
-                                            {/* STATUS */}
-                                            <View style={[styles.tbCell, { width: 110, alignItems: 'center', justifyContent: 'center' }]}>
-                                                <View style={styles.statusCompletedBadge}>
-                                                    <Text style={styles.statusCompletedBadgeText}>{item.status || 'Completed'}</Text>
-                                                </View>
-                                            </View>
-
-                                            {/* TRACKING ID / NIN */}
-                                            <Text style={[styles.tbCell, { width: 160, fontWeight: '700', color: '#1e293b' }]}>
-                                                {item.target}
-                                            </Text>
-
-                                            {/* SLIP */}
-                                            <Text style={[styles.tbCell, { width: 100, color: '#475569', fontWeight: '600' }]}>
-                                                {item.slip || 'No Slip'}
-                                            </Text>
-
-                                            {/* AMOUNT */}
-                                            <Text style={[styles.tbCell, { width: 110, fontWeight: '800', color: '#0f172a' }]}>
-                                                ₦{(item.amount || 900).toLocaleString()}
-                                            </Text>
-
-                                            {/* DATE */}
-                                            <Text style={[styles.tbCell, { width: 110, color: '#64748b', fontWeight: '500' }]}>
-                                                {item.date}
-                                            </Text>
-                                        </View>
-                                    );
-                                })}
-                            </View>
-                        </ScrollView>
-                    )}
-                </View>
             </ScrollView>
         </View>
     );
@@ -803,18 +649,6 @@ const styles = StyleSheet.create({
         color: '#64748b',
         fontWeight: '600',
         marginTop: 2,
-    },
-    historyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    historyTitle: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 13,
-        letterSpacing: 0.5,
-        marginLeft: 6,
     },
     processingTimeBadge: {
         flexDirection: 'row',
@@ -1054,6 +888,12 @@ const styles = StyleSheet.create({
         fontSize: 15,
         textAlign: 'center',
     },
+    inputHelperText: {
+        color: '#64748b',
+        fontSize: 11,
+        marginTop: 4,
+        fontWeight: '600',
+    },
     consentContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -1118,48 +958,6 @@ const styles = StyleSheet.create({
         fontSize: 15.5,
         letterSpacing: 0.5,
     },
-    statusGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        width: '100%',
-    },
-    statusCardCell: {
-        borderRadius: 14,
-        paddingHorizontal: 8,
-        paddingVertical: 12,
-        marginBottom: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        width: '48.5%',
-        minHeight: 80,
-    },
-    statusCardSelected: {
-        backgroundColor: '#ffffff',
-        borderColor: '#060d21',
-        shadowColor: '#060d21',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statusCardUnselected: {
-        backgroundColor: '#ffffff',
-        borderColor: '#cbd5e1',
-    },
-    statusPrice: {
-        fontSize: 12,
-        fontWeight: '900',
-        marginBottom: 4,
-    },
-    statusLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        textAlign: 'center',
-        lineHeight: 12,
-        paddingHorizontal: 4,
-    },
     textSelected: {
         color: '#060d21',
     },
@@ -1168,7 +966,7 @@ const styles = StyleSheet.create({
     },
     slipGrid: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         width: '100%',
     },
     slipCardCell: {
@@ -1177,7 +975,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
-        width: '48.5%',
+        width: '50%',
         minHeight: 110,
     },
     slipCardSelected: {
@@ -1494,5 +1292,17 @@ const styles = StyleSheet.create({
         color: '#059669',
         fontSize: 10.5,
         fontWeight: '800',
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    historyTitle: {
+        color: '#1e293b',
+        fontWeight: '700',
+        fontSize: 13,
+        letterSpacing: 0.5,
+        marginLeft: 6,
     },
 });

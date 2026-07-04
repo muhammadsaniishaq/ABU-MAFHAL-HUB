@@ -9,8 +9,8 @@ import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../services/supabase';
-import { api } from '../services/api';
+import { supabase } from '../../../services/supabase';
+import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Helper to safely load external images on Web for canvas rendering
@@ -1116,7 +1116,7 @@ export default function BVNVerificationScreen() {
                                     ₦{prices.bvn_card.toFixed(2)}
                                 </Text>
                                 <View style={styles.slipImageBox}>
-                                    <Image source={require('../assets/images/sample_image.jpg')} style={styles.slipPreviewImage as any} resizeMode="contain" />
+                                    <Image source={require('../../assets/images/sample_image.jpg')} style={styles.slipPreviewImage as any} resizeMode="contain" />
                                 </View>
                                 <Text style={[styles.choiceLabel, styles.textSelected]}>
                                     BVN Card

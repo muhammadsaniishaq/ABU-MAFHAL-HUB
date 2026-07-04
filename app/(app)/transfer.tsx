@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../services/supabase';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { supabase } from '../../../services/supabase';
+import { useAppSettings } from '../../../hooks/useAppSettings';
 
 export default function TransferScreen() {
     const [bank, setBank] = useState('');

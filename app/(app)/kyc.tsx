@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Stack, useRouter } from 'expo-router';
@@ -11,7 +11,7 @@ import * as Speech from 'expo-speech';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { BlurView } from 'expo-blur';
-import { useAppSettings } from '../hooks/useAppSettings';
+import { useAppSettings } from '../../../hooks/useAppSettings';
 
 const NAVY = '#0d1b3e';
 const GOLD = '#f5a623';

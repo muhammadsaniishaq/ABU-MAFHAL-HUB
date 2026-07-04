@@ -5,31 +5,32 @@ import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../services/supabase';
-import { api } from '../../services/api';
+import { supabase } from '../../../../services/supabase';
+import { api } from '../../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StatusResult } from '../../components/StatusResult';
+import { StatusResult } from '../../../../components/StatusResult';
 
 const DEFAULT_STATUS_TYPES = [
-    { id: 'ipe_inprocessing', db_id: 'ipe_inprocessing', name: 'InProcessing Error', price: 700 },
-    { id: 'ipe_still_processed', db_id: 'ipe_still_processed', name: 'Still Being Processed', price: 700 },
-    { id: 'ipe_new_enrollment', db_id: 'ipe_new_enrollment', name: 'New Enrollment For Tracking ID', price: 700 },
-    { id: 'ipe_invalid_tracking', db_id: 'ipe_invalid_tracking', name: 'Invalid Tracking ID', price: 700 }
+    { id: 'val_no_record', db_id: 'val_no_record', name: 'No Record Found', price: 900 },
+    { id: 'val_update_record', db_id: 'val_update_record', name: 'Update Record', price: 900 },
+    { id: 'val_validate_modification', db_id: 'val_validate_modification', name: 'Validate Modification', price: 900 },
+    { id: 'val_vnin_validation', db_id: 'val_vnin_validation', name: 'V-NIN Validation', price: 900 },
+    { id: 'val_photo_error', db_id: 'val_photo_error', name: 'Photograph Error', price: 900 },
+    { id: 'val_bypass_nin', db_id: 'val_bypass_nin', name: 'Bypass NIN', price: 900 }
 ];
 
 const DEFAULT_SLIP_TYPES = [
-    { id: 'ipe_slip_none', db_id: 'ipe_slip_none', name: 'No Slip', price: 0, image: null },
-    { id: 'ipe_slip_regular', db_id: 'ipe_slip_regular', name: 'Regular', price: 0, image: require('../../assets/images/regular.png') },
-    { id: 'ipe_slip_premium', db_id: 'ipe_slip_premium', name: 'Premium', price: 150, image: require('../../assets/images/premium.png') }
+    { id: 'val_slip_none', db_id: 'val_slip_none', name: 'No Slip', price: 0, image: null },
+    { id: 'val_slip_premium', db_id: 'val_slip_premium', name: 'Premium Slip', price: 150, image: require('../../../assets/images/premium.png') }
 ];
 
-export default function IPEClearanceScreen() {
+export default function ValidationScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     
     // Selection States
-    const [selectedStatus, setSelectedStatus] = useState('ipe_still_processed');
-    const [selectedSlip, setSelectedSlip] = useState('ipe_slip_premium');
+    const [selectedStatus, setSelectedStatus] = useState('val_no_record');
+    const [selectedSlip, setSelectedSlip] = useState('val_slip_none');
     
     const [nin, setNin] = useState('');
     const [loading, setLoading] = useState(false);
@@ -71,7 +72,7 @@ export default function IPEClearanceScreen() {
 
     const loadHistory = async () => {
         try {
-            const stored = await AsyncStorage.getItem('recent_ipe_clearances');
+            const stored = await AsyncStorage.getItem('recent_validation_requests');
             if (stored) {
                 setHistoryList(JSON.parse(stored));
             }
@@ -87,22 +88,22 @@ export default function IPEClearanceScreen() {
             const totalPrice = statusPrice + slipPrice;
 
             const newItem = {
-                id: `ipe_${Date.now()}`,
+                id: `val_${Date.now()}`,
                 target: nin.trim(),
                 status: 'Completed',
-                slip: slipTypes.find(s => s.id === selectedSlip)?.name || 'Premium',
+                slip: slipTypes.find(s => s.id === selectedSlip)?.name || 'No Slip',
                 amount: totalPrice,
                 date: (() => {
                     const d = new Date();
                     const pad = (n: number) => n.toString().padStart(2, '0');
-                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                    return `${d.getFullYear()}-\$${pad(d.getMonth() + 1)}-\$${pad(d.getDate())}`;
                 })(),
                 data: verifiedData
             };
             
             const updated = [newItem, ...historyList.filter(item => item.target !== newItem.target)].slice(0, 500);
             setHistoryList(updated);
-            await AsyncStorage.setItem('recent_ipe_clearances', JSON.stringify(updated));
+            await AsyncStorage.setItem('recent_validation_requests', JSON.stringify(updated));
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
@@ -121,7 +122,7 @@ export default function IPEClearanceScreen() {
                         try {
                             const updated = historyList.filter(item => item.id !== itemId);
                             setHistoryList(updated);
-                            await AsyncStorage.setItem('recent_ipe_clearances', JSON.stringify(updated));
+                            await AsyncStorage.setItem('recent_validation_requests', JSON.stringify(updated));
                         } catch (e) {
                             console.warn('Failed to delete history item', e);
                         }
@@ -147,7 +148,7 @@ export default function IPEClearanceScreen() {
 
     const fetchPrices = async () => {
         try {
-            const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'ipe');
+            const { data, error } = await supabase.from('service_pricing').select('*').eq('service_category', 'validation');
             if (error || !data) return;
             
             setStatusTypes(prev => prev.map(item => {
@@ -185,10 +186,10 @@ export default function IPEClearanceScreen() {
     const handleVerify = async () => {
         const cleanNin = nin.trim();
         if (!cleanNin) {
-            return showAlert('Tracking ID Required', 'Please enter a valid Tracking ID.', 'warning');
+            return showAlert('Tracking ID / NIN Required', 'Please enter a valid Tracking ID or NIN.', 'warning');
         }
         if (!isAgreed) {
-            return showAlert('Consent Required', 'You must confirm obtaining consent before running clearance.', 'warning');
+            return showAlert('Consent Required', 'You must confirm obtaining consent before running validation.', 'warning');
         }
 
         const totalPrice = getSelectedTotalPrice();
@@ -198,7 +199,7 @@ export default function IPEClearanceScreen() {
 
         setLoading(true);
         try {
-            const res = await api.identity.runIPEClearance(cleanNin);
+            const res = await api.identity.validateIdentity(cleanNin, 'nin');
             setResult(res);
             await saveHistoryItem(res);
             await fetchWalletBalance(); // Update balance
@@ -208,9 +209,9 @@ export default function IPEClearanceScreen() {
             if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
                 showAlert('Service Unavailable', 'This verification service is temporarily unavailable. Please try again later.', 'warning');
             } else if (lowerMsg.includes('not found') || lowerMsg.includes('no record') || lowerMsg.includes('does not exist') || lowerMsg.includes('not exist') || lowerMsg.includes('invalid or not found')) {
-                showAlert('No Record Found', 'The record or identity you entered does not exist or has no clearance history.', 'error');
+                showAlert('No Record Found', 'The record or identity you entered does not exist or has no validation history.', 'error');
             } else {
-                showAlert('Clearance Failed', errM || 'An error occurred during clearance checks.', 'error');
+                showAlert('Validation Failed', errM || 'An error occurred during validation checks.', 'error');
             }
         } finally {
             setLoading(false);
@@ -218,9 +219,9 @@ export default function IPEClearanceScreen() {
     };
 
     const faqs = [
-        { q: "Menene IPE Clearance?", a: "IPE Clearance wani tsari ne na tantance ingancin lambar NIN ko Tracking ID don tabbatar da cewa babu wata matsala game da bayanan aikin ma'aikaci kafin a ɗauke shi aiki." },
-        { q: "Yaya ake biyan kuɗin wannan sabis?", a: "Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing clearance." },
-        { q: "Zan iya sake duba clearance na baya?", a: "Ee, tarihin dukan clearance ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya." }
+        { q: 'Menene Validation?', a: 'NIN Validation wani tsari ne na daidaitawa da kuma tabbatar da ingancin lambar NIN dinka a kan uwar garken hukumar NIMC lokacin da ta samu wata matsala ko aka canza mata wani bayani.' },
+        { q: 'Yaya ake biyan kuɗin wannan sabis?', a: 'Ana cire kuɗi kaɗan daga balance ɗinka na tantancewa da zarar an sami nasarar runing validation.' },
+        { q: 'Zan iya sake duba validation na baya?', a: 'Ee, tarihin dukan validation ɗin da ka gudanar yana nan a ƙasan shafin don sauƙin reprint ko duba status na baya.' }
     ];
 
     const filteredHistory = historyList.filter(item => {
@@ -233,15 +234,57 @@ export default function IPEClearanceScreen() {
         );
     });
 
+    if (result) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+                <Stack.Screen options={{ 
+                    title: 'Validation Status', 
+                    headerStyle: { backgroundColor: '#060d21' }, 
+                    headerTintColor: '#fff', 
+                    headerShadowVisible: false,
+                    headerRight: () => (
+                        <TouchableOpacity onPress={() => router.push('/nin-services/history?tab=validation')} style={{ marginRight: 8 }}>
+                            <Ionicons name="time-outline" size={22} color="#fff" />
+                        </TouchableOpacity>
+                    )
+                }} />
+                
+                {/* Header Banner */}
+                <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Validation Details</Text>
+                    </View>
+                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>NIN Validation Completed</Text>
+                </LinearGradient>
+
+                <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: -32 }} contentContainerStyle={{ paddingBottom: 80 }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, marginBottom: 16 }}>
+                        <StatusResult result={result} title="Validation Status Report" />
+                    </View>
+
+                    {/* Back Button */}
+                    <TouchableOpacity 
+                        onPress={() => setResult(null)} 
+                        style={{ height: 48, borderRadius: 12, backgroundColor: '#060d21', alignItems: 'center', justifyContent: 'center', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>RUN ANOTHER VALIDATION</Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ 
-                title: 'IPE Clearance', 
+                title: 'Validation', 
                 headerStyle: { backgroundColor: '#060d21' }, 
                 headerTintColor: '#fff', 
                 headerShadowVisible: false,
                 headerRight: () => (
-                    <TouchableOpacity onPress={() => router.push('/nin-services/history?tab=ipe')} style={{ marginRight: 8 }}>
+                    <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ marginRight: 8 }}>
                         <Ionicons name="time-outline" size={22} color="#fff" />
                     </TouchableOpacity>
                 )
@@ -254,7 +297,7 @@ export default function IPEClearanceScreen() {
                     <View style={styles.loaderOverlay}>
                         <View style={styles.loaderCard}>
                             <ActivityIndicator size="large" color="#f5a623" />
-                            <Text style={styles.loaderTitle}>Processing Clearance</Text>
+                            <Text style={styles.loaderTitle}>Processing Validation</Text>
                             <Text style={styles.loaderSub}>Contacting Verification Registry...</Text>
                         </View>
                     </View>
@@ -321,7 +364,7 @@ export default function IPEClearanceScreen() {
                                             <Ionicons name="document-text" size={18} color="#060d21" />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.detailHeaderSubtitle}>TRACKING ID REQUEST</Text>
+                                            <Text style={styles.detailHeaderSubtitle}>VALIDATION REQUEST</Text>
                                             <Text style={styles.detailHeaderTitle} numberOfLines={1}>
                                                 {selectedHistoryItem.data?.name || selectedHistoryItem.data?.fullName || [selectedHistoryItem.data?.firstname, selectedHistoryItem.data?.lastname].filter(Boolean).join(' ') || 'MUHAMMAD SANI ISYAKU'}
                                             </Text>
@@ -343,7 +386,7 @@ export default function IPEClearanceScreen() {
                                         <Text style={styles.detailBadgeText}>Completed</Text>
                                     </View>
                                     <View style={styles.detailBadgeSlip}>
-                                        <Text style={styles.detailBadgeText}>{selectedHistoryItem.slip || 'Premium'}</Text>
+                                        <Text style={styles.detailBadgeText}>{selectedHistoryItem.slip || 'No Slip'}</Text>
                                     </View>
                                 </View>
                             </LinearGradient>
@@ -370,7 +413,7 @@ export default function IPEClearanceScreen() {
 
                                 <View style={styles.detailRow}>
                                     <View style={styles.detailFieldHalf}>
-                                        <Text style={styles.detailFieldLabel}>TRACKING ID</Text>
+                                        <Text style={styles.detailFieldLabel}>TRACKING ID / NIN</Text>
                                         <Text style={styles.detailFieldVal}>{selectedHistoryItem.target}</Text>
                                     </View>
                                     <View style={styles.detailFieldHalf}>
@@ -382,7 +425,7 @@ export default function IPEClearanceScreen() {
                                 <View style={styles.detailRow}>
                                     <View style={styles.detailFieldHalf}>
                                         <Text style={styles.detailFieldLabel}>AMOUNT</Text>
-                                        <Text style={styles.detailFieldVal}>₦{(selectedHistoryItem.amount || 1150).toLocaleString()}</Text>
+                                        <Text style={styles.detailFieldVal}>₦{(selectedHistoryItem.amount || 900).toLocaleString()}</Text>
                                     </View>
                                     <View style={styles.detailFieldHalf}>
                                         <Text style={styles.detailFieldLabel}>REFUND</Text>
@@ -399,7 +442,7 @@ export default function IPEClearanceScreen() {
                                 <TouchableOpacity 
                                     style={styles.detailDownloadBtn}
                                     onPress={() => {
-                                        Alert.alert('Download Started', 'Clearance slip is downloading to your storage.');
+                                        Alert.alert('Download Started', 'Validation slip is downloading to your storage.');
                                     }}
                                     activeOpacity={0.8}
                                 >
@@ -419,8 +462,8 @@ export default function IPEClearanceScreen() {
                         <Ionicons name="shield-checkmark" size={22} color="#ffffff" />
                     </View>
                     <View style={{ marginLeft: 12 }}>
-                        <Text style={styles.headerMainTitle}>IPE Clearance</Text>
-                        <Text style={styles.headerSubTitle}>In-Personalization Error clearance</Text>
+                        <Text style={styles.headerMainTitle}>Validation</Text>
+                        <Text style={styles.headerSubTitle}>NIN validation request</Text>
                     </View>
                 </View>
             </View>
@@ -431,7 +474,7 @@ export default function IPEClearanceScreen() {
                 <View style={styles.processingTimeBadge}>
                     <Ionicons name="time-outline" size={14} color="#d97706" style={{ marginRight: 6 }} />
                     <Text style={styles.processingTimeText}>
-                        Processing time: <Text style={{ fontWeight: '800' }}>10 minutes to 24 hours</Text>
+                        Processing time: <Text style={{ fontWeight: '800' }}>24h to 48h</Text>
                     </Text>
                 </View>
 
@@ -456,13 +499,13 @@ export default function IPEClearanceScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* 1. STATUS TYPE */}
+                {/* 1. DETAILS NEEDED */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>1</Text>
                         </View>
-                        <Text style={styles.cardTitle}>STATUS TYPE</Text>
+                        <Text style={styles.cardTitle}>DETAILS NEEDED</Text>
                     </View>
                     
                     <View style={styles.statusGrid}>
@@ -490,13 +533,13 @@ export default function IPEClearanceScreen() {
                     </View>
                 </View>
 
-                {/* 2. SLIP TYPE (FOR CLEARANCE) */}
+                {/* 2. SLIP TYPE */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>2</Text>
                         </View>
-                        <Text style={styles.cardTitle}>SLIP TYPE (FOR CLEARANCE)</Text>
+                        <Text style={styles.cardTitle}>SLIP TYPE</Text>
                     </View>
 
                     <View style={styles.slipGrid}>
@@ -513,11 +556,11 @@ export default function IPEClearanceScreen() {
                                     activeOpacity={0.8}
                                 >
                                     <Text style={[styles.slipPrice, isSelected ? styles.textSelected : styles.textUnselected]}>
-                                        ₦{item.price.toFixed(2)}
+                                        {item.price > 0 ? `+` : ''}₦{item.price.toFixed(2)}
                                     </Text>
                                     <View style={styles.slipImageBox}>
                                         {item.image === null ? (
-                                            <Ionicons name="document-text-outline" size={32} color={isSelected ? '#060d21' : '#64748b'} />
+                                            <Ionicons name="close" size={28} color={isSelected ? '#060d21' : '#64748b'} />
                                         ) : (
                                             <Image source={item.image} style={styles.slipPreviewImage as any} resizeMode="contain" />
                                         )}
@@ -531,23 +574,23 @@ export default function IPEClearanceScreen() {
                     </View>
                 </View>
 
-                {/* 3. SUPPLY TRACKING ID */}
+                {/* 3. SUPPLY TRACKING / NIN */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>3</Text>
                         </View>
-                        <Text style={styles.cardTitle}>SUPPLY TRACKING ID</Text>
+                        <Text style={styles.cardTitle}>SUPPLY TRACKING / NIN</Text>
                     </View>
                     
                     <View style={{ marginBottom: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                             <Ionicons name="card-outline" size={14} color="#64748b" style={{ marginRight: 6 }} />
-                            <Text style={styles.labelHeader}>Tracking ID</Text>
+                            <Text style={styles.labelHeader}>Tracking ID / NIN</Text>
                         </View>
                         <View style={styles.inputContainer}>
                             <TextInput
-                                placeholder="Enter Tracking ID"
+                                placeholder="Enter Tracking ID / NIN"
                                 placeholderTextColor="#94a3b8"
                                 style={styles.inputStyleCentered}
                                 value={nin} 
@@ -634,7 +677,7 @@ export default function IPEClearanceScreen() {
                         {/* Search Input on the right */}
                         <View style={styles.tableSearchBox}>
                             <TextInput
-                                placeholder="Search Tracking ID..."
+                                placeholder="Search NIN..."
                                 placeholderTextColor="#94a3b8"
                                 style={styles.tableSearchInput}
                                 value={searchQuery}
@@ -650,16 +693,16 @@ export default function IPEClearanceScreen() {
 
                     {filteredHistory.length === 0 ? (
                         <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                            <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600' }}>No past clearance records found.</Text>
+                            <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '600' }}>No past validation records found.</Text>
                         </View>
                     ) : (
                         <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableHorizontalScroll}>
                             <View style={{ flexDirection: 'column' }}>
                                 {/* Table Header Row */}
                                 <View style={styles.tableHeaderRow}>
-                                    <Text style={[styles.thCell, { width: 140 }]}>ACTIONS</Text>
+                                    <Text style={[styles.thCell, { width: 140 }]}>ACTION</Text>
                                     <Text style={[styles.thCell, { width: 110, textAlign: 'center' }]}>STATUS</Text>
-                                    <Text style={[styles.thCell, { width: 160 }]}>TRACKING ID</Text>
+                                    <Text style={[styles.thCell, { width: 160 }]}>NIN</Text>
                                     <Text style={[styles.thCell, { width: 100 }]}>SLIP</Text>
                                     <Text style={[styles.thCell, { width: 110 }]}>AMOUNT</Text>
                                     <Text style={[styles.thCell, { width: 110 }]}>DATE</Text>
@@ -696,19 +739,19 @@ export default function IPEClearanceScreen() {
                                                 </View>
                                             </View>
 
-                                            {/* TRACKING ID */}
+                                            {/* TRACKING ID / NIN */}
                                             <Text style={[styles.tbCell, { width: 160, fontWeight: '700', color: '#1e293b' }]}>
                                                 {item.target}
                                             </Text>
 
                                             {/* SLIP */}
                                             <Text style={[styles.tbCell, { width: 100, color: '#475569', fontWeight: '600' }]}>
-                                                {item.slip || 'Premium'}
+                                                {item.slip || 'No Slip'}
                                             </Text>
 
                                             {/* AMOUNT */}
                                             <Text style={[styles.tbCell, { width: 110, fontWeight: '800', color: '#0f172a' }]}>
-                                                ₦{(item.amount || 1150).toLocaleString()}
+                                                ₦{(item.amount || 900).toLocaleString()}
                                             </Text>
 
                                             {/* DATE */}
@@ -737,7 +780,6 @@ const styles = StyleSheet.create({
     },
     customHeader: {
         paddingHorizontal: 16,
-        paddingTop: 16,
         paddingBottom: 16,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
@@ -761,6 +803,18 @@ const styles = StyleSheet.create({
         color: '#64748b',
         fontWeight: '600',
         marginTop: 2,
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    historyTitle: {
+        color: '#1e293b',
+        fontWeight: '700',
+        fontSize: 13,
+        letterSpacing: 0.5,
+        marginLeft: 6,
     },
     processingTimeBadge: {
         flexDirection: 'row',
@@ -1123,7 +1177,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1.5,
-        width: '31.5%',
+        width: '48.5%',
         minHeight: 110,
     },
     slipCardSelected: {
@@ -1184,42 +1238,6 @@ const styles = StyleSheet.create({
         lineHeight: 16,
         fontWeight: '500',
     },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        paddingHorizontal: 12,
-        height: 48,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 0.5,
-        marginHorizontal: 4,
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 8,
-        color: '#1e293b',
-        fontWeight: '600',
-        fontSize: 13,
-    },
-    historyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    historyTitle: {
-        color: '#1e293b',
-        fontWeight: '700',
-        fontSize: 13,
-        letterSpacing: 0.5,
-        marginLeft: 6,
-    },
     detailOverlay: {
         flex: 1,
         backgroundColor: 'rgba(5, 11, 20, 0.7)',
@@ -1253,7 +1271,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     detailHeaderSubtitle: {
-        color: '#fde68a',
+        color: '#f5a623',
         fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.8,
