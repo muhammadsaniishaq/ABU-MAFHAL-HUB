@@ -1043,7 +1043,7 @@ export default function QRPayScreen() {
                     )}
                 </View>
             ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, marginTop: -16 }}>
+                <ScrollView contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: 100, paddingTop: 40 }}>
                     {currentUser ? (
                         <>
                             <ViewShot ref={flyerRef} options={{ format: 'png', quality: 1 }}>
@@ -1111,6 +1111,14 @@ export default function QRPayScreen() {
                                         </View>
                                     </View>
 
+                                    {/* Hologram decoration */}
+                                    <LinearGradient
+                                        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0)']}
+                                        style={s.hologramLine}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                    />
+
                                     {/* Live QR Code Box with metallic border */}
                                     <View style={s.qrWrapperContainer}>
                                         <LinearGradient 
@@ -1122,7 +1130,7 @@ export default function QRPayScreen() {
                                             <View style={s.qrWrapper}>
                                                 <Image
                                                     source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(myCodePayload)}&color=0d1b3e&margin=1` }}
-                                                    style={{ width: 150, height: 150 }}
+                                                    style={{ width: 140, height: 140 }}
                                                     resizeMode="contain"
                                                 />
                                             </View>
@@ -1156,7 +1164,7 @@ export default function QRPayScreen() {
                     ) : (
                         <ActivityIndicator size="large" color="#0056D2" />
                     )}
-                </View>
+                </ScrollView>
             )}
 
             {/* CONFIRM / AMOUNT INPUT MODAL */}
@@ -1534,9 +1542,9 @@ const s = StyleSheet.create({
   // My Code Card
   myCodeCard: {
     width: '100%',
-    maxWidth: 340,
-    borderRadius: 28,
-    padding: 24,
+    maxWidth: 350,
+    borderRadius: 24,
+    padding: 20,
     alignItems: 'stretch',
     shadowColor: '#0b163a',
     shadowOffset: { width: 0, height: 12 },
@@ -1552,12 +1560,20 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 0,
-    padding: 40,
+    padding: 20,
   },
   myCodeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
+    zIndex: 1,
+  },
+  hologramLine: {
+    width: '120%',
+    height: 4,
+    position: 'absolute',
+    top: 150,
+    left: -10,
     zIndex: 1,
   },
   avatarWrapper: {
