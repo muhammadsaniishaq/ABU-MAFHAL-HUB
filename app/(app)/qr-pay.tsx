@@ -1539,7 +1539,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  // My Code Card
+  // Card Design updates
   myCodeCard: {
     width: '100%',
     maxWidth: 350,
@@ -1554,6 +1554,52 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
+  },
+  securityGrid: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    opacity: 0.5,
+  },
+  cardTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    zIndex: 2,
+  },
+  emvChip: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  brandText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 2,
+    opacity: 0.9,
+  },
+  premiumBadge: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: T.gold,
+    letterSpacing: 1,
+    marginTop: 2,
+    backgroundColor: 'rgba(245, 166, 35, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  qrMetallicBorder: {
+    padding: 3,
+    borderRadius: 20,
+    shadowColor: T.gold,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
   myCodeWatermark: {
     ...StyleSheet.absoluteFillObject,
