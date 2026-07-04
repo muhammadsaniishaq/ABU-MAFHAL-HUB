@@ -98,7 +98,7 @@ export default function QRPayScreen() {
             if (user) {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('id, full_name, email, balance, avatar_url')
+                    .select('id, full_name, email, balance, avatar_url, created_at')
                     .eq('id', user.id)
                     .single();
                 if (profile) {
@@ -1048,17 +1048,29 @@ export default function QRPayScreen() {
                         <>
                             <ViewShot ref={flyerRef} options={{ format: 'png', quality: 1 }}>
                                 <LinearGradient 
-                                    colors={['#102258', '#0b163a']} 
+                                    colors={['#0d1b3e', '#1a2b6d']} 
                                     style={s.myCodeCard}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
                                 >
+                                    {/* Security grid overlay */}
+                                    <View style={s.securityGrid} />
+                                    
                                     {/* Watermark decorations */}
                                     <View style={s.myCodeWatermark}>
-                                        <Image source={require('../../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.05 }} resizeMode="contain" />
+                                        <Image source={require('../../assets/images/logo.png')} style={{ width: '100%', height: '100%', opacity: 0.03 }} resizeMode="contain" />
                                     </View>
                                     <View style={s.decorativeCircle1} />
                                     <View style={s.decorativeCircle2} />
+
+                                    {/* Card Header: Chip and Brand */}
+                                    <View style={s.cardTopBar}>
+                                        <Ionicons name="hardware-chip" size={32} color="#f5a623" style={s.emvChip} />
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={s.brandText}>MAFHAL SUB</Text>
+                                            <Text style={s.premiumBadge}>PREMIUM TIER</Text>
+                                        </View>
+                                    </View>
 
                                     <View style={s.myCodeHeader}>
                                         <View style={s.avatarWrapper}>
@@ -1073,44 +1085,61 @@ export default function QRPayScreen() {
                                                 </Text>
                                             )}
                                         </View>
-                                        <View style={{ marginLeft: 12, flex: 1 }}>
+                                        <View style={{ marginLeft: 16, flex: 1 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={s.myCodeName} numberOfLines={1}>{currentUser.full_name}</Text>
-                                                <Ionicons name="checkmark-circle" size={14} color="#f5a623" style={{ marginLeft: 4 }} />
+                                                <Ionicons name="checkmark-circle" size={16} color="#4ade80" style={{ marginLeft: 6 }} />
                                             </View>
                                             <Text style={s.myCodeEmail} numberOfLines={1}>{currentUser.email}</Text>
                                         </View>
                                     </View>
 
                                     <View style={s.cardInfoRow}>
-                                        <View>
+                                        <View style={s.infoColumn}>
                                             <Text style={s.cardInfoLabel}>WALLET ID</Text>
                                             <Text style={s.cardInfoValue}>MAF-{currentUser.id.substring(0, 8).toUpperCase()}</Text>
                                         </View>
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={s.cardInfoLabel}>ISSUED</Text>
-                                            <Text style={s.cardInfoValue}>{new Date().toLocaleDateString('en-GB')}</Text>
+                                        <View style={[s.infoColumn, { alignItems: 'center' }]}>
+                                            <Text style={s.cardInfoLabel}>STATUS</Text>
+                                            <Text style={[s.cardInfoValue, { color: '#4ade80' }]}>ACTIVE</Text>
+                                        </View>
+                                        <View style={[s.infoColumn, { alignItems: 'flex-end' }]}>
+                                            <Text style={s.cardInfoLabel}>MEMBER SINCE</Text>
+                                            <Text style={s.cardInfoValue}>
+                                                {currentUser.created_at ? new Date(currentUser.created_at).getFullYear() : '2024'}
+                                            </Text>
                                         </View>
                                     </View>
 
-                                    {/* Live QR Code Box */}
+                                    {/* Live QR Code Box with metallic border */}
                                     <View style={s.qrWrapperContainer}>
-                                        <View style={s.qrWrapper}>
-                                            <Image
-                                                source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(myCodePayload)}&color=0d1b3e&margin=1` }}
-                                                style={{ width: 150, height: 150 }}
-                                                resizeMode="contain"
-                                            />
-                                        </View>
+                                        <LinearGradient 
+                                            colors={['#f5a623', '#d4890e', '#f9c566']}
+                                            style={s.qrMetallicBorder}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        >
+                                            <View style={s.qrWrapper}>
+                                                <Image
+                                                    source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(myCodePayload)}&color=0d1b3e&margin=1` }}
+                                                    style={{ width: 150, height: 150 }}
+                                                    resizeMode="contain"
+                                                />
+                                            </View>
+                                        </LinearGradient>
                                     </View>
 
-                                    <Text style={s.qrHintText}>
-                                        Scan this code to send money to this wallet instantly.
-                                    </Text>
-                                    
-                                    <View style={s.verifiedFooter}>
-                                        <Ionicons name="shield-checkmark" size={12} color="#4ade80" />
-                                        <Text style={s.verifiedFooterText}>Verified by Mafhal Sub</Text>
+                                    {/* Footer */}
+                                    <View style={s.cardFooter}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.qrHintText}>
+                                                Scan to transfer funds instantly.
+                                            </Text>
+                                        </View>
+                                        <View style={s.verifiedFooter}>
+                                            <Ionicons name="shield-checkmark" size={12} color="#4ade80" />
+                                            <Text style={s.verifiedFooterText}>Verified Identity</Text>
+                                        </View>
                                     </View>
                                 </LinearGradient>
                             </ViewShot>
@@ -1506,8 +1535,6 @@ const s = StyleSheet.create({
   myCodeCard: {
     width: '100%',
     maxWidth: 340,
-    borderRadius: 30,
-    padding: 24,
     borderRadius: 28,
     padding: 24,
     alignItems: 'stretch',
@@ -1570,69 +1597,77 @@ const s = StyleSheet.create({
   },
   qrHintText: {
     fontSize: 9,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 20,
-    lineHeight: 13,
   },
   decorativeCircle1: {
     position: 'absolute',
     top: -50,
     right: -50,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   decorativeCircle2: {
     position: 'absolute',
-    bottom: -30,
+    bottom: -60,
     left: -40,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: 'rgba(245, 166, 35, 0.05)',
   },
   cardInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    paddingHorizontal: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    paddingTop: 12,
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  infoColumn: {
+    flex: 1,
   },
   cardInfoLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
-    color: '#a0aec0',
+    color: '#94a3b8',
     letterSpacing: 0.5,
   },
   cardInfoValue: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     color: T.white,
-    marginTop: 2,
+    marginTop: 3,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   qrWrapperContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    paddingTop: 16,
   },
   verifiedFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
   },
   verifiedFooterText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 9,
+    fontWeight: '800',
     color: '#4ade80',
+    textTransform: 'uppercase',
   },
   shareBtn: {
     backgroundColor: '#ffffff',
