@@ -79,43 +79,53 @@ export const ClubKonnectProvider: AirtimeProvider & DataProvider & EducationProv
     },
 
     getExamPrices: async () => {
+        let combinedPackages: any[] = [];
+        const endpoints = [
+            'APIWAECPackagesV2.asp',
+            'APINECOPackagesV2.asp',
+            'APIJAMBPackagesV2.asp',
+            'APINABTEBPackagesV2.asp'
+        ];
+
         try {
-            // Fetch available packages from ClubKonnect
-            console.log(`[CLUBKONNECT-LIVE] Fetching Exam Packages...`);
-            const url = `https://www.nellobytesystems.com/APIWAECPackagesV2.asp?UserID=CK101269551`; // Using sample ID for now or Env
-            const response = await fetch(url);
-            // API returns JSON list of packages
-             const data = await response.json();
-             
-             // If manual fallback/mapping is needed or if API fails
-             // Map response to our format
-             // The API usage says: "APIWAECPackagesV2.asp?UserID=..."
-             
-             // If the API returns a list, let's map it. 
-             // Note: Without exact JSON structure from live test, we assume a reasonable shape or fallback
-             // For safety in this "Blind" integration, let's preserve our manual list but try to map functionality if known.
-             
-             // Actually, user provided: "Available Packages... retrieve supported ExamType values in JSON"
-             // Let's assume basic structure.
-             
-             // For now, to guarantee stability while adding "Real" feel:
-             return [
-                { id: 'waec', name: 'WAEC Registration', price: 3800, currency: 'NGN', code: 'waec-registration' },
-                { id: 'waec-result', name: 'WAEC Result Checker', price: 3800, currency: 'NGN', code: 'waecdirect' }, // Example code
-                { id: 'neco', name: 'NECO', price: 1200, currency: 'NGN', code: 'neco' },
-                { id: 'jamb', name: 'JAMB', price: 4700, currency: 'NGN', code: 'jamb' },
-                { id: 'nabteb', name: 'NABTEB', price: 1000, currency: 'NGN', code: 'nabteb' },
-            ];
-             
+            const fetchPromises = endpoints.map(async (endpoint) => {
+                try {
+                    const response = await fetch(`https://www.nellobytesystems.com/${endpoint}?UserID=CK101269551`);
+                    const text = await response.text();
+                    if (!text) return []; // Some endpoints return empty string
+                    const data = JSON.parse(text);
+                    
+                    if (data && data.EXAM_TYPE) {
+                        return data.EXAM_TYPE.map((pkgArray: any) => {
+                            const pkg = pkgArray[0];
+                            return {
+                                id: pkg.PRODUCT_CODE,
+                                name: pkg.PRODUCT_DESCRIPTION,
+                                price: parseFloat(pkg.PRODUCT_AMOUNT),
+                                currency: 'NGN',
+                                code: pkg.PRODUCT_CODE
+                            };
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`Failed to parse ${endpoint}:`, err);
+                }
+                return [];
+            });
+
+            const results = await Promise.all(fetchPromises);
+            // Flatten the results
+            combinedPackages = results.flat();
+            
+            if (combinedPackages.length > 0) {
+                 return combinedPackages;
+            }
+            
         } catch (e) {
-            console.warn("ClubKonnect API fetch failed (likely CORS or Offline). Using static fallback.", e);
-             return [
-                { id: 'waec', name: 'WAEC', price: 3800, currency: 'NGN', code: 'waec' },
-                { id: 'neco', name: 'NECO', price: 1200, currency: 'NGN', code: 'neco' },
-                { id: 'jamb', name: 'JAMB', price: 4700, currency: 'NGN', code: 'jamb' },
-                { id: 'nabteb', name: 'NABTEB', price: 1000, currency: 'NGN', code: 'nabteb' },
-            ];
+            console.warn("ClubKonnect API fetch failed.", e);
         }
+        
+        return combinedPackages;
     },
 
     purchaseEpin: async (params) => {

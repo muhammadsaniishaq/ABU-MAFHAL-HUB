@@ -32,7 +32,6 @@ import '../global.css';
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
 
-import GlobalAnnouncementModal from '../components/GlobalAnnouncementModal';
 import { useAppSettings } from '../hooks/useAppSettings';
 import MaintenanceScreen from '../components/MaintenanceScreen';
 import UpdateScreen from '../components/UpdateScreen';
@@ -186,7 +185,6 @@ export default function RootLayout() {
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(app)" />
                 </Stack>
-                <GlobalAnnouncementModal />
                 <StatusBar style="auto" />
             </ThemeProvider>
         </SafeAreaProvider>

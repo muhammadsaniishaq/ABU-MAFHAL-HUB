@@ -7,11 +7,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
-import { cssInterop } from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-cssInterop(LinearGradient, { className: 'style' });
-
 const CACHE_KEY = '@profile_data_v2';
 
 export default function ProfileScreen() {

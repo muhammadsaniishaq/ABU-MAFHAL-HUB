@@ -51,7 +51,13 @@ export default function SocialOrdersScreen() {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setOrders(data || []);
+            const fetchedOrders = data || [];
+            setOrders(fetchedOrders);
+
+            // Automatically fetch live statuses for all orders
+            fetchedOrders.forEach(order => {
+                checkStatus(order.id, order.reference);
+            });
         } catch (error: any) {
             console.error(error);
             Alert.alert("Error", "Failed to load orders");
@@ -67,12 +73,21 @@ export default function SocialOrdersScreen() {
             if (parts.length < 2) return;
             const orderId = parts[1];
 
+            if (orderId === 'undefined' || !orderId) {
+                throw new Error("This order encountered a processing issue and has no valid ID.");
+            }
+
             const { data, error } = await supabase.functions.invoke('smm-api', {
                 body: { action: 'status', orderId }
             });
 
             if (error) throw error;
-            if (data?.error) throw new Error(data.error);
+            if (data?.error) {
+                if (data.error.toLowerCase().includes('invalid') || data.error.toLowerCase().includes('incorrect')) {
+                    throw new Error("Order not found on the server. It may have been cancelled or the API key changed.");
+                }
+                throw new Error(data.error);
+            }
 
             setLiveStatusMap(prev => ({
                 ...prev,

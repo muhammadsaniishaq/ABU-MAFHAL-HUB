@@ -82,6 +82,24 @@ export class ClubKonnectClient {
     });
   }
 
+  // Smile Databundle
+  verifySmileAccount(mobileNetwork: string, mobileNumber: string) {
+    return this.request('/APIVerifySmileV1.asp', {
+      MobileNetwork: mobileNetwork,
+      MobileNumber: mobileNumber
+    });
+  }
+
+  buySmile(mobileNetwork: string, dataPlan: string, mobileNumber: string, requestId: string) {
+    return this.request('/APISmileV1.asp', {
+      MobileNetwork: mobileNetwork,
+      DataPlan: dataPlan,
+      MobileNumber: mobileNumber,
+      RequestID: requestId,
+      CallBackURL: ''
+    });
+  }
+
   // 6. Recharge Card Printing
   printRechargeCard(mobileNetwork: string, value: string, quantity: number, requestId: string) {
     return this.request('/APIRechargeCardV1.asp', {
@@ -93,14 +111,28 @@ export class ClubKonnectClient {
     });
   }
 
-  // 7. WAEC/JAMB Pins
-  buyEPin(type: 'WAEC'|'JAMB', requestId: string) {
-      // NOTE: Verify exact endpoint for Exams from docs if possible, falling back to guessing
-      const endpoint = type === 'WAEC' ? '/APIWAECV1.asp' : '/APIJAMBV1.asp'; 
-      return this.request(endpoint, {
+  // 7. WAEC/JAMB/NECO/NABTEB Pins
+  buyEPin(examType: string, phoneNo: string, requestId: string, profileId?: string) {
+      const getEndpoint = (type: string) => {
+          if (type.includes('jamb') || type.includes('utme') || type === 'de') return '/APIJAMBV1.asp';
+          if (type.includes('neco')) return '/APINECOV1.asp';
+          if (type.includes('nabteb')) return '/APINABTEBV1.asp';
+          return '/APIWAECV1.asp'; // Default / WAEC
+      };
+      
+      const endpoint = getEndpoint(examType);
+      const params: Record<string, string> = {
+          ExamType: examType,
+          PhoneNo: phoneNo,
           RequestID: requestId,
           CallBackURL: ''
-      });
+      };
+      
+      if (profileId && (examType.includes('jamb') || examType.includes('utme'))) {
+          params.ProfileID = profileId;
+      }
+
+      return this.request(endpoint, params);
   }
 
   // Helper: Query Status

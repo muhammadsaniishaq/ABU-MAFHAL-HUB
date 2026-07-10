@@ -97,7 +97,7 @@ export default function AppLayout() {
                 <Tabs.Screen name="bills" options={{ href: null }} />
                 <Tabs.Screen name="education" options={{ href: null }} />
                 <Tabs.Screen name="bvn-services" options={{ href: null }} />
-                <Tabs.Screen name="crypto" options={{ href: null }} />
+                <Tabs.Screen name="crypto" options={{ href: null, tabBarStyle: { display: 'none' } }} />
                 <Tabs.Screen name="kyc" options={{ href: null }} />
                 <Tabs.Screen name="virtual-cards" options={{ href: null }} />
                 <Tabs.Screen name="transfer" options={{ href: null }} />

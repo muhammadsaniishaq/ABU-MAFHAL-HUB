@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, Image, Dimensions, Platform, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { Video, ResizeMode } from 'expo-av';
+import { useFocusEffect } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,9 +20,7 @@ export default function GlobalAnnouncementModal() {
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
 
     useEffect(() => {
-        checkAnnouncement();
-
-        // Check again when app comes to foreground safely
+        // Check when app comes to foreground safely
         let appStateSub: any;
         try {
             if (AppState && AppState.addEventListener) {
@@ -36,7 +34,7 @@ export default function GlobalAnnouncementModal() {
             console.log('AppState not available', err);
         }
 
-        // Check when auth state changes (e.g. user logs in)
+        // Check when auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
             checkAnnouncement();
         });
@@ -47,9 +45,15 @@ export default function GlobalAnnouncementModal() {
         };
     }, []);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            checkAnnouncement();
+        }, [])
+    );
+
     const checkAnnouncement = async () => {
         try {
-            const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'global_announcement').single();
+            const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'global_announcement').maybeSingle();
             if (error) {
                 console.log('Error fetching global announcement:', error.message || error);
                 return;
@@ -84,15 +88,9 @@ export default function GlobalAnnouncementModal() {
             
             if (!parsed.isActive) return;
 
-            // Use length of mediaUrl instead of full base64 string to avoid AsyncStorage limits
-            const mediaHash = parsed.mediaUrl ? parsed.mediaUrl.length : 'none';
-            const announcementId = `announcement_${parsed.text}_${mediaHash}`;
-            
-            const lastSeenId = await AsyncStorage.getItem('last_seen_announcement');
-            if (lastSeenId !== announcementId) {
-                setConfig(parsed);
-                setVisible(true);
-            }
+            // Removed AsyncStorage last_seen check as per request
+            setConfig(parsed);
+            setVisible(true);
         } catch (error) {
             console.log('Error fetching global announcement:', error);
         }
@@ -100,11 +98,6 @@ export default function GlobalAnnouncementModal() {
 
     const handleClose = async () => {
         setVisible(false);
-        if (config) {
-            const mediaHash = config.mediaUrl ? config.mediaUrl.length : 'none';
-            const announcementId = `announcement_${config.text}_${mediaHash}`;
-            await AsyncStorage.setItem('last_seen_announcement', announcementId);
-        }
     };
 
     if (!config) return null;

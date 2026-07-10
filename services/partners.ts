@@ -1,4 +1,5 @@
 import { AijalonAPI } from './aijalon';
+import { supabase } from './supabase';
 
 export interface TransactionResult {
     success: boolean;
@@ -379,8 +380,11 @@ export const AijalonIdentityVerifier: IdentityVerifier & {
 export const CoingeckoCryptoExchange: CryptoExchange = {
     getRates: async (ids) => {
         try {
-            // Real API Call
-            const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h`);
+            const { data: secret } = await supabase.from('system_secrets').select('value').eq('key', 'CRYPTO_EXCHANGE_KEY').maybeSingle();
+            const apiKey = secret?.value || 'CG-aCYt79QE4RQps5QUdTWxKGRy';
+
+            // Real API Call using provided Demo API Key
+            const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h&x_cg_demo_api_key=${apiKey}`);
             const data = await response.json();
 
             // Validate Response

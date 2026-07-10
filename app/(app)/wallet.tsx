@@ -76,10 +76,22 @@ export default function WalletScreen() {
 
             setUserEmail(user.email || '');
 
-            // Use the bundled public key from environment variables
-            const envKey = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY;
-            if (envKey) {
-                setPaystackKey(envKey);
+            // Priority 1: Fetch Paystack Public Key from Database (API Vault / system_secrets)
+            let finalKey = '';
+            const { data: paystackDbKey } = await supabase.from('system_secrets').select('value').eq('key', 'PAYSTACK_PUBLIC_KEY').maybeSingle();
+            
+            if (paystackDbKey && paystackDbKey.value && paystackDbKey.value.length > 10) {
+                finalKey = paystackDbKey.value.trim();
+            } else {
+                // Priority 2: Fallback to environment variable if DB is empty
+                const envKey = process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY;
+                if (envKey && envKey.length > 10 && !envKey.includes('...')) {
+                    finalKey = envKey.trim();
+                }
+            }
+
+            if (finalKey) {
+                setPaystackKey(finalKey);
             }
 
             // 1. Profile Balance
@@ -594,7 +606,11 @@ export default function WalletScreen() {
                                             return;
                                         }
                                         if (!paystackKey) {
-                                            Alert.alert("Error", "Payment system is currently unavailable. Please use Bank Transfer.");
+                                            Alert.alert("Configuration Error", "Paystack is not configured yet.");
+                                            return;
+                                        }
+                                        if (!paystackKey.startsWith('pk_live_') && !paystackKey.startsWith('pk_test_')) {
+                                            Alert.alert("Invalid Key Format", "The Paystack Public Key in your API Vault is invalid. It must start with 'pk_live_' or 'pk_test_'. Please check the API Vault.");
                                             return;
                                         }
                                         setPaystackVisible(true);

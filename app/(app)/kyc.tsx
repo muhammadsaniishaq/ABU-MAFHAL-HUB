@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { BlurView } from 'expo-blur';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { WebView } from 'react-native-webview';
 
 const NAVY = '#0d1b3e';
 const GOLD = '#f5a623';
@@ -32,12 +33,10 @@ export default function KYC() {
 
     const [bvn, setBvn] = useState('');
     const [nin, setNin] = useState('');
-    const [selfie, setSelfie] = useState<string | null>(null);
 
-    // Liveness Detection State
-    const [livenessStep, setLivenessStep] = useState(0);
-    const [livenessMessage, setLivenessMessage] = useState('Position your face inside the frame');
-    const [isAutoCapturing, setIsAutoCapturing] = useState(false);
+    // Sumsub Integration State
+    const [showSumsub, setShowSumsub] = useState(false);
+    const [sumsubToken, setSumsubToken] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -75,15 +74,7 @@ export default function KYC() {
         }
     };
 
-    const speakMsg = (text: string) => {
-        setLivenessMessage(text);
-        try {
-            Speech.stop();
-            Speech.speak(text, { language: 'en-US', pitch: 1.1, rate: 0.9 });
-        } catch (e) {
-            console.log("Speech error: ", e);
-        }
-    };
+
 
     const handleSubmit = async (docType: string, payload: any) => {
         setVerifying(true);
@@ -191,7 +182,6 @@ export default function KYC() {
                 }
 
                 if (docType === 'liveness') {
-                     speakMsg("Verification successful!");
                      Alert.alert("Success", "Face Verification Saved!");
                 }
 
@@ -221,63 +211,42 @@ export default function KYC() {
         handleSubmit('nin', { idNumber: nin });
     };
 
-    const submitLiveness = () => {
-        if (!selfie) return Alert.alert("Required", "No face scan found. Please scan again.");
-        handleSubmit('liveness', { fileUri: selfie });
-    };
-
-    const handleOpenCamera = async () => {
-        let currentPermission = permission;
-        if (!currentPermission || !currentPermission.granted) {
-            const response = await requestPermission();
-            if (!response.granted) {
-                Alert.alert(
-                    "Permission Denied", 
-                    "Camera access is required for Face Verification. Please enable it in your device settings."
-                );
-                return;
-            }
-        }
-        setShowCamera(true);
-        startLivenessSequence();
-    };
-
-    const startLivenessSequence = () => {
-        setLivenessStep(0);
-        setIsAutoCapturing(false);
-        speakMsg('Position your face inside the frame and tap ready');
-    };
-
-    const nextLivenessStep = () => {
-        if (livenessStep === 0) {
-            setLivenessStep(1);
-            speakMsg('Please blink your eyes, then tap next');
-        } else if (livenessStep === 1) {
-            setLivenessStep(2);
-            speakMsg('Now, turn your head slightly, then tap next');
-        } else if (livenessStep === 2) {
-            setLivenessStep(3);
-            speakMsg('Hold still, capturing');
-            setIsAutoCapturing(true);
-            setTimeout(() => {
-                takeAutoSelfie();
-            }, 2000);
-        }
-    };
-
-    const takeAutoSelfie = async () => {
+    const startSumsubVerification = async () => {
         try {
-            if (cameraRef.current) {
-                const photo = await cameraRef.current.takePictureAsync({ quality: 0.5, skipProcessing: true });
-                if (photo && photo.uri) {
-                    setSelfie(photo.uri);
-                    setShowCamera(false);
-                    speakMsg("Capture complete. Please tap save to upload.");
-                }
+            setVerifying(true);
+            const { data, error } = await supabase.functions.invoke('sumsub-token');
+            if (error || !data?.token) {
+                throw new Error(error?.message || 'Failed to initialize Sumsub verification');
             }
+            setSumsubToken(data.token);
+            setShowSumsub(true);
         } catch (e: any) {
-             Alert.alert("Camera Error", e.message || "Unknown error occurred while capturing image.");
-             setShowCamera(false);
+            Alert.alert("Verification Error", e.message);
+        } finally {
+            setVerifying(false);
+        }
+    };
+
+    const handleSumsubMessage = (event: any) => {
+        try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'onStepCompleted') {
+                console.log('Step completed', data.payload);
+            } else if (data.type === 'onApplicantSubmitted') {
+                // Verification complete!
+                setShowSumsub(false);
+                handleSubmit('liveness', { status: 'submitted_to_sumsub' });
+                Alert.alert("Success", "Your identity verification has been submitted successfully!");
+                // Optionally update tier locally
+                setTier(3);
+                loadData();
+            } else if (data.type === 'onError') {
+                console.error("Sumsub Error:", data.error);
+                Alert.alert("Verification Error", "There was an issue processing your verification. Please try again.");
+                setShowSumsub(false);
+            }
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -423,36 +392,20 @@ export default function KYC() {
                                     <Text style={s.cardTitle}>Auto Face Verification</Text>
                                     <Text style={s.cardDesc}>We use advanced AI to verify your face automatically. Ensure you are in a well-lit room.</Text>
                                     
-                                    <View style={s.selfieBox}>
-                                        {selfie ? (
-                                            <Image source={{ uri: selfie }} style={s.selfieImage} />
-                                        ) : (
-                                            <View style={s.selfieEmpty}>
-                                                <Ionicons name="camera-outline" size={44} color="rgba(255,255,255,0.3)" />
-                                                <Text style={s.selfieEmptyText}>Ready for scan</Text>
-                                            </View>
-                                        )}
-                                    </View>
+
 
                                     {/* Action Buttons Container */}
-                                    <View style={{flexDirection: 'row', gap: 10}}>
-                                        <TouchableOpacity onPress={handleOpenCamera} style={[s.actionBtn, {flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)'}]} activeOpacity={0.8}>
-                                            <Ionicons name="scan-outline" size={20} color="#ffffff" style={{marginRight: 6}} />
-                                            <Text style={[s.actionBtnText, {color: '#ffffff'}]}>{selfie ? 'Retake' : 'Start Scan'}</Text>
+                                    <View style={{flexDirection: 'row', gap: 10, marginTop: 16}}>
+                                        <TouchableOpacity onPress={startSumsubVerification} disabled={verifying} style={[s.actionBtn, {flex: 1}]} activeOpacity={0.8}>
+                                            {verifying ? (
+                                                <ActivityIndicator color={NAVY} size="small" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="scan-outline" size={20} color="#ffffff" style={{marginRight: 6}} />
+                                                    <Text style={[s.actionBtnText, {color: '#ffffff'}]}>Start Sumsub Scan</Text>
+                                                </>
+                                            )}
                                         </TouchableOpacity>
-
-                                        {selfie && (
-                                            <TouchableOpacity onPress={submitLiveness} disabled={verifying} style={[s.actionBtn, {flex: 1.5}]} activeOpacity={0.8}>
-                                                {verifying ? (
-                                                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                                                        <ActivityIndicator color={NAVY} size="small" />
-                                                        <Text style={s.actionBtnText}>Saving...</Text>
-                                                    </View>
-                                                ) : (
-                                                    <Text style={s.actionBtnText}>Save & Verify</Text>
-                                                )}
-                                            </TouchableOpacity>
-                                        )}
                                     </View>
                                 </View>
                             )}
@@ -476,54 +429,7 @@ export default function KYC() {
                     </ScrollView>
                 </KeyboardAvoidingView>
 
-                {/* Modernized Camera Modal */}
-                <Modal visible={showCamera} animationType="slide" transparent={true} onRequestClose={() => setShowCamera(false)}>
-                    <View style={s.cameraModalContainer}>
-                        <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="front" />
-                        
-                        {/* Dark semi-transparent overlay to dim the background, without blurring the face */}
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
 
-                        <SafeAreaView style={s.cameraOverlayWrapper} edges={['top', 'bottom']}>
-                            <View style={s.cameraTopBar}>
-                                <TouchableOpacity onPress={() => { Speech.stop(); setShowCamera(false); }} style={s.cameraBackBtn}>
-                                    <Ionicons name="close" size={24} color="#ffffff" />
-                                </TouchableOpacity>
-                                <View style={s.cameraHelpBadge}>
-                                    <Text style={s.cameraHelpText}>Liveness Check</Text>
-                                </View>
-                                <View style={{width: 44}}/>
-                            </View>
-                            
-                            <View style={s.faceFrameContainer}>
-                                {/* Using a clear center with solid border to create a "hole" effect */}
-                                <View style={[s.faceFrame, isAutoCapturing ? {borderColor: '#10b981', transform: [{scale: 1.05}]} : {borderColor: GOLD}]} />
-                            </View>
-
-                            <View style={s.cameraBottomBar}>
-                                <View style={s.livenessCard}>
-                                    {isAutoCapturing ? (
-                                        <ActivityIndicator color={GOLD} size="large" style={{marginBottom: 12}} />
-                                    ) : (
-                                        <View style={s.livenessIconCircle}>
-                                            <Ionicons name={livenessStep === 1 ? "eye" : livenessStep === 2 ? "sync" : "person"} size={36} color={GOLD} />
-                                        </View>
-                                    )}
-                                    <Text style={s.livenessTitle}>
-                                        {livenessStep === 1 ? "Blink Your Eyes" : livenessStep === 2 ? "Turn Head Slightly" : isAutoCapturing ? "Hold Still" : "Position Face"}
-                                    </Text>
-                                    <Text style={s.livenessMsgText}>{livenessMessage}</Text>
-                                    
-                                    {!isAutoCapturing && (
-                                        <TouchableOpacity style={s.livenessBtn} onPress={nextLivenessStep} activeOpacity={0.8}>
-                                            <Text style={s.livenessBtnText}>{livenessStep === 0 ? "I'm Ready" : "Next"}</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            </View>
-                        </SafeAreaView>
-                    </View>
-                </Modal>
             </SafeAreaView>
         </View>
     );

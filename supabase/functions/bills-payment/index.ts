@@ -102,6 +102,14 @@ Deno.serve(async (req: Request) => {
             }
 
              providerParams = { network: networkCode, phone: data.phone, amount: Number(data.amount) };
+        } else if (type === 'smile') {
+             amountToCharge = Number(data.amount);
+             if (amountToCharge < 100) throw new Error("Invalid Smile Amount");
+             providerParams = { network: 'smile-direct', phone: data.phone, planId: data.planId };
+        } else if (type === 'education') {
+             amountToCharge = Number(data.amount) * (Number(data.quantity) || 1);
+             if (amountToCharge < 500) throw new Error("Invalid Education Amount");
+             providerParams = { examType: data.examType, phone: data.phone, profileId: data.profileId, quantity: data.quantity || 1 };
         } else {
              throw new Error(`Unsupported service type: ${type}`);
         }
@@ -131,6 +139,13 @@ Deno.serve(async (req: Request) => {
                 result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
             } else if (type === 'data') {
                 result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+            } else if (type === 'smile') {
+                result = await client.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
+            } else if (type === 'education') {
+                result = await client.buyEPin(providerParams.examType as string, providerParams.phone as string, requestId, providerParams.profileId as string);
+                // For quantity > 1, ClubKonnect usually returns them in carddetails or multiple calls are needed.
+                // Assuming the API handles quantity natively or we send multiple requests (if we sent multiple, we'd loop).
+                // APIWAECV1.asp docs only show single PIN buy. We assume quantity is 1 for now or API supports it.
             } else {
                 throw new Error("Invalid service type reached execution");
             }

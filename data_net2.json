@@ -1,0 +1,19 @@
+
+
+{
+	"MOBILE_NETWORK":
+	[
+		{
+			"NETWORK_NAME":"MTN", "NETWORK_ID":"01", "DISCOUNT_AMOUNT":"0.970", "DISCOUNT":"3%"
+		},
+		{
+			"NETWORK_NAME":"Glo", "NETWORK_ID":"02", "DISCOUNT_AMOUNT":"0.955", "DISCOUNT":"4.5%"
+		},
+		{
+			"NETWORK_NAME":"t2mobile", "NETWORK_ID":"03", "DISCOUNT_AMOUNT":"0.930", "DISCOUNT":"7%"
+		},
+		{
+			"NETWORK_NAME":"Airtel", "NETWORK_ID":"04", "DISCOUNT_AMOUNT":"0.970", "DISCOUNT":"3%"
+		}					
+	]
+}

@@ -8,6 +8,7 @@ import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import GlobalAnnouncementModal from '../../components/GlobalAnnouncementModal';
 
 const { width: W } = Dimensions.get('window');
 
@@ -229,7 +230,8 @@ export default function Dashboard() {
       '/investments': 'feature_invest',
       '/insurance': 'feature_insurance',
       '/bvn-services': 'feature_bvn',
-      '/nin-services': 'feature_nin'
+      '/nin-services': 'feature_nin',
+      '/cac-services': 'feature_cac'
     };
 
     const featureKey = featureMap[action.route];
@@ -293,8 +295,9 @@ export default function Dashboard() {
     { icon: 'person-add-outline', label: 'NIN Services', color: '#10b981', route: '/nin-services' },
     { icon: 'tv-outline', label: 'Cable TV', color: '#8b5cf6', route: '/bills' },
     { icon: 'flash-outline', label: 'Electricity', color: '#f5a623', route: '/bills' },
-    { icon: 'globe-outline', label: 'Internet', color: '#ec4899', route: '/bills' },
+    { icon: 'globe-outline', label: 'Smile Data', color: '#ec4899', route: '/smile' },
     { icon: 'school-outline', label: 'Education', color: '#06b6d4', route: '/education' },
+    { icon: 'briefcase-outline', label: 'CAC Reg', color: '#8b5cf6', route: '/cac-services' },
     { icon: 'rocket-outline', label: 'Social Boost', color: '#ec4899', route: '/social-boost' },
     // Remaining actions shown when expanded
     { icon: 'card-outline', label: 'Cards', color: '#8B5CF6', route: '/virtual-cards' },
@@ -679,6 +682,7 @@ export default function Dashboard() {
         </TouchableOpacity>
 
       </ScrollView>
+      <GlobalAnnouncementModal />
     </View>
   );
 }

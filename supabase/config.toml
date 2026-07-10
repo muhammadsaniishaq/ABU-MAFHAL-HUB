@@ -9,3 +9,47 @@ entrypoint = "./functions/smm-api/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/smm-api/*.html" ]
+
+[functions.generate-crypto-address]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-crypto-address/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/generate-crypto-address/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/generate-crypto-address/*.html" ]
+
+[functions.crypto-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/crypto-webhook/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/crypto-webhook/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/crypto-webhook/*.html" ]
+
+[functions.crypto-swap]
+enabled = true
+verify_jwt = true
+import_map = "./functions/crypto-swap/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/crypto-swap/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/crypto-swap/*.html" ]
+
+[functions.sumsub-token]
+enabled = true
+verify_jwt = true
+import_map = "./functions/sumsub-token/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/sumsub-token/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/sumsub-token/*.html" ]

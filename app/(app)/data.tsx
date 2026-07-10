@@ -78,11 +78,44 @@ const T = {
 
 export default function DataScreen() {
     const [network, setNetwork] = useState('');
+    const [networksData, setNetworksData] = useState(NETWORKS_DATA);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
     const [plans, setPlans] = useState<DataPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
+    
+    // Fetch dynamic networks
+    useEffect(() => {
+        const fetchNetworks = async () => {
+            try {
+                const response = await fetch('https://www.nellobytesystems.com/APIDatabundleNetworkV2.asp?UserID=CK101269551');
+                const data = await response.json();
+                if (data && data.MOBILE_NETWORK) {
+                    const dynamic = data.MOBILE_NETWORK.map((net: any) => {
+                        const nameLower = net.NETWORK_NAME.toLowerCase();
+                        let localId = 'mtn';
+                        if (nameLower.includes('glo')) localId = 'glo';
+                        if (nameLower.includes('airtel')) localId = 'airtel';
+                        if (nameLower.includes('mobile') || nameLower.includes('etisalat') || nameLower.includes('t2mobile')) localId = '9mobile';
+
+                        const base = NETWORKS_DATA.find(n => n.id === localId) || NETWORKS_DATA[0];
+                        return {
+                            ...base,
+                            id: localId,
+                            apiId: net.NETWORK_ID,
+                            name: net.NETWORK_NAME === 't2mobile' ? '9mobile' : net.NETWORK_NAME,
+                            discount: net.DISCOUNT
+                        };
+                    });
+                    setNetworksData(dynamic);
+                }
+            } catch (err) {
+                console.warn('Failed to fetch dynamic networks', err);
+            }
+        };
+        fetchNetworks();
+    }, []);
     
     // UI states
     const [balance, setBalance] = useState<number | null>(null);
@@ -187,12 +220,16 @@ export default function DataScreen() {
         const cleanPhone = phone.replace(/\D/g, '');
         if (cleanPhone.length >= 4) {
             const prefix = cleanPhone.substring(0, 4);
-            const found = NETWORKS_DATA.find(n => n.prefixes.includes(prefix));
-            if (found && found.id !== network) {
-                 setNetwork(found.id);
-            }
+            // We use the functional state update so we don't depend on `network` state
+            setNetworksData(currentNetworks => {
+                const found = currentNetworks.find(n => n.prefixes.includes(prefix));
+                if (found) {
+                     setNetwork(prev => found.id !== prev ? found.id : prev);
+                }
+                return currentNetworks;
+            });
         }
-    }, [network]);
+    }, []);
 
     const handlePhoneChange = (text: string) => {
         setPhoneNumber(text);
@@ -316,46 +353,12 @@ export default function DataScreen() {
         setLoadingPlans(true);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         try {
-            const { data, error } = await supabase
-                .from('data_plans')
-                .select('*')
-                .eq('network', netId.toLowerCase())
-                .eq('is_active', true)
-                .order('cost_price', { ascending: true });
-
-            if (error) throw error;
-
-            const mappedPlans: DataPlan[] = (data || []).map((p: any) => {
-                let inferredValidity = p.validity;
-                if (!inferredValidity) {
-                    const nameLower = p.name.toLowerCase();
-                    if (nameLower.includes('daily') || nameLower.includes('24hr')) inferredValidity = '1 Day';
-                    else if (nameLower.includes('weekly') || nameLower.includes('7 days')) inferredValidity = '7 Days';
-                    else if (nameLower.includes('monthly') || nameLower.includes('30 days')) inferredValidity = '30 Days';
-                    else {
-                         const match = p.name.match(/(\d+)\s*(day|week|month|hr)/i);
-                         if (match) inferredValidity = match[0];
-                         else inferredValidity = '30 Days';
-                    }
-                }
-
-                return {
-                    id: p.plan_id,
-                    code: p.plan_id,
-                    name: p.name.replace(/\b(Daily|Weekly|Monthly|Day|Week|Month|Days|Weeks|Months|Hour|Hours|Hr|Hrs)\b/gi, '').replace(/\d+(hr|hrs)/gi, '').trim(),
-                    originalName: p.name,
-                    price: p.selling_price,
-                    validity: inferredValidity,
-                    volume: p.volume,
-                    network: p.network,
-                    icon: p.icon_url
-                };
-            });
-
+            const mappedPlans = await api.data.getPlans(netId);
             setPlans(mappedPlans);
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "Failed to load data plans");
+            Alert.alert("Error", "Failed to load data plans. Please try again.");
+            setPlans([]);
         } finally {
             setLoadingPlans(false);
         }
@@ -413,7 +416,7 @@ export default function DataScreen() {
     };
 
     const getNetworkColor = (netId: string) => {
-        return NETWORKS_DATA.find(n => n.id === netId)?.color || '#0056D2';
+        return networksData.find(n => n.id === netId)?.color || '#0056D2';
     };
 
     return (
@@ -483,7 +486,7 @@ export default function DataScreen() {
                         <Text style={s.sectionTitle}>Select Network</Text>
                     </View>
                     <View style={s.networksRow}>
-                        {NETWORKS_DATA.map((net) => {
+                        {networksData.map((net) => {
                             const isSelected = network === net.id;
                             const styles = getNetworkStyles(net.id, isSelected);
                             return (

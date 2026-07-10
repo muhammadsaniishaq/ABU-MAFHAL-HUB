@@ -1,0 +1,117 @@
+
+{
+	"ELECTRIC_COMPANY":
+	[
+
+		[
+			{
+				"ID":"01","NAME":"Eko Electric - EKEDC (PHCN)","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"02","NAME":"Ikeja Electric - IKEDC (PHCN)","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"03","NAME":"Abuja Electric - AEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"04","NAME":"Kano Electric - KEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"05","NAME":"Portharcourt Electric - PHEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"06","NAME":"Jos Electric - JEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"07","NAME":"Ibadan Electric - IBEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"08","NAME":"Kaduna Electric - KAEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"09","NAME":"ENUGU Electric - EEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"10","NAME":"BENIN Electric - BEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+,
+		[
+			{
+				"ID":"11","NAME":"YOLA Electric - YEDC","PRODUCT":
+				[
+					{"PRODUCT_ID":"01","PRODUCT_TYPE":"prepaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000},
+					{"PRODUCT_ID":"02","PRODUCT_TYPE":"postpaid","DISCOUNT_AMOUNT":"0.995","DISCOUNT":"0.50%","MINAMOUNT":1000,"MAXAMOUNT":200000}
+				]
+			}
+		]
+
+	]
+}
