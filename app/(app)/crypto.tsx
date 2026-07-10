@@ -28,14 +28,14 @@ export default function CryptoScreen() {
     const [assets, setAssets] = useState<CryptoRate[]>([]);
     const [loading, setLoading] = useState(true);
     const insets = useSafeAreaInsets();
-    
+
     // Permission for Camera
     const [permission, requestPermission] = useCameraPermissions();
 
     // Data Fetching
     useEffect(() => {
         fetchInitialData();
-        const interval = setInterval(fetchRates, 60000); 
+        const interval = setInterval(fetchRates, 60000);
         return () => clearInterval(interval);
     }, []);
 
@@ -60,8 +60,8 @@ export default function CryptoScreen() {
     };
 
     return (
-        <LinearGradient 
-            colors={['#F0F4F8', '#E2E8F0']} 
+        <LinearGradient
+            colors={['#F0F4F8', '#E2E8F0']}
             style={{ flex: 1, paddingTop: insets.top }}
         >
             <StatusBar style="dark" />
@@ -69,10 +69,10 @@ export default function CryptoScreen() {
             {/* TAB CONTENT */}
             <View className="flex-1 pb-20">
                 {activeTab === 'home' && (
-                    <HomeView 
-                        assets={assets} 
-                        loading={loading} 
-                        permission={permission} 
+                    <HomeView
+                        assets={assets}
+                        loading={loading}
+                        permission={permission}
                         requestPermission={requestPermission}
                         setActiveTab={setActiveTab}
                     />
@@ -103,11 +103,11 @@ const CustomTabBar = ({ activeTab, setActiveTab }: { activeTab: Tab, setActiveTa
                 { id: 'settings', icon: 'settings', label: 'Settings' },
             ].map((tab) => {
                 const isActive = activeTab === tab.id;
-                
+
                 if (tab.special) {
                     return (
-                        <TouchableOpacity 
-                            key={tab.id} 
+                        <TouchableOpacity
+                            key={tab.id}
                             onPress={() => { Vibration.vibrate(40); setActiveTab(tab.id as Tab); }}
                             className="w-12 h-12 rounded-full items-center justify-center -mt-6 shadow-lg shadow-blue-600/50 border-4 border-[#F8FAFC]"
                         >
@@ -122,16 +122,16 @@ const CustomTabBar = ({ activeTab, setActiveTab }: { activeTab: Tab, setActiveTa
                 }
 
                 return (
-                    <TouchableOpacity 
-                        key={tab.id} 
+                    <TouchableOpacity
+                        key={tab.id}
                         onPress={() => { Vibration.vibrate(30); setActiveTab(tab.id as Tab); }}
                         className="flex-1 items-center justify-center py-1"
                     >
                         <Animated.View style={{ transform: [{ scale: isActive ? 1.1 : 1 }] }}>
-                            <Ionicons 
-                                name={tab.icon as any} 
-                                size={18} 
-                                color={isActive ? '#0E1A2E' : '#94a3b8'} 
+                            <Ionicons
+                                name={tab.icon as any}
+                                size={18}
+                                color={isActive ? '#0E1A2E' : '#94a3b8'}
                             />
                         </Animated.View>
                         <Text className={`text-[9px] font-bold mt-1 tracking-wider ${isActive ? 'text-[#0E1A2E]' : 'text-slate-400'}`}>
@@ -151,10 +151,12 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
     const [walletBalance, setWalletBalance] = useState(0);
     const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
     const [cryptoWalletBalanceUsdt, setCryptoWalletBalanceUsdt] = useState(0);
+    const [monthlyProfit, setMonthlyProfit] = useState(0);
+    const [rewardPoints, setRewardPoints] = useState(0);
     const [hideBalance, setHideBalance] = useState(false);
     const [scannerVisible, setScannerVisible] = useState(false);
     const [scannedData, setScannedData] = useState('');
-    
+
     // Action Modals State
     const [activeModal, setActiveModal] = useState<'send' | 'receive' | 'buy' | 'sell' | 'deposit' | 'withdraw' | 'gas' | 'pay' | null>(null);
 
@@ -170,7 +172,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
     // Dynamic Network Fee Calculation
     const getNetworkFee = (net: string) => {
-        switch(net) {
+        switch (net) {
             case 'TRC20': return 1.50; // TRON standard + margin
             case 'BEP20': return 0.50; // BSC standard + margin
             case 'ERC20': return 6.00; // ETH standard (high) + margin
@@ -212,7 +214,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
             setLoadingAddress(true);
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
-            
+
             // Map network to NowPayments currency code for USDT or native coin
             const currencyMap: Record<string, string> = {
                 'TRC20': 'usdttrc20',
@@ -221,7 +223,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                 'SOL': 'sol'
             };
             const curr = currencyMap[network] || 'usdttrc20';
-            
+
             const data = await api.crypto.generateDepositAddress(user.id, network, curr);
             setReceiveAddresses(prev => ({ ...prev, [network]: data.address }));
         } catch (error) {
@@ -237,13 +239,22 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
     const getBal = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            // Fetch NGN Balance
-            const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-            if (data) {
-                setWalletBalance(data.balance);
-                setWalletBalanceUsd(data.balance / 1500); 
+            // Fetch NGN Balance, Profit and Rewards
+            const { data, error } = await supabase.from('profiles').select('balance, monthly_profit, reward_points').eq('id', user.id).single();
+            if (error) {
+                // Fallback if migration hasn't run yet
+                const { data: fallbackData } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
+                if (fallbackData) {
+                    setWalletBalance(fallbackData.balance || 0);
+                    setWalletBalanceUsd((fallbackData.balance || 0) / 1500); 
+                }
+            } else if (data) {
+                setWalletBalance(data.balance || 0);
+                setWalletBalanceUsd((data.balance || 0) / 1500); 
+                setMonthlyProfit(data.monthly_profit || 0);
+                setRewardPoints(data.reward_points || 0);
             }
-            
+
             // Fetch Crypto Balance (USDT)
             const { data: cbData } = await supabase
                 .from('crypto_balances')
@@ -268,19 +279,19 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
     const handleScan = async () => {
         if (!permission?.granted) {
-             const result = await requestPermission();
-             if (!result.granted) {
-                 Alert.alert("Permission Required", "Camera access is needed to scan QR codes.");
-                 return;
-             }
+            const result = await requestPermission();
+            if (!result.granted) {
+                Alert.alert("Permission Required", "Camera access is needed to scan QR codes.");
+                return;
+            }
         }
         setScannerVisible(true);
     };
 
     const QuickActionButton = ({ icon, label, action, color = "#0E1A2E", badge }: { icon: string, label: string, action: () => void, color?: string, badge?: string }) => (
         <View className="items-center mb-4 w-[20%] relative">
-            <TouchableOpacity 
-                onPress={() => { Vibration.vibrate(30); action(); }} 
+            <TouchableOpacity
+                onPress={() => { Vibration.vibrate(30); action(); }}
                 className="w-11 h-11 bg-white border border-slate-50 shadow-md shadow-slate-200/60 rounded-2xl items-center justify-center mb-1.5"
                 activeOpacity={0.7}
             >
@@ -297,8 +308,8 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
     return (
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-             {/* HEADER */}
-             <View className="px-4 pt-1 pb-3">
+            {/* HEADER */}
+            <View className="px-4 pt-1 pb-3">
                 <View className="flex-row justify-between items-center mb-5">
                     {/* Left: Profile Avatar & Greeting */}
                     <View className="flex-row items-center gap-2.5">
@@ -316,7 +327,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                             <Text className="text-[#0E1A2E] font-black text-sm">Muhammad 👋</Text>
                         </View>
                     </View>
-                    
+
                     {/* Right: Actions */}
                     <View className="flex-row items-center gap-1.5">
                         <TouchableOpacity className="bg-white w-8 h-8 rounded-full items-center justify-center shadow-sm border border-slate-100">
@@ -336,13 +347,15 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                 <LinearGradient
                     colors={['#0A1128', '#1e293b']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={{ padding: 20, borderRadius: 24, position: 'relative', overflow: 'hidden' }}
-                    style={{ elevation: 8, shadowColor: '#0E1A2E', shadowOffset: {width: 0, height: 6}, shadowOpacity: 0.3, shadowRadius: 12 }}
+                    style={{
+                        padding: 20, borderRadius: 24, position: 'relative', overflow: 'hidden',
+                        elevation: 8, shadowColor: '#0E1A2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12
+                    }}
                 >
                     {/* Sleek Geometric Background */}
                     <View className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-24 translate-x-12" />
                     <View className="absolute bottom-0 right-0 w-32 h-32 bg-[#D9A73A]/5 rounded-full translate-y-12 translate-x-8" />
-                    
+
                     <View className="flex-row justify-between items-start mb-6">
                         <View>
                             <View className="flex-row items-center gap-1.5 mb-1.5">
@@ -356,7 +369,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 {hideBalance ? '₦ ****' : `Naira Wallet: ₦${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                             </Text>
                         </View>
-                        
+
                         <TouchableOpacity onPress={() => { Vibration.vibrate(30); setHideBalance(!hideBalance); }} className="w-8 h-8 bg-white/10 items-center justify-center rounded-full">
                             <Ionicons name={hideBalance ? "eye-off" : "eye"} size={14} color="#cbd5e1" />
                         </TouchableOpacity>
@@ -366,19 +379,19 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         <View className="flex-row items-center gap-4">
                             <View>
                                 <Text className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-0.5">Monthly Profit</Text>
-                                <Text className="text-emerald-400 font-black text-xs">+₦24,500</Text>
+                                <Text className="text-emerald-400 font-black text-xs">+{monthlyProfit > 0 ? '₦' : ''}{monthlyProfit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</Text>
                             </View>
                             <View className="w-[1px] h-6 bg-white/10" />
                             <View>
                                 <Text className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-0.5">Reward Points</Text>
                                 <View className="flex-row items-center gap-1">
                                     <Ionicons name="star" size={10} color="#D9A73A" />
-                                    <Text className="text-white font-black text-xs">1,250</Text>
+                                    <Text className="text-white font-black text-xs">{rewardPoints.toLocaleString()}</Text>
                                 </View>
                             </View>
                         </View>
-                        
-                        <TouchableOpacity className="flex-row items-center gap-1 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+
+                        <TouchableOpacity onPress={() => router.push('/analytics')} className="flex-row items-center gap-1 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
                             <Text className="text-slate-300 font-bold text-[10px]">Analytics</Text>
                             <Ionicons name="chevron-forward" size={12} color="#cbd5e1" />
                         </TouchableOpacity>
@@ -392,7 +405,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                     {/* Modern Card Decorations */}
                     <View className="absolute top-0 right-0 w-40 h-40 bg-[#D9A73A]/10 rounded-full blur-3xl translate-x-10 -translate-y-10" />
                     <View className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -translate-x-10 translate-y-10" />
-                    
+
                     <View className="flex-row items-center justify-between mb-4 relative z-10 px-1 border-b border-slate-200/50 pb-2">
                         <Text className="text-[#0E1A2E] font-black uppercase tracking-widest text-[9px]">App Services</Text>
                         <View className="flex-row gap-1">
@@ -409,19 +422,19 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         <QuickActionButton icon="cart" label="Buy" color="#0E1A2E" action={() => setActiveModal('buy')} badge="0%" />
                         <QuickActionButton icon="cash" label="Sell" color="#ef4444" action={() => setActiveModal('sell')} />
                         <QuickActionButton icon="swap-horizontal" label="Swap" color="#f59e0b" action={() => setActiveTab('swap')} />
-                        
+
                         {/* Row 2 */}
-                        <QuickActionButton icon="diamond" label="Earn" color="#8b5cf6" action={() => {}} badge="NEW" />
-                        <QuickActionButton icon="card" label="Cards" color="#06b6d4" action={() => {}} />
-                        <QuickActionButton icon="leaf" label="Stake" color="#22c55e" action={() => {}} />
-                        <QuickActionButton icon="wallet" label="Loan" color="#6366f1" action={() => {}} />
-                        <QuickActionButton icon="gift" label="Gift" color="#ec4899" action={() => {}} />
+                        <QuickActionButton icon="diamond" label="Earn" color="#8b5cf6" action={() => { }} badge="NEW" />
+                        <QuickActionButton icon="card" label="Cards" color="#06b6d4" action={() => { }} />
+                        <QuickActionButton icon="leaf" label="Stake" color="#22c55e" action={() => { }} />
+                        <QuickActionButton icon="wallet" label="Loan" color="#6366f1" action={() => { }} />
+                        <QuickActionButton icon="gift" label="Gift" color="#ec4899" action={() => { }} />
 
                         {/* Row 3 */}
                         <QuickActionButton icon="flame" label="Gas" color="#d946ef" action={() => setActiveModal('gas')} />
                         <QuickActionButton icon="qr-code" label="QR Pay" color="#14b8a6" action={() => setActiveModal('pay')} />
-                        <QuickActionButton icon="time" label="History" color="#64748b" action={() => {}} />
-                        <QuickActionButton icon="chatbubbles" label="Support" color="#3b82f6" action={() => {}} />
+                        <QuickActionButton icon="time" label="History" color="#64748b" action={() => { }} />
+                        <QuickActionButton icon="chatbubbles" label="Support" color="#3b82f6" action={() => { }} />
                         <QuickActionButton icon="apps" label="More" color="#0E1A2E" action={() => setActiveTab('portfolio')} />
                     </View>
                 </View>
@@ -429,11 +442,13 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
             {/* AI INSIGHTS WIDGET */}
             <View className="px-4 mb-6">
-                <LinearGradient 
-                    colors={['#eff6ff', '#eef2ff']} 
+                <LinearGradient
+                    colors={['#eff6ff', '#eef2ff']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={{ padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#dbeafe' }}
-                    style={{ elevation: 2, shadowColor: '#3b82f6', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.1, shadowRadius: 4 }}
+                    style={{
+                        padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#dbeafe',
+                        elevation: 2, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4
+                    }}
                 >
                     <View className="flex-row justify-between items-center mb-1.5">
                         <View className="flex-row items-center gap-1.5">
@@ -590,18 +605,18 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
             <Modal visible={activeModal === 'receive'} animationType="slide" transparent>
                 <View className="flex-1 justify-end">
                     {/* Dark Backdrop */}
-                    <TouchableOpacity 
-                        activeOpacity={1} 
-                        onPress={() => setActiveModal(null)} 
-                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setActiveModal(null)}
+                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
                     />
-                    
+
                     {/* Compact Modern White Modal with Brand Accents */}
                     <View className="bg-white rounded-t-[32px] shadow-2xl pt-2 pb-5 px-5 border-t-4 border-[#0E1A2E]">
-                        
+
                         {/* Drag Handle */}
                         <View className="w-10 h-1 bg-slate-200 rounded-full self-center mb-4 mt-1" />
-                        
+
                         {/* Header */}
                         <View className="flex-row justify-between items-center mb-4">
                             <View>
@@ -618,7 +633,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         <View className="flex-row justify-between w-full mb-5">
                             {['TRC20', 'BEP20', 'ERC20', 'SOL'].map((net, i) => {
                                 const isSelected = receiveNetwork === net;
-                                
+
                                 // Reliable Coingecko Logos
                                 let logoUri = '';
                                 if (net === 'TRC20') logoUri = 'https://assets.coingecko.com/coins/images/1094/standard/tron-logo.png';
@@ -627,24 +642,24 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 if (net === 'SOL') logoUri = 'https://assets.coingecko.com/coins/images/4128/standard/solana.png';
 
                                 return (
-                                <TouchableOpacity 
-                                    key={i} 
-                                    onPress={() => setReceiveNetwork(net)} 
-                                    activeOpacity={0.7}
-                                    style={{
-                                        shadowColor: isSelected ? '#D9A73A' : '#000',
-                                        shadowOffset: { width: 0, height: 4 },
-                                        shadowOpacity: isSelected ? 0.4 : 0.05,
-                                        shadowRadius: 8,
-                                        elevation: isSelected ? 8 : 2
-                                    }}
-                                    className={`flex-1 items-center justify-center py-2.5 mx-1 rounded-2xl border-2 ${isSelected ? 'bg-[#0E1A2E] border-[#D9A73A]' : 'bg-white border-slate-100'}`}
-                                >
-                                    <View className={`w-7 h-7 mb-1.5 rounded-full items-center justify-center ${isSelected ? 'bg-white' : 'bg-slate-50'}`}>
-                                        <Image source={{ uri: logoUri }} style={{ width: 16, height: 16 }} resizeMode="contain" />
-                                    </View>
-                                    <Text className={`font-black text-[9px] tracking-wider ${isSelected ? 'text-[#D9A73A]' : 'text-slate-500'}`}>{net}</Text>
-                                </TouchableOpacity>
+                                    <TouchableOpacity
+                                        key={i}
+                                        onPress={() => setReceiveNetwork(net)}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            shadowColor: isSelected ? '#D9A73A' : '#000',
+                                            shadowOffset: { width: 0, height: 4 },
+                                            shadowOpacity: isSelected ? 0.4 : 0.05,
+                                            shadowRadius: 8,
+                                            elevation: isSelected ? 8 : 2
+                                        }}
+                                        className={`flex-1 items-center justify-center py-2.5 mx-1 rounded-2xl border-2 ${isSelected ? 'bg-[#0E1A2E] border-[#D9A73A]' : 'bg-white border-slate-100'}`}
+                                    >
+                                        <View className={`w-7 h-7 mb-1.5 rounded-full items-center justify-center ${isSelected ? 'bg-white' : 'bg-slate-50'}`}>
+                                            <Image source={{ uri: logoUri }} style={{ width: 16, height: 16 }} resizeMode="contain" />
+                                        </View>
+                                        <Text className={`font-black text-[9px] tracking-wider ${isSelected ? 'text-[#D9A73A]' : 'text-slate-500'}`}>{net}</Text>
+                                    </TouchableOpacity>
                                 );
                             })}
                         </View>
@@ -665,7 +680,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                         <Text className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest">Generating</Text>
                                     </View>
                                 ) : (
-                                    <QRCode 
+                                    <QRCode
                                         value={receiveAddresses[receiveNetwork] || 'Pending...'}
                                         size={150}
                                         color="#0E1A2E"
@@ -673,16 +688,16 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                     />
                                 )}
                             </View>
-                            
+
                             {/* Premium Decorated Address Copy Area */}
-                            <TouchableOpacity 
-                                onPress={async () => { 
-                                    if(receiveAddresses[receiveNetwork]){
-                                        await ExpoClipboard.setStringAsync(receiveAddresses[receiveNetwork]); 
+                            <TouchableOpacity
+                                onPress={async () => {
+                                    if (receiveAddresses[receiveNetwork]) {
+                                        await ExpoClipboard.setStringAsync(receiveAddresses[receiveNetwork]);
                                         Alert.alert('Copied', 'Address copied to clipboard');
                                         Vibration.vibrate(50);
                                     }
-                                }} 
+                                }}
                                 activeOpacity={0.7}
                                 className="w-full bg-[#f8fafc] flex-row items-center justify-between p-1.5 pl-4 rounded-2xl border border-dashed border-slate-300 mb-3"
                             >
@@ -716,15 +731,15 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         </View>
 
                         {/* Premium Decorated Share Button - Compact */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={async () => {
                                 if (loadingAddress || !receiveAddresses[receiveNetwork]) return;
                                 try {
                                     await Share.share({
                                         message: `My Crypto Deposit Address (${receiveNetwork}):\n${receiveAddresses[receiveNetwork]}`,
                                     });
-                                } catch (error) {}
-                            }} 
+                                } catch (error) { }
+                            }}
                             activeOpacity={0.8}
                             className="shadow-sm shadow-[#0E1A2E]/20 rounded-lg overflow-hidden border border-[#0E1A2E]/10"
                         >
@@ -735,7 +750,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 style={{ width: '100%', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, position: 'relative' }}
                             >
                                 <View className="absolute top-0 left-0 w-full h-[50%] bg-white/5 rounded-b-[100px]" />
-                                
+
                                 <View className="bg-white/10 w-6 h-6 rounded-full items-center justify-center">
                                     <Ionicons name="share-social" size={12} color="#D9A73A" />
                                 </View>
@@ -749,17 +764,17 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
             <Modal visible={activeModal === 'send'} animationType="slide" transparent>
                 <View className="flex-1 justify-end">
                     {/* Dark Backdrop */}
-                    <TouchableOpacity 
-                        activeOpacity={1} 
-                        onPress={() => setActiveModal(null)} 
-                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setActiveModal(null)}
+                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
                     />
-                    
+
                     {/* Premium Send Modal */}
                     <View className="bg-white rounded-t-[32px] shadow-2xl pt-2 pb-6 px-5 border-t-4 border-[#3b82f6]">
                         {/* Drag Handle */}
                         <View className="w-10 h-1 bg-slate-200 rounded-full self-center mb-4 mt-1" />
-                        
+
                         {/* Header */}
                         <View className="flex-row justify-between items-center mb-5">
                             <View>
@@ -776,7 +791,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         <View className="flex-row justify-between w-full mb-4">
                             {['TRC20', 'BEP20', 'ERC20', 'SOL'].map((net, i) => {
                                 const isSelected = sendNetwork === net;
-                                
+
                                 let logoUri = '';
                                 if (net === 'TRC20') logoUri = 'https://assets.coingecko.com/coins/images/1094/standard/tron-logo.png';
                                 if (net === 'BEP20') logoUri = 'https://assets.coingecko.com/coins/images/825/standard/bnb-icon2_2x.png';
@@ -784,22 +799,22 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 if (net === 'SOL') logoUri = 'https://assets.coingecko.com/coins/images/4128/standard/solana.png';
 
                                 return (
-                                <TouchableOpacity 
-                                    key={i} 
-                                    onPress={() => setSendNetwork(net)} 
-                                    activeOpacity={0.7}
-                                    style={{
-                                        shadowColor: isSelected ? '#3b82f6' : '#000',
-                                        shadowOffset: { width: 0, height: 4 },
-                                        shadowOpacity: isSelected ? 0.3 : 0.05,
-                                        shadowRadius: 8,
-                                        elevation: isSelected ? 8 : 2
-                                    }}
-                                    className={`flex-1 items-center justify-center py-2 mx-1 rounded-xl border-2 ${isSelected ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-100'}`}
-                                >
-                                    <Image source={{ uri: logoUri }} className="w-4 h-4 mb-1 rounded-full bg-slate-100" />
-                                    <Text className={`font-black text-[8px] tracking-wider ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>{net}</Text>
-                                </TouchableOpacity>
+                                    <TouchableOpacity
+                                        key={i}
+                                        onPress={() => setSendNetwork(net)}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            shadowColor: isSelected ? '#3b82f6' : '#000',
+                                            shadowOffset: { width: 0, height: 4 },
+                                            shadowOpacity: isSelected ? 0.3 : 0.05,
+                                            shadowRadius: 8,
+                                            elevation: isSelected ? 8 : 2
+                                        }}
+                                        className={`flex-1 items-center justify-center py-2 mx-1 rounded-xl border-2 ${isSelected ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-100'}`}
+                                    >
+                                        <Image source={{ uri: logoUri }} className="w-4 h-4 mb-1 rounded-full bg-slate-100" />
+                                        <Text className={`font-black text-[8px] tracking-wider ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>{net}</Text>
+                                    </TouchableOpacity>
                                 );
                             })}
                         </View>
@@ -810,17 +825,17 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                             <View className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-sm border border-slate-100 mr-2">
                                 <Ionicons name="wallet-outline" size={14} color="#64748b" />
                             </View>
-                            <TextInput 
+                            <TextInput
                                 className="flex-1 font-mono text-xs font-bold text-[#0E1A2E] p-0"
                                 placeholder="Paste or enter address..."
                                 placeholderTextColor="#cbd5e1"
                                 value={sendAddress}
                                 onChangeText={setSendAddress}
                             />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={async () => {
                                     const text = await ExpoClipboard.getStringAsync();
-                                    if(text) setSendAddress(text);
+                                    if (text) setSendAddress(text);
                                 }}
                                 className="bg-[#0E1A2E] px-3 py-1.5 rounded-lg ml-2 shadow-sm"
                             >
@@ -835,7 +850,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 <View className="w-8 h-8 rounded-full bg-emerald-50/50 items-center justify-center mr-2">
                                     <Image source={{ uri: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png' }} className="w-5 h-5 rounded-full" />
                                 </View>
-                                <TextInput 
+                                <TextInput
                                     className="text-xl font-black text-[#0E1A2E] flex-1 p-0 h-8"
                                     placeholder="0.00"
                                     placeholderTextColor="#cbd5e1"
@@ -849,7 +864,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                             </View>
                             <View className="flex-row justify-between items-center px-1">
                                 <Text className="text-slate-500 font-medium text-[10px]">Available: <Text className="font-black text-[#0E1A2E]">{cryptoWalletBalanceUsdt.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT</Text></Text>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => setSendAmount(cryptoWalletBalanceUsdt.toFixed(2))}
                                     className="bg-blue-100/50 px-2 py-1 rounded border border-blue-200/50"
                                 >
@@ -871,31 +886,33 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         </View>
 
                         {/* Action Button */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => {
-                                if(isSending) return;
-                                if(!sendAddress) return Alert.alert("Error", "Please enter a destination address");
-                                if(!sendAmount || Number(sendAmount) <= 0) return Alert.alert("Error", "Please enter a valid amount");
-                                if(Number(sendAmount) + networkFee > cryptoWalletBalanceUsdt) return Alert.alert("Error", "Insufficient balance to cover amount + network fee");
-                                
-                                Alert.alert("Confirm Send", `Are you sure you want to send ${sendAmount} USDT to ${sendAddress}?\n\nA total of ${(Number(sendAmount)+networkFee).toFixed(2)} USDT will be deducted.`, [
+                                if (isSending) return;
+                                if (!sendAddress) return Alert.alert("Error", "Please enter a destination address");
+                                if (!sendAmount || Number(sendAmount) <= 0) return Alert.alert("Error", "Please enter a valid amount");
+                                if (Number(sendAmount) + networkFee > cryptoWalletBalanceUsdt) return Alert.alert("Error", "Insufficient balance to cover amount + network fee");
+
+                                Alert.alert("Confirm Send", `Are you sure you want to send ${sendAmount} USDT to ${sendAddress}?\n\nA total of ${(Number(sendAmount) + networkFee).toFixed(2)} USDT will be deducted.`, [
                                     { text: "Cancel", style: "cancel" },
-                                    { text: "Send Now", onPress: async () => {
-                                        try {
-                                            setIsSending(true);
-                                            await api.crypto.withdraw(sendNetwork, sendAddress, Number(sendAmount) + networkFee); // Amount + Fee
-                                            Alert.alert("Success", "Transaction submitted successfully!");
-                                            setSendAddress('');
-                                            setSendAmount('');
-                                            setActiveModal(null);
-                                            // Refresh balance locally for instant feedback
-                                            setCryptoWalletBalanceUsdt(prev => prev - (Number(sendAmount) + networkFee));
-                                        } catch (error: any) {
-                                            Alert.alert("Failed", error.message || "Failed to send crypto");
-                                        } finally {
-                                            setIsSending(false);
+                                    {
+                                        text: "Send Now", onPress: async () => {
+                                            try {
+                                                setIsSending(true);
+                                                await api.crypto.withdraw(sendNetwork, sendAddress, Number(sendAmount) + networkFee); // Amount + Fee
+                                                Alert.alert("Success", "Transaction submitted successfully!");
+                                                setSendAddress('');
+                                                setSendAmount('');
+                                                setActiveModal(null);
+                                                // Refresh balance locally for instant feedback
+                                                setCryptoWalletBalanceUsdt(prev => prev - (Number(sendAmount) + networkFee));
+                                            } catch (error: any) {
+                                                Alert.alert("Failed", error.message || "Failed to send crypto");
+                                            } finally {
+                                                setIsSending(false);
+                                            }
                                         }
-                                    }}
+                                    }
                                 ])
                             }}
                             activeOpacity={0.8}
@@ -925,15 +942,15 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
             <Modal visible={activeModal === 'buy'} animationType="slide" transparent>
                 <View className="flex-1 justify-end">
-                    <TouchableOpacity 
-                        activeOpacity={1} 
-                        onPress={() => setActiveModal(null)} 
-                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setActiveModal(null)}
+                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
                     />
-                    
+
                     <View className="bg-white rounded-t-[32px] shadow-2xl pt-2 pb-6 px-5 border-t-4 border-emerald-500">
                         <View className="w-10 h-1 bg-slate-200 rounded-full self-center mb-4 mt-1" />
-                        
+
                         <View className="flex-row justify-between items-center mb-5">
                             <View>
                                 <Text className="text-lg font-black text-[#0E1A2E] tracking-tight">Buy Crypto</Text>
@@ -953,7 +970,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         {/* Ultra Compact Buy Input */}
                         <View className="bg-slate-50/80 rounded-2xl border border-indigo-100/40 p-2.5 mb-4 overflow-hidden relative">
                             <View className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-10 translate-x-10" />
-                            
+
                             <View className="flex-row justify-between items-center px-1 mb-2">
                                 <Text className="text-[#0E1A2E] font-black uppercase tracking-widest text-[9px]">Purchase Amount</Text>
                                 <View className="bg-white px-2 py-0.5 rounded-full border border-slate-100 shadow-sm flex-row items-center gap-1">
@@ -966,7 +983,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 <View className="w-8 h-8 bg-indigo-50 rounded-lg items-center justify-center mr-2">
                                     <Text className="text-indigo-600 font-black text-sm">₦</Text>
                                 </View>
-                                <TextInput 
+                                <TextInput
                                     className="text-xl font-black text-[#0E1A2E] flex-1 p-0 h-8"
                                     placeholder="0"
                                     placeholderTextColor="#cbd5e1"
@@ -974,14 +991,14 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                     value={buyAmountNgn}
                                     onChangeText={setBuyAmountNgn}
                                 />
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => setBuyAmountNgn(walletBalance.toString())}
                                     className="bg-slate-800 px-3 py-2 rounded-lg ml-2 shadow-sm"
                                 >
                                     <Text className="text-white font-black text-[9px] uppercase tracking-wider">MAX</Text>
                                 </TouchableOpacity>
                             </View>
-                            
+
                             <View className="flex-row justify-between items-center px-1 mt-2">
                                 <View className="flex-row items-center gap-1">
                                     <Ionicons name="wallet-outline" size={10} color="#94a3b8" />
@@ -989,12 +1006,12 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 </View>
                                 <View className="flex-row gap-1">
                                     {[10000, 50000, 100000].map(amt => (
-                                        <TouchableOpacity 
-                                            key={amt} 
+                                        <TouchableOpacity
+                                            key={amt}
                                             onPress={() => setBuyAmountNgn(amt.toString())}
                                             className="bg-indigo-50/50 px-2 py-1 rounded"
                                         >
-                                            <Text className="text-indigo-600 font-bold text-[8px]">₦{(amt/1000).toFixed(0)}k</Text>
+                                            <Text className="text-indigo-600 font-bold text-[8px]">₦{(amt / 1000).toFixed(0)}k</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -1004,9 +1021,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         {/* Order Summary Receipt */}
                         <View className="bg-[#0b132b] rounded-[20px] mb-6 shadow-sm overflow-hidden p-4 relative">
                             <View className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl translate-x-10 -translate-y-10" />
-                            
+
                             <Text className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-3">Transaction Details</Text>
-                            
+
                             <View className="flex-row justify-between items-end mb-4">
                                 <View>
                                     <Text className="text-slate-400 font-medium text-[10px] mb-1">You will receive</Text>
@@ -1019,9 +1036,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                     <Image source={{ uri: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png' }} className="w-5 h-5 rounded-full" />
                                 </View>
                             </View>
-                            
+
                             <View className="h-[1px] w-full bg-slate-700/50 my-3" />
-                            
+
                             <View className="flex-row justify-between items-center mb-2">
                                 <Text className="text-slate-400 font-medium text-[10px]">Exchange Rate</Text>
                                 <Text className="text-slate-200 font-bold text-[10px]">₦{BUY_RATE} / USDT</Text>
@@ -1042,32 +1059,34 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         </View>
 
                         {/* Action Button */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => {
-                                if(isBuying) return;
-                                if(!buyAmountNgn || Number(buyAmountNgn) < 5000) return Alert.alert("Error", "Minimum buy amount is ₦5,000");
-                                if(Number(buyAmountNgn) > walletBalance) return Alert.alert("Insufficient Funds", "You do not have enough Naira balance.");
-                                
+                                if (isBuying) return;
+                                if (!buyAmountNgn || Number(buyAmountNgn) < 5000) return Alert.alert("Error", "Minimum buy amount is ₦5,000");
+                                if (Number(buyAmountNgn) > walletBalance) return Alert.alert("Insufficient Funds", "You do not have enough Naira balance.");
+
                                 Alert.alert("Confirm Purchase", `Buy ${buyAmountCrypto} USDT for ₦${Number(buyAmountNgn).toLocaleString()}?\n\nIt will be instantly credited to your internal Crypto Wallet.`, [
                                     { text: "Cancel", style: "cancel" },
-                                    { text: "Confirm Buy", onPress: async () => {
-                                        try {
-                                            setIsBuying(true);
-                                            await api.crypto.buy({
-                                                asset: 'USDT',
-                                                amountNgn: Number(buyAmountNgn),
-                                                amountCrypto: Number(buyAmountCrypto)
-                                            });
-                                            Alert.alert("Success", "Crypto purchased successfully and added to your wallet.");
-                                            setBuyAmountNgn('');
-                                            setActiveModal(null);
-                                            getBal(); // Refresh balances
-                                        } catch (error: any) {
-                                            Alert.alert("Failed", error.message || "Failed to buy crypto");
-                                        } finally {
-                                            setIsBuying(false);
+                                    {
+                                        text: "Confirm Buy", onPress: async () => {
+                                            try {
+                                                setIsBuying(true);
+                                                await api.crypto.buy({
+                                                    asset: 'USDT',
+                                                    amountNgn: Number(buyAmountNgn),
+                                                    amountCrypto: Number(buyAmountCrypto)
+                                                });
+                                                Alert.alert("Success", "Crypto purchased successfully and added to your wallet.");
+                                                setBuyAmountNgn('');
+                                                setActiveModal(null);
+                                                getBal(); // Refresh balances
+                                            } catch (error: any) {
+                                                Alert.alert("Failed", error.message || "Failed to buy crypto");
+                                            } finally {
+                                                setIsBuying(false);
+                                            }
                                         }
-                                    }}
+                                    }
                                 ])
                             }}
                             activeOpacity={0.8}
@@ -1098,15 +1117,15 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
             {/* SELL MODAL */}
             <Modal visible={activeModal === 'sell'} animationType="slide" transparent>
                 <View className="flex-1 justify-end">
-                    <TouchableOpacity 
-                        activeOpacity={1} 
-                        onPress={() => setActiveModal(null)} 
-                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} 
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setActiveModal(null)}
+                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
                     />
-                    
+
                     <View className="bg-white rounded-t-[32px] shadow-2xl pt-2 pb-6 px-5 border-t-4 border-rose-500">
                         <View className="w-10 h-1 bg-slate-200 rounded-full self-center mb-4 mt-1" />
-                        
+
                         <View className="flex-row justify-between items-center mb-5">
                             <View>
                                 <Text className="text-lg font-black text-[#0E1A2E] tracking-tight">Sell Crypto</Text>
@@ -1126,7 +1145,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         {/* Ultra Compact Sell Input */}
                         <View className="bg-slate-50/80 rounded-2xl border border-rose-100/40 p-2.5 mb-4 overflow-hidden relative">
                             <View className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl -translate-y-10 translate-x-10" />
-                            
+
                             <View className="flex-row justify-between items-center px-1 mb-2">
                                 <Text className="text-[#0E1A2E] font-black uppercase tracking-widest text-[9px]">Sell Amount</Text>
                                 <View className="bg-white px-2 py-0.5 rounded-full border border-slate-100 shadow-sm flex-row items-center gap-1">
@@ -1139,7 +1158,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 <View className="w-8 h-8 bg-rose-50 rounded-lg items-center justify-center mr-2">
                                     <Image source={{ uri: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png' }} className="w-4 h-4 rounded-full" />
                                 </View>
-                                <TextInput 
+                                <TextInput
                                     className="text-xl font-black text-[#0E1A2E] flex-1 p-0 h-8"
                                     placeholder="0.00"
                                     placeholderTextColor="#cbd5e1"
@@ -1147,14 +1166,14 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                     value={sellAmountCrypto}
                                     onChangeText={setSellAmountCrypto}
                                 />
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => setSellAmountCrypto(cryptoWalletBalanceUsdt.toString())}
                                     className="bg-slate-800 px-3 py-2 rounded-lg ml-2 shadow-sm"
                                 >
                                     <Text className="text-white font-black text-[9px] uppercase tracking-wider">MAX</Text>
                                 </TouchableOpacity>
                             </View>
-                            
+
                             <View className="flex-row justify-between items-center px-1 mt-2">
                                 <View className="flex-row items-center gap-1">
                                     <Ionicons name="wallet-outline" size={10} color="#94a3b8" />
@@ -1162,9 +1181,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 </View>
                                 <View className="flex-row gap-1">
                                     {[25, 50, 75].map(percent => (
-                                        <TouchableOpacity 
-                                            key={percent} 
-                                            onPress={() => setSellAmountCrypto((cryptoWalletBalanceUsdt * (percent/100)).toFixed(2).toString())}
+                                        <TouchableOpacity
+                                            key={percent}
+                                            onPress={() => setSellAmountCrypto((cryptoWalletBalanceUsdt * (percent / 100)).toFixed(2).toString())}
                                             className="bg-rose-50/50 px-2 py-1 rounded"
                                         >
                                             <Text className="text-rose-600 font-bold text-[8px]">{percent}%</Text>
@@ -1177,9 +1196,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         {/* Order Summary Receipt */}
                         <View className="bg-[#0b132b] rounded-[20px] mb-6 shadow-sm overflow-hidden p-4 relative">
                             <View className="absolute top-0 right-0 w-32 h-32 bg-rose-500/20 rounded-full blur-3xl translate-x-10 -translate-y-10" />
-                            
+
                             <Text className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-3">Transaction Details</Text>
-                            
+
                             <View className="flex-row justify-between items-end mb-4">
                                 <View>
                                     <Text className="text-slate-400 font-medium text-[10px] mb-1">Naira to receive</Text>
@@ -1191,9 +1210,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                     <Ionicons name="wallet" size={20} color="#f43f5e" />
                                 </View>
                             </View>
-                            
+
                             <View className="h-[1px] w-full bg-slate-700/50 my-3" />
-                            
+
                             <View className="flex-row justify-between items-center mb-2">
                                 <Text className="text-slate-400 font-medium text-[10px]">Exchange Rate</Text>
                                 <Text className="text-slate-200 font-bold text-[10px]">1 USDT = ₦{SELL_RATE}</Text>
@@ -1214,32 +1233,34 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         </View>
 
                         {/* Action Button */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => {
-                                if(isSelling) return;
-                                if(!sellAmountCrypto || Number(sellAmountCrypto) <= 0) return Alert.alert("Error", "Please enter a valid amount");
-                                if(Number(sellAmountCrypto) > cryptoWalletBalanceUsdt) return Alert.alert("Insufficient Balance", "You do not have enough USDT in your internal wallet.");
-                                
+                                if (isSelling) return;
+                                if (!sellAmountCrypto || Number(sellAmountCrypto) <= 0) return Alert.alert("Error", "Please enter a valid amount");
+                                if (Number(sellAmountCrypto) > cryptoWalletBalanceUsdt) return Alert.alert("Insufficient Balance", "You do not have enough USDT in your internal wallet.");
+
                                 Alert.alert("Confirm Sale", `Are you sure you want to sell ${sellAmountCrypto} USDT?\n\nYour Naira wallet will instantly receive ₦${Number(expectedNgn).toLocaleString()}`, [
                                     { text: "Cancel", style: "cancel" },
-                                    { text: "Yes, Sell Now", onPress: async () => {
-                                        try {
-                                            setIsSelling(true);
-                                            await api.crypto.sell({
-                                                asset: 'USDT',
-                                                amountCrypto: Number(sellAmountCrypto),
-                                                expectedNgn: Number(expectedNgn)
-                                            });
-                                            Alert.alert("Success", "USDT sold successfully. Your Naira wallet has been credited.");
-                                            setSellAmountCrypto('');
-                                            setActiveModal(null);
-                                            getBal(); // Refresh balances
-                                        } catch (error: any) {
-                                            Alert.alert("Failed", error.message || "Failed to submit sell request");
-                                        } finally {
-                                            setIsSelling(false);
+                                    {
+                                        text: "Yes, Sell Now", onPress: async () => {
+                                            try {
+                                                setIsSelling(true);
+                                                await api.crypto.sell({
+                                                    asset: 'USDT',
+                                                    amountCrypto: Number(sellAmountCrypto),
+                                                    expectedNgn: Number(expectedNgn)
+                                                });
+                                                Alert.alert("Success", "USDT sold successfully. Your Naira wallet has been credited.");
+                                                setSellAmountCrypto('');
+                                                setActiveModal(null);
+                                                getBal(); // Refresh balances
+                                            } catch (error: any) {
+                                                Alert.alert("Failed", error.message || "Failed to submit sell request");
+                                            } finally {
+                                                setIsSelling(false);
+                                            }
                                         }
-                                    }}
+                                    }
                                 ])
                             }}
                             activeOpacity={0.8}
@@ -1280,21 +1301,21 @@ function MarketsView({ assets }: { assets: CryptoRate[] }) {
         return matchesSearch;
     }).sort((a, b) => {
         if (filter === 'Gainers') return (b.percent_change_24h || 0) - (a.percent_change_24h || 0);
-        return 0; 
+        return 0;
     });
 
     return (
         <View className="flex-1">
-             <View className="px-4 pt-4 pb-2">
+            <View className="px-4 pt-4 pb-2">
                 <Text className="text-2xl font-black text-[#0E1A2E] mb-4 tracking-tight">Markets</Text>
 
                 <View className="flex-row bg-slate-200/60 p-1 rounded-xl mb-4">
                     {['Trending', 'Gainers', 'Watchlist'].map(f => {
                         const isActive = filter === f;
                         return (
-                            <TouchableOpacity 
-                                key={f} 
-                                onPress={() => setFilter(f as any)} 
+                            <TouchableOpacity
+                                key={f}
+                                onPress={() => setFilter(f as any)}
                                 className={`flex-1 py-2 items-center rounded-lg ${isActive ? 'bg-white shadow-sm' : 'bg-transparent'}`}
                             >
                                 <Text className={`font-black text-xs ${isActive ? 'text-[#0E1A2E]' : 'text-slate-500'}`}>{f}</Text>
@@ -1305,8 +1326,8 @@ function MarketsView({ assets }: { assets: CryptoRate[] }) {
 
                 <View className="flex-row items-center bg-white border border-slate-200 rounded-xl px-4 py-1.5 mb-3 shadow-sm">
                     <Ionicons name="search" size={18} color="#94a3b8" />
-                    <TextInput 
-                        placeholder="Search coins..." 
+                    <TextInput
+                        placeholder="Search coins..."
                         className="flex-1 p-2 text-sm font-black text-slate-800"
                         value={search}
                         onChangeText={setSearch}
@@ -1323,7 +1344,7 @@ function MarketsView({ assets }: { assets: CryptoRate[] }) {
                 </View>
             </View>
 
-            <FlatList 
+            <FlatList
                 data={filteredAssets}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
@@ -1358,22 +1379,22 @@ function MarketsView({ assets }: { assets: CryptoRate[] }) {
 function SwapView({ assets }: { assets: CryptoRate[] }) {
     const [amount, setAmount] = useState('');
     const [slippage, setSlippage] = useState('0.5');
-    const [txSpeed, setTxSpeed] = useState<'standard'|'fast'|'lightning'>('fast');
-    
+    const [txSpeed, setTxSpeed] = useState<'standard' | 'fast' | 'lightning'>('fast');
+
     // Dynamic asset selection
     const [fromAssetId, setFromAssetId] = useState('tether');
     const [toAssetId, setToAssetId] = useState('bitcoin');
-    
+
     const [fromBalance, setFromBalance] = useState(0);
     const [isSwapping, setIsSwapping] = useState(false);
-    
+
     // Modal for coin selection
     const [selectorVisible, setSelectorVisible] = useState(false);
     const [selectingSide, setSelectingSide] = useState<'from' | 'to'>('from');
-    
+
     const fromAsset = assets.find(a => a.id === fromAssetId) || assets[0];
     const toAsset = assets.find(a => a.id === toAssetId) || assets[1];
-    
+
     // Exchange rate logic (e.g. 1 FROM = X TO)
     const rate = (fromAsset?.price_usd || 1) / (toAsset?.price_usd || 1);
     const expectedOut = amount ? (Number(amount) * rate) : 0;
@@ -1381,7 +1402,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
     // Faux price impact calculation based on amount
     const priceImpact = amount ? Math.min((Number(amount) / 10000) * 0.1, 2.5) : 0;
     const impactColor = priceImpact > 1 ? 'text-rose-500' : (priceImpact > 0.5 ? 'text-orange-500' : 'text-emerald-500');
-    
+
     useEffect(() => {
         if (fromAsset) {
             fetchBalance(fromAsset.symbol.toLowerCase());
@@ -1400,12 +1421,12 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
             setFromBalance(data?.balance || 0);
         }
     };
-    
+
     // Animations
     const spinValue = useRef(new Animated.Value(0)).current;
     const pulseValue = useRef(new Animated.Value(1)).current;
     const timerValue = useRef(new Animated.Value(1)).current;
-    
+
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
@@ -1426,7 +1447,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
     const handleSwapClick = () => {
         Vibration.vibrate(50);
         Animated.timing(spinValue, { toValue: 1, duration: 300, useNativeDriver: true }).start(() => spinValue.setValue(0));
-        
+
         // Flip assets
         const temp = fromAssetId;
         setFromAssetId(toAssetId);
@@ -1435,30 +1456,32 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
     };
 
     const handleExecuteSwap = () => {
-        if(isSwapping) return;
-        if(!amount || Number(amount) <= 0) return Alert.alert("Error", "Please enter a valid amount");
-        if(Number(amount) > fromBalance) return Alert.alert("Insufficient Balance", `You do not have enough ${fromAsset.symbol} to perform this swap.`);
-        
+        if (isSwapping) return;
+        if (!amount || Number(amount) <= 0) return Alert.alert("Error", "Please enter a valid amount");
+        if (Number(amount) > fromBalance) return Alert.alert("Insufficient Balance", `You do not have enough ${fromAsset.symbol} to perform this swap.`);
+
         Alert.alert("Confirm Swap", `Are you sure you want to swap ${amount} ${fromAsset.symbol} for approximately ${expectedOut.toFixed(6)} ${toAsset.symbol}?`, [
             { text: "Cancel", style: "cancel" },
-            { text: "Confirm", onPress: async () => {
-                try {
-                    setIsSwapping(true);
-                    await api.crypto.swap({
-                        fromAsset: fromAsset.symbol.toLowerCase(),
-                        toAsset: toAsset.symbol.toLowerCase(),
-                        amountIn: Number(amount),
-                        expectedAmountOut: expectedOut
-                    });
-                    Alert.alert("Swap Successful", `You successfully swapped ${amount} ${fromAsset.symbol} for ${expectedOut.toFixed(6)} ${toAsset.symbol}!`);
-                    setAmount('');
-                    fetchBalance(fromAsset.symbol.toLowerCase()); // Refresh balance
-                } catch (error: any) {
-                    Alert.alert("Swap Failed", error.message || "Failed to process swap");
-                } finally {
-                    setIsSwapping(false);
+            {
+                text: "Confirm", onPress: async () => {
+                    try {
+                        setIsSwapping(true);
+                        await api.crypto.swap({
+                            fromAsset: fromAsset.symbol.toLowerCase(),
+                            toAsset: toAsset.symbol.toLowerCase(),
+                            amountIn: Number(amount),
+                            expectedAmountOut: expectedOut
+                        });
+                        Alert.alert("Swap Successful", `You successfully swapped ${amount} ${fromAsset.symbol} for ${expectedOut.toFixed(6)} ${toAsset.symbol}!`);
+                        setAmount('');
+                        fetchBalance(fromAsset.symbol.toLowerCase()); // Refresh balance
+                    } catch (error: any) {
+                        Alert.alert("Swap Failed", error.message || "Failed to process swap");
+                    } finally {
+                        setIsSwapping(false);
+                    }
                 }
-            }}
+            }
         ]);
     };
 
@@ -1516,13 +1539,13 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                 {/* Enhanced Decorative backgrounds */}
                 <Animated.View style={{ transform: [{ scale: pulseValue }], position: 'absolute', top: -30, right: -30, width: 140, height: 140, backgroundColor: 'rgba(59, 130, 246, 0.15)', borderRadius: 9999 }} />
                 <Animated.View style={{ transform: [{ scale: pulseValue }], position: 'absolute', bottom: -30, left: -30, width: 140, height: 140, backgroundColor: 'rgba(217, 167, 58, 0.15)', borderRadius: 9999 }} />
-                
+
                 {/* Pay Section */}
                 <View className="bg-white/95 backdrop-blur-3xl p-4 rounded-[24px] shadow-xl shadow-[#0E1A2E]/5 border border-slate-100 mb-1.5 z-10" style={{ elevation: 12 }}>
                     <View className="absolute top-0 left-0 w-full h-full rounded-[24px] overflow-hidden opacity-[0.03] pointer-events-none">
                         <View className="w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
                     </View>
-                    
+
                     <View className="flex-row justify-between mb-3 items-center relative z-20">
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="arrow-up-circle" size={12} color="#f43f5e" />
@@ -1536,11 +1559,11 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                             </TouchableOpacity>
                         </View>
                     </View>
-                    
+
                     <View className="flex-row justify-between items-center relative z-20">
-                        <TextInput 
-                            className="text-3xl font-black text-[#0E1A2E] flex-1 p-0 h-10" 
-                            placeholder="0" 
+                        <TextInput
+                            className="text-3xl font-black text-[#0E1A2E] flex-1 p-0 h-10"
+                            placeholder="0"
                             value={amount}
                             onChangeText={setAmount}
                             keyboardType="numeric"
@@ -1553,7 +1576,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                             <Ionicons name="chevron-down" size={12} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
-                    
+
                     <View className="flex-row justify-between items-center mt-2 relative z-20">
                         <Text className="text-slate-400 font-bold text-[10px]">≈ ${(Number(amount || 0) * fromAsset.price_usd).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                         <View className="flex-row items-center gap-1 opacity-70">
@@ -1609,15 +1632,15 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                     <Text className="text-slate-400 font-black text-[8px] uppercase tracking-widest mb-1.5">Tx Speed</Text>
                     <View className="flex-row bg-slate-50 rounded-md p-1 border border-slate-100">
                         {['standard', 'fast', 'lightning'].map((speed) => (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 key={speed}
                                 onPress={() => setTxSpeed(speed as any)}
                                 className={["flex-1 py-1 rounded items-center justify-center", txSpeed === speed ? "bg-white shadow-sm border border-slate-200" : ""].filter(Boolean).join(" ")}
                             >
-                                <Ionicons 
-                                    name={speed === 'standard' ? 'bicycle' : speed === 'fast' ? 'car' : 'flash'} 
-                                    size={10} 
-                                    color={txSpeed === speed ? (speed === 'lightning' ? '#D9A73A' : '#0E1A2E') : '#94a3b8'} 
+                                <Ionicons
+                                    name={speed === 'standard' ? 'bicycle' : speed === 'fast' ? 'car' : 'flash'}
+                                    size={10}
+                                    color={txSpeed === speed ? (speed === 'lightning' ? '#D9A73A' : '#0E1A2E') : '#94a3b8'}
                                 />
                             </TouchableOpacity>
                         ))}
@@ -1632,7 +1655,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                     </View>
                     <View className="flex-row bg-slate-50 rounded-md p-1 border border-slate-100 gap-1">
                         {['0.5', '1.0', 'Auto'].map(slip => (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 key={slip}
                                 onPress={() => setSlippage(slip)}
                                 className={["flex-1 py-1 rounded items-center justify-center", slippage === slip ? "bg-white shadow-sm border border-slate-200" : ""].filter(Boolean).join(" ")}
@@ -1647,7 +1670,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
             {/* Advanced Quote Details - Sleek Card */}
             <View className="bg-white rounded-[20px] p-4 border border-slate-100 shadow-lg shadow-blue-900/5 mb-5 relative overflow-hidden" style={{ elevation: 3 }}>
                 <View className="absolute top-0 right-0 w-24 h-24 bg-[#D9A73A]/5 rounded-full -translate-y-12 translate-x-12" />
-                
+
                 <View className="flex-row justify-between mb-3 items-center">
                     <View className="flex-row items-center gap-2">
                         <View className="w-4 h-4 rounded-full bg-blue-50 items-center justify-center"><Ionicons name="git-compare" size={8} color="#3b82f6" /></View>
@@ -1669,7 +1692,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                         <View className="w-5 h-5 rounded-full bg-blue-50 border border-blue-100 items-center justify-center"><Ionicons name="shield-checkmark" size={10} color="#3b82f6" /></View>
                         <Text className="text-slate-600 font-black text-[10px] uppercase tracking-widest">Minimum Received</Text>
                     </View>
-                    <Text className="text-[#0E1A2E] font-black text-[10px]">{(expectedOut * (1 - (slippage === 'Auto' ? 0.005 : Number(slippage)/100))).toLocaleString(undefined, { maximumFractionDigits: 6 })} {toAsset.symbol}</Text>
+                    <Text className="text-[#0E1A2E] font-black text-[10px]">{(expectedOut * (1 - (slippage === 'Auto' ? 0.005 : Number(slippage) / 100))).toLocaleString(undefined, { maximumFractionDigits: 6 })} {toAsset.symbol}</Text>
                 </View>
 
                 <View className="flex-row justify-between mb-3 items-center">
@@ -1679,7 +1702,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                     </View>
                     <Text className="text-[#0E1A2E] font-black text-[10px]">Free (AbuMafhal Route)</Text>
                 </View>
-                
+
                 {/* Feature: Save to Contacts / History shortcut */}
                 <View className="border-t border-slate-100 pt-3 mt-1 flex-row justify-between items-center">
                     <Text className="text-slate-400 font-bold text-[9px]">Swap instantly across ABU-MAFHAL</Text>
@@ -1708,7 +1731,7 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
             </View>
 
             {/* Primary Action Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 activeOpacity={0.8}
                 disabled={isSwapping}
                 onPress={handleExecuteSwap}
@@ -1741,12 +1764,12 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                                 <Ionicons name="close" size={18} color="#0E1A2E" />
                             </TouchableOpacity>
                         </View>
-                        <FlatList 
+                        <FlatList
                             data={assets}
                             keyExtractor={item => item.id}
                             contentContainerStyle={{ padding: 12 }}
                             renderItem={({ item }) => (
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => selectAsset(item.id)}
                                     className="flex-row items-center justify-between bg-white p-3 rounded-[16px] mb-2 border border-slate-100 shadow-sm"
                                     style={{ elevation: 1 }}
@@ -1779,13 +1802,13 @@ function PortfolioView({ assets }: { assets: CryptoRate[] }) {
 
     return (
         <View className="flex-1">
-             <View className="px-4 pt-4 pb-2 mb-2">
+            <View className="px-4 pt-4 pb-2 mb-2">
                 <Text className="text-2xl font-black text-[#0E1A2E] mb-4 tracking-tight">Portfolio</Text>
                 <View className="flex-row bg-slate-200/60 p-1 rounded-xl">
                     {['Overview', 'History'].map(f => (
-                        <TouchableOpacity 
-                            key={f} 
-                            onPress={() => setFilter(f as any)} 
+                        <TouchableOpacity
+                            key={f}
+                            onPress={() => setFilter(f as any)}
                             className={`flex-1 py-2 items-center rounded-lg ${filter === f ? 'bg-white shadow-sm' : 'bg-transparent'}`}
                         >
                             <Text className={`font-black text-xs ${filter === f ? 'text-[#0E1A2E]' : 'text-slate-500'}`}>{f}</Text>
@@ -1810,9 +1833,9 @@ function PortfolioView({ assets }: { assets: CryptoRate[] }) {
                                 </View>
                             </View>
                             <View className="flex-row justify-center gap-4 w-full bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-emerald-500"/><Text className="text-xs font-black text-slate-700">USDT</Text></View>
-                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-blue-500"/><Text className="text-xs font-black text-slate-700">BTC</Text></View>
-                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-amber-500"/><Text className="text-xs font-black text-slate-700">SOL</Text></View>
+                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-emerald-500" /><Text className="text-xs font-black text-slate-700">USDT</Text></View>
+                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-blue-500" /><Text className="text-xs font-black text-slate-700">BTC</Text></View>
+                                <View className="flex-row items-center gap-1.5"><View className="w-3 h-3 rounded-full bg-amber-500" /><Text className="text-xs font-black text-slate-700">SOL</Text></View>
                             </View>
                         </View>
 
@@ -1820,16 +1843,16 @@ function PortfolioView({ assets }: { assets: CryptoRate[] }) {
                         {['USDT', 'BTC', 'SOL'].map((coin, i) => (
                             <View key={i} className="flex-row justify-between items-center bg-white p-4 rounded-2xl mb-3 border border-slate-100 shadow-sm">
                                 <View className="flex-row items-center gap-3">
-                                    <View className={`w-10 h-10 rounded-xl items-center justify-center ${i===0?'bg-emerald-50':'bg-amber-50'}`}>
-                                        <Text className={`font-black text-sm ${i===0?'text-emerald-600':'text-amber-600'}`}>{coin[0]}</Text>
+                                    <View className={`w-10 h-10 rounded-xl items-center justify-center ${i === 0 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                                        <Text className={`font-black text-sm ${i === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{coin[0]}</Text>
                                     </View>
                                     <View>
                                         <Text className="font-black text-slate-900 text-sm mb-0.5">{coin}</Text>
-                                        <Text className="text-[10px] text-slate-500 font-bold bg-slate-50 px-1.5 py-0.5 rounded self-start">{i===0?'1,000.00':'0.015'} {coin}</Text>
+                                        <Text className="text-[10px] text-slate-500 font-bold bg-slate-50 px-1.5 py-0.5 rounded self-start">{i === 0 ? '1,000.00' : '0.015'} {coin}</Text>
                                     </View>
                                 </View>
                                 <View className="items-end">
-                                    <Text className="font-black text-slate-900 text-base mb-0.5">${i===0?'1,000.00':'1,440.00'}</Text>
+                                    <Text className="font-black text-slate-900 text-base mb-0.5">${i === 0 ? '1,000.00' : '1,440.00'}</Text>
                                     <Text className="text-[10px] font-bold text-emerald-500">+1.2%</Text>
                                 </View>
                             </View>
@@ -1839,27 +1862,27 @@ function PortfolioView({ assets }: { assets: CryptoRate[] }) {
                     <>
                         <View className="flex-row gap-2 mb-4">
                             {['All', 'Buy', 'Sell', 'Swap'].map((t, i) => (
-                                <TouchableOpacity key={i} className={`px-4 py-2 rounded-xl ${i===0?'bg-[#0E1A2E]':'bg-white border border-slate-200'}`}>
-                                    <Text className={`font-black text-xs ${i===0?'text-white':'text-slate-600'}`}>{t}</Text>
+                                <TouchableOpacity key={i} className={`px-4 py-2 rounded-xl ${i === 0 ? 'bg-[#0E1A2E]' : 'bg-white border border-slate-200'}`}>
+                                    <Text className={`font-black text-xs ${i === 0 ? 'text-white' : 'text-slate-600'}`}>{t}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
-                        
+
                         <View className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             {[1, 2, 3, 4, 5].map((_, i) => (
-                                <View key={i} className={`flex-row justify-between items-center p-4 ${i!==4?'border-b border-slate-50':''}`}>
+                                <View key={i} className={`flex-row justify-between items-center p-4 ${i !== 4 ? 'border-b border-slate-50' : ''}`}>
                                     <View className="flex-row items-center gap-3">
-                                        <View className={`w-10 h-10 rounded-full items-center justify-center ${i%2===0 ? 'bg-blue-50' : 'bg-emerald-50'}`}>
-                                            <Ionicons name={i%2===0?'swap-horizontal':'arrow-down'} size={16} color={i%2===0 ? "#3b82f6" : "#10b981"} />
+                                        <View className={`w-10 h-10 rounded-full items-center justify-center ${i % 2 === 0 ? 'bg-blue-50' : 'bg-emerald-50'}`}>
+                                            <Ionicons name={i % 2 === 0 ? 'swap-horizontal' : 'arrow-down'} size={16} color={i % 2 === 0 ? "#3b82f6" : "#10b981"} />
                                         </View>
                                         <View>
-                                            <Text className="font-black text-slate-900 text-xs mb-0.5">{i%2===0?'Swap USDT for BTC':'Received USDT'}</Text>
+                                            <Text className="font-black text-slate-900 text-xs mb-0.5">{i % 2 === 0 ? 'Swap USDT for BTC' : 'Received USDT'}</Text>
                                             <Text className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Oct 12, 14:30</Text>
                                         </View>
                                     </View>
                                     <View className="items-end">
-                                        <Text className={`font-black text-sm mb-1 ${i%2===0?'text-slate-900':'text-emerald-500'}`}>
-                                            {i%2===0?'-100 USDT':'+50 USDT'}
+                                        <Text className={`font-black text-sm mb-1 ${i % 2 === 0 ? 'text-slate-900' : 'text-emerald-500'}`}>
+                                            {i % 2 === 0 ? '-100 USDT' : '+50 USDT'}
                                         </Text>
                                         <View className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
                                             <Text className="text-[8px] text-emerald-600 font-black uppercase tracking-wider">Completed</Text>
@@ -1876,7 +1899,7 @@ function PortfolioView({ assets }: { assets: CryptoRate[] }) {
 }
 
 function SettingsView() {
-    const SettingRow = ({ icon, title, value, color="#0E1A2E", toggle=false }: any) => (
+    const SettingRow = ({ icon, title, value, color = "#0E1A2E", toggle = false }: any) => (
         <TouchableOpacity className="flex-row items-center justify-between py-4 border-b border-slate-50">
             <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-xl items-center justify-center bg-slate-50 border border-slate-100 shadow-sm">
