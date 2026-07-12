@@ -39,7 +39,19 @@ const DEFAULT_SETTINGS: AppSettings = {
     funding_fee_type: 'fixed',
     funding_fee_value: '0',
     company_name: 'MAFHAL SUB',
-    app_logo: ''
+    app_logo: '',
+    // Crypto Defaults
+    crypto_enabled_btc: true,
+    crypto_enabled_usdt: true,
+    crypto_enabled_eth: false,
+    crypto_fee_trc20_usdt: '1.5',
+    crypto_fee_btc: '0.0005',
+    crypto_rate_btc_buy: '86500000',
+    crypto_rate_btc_sell: '85000000',
+    crypto_rate_usdt_buy: '1480',
+    crypto_rate_usdt_sell: '1460',
+    crypto_rate_eth_buy: '4500000',
+    crypto_rate_eth_sell: '4300000'
 };
 
 export function useAppSettings() {

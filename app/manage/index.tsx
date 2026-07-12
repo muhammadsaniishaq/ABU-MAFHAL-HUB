@@ -49,6 +49,7 @@ const modules = {
         { title: 'Analytics', icon: 'bar-chart-outline', route: '/manage/reports', color: '#F59E0B' },
         { title: 'Comms Center', icon: 'megaphone-outline', route: '/manage/communications', color: '#F472B6' },
         { title: 'Cortex AI', icon: 'sparkles-outline', route: '/manage/ai', color: '#818CF8', dark: true },
+        { title: 'Crypto Mgmt', icon: 'logo-bitcoin', route: '/manage/crypto', color: '#F7931A' },
     ],
     technical: [
         { title: 'Infra', icon: 'server-outline', route: '/manage/infrastructure', color: '#475569' },

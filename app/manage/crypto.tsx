@@ -2,7 +2,8 @@ import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, Style
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useCryptoManager } from '../../hooks/useCryptoManager';
 
 const { width } = Dimensions.get('window');
 const T = {
@@ -18,8 +19,23 @@ const T = {
 
 export default function CryptoManager() {
     const router = useRouter();
-    const [enabledCoins, setEnabledCoins] = useState({ btc: true, usdt: true, eth: false, sol: true });
+    const { settings, stats, loading, updateSetting } = useCryptoManager();
     const [activeTab, setActiveTab] = useState('overview');
+
+    // Local state for text inputs to avoid jumping during typing
+    const [feeTrc20, setFeeTrc20] = useState('');
+    const [feeBtc, setFeeBtc] = useState('');
+
+    useEffect(() => {
+        setFeeTrc20(settings.crypto_fee_trc20_usdt || '1.5');
+        setFeeBtc(settings.crypto_fee_btc || '0.0005');
+    }, [settings.crypto_fee_trc20_usdt, settings.crypto_fee_btc]);
+
+    const handleSaveFees = () => {
+        updateSetting('crypto_fee_trc20_usdt', feeTrc20);
+        updateSetting('crypto_fee_btc', feeBtc);
+        alert('Fees Updated Successfully!');
+    };
 
     return (
         <View style={s.container}>
@@ -41,7 +57,7 @@ export default function CryptoManager() {
                         </View>
                         <TouchableOpacity style={s.headerActionBtn}>
                             <Ionicons name="notifications-outline" size={20} color={T.gold} />
-                            <View style={s.badge} />
+                            {stats.pendingWithdrawals > 0 && <View style={s.badge} />}
                         </TouchableOpacity>
                     </View>
 
@@ -49,25 +65,25 @@ export default function CryptoManager() {
                     <View style={s.statsWrapper}>
                         <View style={s.statBox}>
                             <Text style={s.statLabel}>24h Volume</Text>
-                            <Text style={s.statValue}>₦ 142.5M</Text>
+                            <Text style={s.statValue}>₦ {stats.totalVolume24h.toLocaleString()}</Text>
                             <View style={s.trendTag}>
                                 <Ionicons name="caret-up" size={10} color="#10B981" />
-                                <Text style={s.trendTagTxt}>14.5%</Text>
+                                <Text style={s.trendTagTxt}>Live</Text>
                             </View>
                         </View>
                         <View style={s.statDivider} />
                         <View style={s.statBox}>
                             <Text style={s.statLabel}>Total Liquidity</Text>
-                            <Text style={s.statValue}>$ 840,200</Text>
+                            <Text style={s.statValue}>API Syncing...</Text>
                             <View style={[s.trendTag, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                                <Ionicons name="caret-down" size={10} color="#EF4444" />
-                                <Text style={[s.trendTagTxt, { color: '#EF4444' }]}>2.1%</Text>
+                                <Ionicons name="sync" size={10} color="#EF4444" />
+                                <Text style={[s.trendTagTxt, { color: '#EF4444' }]}>Pending</Text>
                             </View>
                         </View>
                         <View style={s.statDivider} />
                         <View style={s.statBox}>
                             <Text style={s.statLabel}>Active P2P</Text>
-                            <Text style={s.statValue}>48 Open</Text>
+                            <Text style={s.statValue}>{stats.p2pPending} Open</Text>
                             <View style={[s.trendTag, { backgroundColor: 'rgba(245,166,35,0.1)' }]}>
                                 <Ionicons name="radio-button-on" size={10} color="#f5a623" />
                                 <Text style={[s.trendTagTxt, { color: '#f5a623' }]}>Live</Text>
@@ -97,29 +113,26 @@ export default function CryptoManager() {
                 
                 {activeTab === 'overview' && (
                     <>
-                        {/* Premium Chart Placeholder */}
                         <View style={s.chartCard}>
                             <View style={s.chartHeader}>
                                 <Text style={s.chartTitle}>Platform Revenue (7D)</Text>
                                 <Ionicons name="bar-chart" size={20} color="#64748B" />
                             </View>
                             <LinearGradient colors={['rgba(245,166,35,0.2)', 'transparent']} style={s.chartGraphBox}>
-                                <Text style={s.chartAmount}>₦ 4,820,000</Text>
-                                <Text style={s.chartSub}>Total accumulated fees</Text>
-                                {/* Simulated Graph Line */}
+                                <Text style={s.chartAmount}>₦ {stats.totalRevenue7d.toLocaleString()}</Text>
+                                <Text style={s.chartSub}>Total accumulated fees from transactions</Text>
                                 <View style={s.graphLine} />
                             </LinearGradient>
                         </View>
 
-                        {/* Quick Grid */}
                         <View style={s.quickGrid}>
                             <TouchableOpacity style={s.quickCard}>
                                 <LinearGradient colors={['rgba(59,130,246,0.1)', 'transparent']} style={s.quickCardBg} />
                                 <View style={[s.quickIconBox, { backgroundColor: '#3B82F6' }]}>
                                     <Ionicons name="wallet" size={20} color="#fff" />
                                 </View>
-                                <Text style={s.quickCardTitle}>Hot Wallets</Text>
-                                <Text style={s.quickCardSub}>Manage liquidity</Text>
+                                <Text style={s.quickCardTitle}>User Balances</Text>
+                                <Text style={s.quickCardSub}>View active wallets</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity style={s.quickCard}>
@@ -128,25 +141,26 @@ export default function CryptoManager() {
                                     <Ionicons name="warning" size={20} color="#fff" />
                                 </View>
                                 <Text style={s.quickCardTitle}>Disputes</Text>
-                                <Text style={s.quickCardSub}>2 Escrow claims</Text>
+                                <Text style={s.quickCardSub}>{stats.p2pDisputed} Escrow claims</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Recent Transactions Alert */}
-                        <View style={s.alertCard}>
-                            <LinearGradient colors={['#FEF2F2', '#FEF2F2']} style={StyleSheet.absoluteFillObject} style={{ borderRadius: 16 }} />
-                            <View style={s.alertIconBox}>
-                                <Ionicons name="time" size={24} color="#EF4444" />
+                        {stats.pendingWithdrawals > 0 && (
+                            <View style={s.alertCard}>
+                                <LinearGradient colors={['#FEF2F2', '#FEF2F2']} style={[StyleSheet.absoluteFillObject, { borderRadius: 16 }]} />
+                                <View style={s.alertIconBox}>
+                                    <Ionicons name="time" size={24} color="#EF4444" />
+                                </View>
+                                <View style={{ flex: 1, paddingLeft: 12 }}>
+                                    <Text style={s.alertTitle}>{stats.pendingWithdrawals} Pending Withdrawals</Text>
+                                    <Text style={s.alertDesc}>High value withdrawals requiring manual approval from admin.</Text>
+                                    <TouchableOpacity style={s.alertAction}>
+                                        <Text style={s.alertActionTxt}>Review Queue</Text>
+                                        <Ionicons name="arrow-forward" size={14} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                            <View style={{ flex: 1, paddingLeft: 12 }}>
-                                <Text style={s.alertTitle}>3 High-Value Withdrawals</Text>
-                                <Text style={s.alertDesc}>Amounts exceeding $5k require manual admin approval.</Text>
-                                <TouchableOpacity style={s.alertAction}>
-                                    <Text style={s.alertActionTxt}>Review Queue</Text>
-                                    <Ionicons name="arrow-forward" size={14} color="#EF4444" />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+                        )}
                     </>
                 )}
 
@@ -162,14 +176,15 @@ export default function CryptoManager() {
                                     </View>
                                     <View>
                                         <Text style={s.coinName}>Bitcoin (BTC)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦86.5M | Sell: ₦85.0M</Text>
+                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_btc_buy || '86.5M'} | Sell: ₦{settings.crypto_rate_btc_sell || '85.0M'}</Text>
                                     </View>
                                 </View>
                                 <Switch 
-                                    value={enabledCoins.btc} 
-                                    onValueChange={(v) => setEnabledCoins({...enabledCoins, btc: v})}
+                                    value={settings.crypto_enabled_btc} 
+                                    onValueChange={(v) => updateSetting('crypto_enabled_btc', v)}
                                     trackColor={{ false: '#e2e8f0', true: '#10B981' }}
                                     thumbColor="#fff"
+                                    disabled={loading}
                                 />
                             </View>
                             <View style={s.divider} />
@@ -182,14 +197,15 @@ export default function CryptoManager() {
                                     </View>
                                     <View>
                                         <Text style={s.coinName}>Tether (USDT)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦1,480 | Sell: ₦1,460</Text>
+                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_usdt_buy || '1,480'} | Sell: ₦{settings.crypto_rate_usdt_sell || '1,460'}</Text>
                                     </View>
                                 </View>
                                 <Switch 
-                                    value={enabledCoins.usdt} 
-                                    onValueChange={(v) => setEnabledCoins({...enabledCoins, usdt: v})}
+                                    value={settings.crypto_enabled_usdt} 
+                                    onValueChange={(v) => updateSetting('crypto_enabled_usdt', v)}
                                     trackColor={{ false: '#e2e8f0', true: '#10B981' }}
                                     thumbColor="#fff"
+                                    disabled={loading}
                                 />
                             </View>
                             <View style={s.divider} />
@@ -202,14 +218,15 @@ export default function CryptoManager() {
                                     </View>
                                     <View>
                                         <Text style={s.coinName}>Ethereum (ETH)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦4.5M | Sell: ₦4.3M</Text>
+                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_eth_buy || '4.5M'} | Sell: ₦{settings.crypto_rate_eth_sell || '4.3M'}</Text>
                                     </View>
                                 </View>
                                 <Switch 
-                                    value={enabledCoins.eth} 
-                                    onValueChange={(v) => setEnabledCoins({...enabledCoins, eth: v})}
+                                    value={settings.crypto_enabled_eth} 
+                                    onValueChange={(v) => updateSetting('crypto_enabled_eth', v)}
                                     trackColor={{ false: '#e2e8f0', true: '#10B981' }}
                                     thumbColor="#fff"
+                                    disabled={loading}
                                 />
                             </View>
 
@@ -231,7 +248,7 @@ export default function CryptoManager() {
                                     <Text style={s.feeSubLabel}>Tron Network</Text>
                                 </View>
                                 <View style={s.feeInputBox}>
-                                    <TextInput style={s.feeInput} defaultValue="1.5" keyboardType="numeric" />
+                                    <TextInput style={s.feeInput} value={feeTrc20} onChangeText={setFeeTrc20} keyboardType="numeric" />
                                     <Text style={s.feeSuffix}>USDT</Text>
                                 </View>
                             </View>
@@ -242,16 +259,15 @@ export default function CryptoManager() {
                                     <Text style={s.feeSubLabel}>Bitcoin Network</Text>
                                 </View>
                                 <View style={s.feeInputBox}>
-                                    <TextInput style={s.feeInput} defaultValue="0.0005" keyboardType="numeric" />
+                                    <TextInput style={s.feeInput} value={feeBtc} onChangeText={setFeeBtc} keyboardType="numeric" />
                                     <Text style={s.feeSuffix}>BTC</Text>
                                 </View>
                             </View>
-                            <TouchableOpacity style={s.saveFeesBtn}>
-                                <Text style={s.saveFeesTxt}>Save Fee Config</Text>
+                            <TouchableOpacity style={s.saveFeesBtn} onPress={handleSaveFees}>
+                                <Text style={s.saveFeesTxt}>{loading ? 'Saving...' : 'Save Fee Config'}</Text>
                             </TouchableOpacity>
                         </View>
                         
-                        {/* API Connections */}
                         <Text style={s.sectionTitle}>Exchange API Nodes</Text>
                         <View style={s.card}>
                             <View style={s.nodeRow}>
@@ -274,17 +290,17 @@ export default function CryptoManager() {
                         <View style={s.card}>
                             <View style={s.p2pStatRow}>
                                 <View style={s.p2pStat}>
-                                    <Text style={s.p2pStatVal}>214</Text>
+                                    <Text style={s.p2pStatVal}>{stats.p2pCompleted}</Text>
                                     <Text style={s.p2pStatLabel}>Completed</Text>
                                 </View>
                                 <View style={s.statDivider} />
                                 <View style={s.p2pStat}>
-                                    <Text style={[s.p2pStatVal, { color: '#f5a623' }]}>48</Text>
+                                    <Text style={[s.p2pStatVal, { color: '#f5a623' }]}>{stats.p2pPending}</Text>
                                     <Text style={s.p2pStatLabel}>Pending</Text>
                                 </View>
                                 <View style={s.statDivider} />
                                 <View style={s.p2pStat}>
-                                    <Text style={[s.p2pStatVal, { color: '#EF4444' }]}>2</Text>
+                                    <Text style={[s.p2pStatVal, { color: '#EF4444' }]}>{stats.p2pDisputed}</Text>
                                     <Text style={s.p2pStatLabel}>Disputed</Text>
                                 </View>
                             </View>
@@ -300,6 +316,7 @@ export default function CryptoManager() {
         </View>
     );
 }
+
 
 const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: T.bg },
