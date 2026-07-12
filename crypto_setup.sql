@@ -5,6 +5,7 @@ VALUES
     ('crypto_enabled_btc', 'true'),
     ('crypto_enabled_usdt', 'true'),
     ('crypto_enabled_eth', 'false'),
+    ('crypto_maintenance_mode', 'false'),
     ('crypto_fee_trc20_usdt', '1.5'),
     ('crypto_fee_btc', '0.0005'),
     ('crypto_rate_btc_buy', '86500000'),

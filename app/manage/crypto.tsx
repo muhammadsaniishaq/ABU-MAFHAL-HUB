@@ -362,6 +362,28 @@ export default function CryptoManager() {
 
                 {activeTab === 'networks' && (
                     <>
+                        <Text style={s.sectionTitle}>Global Engine Control</Text>
+                        <View style={s.card}>
+                            <View style={s.coinRow}>
+                                <View style={s.coinInfo}>
+                                    <View style={[s.coinIcon, { backgroundColor: '#FEE2E2' }]}>
+                                        <Ionicons name="power" size={22} color="#EF4444" />
+                                    </View>
+                                    <View>
+                                        <Text style={[s.coinName, { color: '#EF4444' }]}>Maintenance Mode</Text>
+                                        <Text style={s.coinRate}>Disable all crypto features for users</Text>
+                                    </View>
+                                </View>
+                                <Switch 
+                                    value={settings.crypto_maintenance_mode} 
+                                    onValueChange={(v) => updateSetting('crypto_maintenance_mode', v)}
+                                    trackColor={{ false: '#e2e8f0', true: '#EF4444' }}
+                                    thumbColor="#fff"
+                                    disabled={loading}
+                                />
+                            </View>
+                        </View>
+
                         <Text style={s.sectionTitle}>Network & Gas Fees</Text>
                         <View style={s.card}>
                             <View style={s.feeRow}>
