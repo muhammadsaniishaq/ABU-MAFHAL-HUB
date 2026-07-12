@@ -1,5 +1,6 @@
-import { View, Text, SectionList, ActivityIndicator, TouchableOpacity, Alert, TextInput, Dimensions, Animated as RNAnimated } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, SectionList, ActivityIndicator, TouchableOpacity, Alert, TextInput, Dimensions, Animated as RNAnimated, Share, RefreshControl } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -19,15 +20,15 @@ const NotificationSkeleton = () => {
     }, []);
     
     return (
-        <View className="bg-white/80 p-4 rounded-xl mb-3 shadow-sm border border-white/50 flex-row">
-            <View className="w-10 h-10 rounded-full bg-gray-200/50 mr-4" />
+        <View className="bg-white p-3 rounded-2xl mb-2 shadow-sm border border-slate-100 flex-row">
+            <View className="w-10 h-10 rounded-full bg-gray-200 mr-3" />
             <View className="flex-1">
                 <View className="flex-row justify-between mb-2">
-                    <View className="h-4 w-24 bg-gray-200/50 rounded" />
-                    <View className="h-3 w-12 bg-gray-200/50 rounded" />
+                    <View className="h-3 w-20 bg-gray-200 rounded" />
+                    <View className="h-2 w-10 bg-gray-200 rounded" />
                 </View>
-                <View className="h-3 w-full bg-gray-200/50 rounded mb-1" />
-                <View className="h-3 w-3/4 bg-gray-200/50 rounded" />
+                <View className="h-2 w-full bg-gray-200 rounded mb-1" />
+                <View className="h-2 w-2/3 bg-gray-200 rounded" />
             </View>
         </View>
     );
@@ -36,6 +37,9 @@ const NotificationSkeleton = () => {
 export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [sortAsc, setSortAsc] = useState(false); // NEW FEATURE: SORT ORDER
     const [filter, setFilter] = useState<'all' | 'unread' | 'high'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     
@@ -43,6 +47,7 @@ export default function NotificationsScreen() {
     const [deletedItem, setDeletedItem] = useState<{ item: any, index: number } | null>(null);
     const [showUndo, setShowUndo] = useState(false);
     const undoTimeout = useRef<NodeJS.Timeout | null>(null);
+    const router = useRouter();
 
     // Header Blur Effect for Background
     const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -64,6 +69,13 @@ export default function NotificationsScreen() {
         }
     };
 
+    const onRefresh = async () => {
+        setRefreshing(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        await fetchNotifications();
+        setRefreshing(false);
+    };
+
     const subscribeToNotifications = () => {
         const channel = supabase.channel('notifications-modern').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, 
                 (payload) => setNotifications((prev) => [payload.new, ...prev]))
@@ -76,6 +88,15 @@ export default function NotificationsScreen() {
         const updated = notifications.map(n => n.id === item.id ? { ...n, is_read: status } : n);
         setNotifications(updated);
         await supabase.from('notifications').update({ is_read: status }).eq('id', item.id);
+    };
+
+    const handlePressNotification = (item: any) => {
+        if (!item.is_read) {
+            markAsRead(item, true);
+        }
+        if (item.data?.route) {
+            router.push(item.data.route);
+        }
     };
 
     const markAllAsRead = async () => {
@@ -134,6 +155,16 @@ export default function NotificationsScreen() {
         ]);
     };
 
+    const shareNotification = async (item: any) => {
+        try {
+            await Share.share({
+                message: `*${item.title}*\n\n${item.body}\n\n- Shared via Abu Mafhal Sub`,
+            });
+        } catch (error: any) {
+            Alert.alert("Share Failed", error.message);
+        }
+    };
+
     // Derived State for Badges
     const counts = useMemo(() => ({
         all: notifications.length,
@@ -175,16 +206,15 @@ export default function NotificationsScreen() {
     };
 
     const FilterTab = ({ label, value, count }: { label: string, value: 'all' | 'unread' | 'high', count: number }) => (
-        <TouchableOpacity onPress={() => setFilter(value)} className={`px-4 py-2 rounded-full mr-2 flex-row items-center ${filter === value ? 'bg-indigo-600 shadow-xl' : 'bg-white/80 border border-white/50'}`}>
-            <Text className={`font-bold mr-1 ${filter === value ? 'text-white' : 'text-slate-600'}`}>{label}</Text>
+        <TouchableOpacity onPress={() => setFilter(value)} className={`px-2 py-1 rounded-full mr-1.5 flex-row items-center ${filter === value ? 'bg-[#f5a623] shadow-sm' : 'bg-transparent border border-[#f5a623]/30'}`}>
+            <Text className={`font-bold mr-1 text-[9px] uppercase ${filter === value ? 'text-[#0d1b3e]' : 'text-[#f5a623]'}`}>{label}</Text>
             {count > 0 && (
-                <View className={`rounded-full px-1.5 py-0.5 ${filter === value ? 'bg-white/30' : 'bg-slate-200/50'}`}>
-                    <Text className={`text-[10px] font-bold ${filter === value ? 'text-white' : 'text-slate-500'}`}>{count}</Text>
+                <View className={`rounded-full px-1 py-0.5 ${filter === value ? 'bg-[#0d1b3e]' : 'bg-[#f5a623]/20'}`}>
+                    <Text className={`text-[8px] font-bold ${filter === value ? 'text-[#f5a623]' : 'text-[#f5a623]'}`}>{count}</Text>
                 </View>
             )}
         </TouchableOpacity>
     );
-
     // Swipeable Item
     const renderSwipeableItem = ({ item }: { item: any }) => {
         const renderRightActions = (_progress: any, dragX: any) => {
@@ -194,7 +224,7 @@ export default function NotificationsScreen() {
                 extrapolate: 'clamp',
             });
             return (
-                <TouchableOpacity onPress={() => confirmDelete(item.id, item)} className="bg-rose-500 justify-center items-center w-20 h-full rounded-2xl my-1 ml-2 shadow-sm">
+                <TouchableOpacity onPress={() => confirmDelete(item.id, item)} className="bg-[#ef4444] justify-center items-center w-20 h-full rounded-2xl my-1 ml-2 shadow-sm">
                     <RNAnimated.View style={{ transform: [{ scale }] }}>
                         <Ionicons name="trash" size={24} color="white" />
                     </RNAnimated.View>
@@ -202,38 +232,96 @@ export default function NotificationsScreen() {
             );
         };
 
+        const renderLeftActions = (_progress: any, dragX: any) => {
+            const scale = dragX.interpolate({
+                inputRange: [0, 80],
+                outputRange: [0, 1],
+                extrapolate: 'clamp',
+            });
+            return (
+                <TouchableOpacity onPress={() => markAsRead(item, !item.is_read)} className="bg-[#f5a623] justify-center items-center w-20 h-full rounded-2xl my-1 mr-2 shadow-sm">
+                    <RNAnimated.View style={{ transform: [{ scale }] }}>
+                        <Ionicons name={item.is_read ? "mail-unread" : "mail-open"} size={24} color="#0d1b3e" />
+                    </RNAnimated.View>
+                </TouchableOpacity>
+            );
+        };
+
         const isHigh = item.data?.priority === 'high';
+        const hasAction = !!item.data?.route;
 
         return (
             <Animated.View entering={FadeInUp} layout={Layout.springify()}>
-                <Swipeable renderRightActions={renderRightActions}>
+                <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>
                     <TouchableOpacity 
                         activeOpacity={0.8}
-                        onPress={() => markAsRead(item, !item.is_read)}
-                        className={`p-4 rounded-3xl mb-3 shadow-sm border border-white/60 relative overflow-hidden ${!item.is_read ? 'bg-white/95' : 'bg-white/60'}`}
+                        onPress={() => handlePressNotification(item)}
+                        onLongPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                            Alert.alert("Options", "What do you want to do?", [
+                                { text: "Cancel", style: "cancel" },
+                                { text: "Copy Text", onPress: async () => { await Clipboard.setStringAsync(item.body); Alert.alert("Copied!"); } },
+                                { text: item.is_read ? "Mark as Unread" : "Mark as Read", onPress: () => markAsRead(item, !item.is_read) },
+                                { text: "Delete", style: "destructive", onPress: () => confirmDelete(item.id, item) }
+                            ])
+                        }}
+                        className={`mb-1.5 mx-2 rounded-2xl overflow-hidden bg-white shadow-sm border ${!item.is_read ? 'border-[#f5a623]/40 shadow-[#f5a623]/20' : 'border-slate-100'}`}
                     >
-                        {/* Status Indicator Line */}
-                        {!item.is_read && <View className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500" />}
+                        <View className={`p-2.5 flex-row items-start`}>
+                        {/* Status Indicator Dot (Modern Light) */}
+                        {!item.is_read && <View className="absolute left-2.5 top-1/2 w-1.5 h-1.5 rounded-full bg-[#f5a623]" style={{ transform: [{ translateY: -3 }] }} />}
                         
-                        <View className="flex-row items-start">
-                             {/* Icon with Soft Background */}
-                            <View className={`w-12 h-12 rounded-2xl items-center justify-center mr-4 ${isHigh ? 'bg-rose-500/10' : 'bg-indigo-500/10'}`}>
-                                <Ionicons name={isHigh ? 'warning' : 'notifications'} size={24} color={isHigh ? '#F43F5E' : '#6366F1'} />
-                            </View>
+                        <View className={`flex-row items-start z-10 ${!item.is_read ? 'ml-2.5' : 'ml-0'}`}>
+                             {/* Gradient Icon Box */}
+                            <LinearGradient 
+                                colors={isHigh ? ['#fee2e2', '#fecaca'] : (!item.is_read ? ['#fef3c7', '#fde68a'] : ['#f1f5f9', '#e2e8f0'])}
+                                className="w-8 h-8 rounded-full items-center justify-center mr-2.5"
+                            >
+                                <Ionicons name={isHigh ? 'warning' : 'notifications'} size={14} color={isHigh ? '#ef4444' : (!item.is_read ? '#f5a623' : '#94a3b8')} />
+                            </LinearGradient>
                             
                             <View className="flex-1">
-                                <View className="flex-row justify-between items-start mb-1">
-                                    <Text className={`text-[16px] flex-1 mr-2 ${!item.is_read ? 'font-bold text-slate-800' : 'font-semibold text-slate-600'}`}>
-                                        {item.title}
-                                    </Text>
-                                    <View className="bg-slate-200/50 px-2 py-1 rounded-lg">
-                                        <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                            {new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                <View className="flex-row justify-between items-center mb-0.5">
+                                    <View className="flex-1 mr-1">
+                                        <Text className={`text-[12px] ${!item.is_read ? 'font-black text-[#0d1b3e]' : 'font-bold text-slate-600'}`} numberOfLines={1}>
+                                            {item.title}
                                         </Text>
                                     </View>
+                                    <Text className="text-[9px] text-slate-400 font-medium">
+                                        {new Date(item.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                    </Text>
                                 </View>
-                                <Text className={`leading-5 text-[14px] ${!item.is_read ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>{item.body}</Text>
+                                
+                                {item.type && item.type !== 'general' && (
+                                    <View className="bg-slate-100 self-start px-1.5 py-0.5 rounded flex-row items-center mb-1">
+                                        <Text className="text-slate-500 text-[8px] font-bold uppercase tracking-wider">{item.type}</Text>
+                                    </View>
+                                )}
+                                
+                                <Text className={`leading-tight text-[11px] ${!item.is_read ? 'text-slate-600' : 'text-slate-500'}`} numberOfLines={2}>{item.body}</Text>
+                                
+                                <View className="flex-row mt-1.5 gap-1.5">
+                                    {hasAction && (
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                markAsRead(item, true);
+                                                router.push(item.data.route);
+                                            }}
+                                            className="bg-[#0d1b3e] px-2.5 py-1 rounded-full flex-row items-center shadow-sm"
+                                        >
+                                            <Text className="text-[#f5a623] font-bold text-[9px] mr-1 uppercase">View</Text>
+                                            <Ionicons name="chevron-forward" size={9} color="#f5a623" />
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity 
+                                        onPress={() => shareNotification(item)}
+                                        className="bg-slate-50 px-2 py-1 rounded-full flex-row items-center border border-slate-200"
+                                    >
+                                        <Ionicons name="share-outline" size={10} color="#64748b" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
+                        </View>
                         </View>
                     </TouchableOpacity>
                 </Swipeable>
@@ -244,94 +332,120 @@ export default function NotificationsScreen() {
     return (
         <GestureHandlerRootView className="flex-1 bg-slate-50">
             <StatusBar style="dark" />
+            <Stack.Screen options={{ headerShown: false }} />
 
-            {/* 🔥 Ultra-Modern Background Blobs (Premium Feel) */}
-            <View className="absolute inset-0 overflow-hidden pointer-events-none">
-                <LinearGradient
-                    colors={['rgba(99, 102, 241, 0.08)', 'rgba(168, 85, 247, 0.08)']}
-                    className="absolute -top-[10%] -left-[20%] w-[120%] h-[50%] rounded-full transform -rotate-12"
-                />
-                <LinearGradient
-                    colors={['rgba(236, 72, 153, 0.08)', 'transparent']}
-                    className="absolute top-[40%] -right-[30%] w-[100%] h-[60%] rounded-full"
-                />
-                 <LinearGradient
-                    colors={['rgba(59, 130, 246, 0.05)', 'transparent']}
-                    className="absolute bottom-[-10%] left-[-10%] w-[100%] h-[40%] rounded-full"
-                />
-            </View>
-
-            <Stack.Screen options={{ 
-                title: 'Notifications', 
-                headerTintColor: '#1E293B',
-                headerTransparent: true,
-                headerBlurEffect: 'regular',
-                headerBackground: () => <BlurView intensity={80} tint="light" style={{ flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.7)' }} />,
-                headerRight: () => (
-                    <View className="flex-row items-center gap-3">
-                        <TouchableOpacity onPress={markAllAsRead}>
-                            <Ionicons name="checkmark-done-circle" size={24} color="#4F46E5" />
+            {/* Light Mode Premium Header */}
+            <View className="z-20 bg-white border-b border-slate-100 shadow-sm pb-3 pt-12 px-4 rounded-b-3xl">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center border border-slate-100">
+                            <Ionicons name="arrow-back" size={20} color="#0d1b3e" />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={clearAll}>
-                            <Ionicons name="trash-bin-outline" size={22} color="#EF4444" />
-                        </TouchableOpacity>
+                        
+                        <View className="flex-1 items-center">
+                            <Text className="text-[#0d1b3e] font-black text-[17px] tracking-wide">Notifications</Text>
+                            {counts.unread > 0 && (
+                                <View className="bg-[#f5a623]/10 px-2.5 py-0.5 rounded-full mt-1 border border-[#f5a623]/30">
+                                    <Text className="text-[#f5a623] text-[10px] font-bold uppercase">{counts.unread} New Alerts</Text>
+                                </View>
+                            )}
+                        </View>
+                        
+                        <View className="flex-row gap-2">
+                            <TouchableOpacity 
+                                onPress={() => { Alert.alert("Settings", "Notification Preferences Coming Soon!"); }} 
+                                className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center border border-slate-100"
+                            >
+                                <Ionicons name="settings-outline" size={18} color="#0d1b3e" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                )
-            }} />
 
-            {/* Using inline style to ensure padding applies correctly. 160 roughly accounts for transparent header + safe area */}
-            <View style={{ paddingTop: 160 }} className="flex-1">
-                {/* Search & Filter Header */}
-                <View className="px-5 pb-4 z-10">
-                    <View className="flex-row items-center bg-white/90 p-2 rounded-[20px] shadow-sm border border-white/60 mb-5">
+                    {/* Quick Tools Row (Mute, Sort, Read All) */}
+                    <View className="flex-row justify-between items-center mb-3">
+                        <View className="flex-row gap-2">
+                             <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSortAsc(!sortAsc); }} className="px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 flex-row items-center">
+                                <Ionicons name="swap-vertical" size={12} color="#64748b" />
+                                <Text className="text-[10px] font-bold text-slate-600 ml-1">Sort</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setIsMuted(!isMuted)} className={`px-3 py-1.5 rounded-full border flex-row items-center ${isMuted ? 'bg-[#fee2e2] border-[#f87171]' : 'bg-slate-50 border-slate-200'}`}>
+                                <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={12} color={isMuted ? "#ef4444" : "#64748b"} />
+                                <Text className={`text-[10px] font-bold ml-1 ${isMuted ? 'text-red-500' : 'text-slate-600'}`}>{isMuted ? 'Muted' : 'Sound'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View className="flex-row gap-2">
+                            <TouchableOpacity onPress={markAllAsRead} className="px-3 py-1.5 rounded-full bg-[#0d1b3e] flex-row items-center shadow-sm">
+                                <Ionicons name="checkmark-done" size={12} color="#f5a623" />
+                                <Text className="text-[#f5a623] text-[10px] font-bold ml-1">Read All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={clearAll} className="w-8 h-8 rounded-full bg-rose-50 items-center justify-center border border-rose-100">
+                                <Ionicons name="trash" size={14} color="#ef4444" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Modern Search Bar */}
+                    <View className="flex-row items-center bg-slate-50 rounded-2xl p-1 shadow-sm border border-slate-100 mb-2">
                         <View className="p-2 ml-1">
-                            <Ionicons name="search" size={20} color="#94A3B8" />
+                            <Ionicons name="search" size={18} color="#94A3B8" />
                         </View>
                         <TextInput 
-                            placeholder="Search alerts..."
+                            placeholder="Search in notifications..."
                             value={searchQuery}
                             onChangeText={setSearchQuery}
-                            className="flex-1 font-semibold text-slate-700 text-base"
+                            className="flex-1 font-medium text-[#0d1b3e] text-[13px] h-10"
                             placeholderTextColor="#94A3B8"
                         />
-                         {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')} className="p-2">
-                                <Ionicons name="close-circle" size={18} color="#CBD5E1" />
+                         {searchQuery.length > 0 ? (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} className="p-2 mr-1">
+                                <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity onPress={() => Alert.alert("Voice Search", "Coming Soon!")} className="p-2 mr-1">
+                                <Ionicons name="mic" size={18} color="#94A3B8" />
                             </TouchableOpacity>
                         )}
                     </View>
 
-                    <View className="flex-row">
+                    <View className="flex-row px-1">
                         <FilterTab label="All" value="all" count={counts.all} />
                         <FilterTab label="Unread" value="unread" count={counts.unread} />
                         <FilterTab label="Urgent" value="high" count={counts.high} />
                     </View>
-                </View>
+            </View>
+
+            <View className="flex-1 z-10 pt-2">
 
                 {loading ? (
-                    <View className="px-4 pt-4">
-                        <NotificationSkeleton />
+                    <View className="px-2 pt-2">
                         <NotificationSkeleton />
                         <NotificationSkeleton />
                     </View>
                 ) : (
                     <SectionList
-                        sections={getFilteredAndGrouped()}
+                        sections={sortAsc ? getFilteredAndGrouped().reverse() : getFilteredAndGrouped()}
                         keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+                        contentContainerStyle={{ paddingBottom: 100 }}
                         showsVerticalScrollIndicator={false}
-                        stickySectionHeadersEnabled={false}
+                        stickySectionHeadersEnabled={true}
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f5a623" />
+                        }
                         renderSectionHeader={({ section: { title } }) => (
-                            <Text className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-2 mt-4 ml-1">{title}</Text>
+                            <View className="py-2 items-center bg-slate-50/90">
+                                <View className="px-4 py-1.5 rounded-full overflow-hidden border border-slate-200 bg-white shadow-sm">
+                                    <Text className="text-[#0d1b3e] font-bold text-[11px] uppercase tracking-wider">{title}</Text>
+                                </View>
+                            </View>
                         )}
                         renderItem={renderSwipeableItem}
                         ListEmptyComponent={
-                            <View className="items-center justify-center py-20 opacity-50">
-                                <View className="bg-gray-100 w-20 h-20 rounded-full items-center justify-center mb-4">
-                                    <Ionicons name="notifications-off-outline" size={40} color="#94A3B8" />
+                            <View className="items-center justify-center py-20 opacity-80">
+                                <View className="bg-white border border-slate-100 w-20 h-20 rounded-3xl items-center justify-center mb-4 shadow-sm transform rotate-12">
+                                    <Ionicons name="checkmark-circle-outline" size={40} color="#f5a623" />
                                 </View>
-                                <Text className="text-gray-500 font-bold text-lg">All caught up!</Text>
-                                <Text className="text-gray-400 text-center px-10 mt-1">No notifications found matching your filter.</Text>
+                                <Text className="text-[#0d1b3e] font-black text-base uppercase tracking-widest">All clear</Text>
+                                <Text className="text-slate-400 text-center mt-2 text-[13px] px-8">You have no new notifications right now.</Text>
                             </View>
                         }
                     />

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../services/supabase';
 import { Video, ResizeMode } from 'expo-av';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, usePathname } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,6 +18,7 @@ interface AnnouncementConfig {
 export default function GlobalAnnouncementModal() {
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
+    const pathname = usePathname();
 
     useEffect(() => {
         // Check when app comes to foreground safely
@@ -100,7 +101,10 @@ export default function GlobalAnnouncementModal() {
         setVisible(false);
     };
 
-    if (!config) return null;
+    if (!config || !visible) return null;
+    
+    // Only render the Modal if we are currently on the dashboard
+    if (pathname !== '/dashboard' && pathname !== '/') return null;
 
     return (
         <Modal visible={visible} transparent animationType="fade">

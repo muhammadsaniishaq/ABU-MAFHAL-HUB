@@ -88,6 +88,11 @@ export default function AdminSettings() {
     // Comms
     const [supportWhatsapp, setSupportWhatsapp] = useState('');
     const [supportEmail, setSupportEmail] = useState('');
+    const [supportFacebook, setSupportFacebook] = useState('');
+    const [supportTwitter, setSupportTwitter] = useState('');
+    const [supportInstagram, setSupportInstagram] = useState('');
+    const [supportTelegram, setSupportTelegram] = useState('');
+    const [supportOfficeAddress, setSupportOfficeAddress] = useState('');
     
     // Global Announcement
     const [announcementText, setAnnouncementText] = useState('');
@@ -98,7 +103,20 @@ export default function AdminSettings() {
     // UI State
     const [loading, setLoading] = useState(false);
     const [keysLoading, setKeysLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'system' | 'economics' | 'api'>('system');
+    const [activeTab, setActiveTab] = useState<'system' | 'features' | 'economics' | 'api'>('system');
+
+    // Feature Flags
+    const allKnownFeatures = [
+      'feature_transfer', 'feature_airtime', 'feature_data', 'feature_education',
+      'feature_bills', 'feature_cards', 'feature_savings', 'feature_loans',
+      'feature_crypto', 'feature_analytics', 'feature_rewards', 'feature_qr',
+      'feature_invest', 'feature_insurance', 'feature_bvn', 'feature_nin', 'feature_cac',
+      'feature_smile', 'feature_social'
+    ];
+    
+    const [features, setFeatures] = useState<Record<string, boolean>>(
+        allKnownFeatures.reduce((acc, key) => ({ ...acc, [key]: true }), {})
+    );
     const [expandedApi, setExpandedApi] = useState<string | null>('payments');
 
     // Virtual Accounts & Payment Keys
@@ -150,6 +168,11 @@ export default function AdminSettings() {
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
                     if (s.key === 'support_email') setSupportEmail(s.value);
+                    if (s.key === 'support_facebook') setSupportFacebook(s.value);
+                    if (s.key === 'support_twitter') setSupportTwitter(s.value);
+                    if (s.key === 'support_instagram') setSupportInstagram(s.value);
+                    if (s.key === 'support_telegram') setSupportTelegram(s.value);
+                    if (s.key === 'support_office_address') setSupportOfficeAddress(s.value);
                     if (s.key === 'global_announcement') {
                         try {
                             const parsed = JSON.parse(s.value);
@@ -160,6 +183,16 @@ export default function AdminSettings() {
                         } catch (e) {
                             setAnnouncementText(s.value);
                         }
+                    }
+                    if (s.key === 'hidden_features') {
+                        try {
+                            const hiddenList: string[] = JSON.parse(s.value);
+                            setFeatures(prev => {
+                                const newFeatures = { ...prev };
+                                hiddenList.forEach(feat => { newFeatures[feat] = false; });
+                                return newFeatures;
+                            });
+                        } catch (e) { }
                     }
                 });
             }
@@ -228,6 +261,10 @@ export default function AdminSettings() {
                 .eq('pair', 'USDT / NGN');
 
             // Update System Settings
+            const hiddenFeaturesList = Object.entries(features)
+                .filter(([_, isVisible]) => !isVisible)
+                .map(([key, _]) => key);
+
             const settingsToSave = [
                 { key: 'maintenance_mode', value: String(maintenance) },
                 { key: 'allow_registrations', value: String(registrations) },
@@ -236,6 +273,7 @@ export default function AdminSettings() {
                 { key: 'allow_biometrics', value: String(allowBiometrics) },
                 { key: 'auto_approve_kyc', value: String(autoApproveKyc) },
                 { key: 'hide_user_balances', value: String(hideUserBalances) },
+                { key: 'hidden_features', value: JSON.stringify(hiddenFeaturesList) },
                 { key: 'agent_commission', value: agentCommission },
                 { key: 'daily_withdrawal_limit', value: dailyWithdrawalLimit },
                 { key: 'min_withdrawal', value: minWithdrawal },
@@ -245,6 +283,11 @@ export default function AdminSettings() {
                 { key: 'funding_fee_type', value: fundingFeeType },
                 { key: 'support_whatsapp', value: supportWhatsapp },
                 { key: 'support_email', value: supportEmail },
+                { key: 'support_facebook', value: supportFacebook },
+                { key: 'support_twitter', value: supportTwitter },
+                { key: 'support_instagram', value: supportInstagram },
+                { key: 'support_telegram', value: supportTelegram },
+                { key: 'support_office_address', value: supportOfficeAddress },
                 { key: 'global_announcement', value: JSON.stringify({
                     text: announcementText,
                     mediaUrl: announcementUrl,
@@ -336,6 +379,10 @@ export default function AdminSettings() {
                             <Ionicons name="settings-outline" size={14} color={activeTab === 'system' ? '#0d1b3e' : '#94a3b8'} style={{ marginRight: 4 }} />
                             <Text style={[s.tabText, activeTab === 'system' && s.tabTextActive]}>System</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setActiveTab('features')} style={[s.tabBtn, activeTab === 'features' && s.tabBtnActive]}>
+                            <Ionicons name="apps-outline" size={14} color={activeTab === 'features' ? '#0d1b3e' : '#94a3b8'} style={{ marginRight: 4 }} />
+                            <Text style={[s.tabText, activeTab === 'features' && s.tabTextActive]}>Features</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => setActiveTab('economics')} style={[s.tabBtn, activeTab === 'economics' && s.tabBtnActive]}>
                             <Ionicons name="cash-outline" size={14} color={activeTab === 'economics' ? '#0d1b3e' : '#94a3b8'} style={{ marginRight: 4 }} />
                             <Text style={[s.tabText, activeTab === 'economics' && s.tabTextActive]}>Economics</Text>
@@ -393,6 +440,11 @@ export default function AdminSettings() {
                         <View style={s.card}>
                             <InputRow label="WhatsApp Support" value={supportWhatsapp} onChangeText={setSupportWhatsapp} prefix="WA" keyboardType="phone-pad" />
                             <InputRow label="Support Email" value={supportEmail} onChangeText={setSupportEmail} placeholder="help@abumafhal.com" keyboardType="email-address" />
+                            <InputRow label="Telegram Link" value={supportTelegram} onChangeText={setSupportTelegram} placeholder="https://t.me/..." keyboardType="url" />
+                            <InputRow label="Facebook Link" value={supportFacebook} onChangeText={setSupportFacebook} placeholder="https://facebook.com/..." keyboardType="url" />
+                            <InputRow label="Twitter (X) Link" value={supportTwitter} onChangeText={setSupportTwitter} placeholder="https://twitter.com/..." keyboardType="url" />
+                            <InputRow label="Instagram Link" value={supportInstagram} onChangeText={setSupportInstagram} placeholder="https://instagram.com/..." keyboardType="url" />
+                            <InputRow label="Office Address" value={supportOfficeAddress} onChangeText={setSupportOfficeAddress} placeholder="No 1. Abu Mafhal Hub Plaza..." />
                         </View>
 
                         <Text style={s.groupLabel}>Global Announcement</Text>
@@ -439,6 +491,72 @@ export default function AdminSettings() {
                                 <>
                                     <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
                                     <Text style={s.saveBtnText}>Save System Config</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {activeTab === 'features' && (
+                    <View style={s.section}>
+                        <Text style={s.groupLabel}>Utility & Bills</Text>
+                        <View style={s.card}>
+                            <ToggleRow title="Airtime Top-up" subtitle="Toggle airtime recharge feature" icon="phone-portrait" color="#f97316" value={features['feature_airtime'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_airtime: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Data Bundles" subtitle="Toggle data subscription feature" icon="wifi" color="#22c55e" value={features['feature_data'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_data: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Smile Data" subtitle="Toggle Smile internet data" icon="globe" color="#ec4899" value={features['feature_smile'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_smile: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Cable TV & Bills" subtitle="Toggle DSTV, GOTV, Electricity" icon="tv" color="#8b5cf6" value={features['feature_bills'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_bills: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Education (WAEC/NECO)" subtitle="Toggle result checker pins" icon="school" color="#06b6d4" value={features['feature_education'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_education: val})} />
+                        </View>
+
+                        <Text style={s.groupLabel}>Transfers & Cards</Text>
+                        <View style={s.card}>
+                            <ToggleRow title="Fund Transfers" subtitle="Toggle bank transfers" icon="swap-horizontal" color="#2563eb" value={features['feature_transfer'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_transfer: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Virtual Cards" subtitle="Toggle USD/NGN virtual cards" icon="card" color="#14b8a6" value={features['feature_cards'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_cards: val})} />
+                        </View>
+
+                        <Text style={s.groupLabel}>Financial & Crypto</Text>
+                        <View style={s.card}>
+                            <ToggleRow title="Crypto Trading" subtitle="Toggle cryptocurrency exchange" icon="logo-bitcoin" color="#f59e0b" value={features['feature_crypto'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_crypto: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Savings" subtitle="Toggle savings" icon="wallet" color="#10b981" value={features['feature_savings'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_savings: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Investments" subtitle="Toggle investments feature" icon="trending-up" color="#0ea5e9" value={features['feature_invest'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_invest: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Loans" subtitle="Toggle loan services" icon="cash" color="#ef4444" value={features['feature_loans'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_loans: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Insurance" subtitle="Toggle insurance services" icon="shield-checkmark" color="#6366f1" value={features['feature_insurance'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_insurance: val})} />
+                        </View>
+
+                        <Text style={s.groupLabel}>Extras & Analytics</Text>
+                        <View style={s.card}>
+                            <ToggleRow title="Social Boost" subtitle="Toggle social media boosting" icon="rocket" color="#ec4899" value={features['feature_social'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_social: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Analytics" subtitle="Toggle user analytics dashboard" icon="pie-chart" color="#8b5cf6" value={features['feature_analytics'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_analytics: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="Rewards" subtitle="Toggle rewards and points" icon="gift" color="#ec4899" value={features['feature_rewards'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_rewards: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="QR Pay" subtitle="Toggle QR code payments" icon="qr-code" color="#14b8a6" value={features['feature_qr'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_qr: val})} />
+                        </View>
+
+                        <Text style={s.groupLabel}>Identity & Verification</Text>
+                        <View style={s.card}>
+                            <ToggleRow title="BVN Verification" subtitle="Toggle BVN lookup service" icon="finger-print" color="#3b82f6" value={features['feature_bvn'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_bvn: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="NIN Registration" subtitle="Toggle NIN lookup service" icon="person-add" color="#10b981" value={features['feature_nin'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_nin: val})} />
+                            <View style={s.divider} />
+                            <ToggleRow title="CAC Registration" subtitle="Toggle business registration" icon="briefcase" color="#8b5cf6" value={features['feature_cac'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_cac: val})} />
+                        </View>
+                        
+                        <TouchableOpacity onPress={handleUpdateSettings} style={s.saveBtn} activeOpacity={0.8}>
+                            {loading ? <ActivityIndicator color="#fff" size="small" /> : (
+                                <>
+                                    <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                                    <Text style={s.saveBtnText}>Save Features</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -578,7 +696,7 @@ const s = StyleSheet.create({
     headerSubtitle: { fontSize: 12, fontWeight: '500', color: '#94a3b8', marginTop: 2 },
     
     tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.2)', marginHorizontal: 20, marginBottom: 20, borderRadius: 12, padding: 4 },
-    tabBtn: { flex: 1, flexDirection: 'row', paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+    tabBtn: { flex: 1, minWidth: 90, flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
     tabBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
     tabText: { fontSize: 12, fontWeight: '700', color: '#94a3b8' },
     tabTextActive: { color: '#0d1b3e' },

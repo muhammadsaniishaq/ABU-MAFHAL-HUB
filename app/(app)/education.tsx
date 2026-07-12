@@ -2,6 +2,8 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityInd
 import { useState, useEffect } from 'react';
 import { useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useAppSettings } from '../../hooks/useAppSettings';
+import DynamicBanners from '../../components/DynamicBanners';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -252,6 +254,8 @@ export default function EducationScreen() {
                     isWeb && { backgroundColor: T.white, minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
                 ]}
             >
+                {/* Dynamic Banners */}
+                <DynamicBanners placement="education" />
                 <View style={s.sectionHeader}>
                     <Text style={s.sectionTitle}>Select Provider</Text>
                     {fetchingPrices && <ActivityIndicator size="small" color={T.gold} />}

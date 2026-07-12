@@ -5,6 +5,9 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { createAppNotification } from '../../services/notificationsHelper';
+import * as Haptics from 'expo-haptics';
+import DynamicBanners from '../../components/DynamicBanners';
 
 export default function TransferScreen() {
     const [bank, setBank] = useState('');
@@ -134,6 +137,16 @@ export default function TransferScreen() {
 
                             if (balanceError) throw balanceError;
 
+                            // Send Notification
+                            await createAppNotification(
+                                user.id,
+                                "Transfer Successful",
+                                `You have successfully transferred ₦${transferAmount} to ${accountName} (${bank.toUpperCase()}).`,
+                                "transfer",
+                                "normal",
+                                { route: "/(app)/history" }
+                            );
+
                             Alert.alert("Success", "Transfer Successful!");
                             router.replace('/dashboard');
                         } catch (error: any) {
@@ -159,6 +172,8 @@ export default function TransferScreen() {
                     isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
                 ]}
             >
+                {/* Dynamic Banners */}
+                <DynamicBanners placement="transfer" />
                 <Text className="text-slate font-bold mb-4">Select Bank</Text>
                 <View className="flex-row flex-wrap justify-between gap-y-4 mb-6">
                     {banks.map((b) => (

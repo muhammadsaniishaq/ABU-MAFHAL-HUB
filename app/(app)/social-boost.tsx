@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DynamicBanners from '../../components/DynamicBanners';
+import { api } from '../../services/api';
 
 // Theme Configuration matching the rest of the app
 const T = {
@@ -256,6 +258,8 @@ export default function SocialBoostScreen() {
 
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
                 <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+                    {/* Dynamic Banners */}
+                    <DynamicBanners placement="social_boost" />
                     
                     <Text className="text-slate-800 text-xs font-bold mb-3 ml-1 uppercase tracking-widest">Select Platform</Text>
                     

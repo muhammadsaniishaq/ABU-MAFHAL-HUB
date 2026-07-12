@@ -2,15 +2,18 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityInd
 import { useState, useEffect, useCallback } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { DataPlan } from '../../services/partners';
+import { createAppNotification } from '../../services/notificationsHelper';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
+import DynamicBanners from '../../components/DynamicBanners';
 
 const parseVolumeToGB = (volume: any, name: string): number => {
     const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();
@@ -398,6 +401,16 @@ export default function DataScreen() {
             });
 
             if (result.success) {
+                // Send Notification
+                await createAppNotification(
+                    user.id,
+                    "Data Purchase Successful",
+                    `You have successfully purchased ${planNameString} for ${phoneNumber}. Amount: ₦${selectedPlan.price}.`,
+                    "data",
+                    "normal",
+                    { route: "/(app)/history" }
+                );
+
                 router.replace({
                     pathname: '/success',
                     params: {
@@ -458,6 +471,8 @@ export default function DataScreen() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
+                    {/* Dynamic Banners */}
+                    <DynamicBanners placement="data" />
                     {/* Quick Repeat Card */}
                     {lastTransaction && (
                         <TouchableOpacity 

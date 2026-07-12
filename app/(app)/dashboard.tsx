@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -44,6 +44,24 @@ export default function Dashboard() {
   const [dbError, setDbError] = useState<boolean>(false);
   const [showAllActions, setShowAllActions] = useState(false);
   const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeBanners, setActiveBanners] = useState<any[]>([]);
+  const bannerRef = useRef<FlatList>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  useEffect(() => {
+    if (activeBanners.length > 1) {
+      const interval = setInterval(() => {
+        let nextIndex = currentBannerIndex + 1;
+        if (nextIndex >= activeBanners.length) {
+          nextIndex = 0;
+        }
+        bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+        setCurrentBannerIndex(nextIndex);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [currentBannerIndex, activeBanners.length]);
   
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   
@@ -54,6 +72,13 @@ export default function Dashboard() {
     loadCachedData().then(() => {
       loadAllData(); // fetch fresh data silently
     });
+
+    const channel = supabase.channel('dashboard-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, 
+        () => setUnreadCount(prev => prev + 1))
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const loadCachedData = async () => {
@@ -72,6 +97,7 @@ export default function Dashboard() {
         if (!IS_CACHE_STALE) {
           if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
           if (cached.logoUrl) setLogoUrl(cached.logoUrl);
+          if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
         } else {
           console.log("Cached feature flags are stale (older than 1 hour). Skipping cache load for flags.");
         }
@@ -104,7 +130,9 @@ export default function Dashboard() {
         fetchUserData(user),
         fetchTransactions(user.id),
         fetchFeatureFlags(),
-        fetchLogo()
+        fetchAppSettings(),
+        fetchUnreadCount(user.id),
+        fetchActiveBanners()
       ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -119,15 +147,76 @@ export default function Dashboard() {
     loadAllData();
   }, []);
 
-  const fetchLogo = async () => {
+  const [hiddenFeatures, setHiddenFeatures] = useState<string[]>([]);
+
+  const fetchUnreadCount = async (userId: string) => {
     try {
-      const { data } = await supabase.from('app_settings').select('value').eq('key', 'app_logo').single();
-      if (data?.value?.url) {
-        setLogoUrl(data.value.url);
-        saveCache({ logoUrl: data.value.url });
+      const { count } = await supabase.from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+      if (count !== null) {
+        setUnreadCount(count);
+        saveCache({ unreadCount: count });
       }
     } catch (e) {
-      console.error('Error fetching dynamic logo:', e);
+      console.warn("Error fetching unread count", e);
+    }
+  };
+
+  const fetchActiveBanners = async () => {
+    try {
+      const { data } = await supabase
+        .from('banners')
+        .select('*')
+        .eq('is_active', true)
+        .or('placement.ilike.*dashboard*,placement.is.null') // handle old rows missing placement
+        .order('created_at', { ascending: false });
+      if (data) setActiveBanners(data);
+    } catch (e) {
+      console.warn("Error fetching banners", e);
+    }
+  };
+
+  const handleBannerClick = async (banner: any) => {
+    // Track click asynchronously
+    supabase.rpc('increment_banner_click', { banner_id: banner.id }).then(({ error }) => {
+      if (error) console.log('Banner click track error:', error);
+    });
+    
+    if (banner.target_url) {
+      // Navigate to the target url (can be in-app route or external URL)
+      // Usually, using router.push works for internal routes, or Linking.openURL for external
+      // For now we just use router.push, expo router handles both ok or we can just push
+      router.push(banner.target_url);
+    }
+  };
+
+  const fetchAppSettings = async () => {
+    try {
+      const { data } = await supabase.from('app_settings').select('key, value').in('key', ['app_logo', 'hidden_features', 'company_name']);
+      if (data) {
+        data.forEach(setting => {
+          if (setting.key === 'app_logo' && setting.value) {
+            let url = setting.value;
+            try {
+              const parsed = JSON.parse(setting.value);
+              if (parsed.url) url = parsed.url;
+            } catch (e) {}
+            setLogoUrl(url);
+            saveCache({ logoUrl: url });
+          }
+          if (setting.key === 'hidden_features') {
+            try {
+              const parsed = JSON.parse(setting.value);
+              setHiddenFeatures(parsed);
+              saveCache({ hiddenFeatures: parsed });
+            } catch (e) { }
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching app settings:', e);
     }
   };
 
@@ -213,39 +302,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleActionPress = (action: any) => {
-    const featureMap: Record<string, string> = {
-      '/transfer': 'feature_transfer',
-      '/airtime': 'feature_airtime',
-      '/data': 'feature_data',
-      '/education': 'feature_education',
-      '/bills': 'feature_bills',
-      '/virtual-cards': 'feature_cards',
-      '/savings': 'feature_savings',
-      '/loans': 'feature_loans',
-      '/crypto': 'feature_crypto',
-      '/analytics': 'feature_analytics',
-      '/rewards': 'feature_rewards',
-      '/qr-pay': 'feature_qr',
-      '/investments': 'feature_invest',
-      '/insurance': 'feature_insurance',
-      '/bvn-services': 'feature_bvn',
-      '/nin-services': 'feature_nin',
-      '/cac-services': 'feature_cac'
-    };
-
-    const featureKey = featureMap[action.route];
-    if (featureKey) {
-      const flag = featureFlags[featureKey];
-      if (flag && !flag.is_enabled) {
-        alert(flag.maintenance_message || 'This feature is currently under maintenance.');
-        return;
-      }
-    }
-
-    if (action.route) router.push(action.route as any);
-  };
-
   // ─── Format Balance Helper ──────────────────────────────────────────────────
   const formatBalance = (bal: any) => {
     const numBal = Number(bal) || 0;
@@ -286,6 +342,41 @@ export default function Dashboard() {
     }
   };
 
+  const featureMap: Record<string, string> = {
+    '/transfer': 'feature_transfer',
+    '/airtime': 'feature_airtime',
+    '/data': 'feature_data',
+    '/education': 'feature_education',
+    '/bills': 'feature_bills',
+    '/virtual-cards': 'feature_cards',
+    '/savings': 'feature_savings',
+    '/loans': 'feature_loans',
+    '/crypto': 'feature_crypto',
+    '/analytics': 'feature_analytics',
+    '/rewards': 'feature_rewards',
+    '/qr-pay': 'feature_qr',
+    '/investments': 'feature_invest',
+    '/insurance': 'feature_insurance',
+    '/bvn-services': 'feature_bvn',
+    '/nin-services': 'feature_nin',
+    '/cac-services': 'feature_cac',
+    '/smile': 'feature_smile',
+    '/social-boost': 'feature_social'
+  };
+
+  const handleActionPress = (action: any) => {
+    const featureKey = featureMap[action.route];
+    if (featureKey) {
+      const flag = featureFlags[featureKey];
+      if (flag && !flag.is_enabled) {
+        alert(flag.maintenance_message || 'This feature is currently under maintenance.');
+        return;
+      }
+    }
+
+    if (action.route) router.push(action.route as any);
+  };
+
   // ─── Quick Actions Data Mapping ─────────────────────────────────────────────
   const allActions = [
     { icon: 'phone-portrait-outline', label: 'Airtime', color: '#f97316', route: '/airtime' },
@@ -312,10 +403,19 @@ export default function Dashboard() {
     { icon: 'finger-print-outline', label: 'BVN Svcs', color: '#0056D2', route: '/bvn-services' },
   ];
 
+  // Filter out disabled features based on hiddenFeatures list from admin settings
+  const filteredActions = allActions.filter(action => {
+    const featureKey = featureMap[action.route];
+    if (featureKey && hiddenFeatures.includes(featureKey)) {
+      return false;
+    }
+    return true;
+  });
+
   // Logic: Show first 9 actions + "More" button by default
   const displayedActions = showAllActions 
-    ? [...allActions, { icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less' }]
-    : [...allActions.slice(0, 9), { icon: 'grid-outline', label: 'More', color: '#64748b', route: 'more' }];
+    ? [...filteredActions, { icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less' }]
+    : [...filteredActions.slice(0, 9), { icon: 'grid-outline', label: 'More', color: '#64748b', route: 'more' }];
 
   return (
     <View style={s.container}>
@@ -336,25 +436,39 @@ export default function Dashboard() {
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
         >
-          {/* Top brand row */}
+          {/* QUICK ACTIONS */}
           <View style={s.headerTop}>
             <View style={s.brandRow}>
-              <Image
-                source={logoUrl ? { uri: logoUrl } : require('../../assets/images/logo.png')}
-                style={s.headerLogo as any}
-                resizeMode="contain"
-              />
+              <View style={s.logoWrapper}>
+                <Image
+                  source={logoUrl ? { uri: logoUrl } : (settings?.app_logo ? { uri: settings.app_logo } : require('../../assets/images/logo.png'))}
+                  style={s.headerLogo as any}
+                  resizeMode="contain"
+                />
+              </View>
               <View>
-                <Text style={s.brandTxt}>MAFHAL</Text>
-                <Text style={s.brandSub}>SUB</Text>
+                {(() => {
+                  const companyName = settings?.company_name || 'MAFHAL SUB';
+                  const words = companyName.split(' ');
+                  const firstPart = words[0];
+                  const rest = words.slice(1).join(' ');
+                  return (
+                    <>
+                      <Text style={s.brandTxt}>{firstPart.toUpperCase()}</Text>
+                      {rest ? <Text style={s.brandSub}>{rest.toUpperCase()}</Text> : null}
+                    </>
+                  );
+                })()}
               </View>
             </View>
             
             <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn} activeOpacity={0.8}>
               <Ionicons name="notifications-outline" size={22} color={T.white} />
-              <View style={s.bellBadge}>
-                <Text style={s.bellBadgeText}>3</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -469,8 +583,49 @@ export default function Dashboard() {
                 <Text style={s.historyBtnTxt}>Transaction History</Text>
               </TouchableOpacity>
             </View>
+
+
           </LinearGradient>
         </View>
+
+        {/* ─── SLIM DYNAMIC BANNERS ─── */}
+        {activeBanners.length > 0 && (
+          <View style={{ marginTop: 12, marginBottom: 12, zIndex: 10 }}>
+            <FlatList
+              ref={bannerRef}
+              data={activeBanners}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              pagingEnabled
+              snapToInterval={W - 32 + 12}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity 
+                  onPress={() => handleBannerClick(item)}
+                  activeOpacity={0.9}
+                  className={`rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-200 justify-center ${index < activeBanners.length - 1 ? 'mr-3' : ''}`}
+                  style={{ width: W - 32, height: 60 }}
+                >
+                  {item.image_url ? (
+                    <Image source={{ uri: item.image_url }} className="w-full h-full" resizeMode="cover" />
+                  ) : (
+                    <LinearGradient colors={['#0f172a', '#1e293b']} start={{x:0,y:0}} end={{x:1,y:1}} className="w-full h-full flex-row items-center justify-between px-4 relative overflow-hidden">
+                      <View className="absolute -right-6 -top-6 w-16 h-16 bg-[#f5a623] rounded-full opacity-10" />
+                      <View className="flex-row items-center z-10">
+                         <Text className="text-white font-bold text-sm tracking-tight" numberOfLines={1}>{item.title}</Text>
+                      </View>
+                      <Text className="text-[#94a3b8] font-medium text-[10px] z-10">Tap for details ➔</Text>
+                    </LinearGradient>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+
 
         {/* Database Warning */}
         {dbError && (
@@ -713,11 +868,26 @@ const s = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  logoWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: T.navy,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    padding: 4,
   },
   headerLogo: {
-    width: 28,
-    height: 28,
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   brandTxt: {
     fontSize: 12,

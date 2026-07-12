@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { api } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAppNotification } from '../../services/notificationsHelper';
+import DynamicBanners from '../../components/DynamicBanners';
 
 // Helper to safely load external images on Web for canvas rendering
 const getSafeImageUrl = (url: string) => {
@@ -243,9 +245,12 @@ export default function BVNVerificationScreen() {
                     const userId = authData.user.id;
                     const { data: profile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
                     if (profile && profile.balance >= totalPrice) {
-                        const newBal = profile.balance - totalPrice;
-                        await supabase.from('profiles').update({ balance: newBal }).eq('id', userId);
+                        const { error: deductError } = await supabase.rpc('deduct_balance', {
+                            user_id: userId,
+                            amount: totalPrice
+                        });
                         
+                        if (deductError) throw deductError;
                         // Record Transaction
                         await supabase.from('transactions').insert({
                             user_id: userId,
@@ -256,6 +261,16 @@ export default function BVNVerificationScreen() {
                             reference: `BVN_${Date.now()}`
                         });
                     }
+
+                    // Send Notification
+                    await createAppNotification(
+                        userId,
+                        "BVN Service",
+                        `BVN Search for ${cleanVal} completed successfully.`,
+                        "bvn",
+                        "normal",
+                        { route: "/(app)/history" }
+                    );
                 }
 
                 setResult(finalData);
@@ -1021,6 +1036,8 @@ export default function BVNVerificationScreen() {
             </Modal>
 
             <ScrollView style={{ flex: 1, paddingHorizontal: 12 }} contentContainerStyle={[styles.scrollContent, { paddingTop: 20 }]}>
+                {/* Dynamic Banners */}
+                <DynamicBanners placement="nin_bvn" />
                 
                 {/* Wallet Balance widget */}
                 <View style={[styles.walletBar, { marginTop: 4 }]}>

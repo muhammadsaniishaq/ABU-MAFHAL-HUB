@@ -96,7 +96,7 @@ export default function AppDesigner() {
             
             const { data, error } = await supabase
                 .storage
-                .from('avatars')
+                .from('banners')
                 .upload(fileName, decode(image.base64), {
                     contentType: 'image/jpeg',
                     upsert: true
@@ -106,7 +106,7 @@ export default function AppDesigner() {
 
             const { data: { publicUrl } } = supabase
                 .storage
-                .from('avatars')
+                .from('banners')
                 .getPublicUrl(fileName);
 
             // Upsert setting key in app_settings table

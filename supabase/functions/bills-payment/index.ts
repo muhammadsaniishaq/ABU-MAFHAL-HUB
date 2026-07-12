@@ -61,9 +61,19 @@ Deno.serve(async (req: Request) => {
         const userId = user.id;
         console.log(`[Bills] User Authenticated: ${userId}`);
 
+        // Fetch dynamic secrets from Admin API Vault
+        const rpcClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+        const { data: secretsData } = await rpcClient
+            .from('system_secrets')
+            .select('key, value')
+            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY']);
+            
+        const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
+        const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
+
         // 2. Determine Pricing & Parameters
         let amountToCharge = 0;
-        const client = new ClubKonnectClient();
+        const client = new ClubKonnectClient(ckUserId, ckApiKey);
         const requestId = data.requestId || `REQ-${Date.now()}`;
 
         // Network Mapping
@@ -117,7 +127,6 @@ Deno.serve(async (req: Request) => {
         console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
 
         // 3. Deduct Balance
-        const rpcClient = createClient(supabaseUrl, supabaseServiceRoleKey);
         const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
             user_id: userId,
             amount: amountToCharge

@@ -2,12 +2,15 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, ActivityInd
 import { useState, useEffect, useCallback } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
+import { createAppNotification } from '../../services/notificationsHelper';
+import * as Haptics from 'expo-haptics';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
+import DynamicBanners from '../../components/DynamicBanners';
 
 // Network Assets & Data
 const NETWORK_LOGOS: Record<string, any> = {
@@ -166,6 +169,16 @@ export default function AirtimeScreen() {
             });
 
             if (result.success) {
+                // Send Notification
+                await createAppNotification(
+                    user.id,
+                    "Airtime Purchase Successful",
+                    `You have successfully purchased ₦${amount} airtime for ${phoneNumber} (${network.toUpperCase()}).`,
+                    "airtime",
+                    "normal",
+                    { route: "/(app)/history" }
+                );
+
                 router.replace({
                     pathname: '/success',
                     params: {
@@ -227,19 +240,8 @@ export default function AirtimeScreen() {
                     </LinearGradient>
                 )}
 
-                {/* Promotions Carousel */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-8 -mx-2">
-                    {[
-                        { id: 1, title: '2% Cashback', sub: 'On all MTN Airtime', color: '#FFCC00', text: '#000' },
-                        { id: 2, title: 'Zero Fees', sub: 'Instant top-up', color: '#10B981', text: '#fff' },
-                        { id: 3, title: 'N500 Bonus', sub: 'Refer a friend', color: '#8B5CF6', text: '#fff' }
-                    ].map((promo, idx) => (
-                        <View key={promo.id} className={`w-36 h-20 rounded-2xl p-3 justify-center mx-2 shadow-sm`} style={{ backgroundColor: promo.color }}>
-                            <Text className="font-bold text-lg" style={{ color: promo.text }}>{promo.title}</Text>
-                            <Text className="text-xs opacity-80" style={{ color: promo.text }}>{promo.sub}</Text>
-                        </View>
-                    ))}
-                </ScrollView>
+                {/* Dynamic Banners */}
+                <DynamicBanners placement="airtime" />
 
                 {/* Recent Top-ups */}
                 {recents.length > 0 && (

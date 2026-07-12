@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import DynamicBanners from '../../components/DynamicBanners';
 import PaystackPayment from '../../components/PaystackPayment';
 
 const T = {
@@ -331,6 +332,8 @@ export default function WalletScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={T.gold} />
         }
       >
+        {/* Dynamic Banners */}
+        <DynamicBanners placement="wallet" />
 
         {/* 3. Dedicated Account Box */}
         <View style={s.section}>

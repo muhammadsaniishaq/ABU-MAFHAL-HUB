@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useAppSettings } from '../../hooks/useAppSettings';
+import DynamicBanners from '../../components/DynamicBanners';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import SecurityModal from '../../components/SecurityModal';
@@ -200,6 +202,8 @@ export default function SmileScreen() {
             <View style={{ height: 20 }} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    {/* Dynamic Banners */}
+                    <DynamicBanners placement="smile" />
 
                     <LinearGradient
                         colors={['#0d1b3e', '#142258']}

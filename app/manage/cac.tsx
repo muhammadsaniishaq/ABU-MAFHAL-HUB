@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Platform, Image } from 'react-native';
 import { StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import { decode } from 'base64-arraybuffer';
 
 const COLORS = {
   navy: '#0E1A2E',
@@ -25,6 +31,7 @@ export default function ManageCAC() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('requests'); // 'requests' or 'pricing'
   const [loading, setLoading] = useState(true);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   
   // Requests state
   const [requests, setRequests] = useState<any[]>([]);
@@ -78,26 +85,110 @@ export default function ManageCAC() {
   };
 
   const openUrl = (url: string) => {
-    if (url) Linking.openURL(url);
+    if (url) {
+      setViewerUrl(url);
+    }
+  };
+
+  const downloadAndShare = async (url: string) => {
+    try {
+      const rawFilename = url.split('/').pop() || 'document.jpg';
+      const filename = rawFilename.split('?')[0]; // Remove query params like ?t=123
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      
+      const isImage = uri.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+      
+      let savedToGallery = false;
+      if (isImage) {
+        try {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status === 'granted') {
+            await MediaLibrary.saveToLibraryAsync(uri);
+            Alert.alert('Success', 'Image saved directly to your phone gallery!');
+            savedToGallery = true;
+          }
+        } catch (mediaErr) {
+          console.log("MediaLibrary failed, falling back to Sharing:", mediaErr);
+        }
+      }
+      
+      // Fallback for non-images, denied permission, or MediaLibrary crash
+      if (!savedToGallery) {
+        await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
+      }
+    } catch (e: any) {
+      console.log("Download Error:", e);
+      Alert.alert('Download Error', e.message || 'Could not download the file.');
+    }
   };
 
   const updateRequestStatus = async (status: string, additionalUpdate: any = {}) => {
     if (!selectedReq) return;
     try {
       let updateData = { status, ...additionalUpdate };
+      const req = selectedReq;
       
       // Refunds if rejected
       if (status === 'rejected') {
         const { error: refErr } = await supabase.rpc('refund_transaction', {
-          p_user_id: selectedReq.user_id,
-          p_amount: selectedReq.cost_charged,
-          p_reference: `cac_refund_${selectedReq.id}`
+          p_user_id: req.user_id,
+          p_amount: req.cost_charged,
+          p_reference: `cac_refund_${req.id}`
         });
         if (refErr) throw refErr;
       }
       
-      const { error } = await supabase.from('cac_requests').update(updateData).eq('id', selectedReq.id);
+      const { error } = await supabase.from('cac_requests').update(updateData).eq('id', req.id);
       if (error) throw error;
+
+      // Handle Notifications for Completion
+      if (status === 'completed') {
+        const userId = req.user_id;
+        const userEmail = req.profiles?.email;
+        const title = `CAC Registration Completed! 🎉`;
+        
+        // Push notification
+        if (userId) {
+          const bodyMsg = `Great news! Your CAC registration (${req.registration_type}) for "${req.proposed_names?.name1}" has been completed.`;
+          await supabase.from('notifications').insert([{
+              user_id: userId,
+              title: title,
+              body: bodyMsg,
+              data: { priority: 'high', route: '/cac-services' },
+              created_at: new Date().toISOString()
+          }]);
+        }
+        
+        // Email
+        if (userEmail) {
+          const emailBody = `
+            <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">Hi ${req.profiles?.full_name || 'Customer'},</p>
+            <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">We are thrilled to inform you that your CAC Registration has been successfully completed!</p>
+            
+            <p style="margin:0 0 8px 0; color:#334155; font-size:15px;"><strong>Registration Type:</strong> ${req.registration_type}</p>
+            <p style="margin:0 0 16px 0; color:#334155; font-size:15px;"><strong>Approved Name:</strong> ${req.proposed_names?.name1}</p>
+            
+            <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">You can now log in to your dashboard or services page to download your official Certificate and Status Document.</p>
+            
+            <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">Thanks for choosing Abu Mafhal Sub. We look forward to helping you!</p>
+            
+            <p style="margin:0 0 4px 0; color:#334155; font-size:15px;">Best,</p>
+            <p style="margin:0; color:#334155; font-size:15px; font-weight:600;">The Abu Mafhal Sub Team</p>
+          `;
+          
+          const payload = {
+              type: 'email',
+              recipient_mode: 'single',
+              recipient: userEmail,
+              subject: title,
+              body: emailBody,
+              priority: 'high'
+          };
+          
+          supabase.functions.invoke('send-communication', { body: payload }).catch(e => console.log('Email send failed:', e));
+        }
+      }
       
       Alert.alert('Success', `Status updated to ${status}`);
       setSelectedReq(null);
@@ -107,47 +198,147 @@ export default function ManageCAC() {
     }
   };
 
-  const handleQuery = () => {
+  const handleQuery = async () => {
     if (!queryText) return Alert.alert('Error', 'Enter query message');
-    updateRequestStatus('queried', { admin_query: queryText });
     
-    // Attempt to open email client to send query to user
-    const userEmail = selectedReq?.profiles?.email;
-    if (userEmail) {
-      const subject = encodeURIComponent(`CAC Registration Query: ${selectedReq.registration_type}`);
-      const body = encodeURIComponent(`Dear ${selectedReq.profiles?.full_name},\n\nWe have a query regarding your CAC Registration application.\n\nQuery Details:\n${queryText}\n\nPlease respond with the requested information to proceed with your registration.\n\nBest Regards,\nIDPro Support Team`);
-      Linking.openURL(`mailto:${userEmail}?subject=${subject}&body=${body}`).catch(() => {
-        Alert.alert('Notice', 'Status updated, but could not open email client automatically.');
-      });
-    } else {
-      Alert.alert('Notice', 'Status updated. No user email found to send direct email.');
+    const req = selectedReq;
+    if (!req) return;
+
+    // Send In-App Notification (Broadcast style)
+    const userId = req.user_id;
+    const title = `CAC Registration Query`;
+    const bodyMsg = `Your CAC application (${req.registration_type}) requires attention: ${queryText}`;
+    
+    if (userId) {
+      await supabase.from('notifications').insert([{
+          user_id: userId,
+          title: title,
+          body: bodyMsg,
+          data: { priority: 'high', route: '/cac-services' },
+          created_at: new Date().toISOString()
+      }]);
+
+      await supabase.from('communication_logs').insert([{
+          channel: 'push',
+          recipient: userId,
+          subject: title,
+          content: bodyMsg,
+          status: 'sent',
+          metadata: { priority: true, cac_query: true }
+      }]);
     }
+
+    // Send actual Email via Edge Function (Broadcast style)
+    const userEmail = req.profiles?.email;
+    if (userEmail) {
+      const emailBody = `
+        <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">Hi ${req.profiles?.full_name || 'Customer'},</p>
+        <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">We have a query regarding your CAC Registration application that requires your attention.</p>
+        
+        <p style="margin:0 0 8px 0; color:#334155; font-size:15px; font-weight:bold;">Query Details:</p>
+        <p style="margin:0 0 16px 0; color:#334155; font-size:15px; background-color:#f8fafc; padding:12px; border-left:3px solid #f5a623;">
+          ${queryText.replace(/\n/g, '<br/>')}
+        </p>
+        
+        <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">Please log in to your app and navigate to your CAC History to provide the requested information or documents so we can proceed with your registration.</p>
+        
+        <p style="margin:0 0 16px 0; color:#334155; font-size:15px;">If you have any questions, feel free to reply to this email.</p>
+        
+        <p style="margin:0 0 4px 0; color:#334155; font-size:15px;">Best,</p>
+        <p style="margin:0; color:#334155; font-size:15px; font-weight:600;">The Abu Mafhal Sub Team</p>
+      `;
+      
+      const payload = {
+          type: 'email',
+          recipient_mode: 'single',
+          recipient: userEmail,
+          subject: title,
+          body: emailBody,
+          priority: 'high'
+      };
+      
+      supabase.functions.invoke('send-communication', { body: payload }).catch(e => console.log('Email send failed:', e));
+      
+      await supabase.from('communication_logs').insert([{
+          channel: 'email',
+          recipient: userEmail,
+          subject: title,
+          content: queryText,
+          status: 'sent',
+          metadata: { priority: true, cac_query: true }
+      }]);
+    }
+    
+    updateRequestStatus('queried', { admin_query: queryText });
   };
 
-  const uploadDocument = async (type: 'certificate' | 'status_document') => {
+  const copyAllDetails = async () => {
+    if (!selectedReq) return;
+    
+    let details = `CAC REGISTRATION DETAILS\n`;
+    details += `------------------------\n`;
+    details += `Type: ${selectedReq.registration_type}\n`;
+    details += `Choice 1: ${selectedReq.proposed_names?.name1}\n`;
+    details += `Choice 2: ${selectedReq.proposed_names?.name2}\n`;
+    if (selectedReq.proposed_names?.name3) details += `Choice 3: ${selectedReq.proposed_names?.name3}\n`;
+    
+    details += `\nBUSINESS INFO\n`;
+    details += `------------------------\n`;
+    details += `Email: ${selectedReq.business_info?.email || 'N/A'}\n`;
+    details += `Phone: ${selectedReq.business_info?.phone || 'N/A'}\n`;
+    details += `Nature of Biz: ${selectedReq.business_info?.natureOfBusiness || 'N/A'}\n`;
+    details += `Office: ${selectedReq.business_info?.officeNumber}, ${selectedReq.business_info?.officeAddress}\n`;
+    details += `Location: ${selectedReq.business_info?.lga}, ${selectedReq.business_info?.state}\n`;
+    if (selectedReq.business_info?.tenure) details += `Tenure: ${selectedReq.business_info?.tenure} years\n`;
+    if (selectedReq.aims_and_objectives) details += `Aims: ${selectedReq.aims_and_objectives}\n`;
+
+    const addPersons = (data: any, title: string) => {
+        if (!data) return;
+        details += `\n${title}\n`;
+        details += `------------------------\n`;
+        const props = Array.isArray(data) ? data : [data];
+        props.forEach((p, i) => {
+            details += `${i+1}. ${p.fullName} (${p.gender})\n`;
+            details += `   DOB: ${p.dob} | Phone: ${p.phone} | Email: ${p.email} | NIN: ${p.nin}\n`;
+            details += `   Address: ${p.houseNumber}, ${p.address}, ${p.lga}, ${p.state}\n`;
+        });
+    };
+
+    addPersons(selectedReq.proprietors, 'PROPRIETORS');
+    addPersons(selectedReq.chairman, 'CHAIRMAN');
+    addPersons(selectedReq.secretary, 'SECRETARY');
+    addPersons(selectedReq.trustees, 'TRUSTEES');
+
+    await Clipboard.setStringAsync(details);
+    Alert.alert('Success', 'All details copied to clipboard!');
+  };
+
+  const uploadDocument = async (type: 'certificate' | 'status_document' | 'memorandum') => {
     try {
       const res = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
       if (res.canceled) return;
       
       const file = res.assets[0];
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
+      const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
       const filename = `cac_results/${selectedReq.id}_${type}_${Date.now()}`;
       
-      const { error } = await supabase.storage.from('cac_documents').upload(filename, blob);
+      const { error } = await supabase.storage.from('cac_documents').upload(filename, decode(base64), { contentType: file.mimeType || 'application/pdf' });
       if (error) throw error;
       
       const { data: publicData } = supabase.storage.from('cac_documents').getPublicUrl(filename);
       
-      const updateData = type === 'certificate' 
-        ? { certificate_url: publicData.publicUrl } 
-        : { status_document_url: publicData.publicUrl };
+      let updateData: any = {};
+      if (type === 'certificate') updateData.certificate_url = publicData.publicUrl;
+      else if (type === 'status_document') updateData.status_document_url = publicData.publicUrl;
+      else if (type === 'memorandum') updateData.memorandum_url = publicData.publicUrl;
         
       const { error: dbErr } = await supabase.from('cac_requests').update(updateData).eq('id', selectedReq.id);
       if (dbErr) throw dbErr;
       
-      Alert.alert('Success', `${type} uploaded successfully`);
+      Alert.alert('Success', 'Document uploaded successfully!');
+      
       setSelectedReq({ ...selectedReq, ...updateData });
+      fetchData();
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -193,18 +384,21 @@ export default function ManageCAC() {
             </View>
 
             <View style={s.docButtonsRow}>
-              {p.passportUrl && (
-                <TouchableOpacity style={s.dlBtn} onPress={() => openUrl(p.passportUrl)}>
-                  <Ionicons name="person-circle-outline" size={16} color={COLORS.navy} />
-                  <Text style={s.dlBtnTxt}>Passport</Text>
-                </TouchableOpacity>
-              )}
-              {p.signatureUrl && (
-                <TouchableOpacity style={s.dlBtn} onPress={() => openUrl(p.signatureUrl)}>
-                  <Ionicons name="create-outline" size={16} color={COLORS.navy} />
-                  <Text style={s.dlBtnTxt}>Signature</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                style={[s.dlBtn, !p.passportUrl && { opacity: 0.5, backgroundColor: '#f8fafc' }]} 
+                onPress={() => p.passportUrl ? openUrl(p.passportUrl) : Alert.alert('Not Found', 'No passport uploaded for this person.')}
+              >
+                <Ionicons name="person-circle-outline" size={16} color={p.passportUrl ? COLORS.navy : COLORS.textSub} />
+                <Text style={[s.dlBtnTxt, !p.passportUrl && { color: COLORS.textSub }]}>{p.passportUrl ? 'Passport' : 'No Passport'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[s.dlBtn, !p.signatureUrl && { opacity: 0.5, backgroundColor: '#f8fafc' }]} 
+                onPress={() => p.signatureUrl ? openUrl(p.signatureUrl) : Alert.alert('Not Found', 'No signature uploaded for this person.')}
+              >
+                <Ionicons name="create-outline" size={16} color={p.signatureUrl ? COLORS.navy : COLORS.textSub} />
+                <Text style={[s.dlBtnTxt, !p.signatureUrl && { color: COLORS.textSub }]}>{p.signatureUrl ? 'Signature' : 'No Signature'}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))}
@@ -351,7 +545,13 @@ export default function ManageCAC() {
           <View style={s.modalContainer}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>Request Details</Text>
-              <TouchableOpacity onPress={() => setSelectedReq(null)}><Ionicons name="close" size={24} color={COLORS.navy} /></TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <TouchableOpacity onPress={copyAllDetails} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                  <Ionicons name="copy-outline" size={16} color={COLORS.navy} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.navy }}>Copy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectedReq(null)}><Ionicons name="close" size={24} color={COLORS.navy} /></TouchableOpacity>
+              </View>
             </View>
             
             <ScrollView style={s.modalContent} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
@@ -460,10 +660,27 @@ export default function ManageCAC() {
                     <Ionicons name="ribbon-outline" size={16} color={COLORS.white} />
                     <Text style={s.actionBtnTxt}>Certificate</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={[s.actionBtn, { backgroundColor: COLORS.navy, opacity: selectedReq.memorandum_url ? 0.7 : 1 }]} onPress={() => uploadDocument('memorandum')}>
+                    <Ionicons name="book-outline" size={16} color={COLORS.white} />
+                    <Text style={s.actionBtnTxt}>MEMART</Text>
+                  </TouchableOpacity>
                 </View>
                 
-                {selectedReq.status_document_url && <Text style={s.uploadSuccessMsg}>✓ Status Document uploaded</Text>}
-                {selectedReq.certificate_url && <Text style={s.uploadSuccessMsg}>✓ Certificate uploaded</Text>}
+                {selectedReq.status_document_url && (
+                  <TouchableOpacity onPress={() => openUrl(selectedReq.status_document_url)}>
+                    <Text style={[s.uploadSuccessMsg, { color: COLORS.info, textDecorationLine: 'underline' }]}>✓ Status Document uploaded (Tap to view)</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedReq.certificate_url && (
+                  <TouchableOpacity onPress={() => openUrl(selectedReq.certificate_url)}>
+                    <Text style={[s.uploadSuccessMsg, { color: COLORS.info, textDecorationLine: 'underline' }]}>✓ Certificate uploaded (Tap to view)</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedReq.memorandum_url && (
+                  <TouchableOpacity onPress={() => openUrl(selectedReq.memorandum_url)}>
+                    <Text style={[s.uploadSuccessMsg, { color: COLORS.info, textDecorationLine: 'underline' }]}>✓ Memorandum uploaded (Tap to view)</Text>
+                  </TouchableOpacity>
+                )}
 
                 <Text style={[s.pText, { fontWeight: 'bold', marginBottom: 4, marginTop: 16 }]}>Query Message</Text>
                 <TextInput 
@@ -488,10 +705,27 @@ export default function ManageCAC() {
                   </TouchableOpacity>
                 </View>
               </View>
-
             </ScrollView>
           </View>
         )}
+      </Modal>
+
+      {/* In-App Image Viewer */}
+      <Modal visible={!!viewerUrl} transparent={true} animationType="fade">
+        <View style={s.viewerOverlay}>
+          <View style={s.viewerHeader}>
+            <TouchableOpacity onPress={() => setViewerUrl(null)} style={s.viewerClose}>
+              <Ionicons name="close" size={28} color={COLORS.white} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => viewerUrl && downloadAndShare(viewerUrl)} style={s.viewerDownload}>
+              <Ionicons name="download-outline" size={24} color={COLORS.white} />
+              <Text style={s.viewerDownloadTxt}>Download</Text>
+            </TouchableOpacity>
+          </View>
+          {viewerUrl && (
+            <Image source={{ uri: viewerUrl }} style={s.viewerImage} resizeMode="contain" />
+          )}
+        </View>
       </Modal>
     </View>
   );
@@ -575,4 +809,11 @@ const s = StyleSheet.create({
   infoBannerText: { fontSize: 10, color: COLORS.textSub, lineHeight: 14 },
   savePriceBtn: { backgroundColor: COLORS.navy, paddingHorizontal: 12, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   savePriceBtnTxt: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
+  
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' },
+  viewerHeader: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 20, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, zIndex: 10 },
+  viewerClose: { padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20 },
+  viewerDownload: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  viewerDownloadTxt: { color: COLORS.white, fontWeight: '600', fontSize: 14 },
+  viewerImage: { width: '100%', height: '80%' },
 });

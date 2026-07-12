@@ -1,6 +1,6 @@
 // Hardcoded for ease of deployment as requested by user context
-export const CLUBKONNECT_USER_ID = Deno.env.get('CLUBKONNECT_USER_ID') || 'CK101269551'; 
-export const CLUBKONNECT_API_KEY = Deno.env.get('CLUBKONNECT_API_KEY') ?? '';
+export const DEFAULT_CLUBKONNECT_USER_ID = Deno.env.get('CLUBKONNECT_USER_ID') || 'CK101269551'; 
+export const DEFAULT_CLUBKONNECT_API_KEY = Deno.env.get('CLUBKONNECT_API_KEY') ?? '';
 const BASE_URL = 'https://www.nellobytesystems.com';
 
 export interface ClubKonnectResponse {
@@ -11,10 +11,18 @@ export interface ClubKonnectResponse {
 }
 
 export class ClubKonnectClient {
+  private userId: string;
+  private apiKey: string;
+
+  constructor(userId?: string, apiKey?: string) {
+    this.userId = userId || DEFAULT_CLUBKONNECT_USER_ID;
+    this.apiKey = apiKey || DEFAULT_CLUBKONNECT_API_KEY;
+  }
+
   private async request(endpoint: string, params: Record<string, string>): Promise<ClubKonnectResponse> {
     const url = new URL(`${BASE_URL}${endpoint}`);
-    url.searchParams.append('UserID', CLUBKONNECT_USER_ID);
-    url.searchParams.append('APIKey', CLUBKONNECT_API_KEY);
+    url.searchParams.append('UserID', this.userId);
+    url.searchParams.append('APIKey', this.apiKey);
     
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.append(key, value);

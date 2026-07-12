@@ -277,9 +277,10 @@ export default function AdminBento() {
                 {/* Header Gradient */}
                 <View style={s.headerWrapper}>
                     <LinearGradient
-                        colors={['#060d21', '#0d1b3e']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
+                        colors={['#020617', '#0f172a', '#1e293b']}
+                        locations={[0, 0.6, 1]}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
                         style={s.headerGradient}
                     >
                         {/* Glowing Decorative Orbs */}
@@ -289,11 +290,13 @@ export default function AdminBento() {
                         {/* Top Bar Brand & User Row */}
                         <View style={s.topBarBrandRow}>
                             <View style={s.brandRow}>
-                                <Image 
-                                    source={logoIconUrl ? { uri: logoIconUrl } : require('../../assets/images/logo-icon.png')} 
-                                    style={s.brandLogo as any}
-                                    resizeMode="contain"
-                                />
+                                <View style={{ padding: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <Image 
+                                        source={logoIconUrl ? { uri: logoIconUrl } : require('../../assets/images/logo-icon.png')} 
+                                        style={s.brandLogo as any}
+                                        resizeMode="contain"
+                                    />
+                                </View>
                                 <View style={s.brandTextContainer}>
                                     <Text style={s.brandTxtTitle}>MAFHAL</Text>
                                     <Text style={s.brandTxtSub}>ADMIN CENTRE</Text>
@@ -306,7 +309,7 @@ export default function AdminBento() {
                                     style={s.logoutBtn}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="log-out-outline" size={12} color="#cbd5e1" />
+                                    <Ionicons name="apps-outline" size={14} color="#e2e8f0" />
                                     <Text style={s.logoutBtnText}>User App</Text>
                                 </TouchableOpacity>
                                 
@@ -327,36 +330,25 @@ export default function AdminBento() {
                         {/* Welcome & Status Bar Row */}
                         <View style={s.welcomeStatusRow}>
                             <View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={s.welcomeText}>Good Evening, Sani 👋</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={s.welcomeText}>Welcome back, Sani 👋</Text>
                                     <View style={s.adminBadgePill}>
-                                        <Text style={s.adminBadgeText}>Super Admin</Text>
+                                        <Text style={s.adminBadgeText}>SUPER ADMIN</Text>
                                     </View>
                                 </View>
                                 <View style={s.liveRow}>
                                     <View style={s.statusDot} />
-                                    <Text style={s.liveText}>Core System Online</Text>
+                                    <Text style={s.liveText}>Core System Online & Secured</Text>
                                 </View>
-                            </View>
-                            <View style={s.statusPillGroup}>
-                                <View style={s.datePill}>
-                                    <Text style={s.dateText}>
-                                        {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity style={s.bellActionBtn}>
-                                    <Ionicons name="notifications" size={14} color="#ffffff" />
-                                    <View style={s.notifBadge} />
-                                </TouchableOpacity>
                             </View>
                         </View>
 
                         {/* Global Search Bar */}
                         <View style={s.searchBarContainer}>
-                            <Ionicons name="search-outline" size={18} color={T.gold} />
+                            <Ionicons name="search-outline" size={18} color="#94a3b8" />
                             <TextInput 
                                 placeholder="Search users, transactions, logs..." 
-                                placeholderTextColor="#94a3b8"
+                                placeholderTextColor="#64748b"
                                 style={s.searchInput}
                                 selectionColor={T.gold}
                             />
@@ -470,34 +462,38 @@ const s = StyleSheet.create({
     },
     orbRight: {
         position: 'absolute',
-        top: -64,
-        right: -64,
-        width: 192,
-        height: 192,
-        borderRadius: 96,
-        backgroundColor: 'rgba(245, 166, 35, 0.08)',
+        top: -100,
+        right: -50,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        backgroundColor: '#4F46E5',
+        opacity: 0.15,
+        filter: 'blur(40px)',
     },
     orbLeft: {
         position: 'absolute',
-        bottom: -48,
-        left: -48,
-        width: 144,
-        height: 144,
-        borderRadius: 72,
-        backgroundColor: 'rgba(245, 166, 35, 0.04)',
+        bottom: -50,
+        left: -100,
+        width: 250,
+        height: 250,
+        borderRadius: 125,
+        backgroundColor: '#10B981',
+        opacity: 0.1,
+        filter: 'blur(40px)',
     },
     goldBottomStrip: {
         height: 4,
-        backgroundColor: T.gold,
+        backgroundColor: '#f5a623',
         width: '100%',
         position: 'absolute',
         bottom: 0,
         borderBottomLeftRadius: 36,
         borderBottomRightRadius: 36,
-        shadowColor: T.gold,
+        shadowColor: '#f5a623',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.8,
-        shadowRadius: 10,
+        shadowOpacity: 0.6,
+        shadowRadius: 12,
     },
     topBarBrandRow: {
         flexDirection: 'row',

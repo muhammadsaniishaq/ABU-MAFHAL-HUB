@@ -25,6 +25,9 @@ export default function ProfileScreen() {
     } | null>(null);
     const [kycStatus, setKycStatus] = useState<'pending' | 'approved' | 'none'>('none');
     const [txCount, setTxCount] = useState<number>(0);
+    const [unreadCount, setUnreadCount] = useState<number>(0);
+    const [appLogo, setAppLogo] = useState<string | null>(null);
+    const [appName, setAppName] = useState<string>('ABU MAFHAL');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -48,6 +51,9 @@ export default function ProfileScreen() {
                 
                 if (cached.profile) setProfile(cached.profile);
                 if (cached.txCount !== undefined) setTxCount(cached.txCount);
+                if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
+                if (cached.appLogo) setAppLogo(cached.appLogo);
+                if (cached.appName) setAppName(cached.appName);
                 
                 if (!IS_CACHE_STALE) {
                     if (cached.kycStatus) setKycStatus(cached.kycStatus);
@@ -80,7 +86,9 @@ export default function ProfileScreen() {
             await Promise.all([
                 fetchProfileData(user.id),
                 fetchTransactionCount(user.id),
-                fetchKycStatus(user.id)
+                fetchKycStatus(user.id),
+                fetchUnreadNotifications(user.id),
+                fetchAppSettings()
             ]);
         } catch (e) {
             console.log("Error loading profile data", e);
@@ -101,6 +109,40 @@ export default function ProfileScreen() {
         if (data) {
             setProfile(data);
             saveCache({ profile: data });
+        }
+    };
+
+    const fetchUnreadNotifications = async (userId: string) => {
+        const { count, error } = await supabase.from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+        if (!error && count !== null) {
+            setUnreadCount(count);
+            saveCache({ unreadCount: count });
+        }
+    };
+
+    const fetchAppSettings = async () => {
+        try {
+            const { data } = await supabase.from('app_settings').select('key, value').in('key', ['app_logo', 'app_name']);
+            if (data) {
+                let logoUrl = null;
+                let name = 'ABU MAFHAL';
+                data.forEach(setting => {
+                    if (setting.key === 'app_logo') {
+                        logoUrl = setting.value?.url || setting.value || null;
+                    }
+                    if (setting.key === 'app_name') {
+                        name = setting.value?.name || setting.value || 'ABU MAFHAL';
+                    }
+                });
+                if (logoUrl) setAppLogo(logoUrl);
+                setAppName(name);
+                saveCache({ appLogo: logoUrl, appName: name });
+            }
+        } catch (e) {
+            console.warn("Failed to fetch app settings:", e);
         }
     };
 
@@ -314,7 +356,7 @@ export default function ProfileScreen() {
                     colors={['#060d21', '#0d1b3e']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={{ paddingTop: 64, paddingBottom: 96, paddingHorizontal: 24, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5, position: 'relative' }}
+                    style={{ paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingBottom: 72, paddingHorizontal: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 5, position: 'relative' }}
                 >
                     {/* Background Gold Mesh Glow */}
                     <LinearGradient
@@ -324,20 +366,27 @@ export default function ProfileScreen() {
                     />
 
                     {/* Decorative Bottom Gold Line */}
-                    <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#f5a623] opacity-80" style={{ borderBottomLeftRadius: 32, borderBottomRightRadius: 32 }} />
+                    <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#f5a623] opacity-80" style={{ borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }} />
 
                     {/* Top Row: Page Title & Action Icons */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Image 
-                                source={require('../../assets/images/logo-icon.png')} 
-                                style={{ width: 32, height: 32 }}
-                                resizeMode="contain"
-                            />
-                            <View style={{ flexDirection: 'column' }}>
-                                <Text style={{ color: 'white', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>MAFHAL</Text>
-                                <Text style={{ color: '#f5a623', fontWeight: 'bold', fontSize: 10, letterSpacing: 1.5 }}>SUB</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden', padding: 2 }}>
+                                {appLogo ? (
+                                    <Image 
+                                        source={{ uri: appLogo }} 
+                                        style={{ width: '100%', height: '100%', borderRadius: 8 }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Image 
+                                        source={require('../../assets/images/logo-icon.png')} 
+                                        style={{ width: '100%', height: '100%', borderRadius: 8 }}
+                                        resizeMode="cover"
+                                    />
+                                )}
                             </View>
+                            <Text style={{ fontSize: 18, fontWeight: '900', color: 'white', letterSpacing: 0.5 }}>{appName}</Text>
                         </View>
                         
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -347,9 +396,11 @@ export default function ProfileScreen() {
                                 style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', position: 'relative' }}
                             >
                                 <Ionicons name="notifications" size={18} color="white" />
-                                <View style={{ position: 'absolute', top: -1, right: -1, backgroundColor: '#f5a623', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#060d21' }}>
-                                    <Text className="text-white text-[8px] font-black">3</Text>
-                                </View>
+                                {unreadCount > 0 && (
+                                    <View style={{ position: 'absolute', top: -1, right: -1, backgroundColor: '#f5a623', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#060d21' }}>
+                                        <Text className="text-white text-[8px] font-black">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
 
                             {/* Settings Cog */}
@@ -435,110 +486,76 @@ export default function ProfileScreen() {
                     </View>
                 </LinearGradient>
 
-                {/* 2. FLOATING STATS CARD (2x2 Grid) */}
-                <View style={{ backgroundColor: '#ffffff', marginHorizontal: 24, borderRadius: 16, padding: 16, marginTop: -40, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)', zIndex: 20 }}>
-                    {/* Row 1 */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                        {/* Wallet Balance */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginRight: 6 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                                <Ionicons name="wallet-sharp" size={16} color="#f5a623" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Balance</Text>
-                                <Text style={{ fontSize: 13, color: '#0d1b3e', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
-                                    ₦{balanceWhole}
-                                    <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '500' }}>.{balanceDecimal}</Text>
-                                </Text>
-                            </View>
+                {/* 2. FLOATING STATS CARD (Single Row - Thin/Compact) */}
+                <View style={{ backgroundColor: '#ffffff', marginHorizontal: 20, borderRadius: 16, marginTop: -24, paddingVertical: 12, paddingHorizontal: 6, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 6, zIndex: 20, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+                    
+                    {/* Wallet Balance */}
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                            <Ionicons name="wallet" size={12} color="#f5a623" />
                         </View>
-
-                        {/* Total Transactions */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginLeft: 6 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                                <Ionicons name="swap-horizontal-sharp" size={16} color="#f5a623" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Transactions</Text>
-                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
-                                    {txCount} <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: '500' }}>this mo</Text>
-                                </Text>
-                            </View>
-                        </View>
+                        <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '900' }} numberOfLines={1}>₦{balanceWhole}</Text>
+                        <Text style={{ fontSize: 8, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Balance</Text>
                     </View>
 
-                    {/* Row 2 */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        {/* Member Since */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginRight: 6 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                                <Ionicons name="calendar-sharp" size={16} color="#f5a623" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Member Since</Text>
-                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
-                                    {getMemberSince(profile?.created_at)}
-                                </Text>
-                            </View>
-                        </View>
+                    {/* Divider */}
+                    <View style={{ width: 1, height: 32, backgroundColor: '#f1f5f9' }} />
 
-                        {/* Account Tier */}
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(252, 249, 242, 0.8)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.15)', marginLeft: 6 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                                <Ionicons name="ribbon-sharp" size={16} color="#f5a623" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 9, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tier</Text>
-                                <Text style={{ fontSize: 13, color: '#334155', fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
-                                    {getTierLabel(profile?.kyc_tier)}
-                                </Text>
-                            </View>
+                    {/* Total Transactions */}
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                            <Ionicons name="swap-horizontal" size={12} color="#f5a623" />
                         </View>
+                        <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '900' }} numberOfLines={1}>{txCount}</Text>
+                        <Text style={{ fontSize: 8, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Transacts</Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={{ width: 1, height: 32, backgroundColor: '#f1f5f9' }} />
+
+                    {/* Member Since */}
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                            <Ionicons name="calendar" size={12} color="#f5a623" />
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#1e293b', fontWeight: '900' }} numberOfLines={1}>{getMemberSince(profile?.created_at)}</Text>
+                        <Text style={{ fontSize: 8, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Joined</Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={{ width: 1, height: 32, backgroundColor: '#f1f5f9' }} />
+
+                    {/* Account Tier */}
+                    <View style={{ alignItems: 'center', flex: 1 }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                            <Ionicons name="ribbon" size={12} color="#f5a623" />
+                        </View>
+                        <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '900' }} numberOfLines={1}>{getTierLabel(profile?.kyc_tier)}</Text>
+                        <Text style={{ fontSize: 8, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Tier</Text>
                     </View>
                 </View>
 
                 {/* 3. GROUPED LIST GROUPS */}
                 <View style={{ marginTop: 24, paddingHorizontal: 24, gap: 20 }}>
                     
-                    {/* ADMIN SECTION (Visible only to admins) */}
-                    {profile?.role && ['admin', 'super_admin'].includes(profile.role) && (
-                        <View>
-                            <Text style={{ fontSize: 10, color: "#f59e0b", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Administration</Text>
-                            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#fde68a", overflow: "hidden" }}>
-                                <TouchableOpacity 
-                                    onPress={() => router.push('/manage')} 
-                                    activeOpacity={0.6}
-                                    style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
-                                >
-                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#fffbeb", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                        <Ionicons name="shield-checkmark" size={15} color="#f59e0b" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={{ fontWeight: "800", fontSize: 12, color: "#b45309" }}>Admin Console</Text>
-                                        <Text style={{ color: "rgba(217, 119, 6, 0.7)", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage app settings, users and system</Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={14} color="#fcd34d" />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
+
 
                     {/* ACCOUNT SECTION */}
                     <View>
                         <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Account</Text>
-                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2, overflow: "hidden" }}>
                             {/* Personal Info */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/edit-profile')} 
-                                activeOpacity={0.6}
+                                activeOpacity={0.7}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="person" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="person" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Personal Information</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>View and update your personal details</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Personal Information</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>View and update your personal details</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -549,12 +566,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="business" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="business" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Bank Accounts</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage your linked bank accounts</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Bank Accounts</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Manage your linked bank accounts</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -565,12 +582,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="shield-checkmark" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="shield-checkmark" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Security</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Password, PIN and security settings</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Security</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Password, PIN and security settings</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -581,12 +598,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="checkmark-done-circle" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="checkmark-done-circle" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Verification</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>KYC verification and account status</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Verification</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>KYC verification and account status</Text>
                                 </View>
                                 <View className="flex-row items-center mr-2">
                                     {profile?.kyc_tier && profile.kyc_tier > 1 ? (
@@ -605,25 +622,44 @@ export default function ProfileScreen() {
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
+
+                            {/* Refer & Earn */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/referrals')} 
+                                activeOpacity={0.7}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
+                            >
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(245, 166, 35, 0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="gift" size={14} color="#f5a623" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Refer & Earn</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Invite friends and earn rewards</Text>
+                                </View>
+                                <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginRight: 6 }}>
+                                    <Text style={{ color: '#d97706', fontSize: 8, fontWeight: '900' }}>NEW</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
+                            </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* PREFERENCES SECTION */}
                     <View>
                         <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Preferences</Text>
-                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2, overflow: "hidden" }}>
                             {/* Notification Settings */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/notifications')} 
-                                activeOpacity={0.6}
+                                activeOpacity={0.7}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="notifications" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="notifications" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Notification Settings</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Manage your notification preferences</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Notification Settings</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Manage your notification preferences</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -634,12 +670,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="globe" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="globe" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Language</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Choose your preferred language</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Language</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Choose your preferred language</Text>
                                 </View>
                                 <Text className="text-slate-400 text-[11px] font-bold mr-1">English</Text>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
@@ -651,12 +687,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="moon" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="moon" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Theme</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Choose app appearance</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Theme</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Choose app appearance</Text>
                                 </View>
                                 <Text className="text-slate-400 text-[11px] font-bold mr-1">System</Text>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
@@ -667,35 +703,35 @@ export default function ProfileScreen() {
                     {/* SUPPORT & ABOUT SECTION */}
                     <View>
                         <Text style={{ fontSize: 10, color: "#94a3b8", fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, marginLeft: 4 }}>Support & About</Text>
-                        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", overflow: "hidden" }}>
+                        <View style={{ backgroundColor: "white", borderRadius: 16, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2, overflow: "hidden" }}>
                             {/* Help Center */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/support')} 
-                                activeOpacity={0.6}
+                                activeOpacity={0.7}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="headset" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="headset" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Help Center</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Get help and support</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Help Center</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Get help and support</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
                             {/* About Mafhal Sub */}
                             <TouchableOpacity 
-                                onPress={() => router.push('/onboarding')} 
+                                onPress={() => router.push('/about')} 
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="information-circle" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="information-circle" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>About Mafhal Sub</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Learn more about us</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>About Mafhal Sub</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Learn more about us</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -706,12 +742,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(13, 27, 62, 0.05)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="document-text" size={15} color="#0d1b3e" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(13, 27, 62, 0.04)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="document-text" size={14} color="#0d1b3e" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontWeight: "800", fontSize: 12, color: "#1e293b" }}>Terms & Conditions</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Read our terms and conditions</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Terms & Conditions</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Read our terms and conditions</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -722,12 +758,12 @@ export default function ProfileScreen() {
                                 activeOpacity={0.6}
                                 style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 }}
                             >
-                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#fef2f2", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                                    <Ionicons name="log-out" size={15} color="#ef4444" />
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(239, 68, 68, 0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="log-out" size={14} color="#ef4444" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text className="font-extrabold text-xs text-red-500">Log Out</Text>
-                                    <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "500", marginTop: 2 }}>Sign out from your account</Text>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#ef4444" }}>Log Out</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Sign out from your account</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>

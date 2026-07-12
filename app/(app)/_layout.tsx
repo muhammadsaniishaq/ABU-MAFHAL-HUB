@@ -110,6 +110,7 @@ export default function AppLayout() {
                 <Tabs.Screen name="beneficiaries" options={{ href: null }} />
                 <Tabs.Screen name="support" options={{ href: null }} />
                 <Tabs.Screen name="nin-services" options={{ href: null }} />
+                <Tabs.Screen name="about" options={{ href: null }} />
             </Tabs>
         </View>
     );

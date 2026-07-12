@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { api } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DynamicBanners from '../../components/DynamicBanners';
 import { CryptoRate } from '../../services/partners';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -308,6 +310,9 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
     return (
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+            {/* Dynamic Banners */}
+            <DynamicBanners placement="crypto" />
+            
             {/* HEADER */}
             <View className="px-4 pt-1 pb-3">
                 <View className="flex-row justify-between items-center mb-5">

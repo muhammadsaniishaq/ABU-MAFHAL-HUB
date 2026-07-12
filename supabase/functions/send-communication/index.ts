@@ -109,7 +109,14 @@ serve(async (req) => {
     }
 
     // --- TEMPLATE HELPER ---
-    const generateHtmlEmail = (bodyContent: string, title: string) => {
+    const generateHtmlEmail = (bodyContent: string, title: string, logoUrl: string | null) => {
+        const currentYear = new Date().getFullYear();
+        
+        // Use the fetched logo, or a simple text AM if it fails
+        const finalLogo = logoUrl 
+            ? `<img src="${logoUrl}" alt="Abu Mafhal Sub" width="36" height="36" style="display:block; border-radius:6px; border:1px solid #D9A73A;" />`
+            : `<table cellpadding="0" cellspacing="0" style="background-color:#D9A73A; border-radius:6px; width:36px; height:36px; text-align:center;"><tr><td style="vertical-align:middle; text-align:center; color:#ffffff; font-size:16px; font-weight:bold; font-family:Arial,sans-serif; height:36px;">AM</td></tr></table>`;
+
         return `
         <!DOCTYPE html>
         <html lang="en">
@@ -118,61 +125,53 @@ serve(async (req) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${title}</title>
         </head>
-        <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#334155;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+        <body style="margin:0;padding:0;background-color:#F4F7FA;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;-webkit-font-smoothing:antialiased;">
+          <!-- OUTER WRAPPER WITH NAVY TOP BANNER -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F7FA; padding-bottom:40px;">
             <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.1);max-width:92%;border:1px solid #e2e8f0;">
-                  <!-- HEADER -->
+              <td align="center" style="background-color:#0E1A2E; height:120px; vertical-align:top; padding-top:30px;">
+                <!-- FLOATING HEADER -->
+                <table width="460" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                   <tr>
-                    <td align="center" style="background:linear-gradient(135deg,#4F46E5,#6366F1);padding:45px 20px;">
-                      <!-- Logo Placeholder - You can replace src with your actual logo URL -->
-                      <div style="width:64px;height:64px;background:#ffffff;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:15px;box-shadow:0 4px 15px rgba(0,0,0,0.1);">
-                         <span style="font-size:32px;">🦅</span>
-                      </div>
-                      <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:1px;text-transform:uppercase;">ABU MAFHAL SUB</h1>
-                      <p style="margin:8px 0 0;font-size:13px;color:#e0e7ff;font-weight:500;letter-spacing:0.5px;">Premium Services • Unmatched Quality</p>
+                    <td align="center">
+                      <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                        <tr>
+                          <td style="padding-right:12px;">
+                            ${finalLogo}
+                          </td>
+                          <td style="vertical-align:middle;">
+                            <span style="font-size:20px; font-weight:700; color:#ffffff; letter-spacing:0.5px;">Abu Mafhal Sub</span>
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
-                  <!-- BODY -->
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="margin-top:-40px;">
+                <!-- FLOATING WHITE CARD -->
+                <table width="460" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; box-shadow:0 10px 30px rgba(14,26,46,0.1); margin-top:-40px; border-top:4px solid #D9A73A;">
                   <tr>
-                    <td style="padding:40px 35px;background-color:#ffffff;">
-                      <h2 style="margin:0 0 25px;font-size:22px;font-weight:700;color:#1e293b;text-align:center;">${title}</h2>
-                      <div style="font-size:16px;line-height:1.7;color:#475569;">
+                    <td style="padding:30px; text-align:left;">
+                      <h2 style="margin:0 0 15px 0; font-size:18px; font-weight:700; color:#0E1A2E;">${title}</h2>
+                      <div style="font-size:14px; color:#475569; line-height:1.7;">
                         ${bodyContent.replace(/\n/g, '<br/>')}
                       </div>
-                      <div style="margin-top:45px;text-align:center;">
-                        <a href="https://abumafhal.com.ng" style="display:inline-block;padding:14px 35px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(79, 70, 229, 0.4);transition:all 0.3s ease;">Open App</a>
-                      </div>
                     </td>
                   </tr>
-                  <!-- SOCIAL MEDIA & FOOTER -->
+                  <!-- MODERN FOOTER INSIDE CARD -->
                   <tr>
-                    <td align="center" style="background:#f8fafc;padding:30px;border-top:1px solid #e2e8f0;">
-                      
-                      <!-- Social Icons -->
-                      <div style="margin-bottom:25px;">
-                        <a href="https://facebook.com" style="margin:0 10px;text-decoration:none;display:inline-block;">
-                          <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24" height="24" alt="Facebook" style="opacity:0.6;">
-                        </a>
-                        <a href="https://twitter.com" style="margin:0 10px;text-decoration:none;display:inline-block;">
-                          <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" width="24" height="24" alt="Twitter" style="opacity:0.6;">
-                        </a>
-                        <a href="https://instagram.com" style="margin:0 10px;text-decoration:none;display:inline-block;">
-                          <img src="https://cdn-icons-png.flaticon.com/512/733/733558.png" width="24" height="24" alt="Instagram" style="opacity:0.6;">
-                        </a>
-                         <a href="https://whatsapp.com" style="margin:0 10px;text-decoration:none;display:inline-block;">
-                          <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" width="24" height="24" alt="WhatsApp" style="opacity:0.6;">
-                        </a>
-                      </div>
-
-                      <p style="margin:0;font-size:12px;color:#94a3b8;font-weight:500;">© ${new Date().getFullYear()} Abu Mafhal Sub. All rights reserved.</p>
-                      <p style="margin:8px 0 0;font-size:12px;color:#cbd5e1;">Gashua, Yobe State, Nigeria</p>
-                      
-                      <div style="margin-top:15px;">
-                        <a href="#" style="font-size:11px;color:#94a3b8;text-decoration:underline;margin:0 8px;">Privacy Policy</a>
-                        <a href="#" style="font-size:11px;color:#94a3b8;text-decoration:underline;margin:0 8px;">Terms of Service</a>
-                      </div>
+                    <td style="padding:20px 30px; background-color:#FAFCFF; border-top:1px solid #F1F5F9; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
+                      <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="text-align:center;">
+                            <p style="margin:0; font-size:12px; color:#64748b; font-weight:500;">&copy; ${currentYear} Abu Mafhal Sub. All rights reserved.</p>
+                            <p style="margin:6px 0 0; font-size:11px; color:#94A3B8;">This is an automated notification. Please do not reply directly to this email.</p>
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
                 </table>
@@ -243,8 +242,21 @@ serve(async (req) => {
         for (const contact of recipients) {
             try {
                 if (type === 'email') {
+                    let dynamicLogo = "https://lh3.googleusercontent.com/msqhVq_JQ6x04b9_cy87eDN3tXjT8lzXUkT_PwdVpVQWjODAAakIC0mw_G3mnOjiXT9dTkuNv6ZGSg6O=s265-w265-h265";
+                    try {
+                        const { data: setting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'app_logo_icon').single();
+                        if (setting && setting.value && setting.value.url) {
+                            // If the URL is a local dev URL, it will fail in real emails, so keep the fallback
+                            if (!setting.value.url.includes('127.0.0.1') && !setting.value.url.includes('localhost')) {
+                                dynamicLogo = setting.value.url;
+                            }
+                        }
+                    } catch (err) {
+                        console.log("Could not fetch logo", err);
+                    }
+
                     const personalizedBody = body.replace(/{{name}}/g, "User"); 
-                    const htmlContent = generateHtmlEmail(personalizedBody, emailSubject);
+                    const htmlContent = generateHtmlEmail(personalizedBody, emailSubject, dynamicLogo);
                     
                     await sendEmail(
                         contact,

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Linking, TextInput, Clipboard, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Linking, TextInput, Clipboard, Alert, Modal } from 'react-native';
 import { StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const COLORS = {
   navy: '#0E1A2E',
@@ -22,11 +26,18 @@ const COLORS = {
 export default function CACHistory() {
   const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
+  const [detailsReq, setDetailsReq] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // Correction Modal State
+  const [correctionReq, setCorrectionReq] = useState<any>(null);
+  const [correctionMsg, setCorrectionMsg] = useState('');
+  const [correctionDoc, setCorrectionDoc] = useState<any>(null);
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   // Stats and Filters
   const counts = {
@@ -100,13 +111,89 @@ export default function CACHistory() {
     }
   };
 
-  const openUrl = (url: string) => {
-    if (url) Linking.openURL(url);
+  const openUrl = async (url: string) => {
+    if (!url) return;
+    try {
+      const rawFilename = url.split('/').pop() || 'document.pdf';
+      const filename = rawFilename.split('?')[0]; // Remove query params like ?t=123
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      
+      const isImage = uri.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+      
+      let savedToGallery = false;
+      if (isImage) {
+        try {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status === 'granted') {
+            await MediaLibrary.saveToLibraryAsync(uri);
+            Alert.alert('Success', 'Image saved directly to your phone gallery!');
+            savedToGallery = true;
+          }
+        } catch (mediaErr) {
+          console.log("MediaLibrary failed, falling back to Sharing:", mediaErr);
+        }
+      }
+      
+      if (!savedToGallery) {
+        await Sharing.shareAsync(uri, { dialogTitle: 'Download / Save Document' });
+      }
+    } catch (e: any) {
+      console.log("Download Error:", e);
+      Alert.alert('Download Error', e.message || 'Could not download the file.');
+    }
   };
 
   const copyToClipboard = (text: string) => {
     Clipboard.setString(text);
     Alert.alert('Copied!', 'Reference ID copied to clipboard.');
+  };
+
+  const pickCorrectionDoc = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (!res.canceled) setCorrectionDoc(res.assets[0]);
+    } catch (e) {}
+  };
+
+  const submitCorrection = async () => {
+    if (!correctionMsg && !correctionDoc) {
+      return Alert.alert('Error', 'Please enter a message or attach a document to submit your correction.');
+    }
+    
+    setSubmittingCorrection(true);
+    try {
+      let publicUrl = '';
+      if (correctionDoc) {
+        const response = await fetch(correctionDoc.uri);
+        const blob = await response.blob();
+        const filename = `cac_corrections/${correctionReq.id}_${Date.now()}`;
+        const { error } = await supabase.storage.from('cac_documents').upload(filename, blob);
+        if (error) throw error;
+        const { data } = supabase.storage.from('cac_documents').getPublicUrl(filename);
+        publicUrl = data.publicUrl;
+      }
+      
+      const replyText = `\n\n--- USER CORRECTION ---\nMessage: ${correctionMsg}\n${publicUrl ? 'Attached Doc: ' + publicUrl : ''}`;
+      const updatedQuery = (correctionReq.admin_query || '') + replyText;
+      
+      const { error: dbErr } = await supabase.from('cac_requests').update({
+        status: 'pending',
+        admin_query: updatedQuery
+      }).eq('id', correctionReq.id);
+      
+      if (dbErr) throw dbErr;
+      
+      Alert.alert('Success', 'Your correction has been submitted and is under review.');
+      setCorrectionReq(null);
+      setCorrectionMsg('');
+      setCorrectionDoc(null);
+      fetchRequests();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSubmittingCorrection(false);
+    }
   };
 
   return (
@@ -196,7 +283,7 @@ export default function CACHistory() {
           </View>
         ) : (
           filteredRequests.map((req) => (
-            <View key={req.id} style={s.card}>
+            <TouchableOpacity key={req.id} style={s.card} onPress={() => setDetailsReq(req)}>
               <View style={s.cardHeader}>
                 <View style={s.cardIconBox}>
                   <Ionicons name="business" size={20} color={COLORS.gold} />
@@ -230,6 +317,24 @@ export default function CACHistory() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.queryTitle}>Action Required</Text>
                     <Text style={s.queryTxt}>{req.admin_query}</Text>
+                    
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                      <TouchableOpacity 
+                        style={{ backgroundColor: COLORS.error, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
+                        onPress={() => { setCorrectionReq(req); setCorrectionMsg(''); setCorrectionDoc(null); }}
+                      >
+                        <Ionicons name="build" size={14} color={COLORS.white} style={{ marginRight: 6 }} />
+                        <Text style={{ color: COLORS.white, fontSize: 12, fontWeight: 'bold' }}>Quick Message</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={{ backgroundColor: COLORS.gold, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
+                        onPress={() => router.push(`/cac-services?editId=${req.id}`)}
+                      >
+                        <Ionicons name="create-outline" size={14} color={COLORS.white} style={{ marginRight: 6 }} />
+                        <Text style={{ color: COLORS.white, fontSize: 12, fontWeight: 'bold' }}>Edit Application</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               )}
@@ -250,7 +355,7 @@ export default function CACHistory() {
                   )}
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -261,6 +366,84 @@ export default function CACHistory() {
           <Ionicons name="add" size={26} color={COLORS.white} />
         </TouchableOpacity>
       )}
+
+      {/* Details Modal */}
+      <Modal visible={!!detailsReq} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContainer, { height: '80%' }]}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Application Details</Text>
+              <TouchableOpacity onPress={() => setDetailsReq(null)}><Ionicons name="close" size={24} color={COLORS.navy} /></TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 16 }}>
+              {detailsReq && (
+                <>
+                  <Text style={s.sectionTitle}>BASIC INFO</Text>
+                  <View style={s.infoBlock}>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Type</Text><Text style={s.infoValue}>{detailsReq.registration_type}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Choice 1</Text><Text style={s.infoValue}>{detailsReq.proposed_names?.name1}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Choice 2</Text><Text style={s.infoValue}>{detailsReq.proposed_names?.name2}</Text></View>
+                    {detailsReq.proposed_names?.name3 && <View style={s.infoRow}><Text style={s.infoLabel}>Choice 3</Text><Text style={s.infoValue}>{detailsReq.proposed_names?.name3}</Text></View>}
+                  </View>
+                  
+                  <Text style={s.sectionTitle}>BUSINESS DETAILS</Text>
+                  <View style={s.infoBlock}>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Email</Text><Text style={s.infoValue}>{detailsReq.business_info?.email || 'N/A'}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Phone</Text><Text style={s.infoValue}>{detailsReq.business_info?.phone || 'N/A'}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Nature</Text><Text style={s.infoValue}>{detailsReq.business_info?.natureOfBusiness || 'N/A'}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Office</Text><Text style={s.infoValue}>{detailsReq.business_info?.officeNumber}, {detailsReq.business_info?.officeAddress}</Text></View>
+                    <View style={s.infoRow}><Text style={s.infoLabel}>Location</Text><Text style={s.infoValue}>{detailsReq.business_info?.lga}, {detailsReq.business_info?.state}</Text></View>
+                    {detailsReq.business_info?.tenure && <View style={s.infoRow}><Text style={s.infoLabel}>Tenure</Text><Text style={s.infoValue}>{detailsReq.business_info?.tenure} years</Text></View>}
+                    {detailsReq.aims_and_objectives && (
+                      <View style={{ marginTop: 8 }}>
+                        <Text style={s.infoLabel}>Aims & Objectives</Text>
+                        <Text style={[s.infoValue, { textAlign: 'left', marginLeft: 0, marginTop: 4 }]}>{detailsReq.aims_and_objectives}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ height: 40 }} />
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Correction Modal */}
+      <Modal visible={!!correctionReq} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContainer}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Submit Correction</Text>
+              <TouchableOpacity onPress={() => setCorrectionReq(null)}><Ionicons name="close" size={24} color={COLORS.navy} /></TouchableOpacity>
+            </View>
+            
+            <View style={{ padding: 16 }}>
+              <Text style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 12 }}>
+                Please provide the requested information or upload any required documents to correct your application.
+              </Text>
+              
+              <TextInput 
+                style={s.correctionInput}
+                placeholder="Type your explanation or correction here..."
+                multiline
+                value={correctionMsg}
+                onChangeText={setCorrectionMsg}
+              />
+              
+              <TouchableOpacity style={s.attachBtn} onPress={pickCorrectionDoc}>
+                <Ionicons name="document-attach" size={20} color={COLORS.navy} />
+                <Text style={s.attachBtnTxt}>{correctionDoc ? correctionDoc.name : 'Attach Document (Optional)'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={s.submitCorrBtn} onPress={submitCorrection} disabled={submittingCorrection}>
+                {submittingCorrection ? <ActivityIndicator color={COLORS.white} /> : <Text style={s.submitCorrBtnTxt}>Submit Correction</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -314,13 +497,25 @@ const s = StyleSheet.create({
   infoLabel: { fontSize: 12, color: COLORS.textSub, fontWeight: '500' },
   infoValue: { fontSize: 12, color: COLORS.navy, fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 16 },
   
+  infoBlock: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' },
+  sectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.textSub, marginBottom: 8, letterSpacing: 0.5, marginLeft: 4 },
+  
   queryBox: { backgroundColor: '#fef2f2', padding: 12, borderRadius: 10, flexDirection: 'row', gap: 10, marginTop: 12, borderWidth: 1, borderColor: '#fecaca' },
   queryTitle: { fontSize: 11, fontWeight: '800', color: '#991b1b', marginBottom: 3 },
   queryTxt: { fontSize: 12, color: '#991b1b', fontWeight: '500', lineHeight: 18 },
   
   downloadActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   downloadBtn: { flex: 1, backgroundColor: COLORS.success, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 8, gap: 6 },
-  downloadBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
-
-  fab: { position: 'absolute', bottom: 90, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.navy, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  downloadBtnTxt: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
+  fab: { position: 'absolute', bottom: 90, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.gold, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContainer: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, minHeight: 350 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: COLORS.navy },
+  correctionInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12, minHeight: 100, textAlignVertical: 'top', backgroundColor: '#f8fafc', fontSize: 14, color: COLORS.textMain, marginBottom: 12 },
+  attachBtn: { flexDirection: 'row', alignItems: 'center', padding: 12, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, borderStyle: 'dashed', backgroundColor: '#f1f5f9', marginBottom: 20 },
+  attachBtnTxt: { marginLeft: 8, fontSize: 13, color: COLORS.navy, fontWeight: '600', flex: 1 },
+  submitCorrBtn: { backgroundColor: COLORS.success, padding: 14, borderRadius: 8, alignItems: 'center' },
+  submitCorrBtnTxt: { color: COLORS.white, fontSize: 14, fontWeight: '700' }
 });

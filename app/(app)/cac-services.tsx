@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Image, Modal } from 'react-native';
 import { StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../services/supabase';
+import DynamicBanners from '../../components/DynamicBanners';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { NIGERIA_STATES, STATE_LIST } from '../../utils/nigeriaStates';
 
 const COLORS = {
   navy: '#0d1b3e',
@@ -26,8 +29,71 @@ const COLORS = {
 
 type Pricing = { id: string; name: string; price: number; };
 
+const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select..." }: any) => {
+  const [visible, setVisible] = useState(false);
+  const safeOptions = Array.isArray(options) ? options : [];
+  return (
+    <View style={[s.inputContainer, { zIndex: visible ? 100 : 1 }]}>
+      <Text style={s.label}>{label}</Text>
+      <TouchableOpacity style={[s.input, { justifyContent: 'center' }]} onPress={() => setVisible(!visible)}>
+        <Text style={{ color: value ? COLORS.navy : COLORS.textSub }}>{value || placeholder}</Text>
+        <Ionicons name={visible ? "chevron-up" : "chevron-down"} size={16} color={COLORS.textSub} style={{ position: 'absolute', right: 12, top: 12 }} />
+      </TouchableOpacity>
+      
+      {visible && (
+        <View style={[s.dropdownList, { position: 'relative', top: 0, marginTop: 4, maxHeight: 250, zIndex: 1000 }]}>
+          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {safeOptions.length === 0 ? (
+              <Text style={{ textAlign: 'center', padding: 12, color: COLORS.textSub }}>No options</Text>
+            ) : (
+              safeOptions.map((opt: string, i: number) => (
+                <TouchableOpacity key={i} style={[s.dropdownItem, value === opt && s.dropdownItemActive]} onPress={() => { onSelect(opt); setVisible(false); }}>
+                  <Text style={[s.dropdownItemTxt, value === opt && s.dropdownItemTxtActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const CustomDatePicker = ({ label, value, onChange }: any) => {
+  const [show, setShow] = useState(false);
+  const dateObj = value ? new Date(value) : new Date();
+  
+  const handleConfirm = (event: any, selectedDate?: Date) => {
+    setShow(Platform.OS === 'ios');
+    if (selectedDate) {
+      const formatted = selectedDate.toISOString().split('T')[0];
+      onChange(formatted);
+    }
+  };
+
+  return (
+    <View style={s.inputContainer}>
+      <Text style={s.label}>{label}</Text>
+      <TouchableOpacity style={[s.input, { justifyContent: 'center' }]} onPress={() => setShow(true)}>
+        <Text style={{ color: value ? COLORS.navy : COLORS.textSub }}>{value || "Select Date"}</Text>
+        <Ionicons name="calendar-outline" size={16} color={COLORS.textSub} style={{ position: 'absolute', right: 12, top: 12 }} />
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          value={dateObj}
+          mode="date"
+          display="default"
+          onChange={handleConfirm}
+          maximumDate={new Date()}
+        />
+      )}
+    </View>
+  );
+};
+
 export default function CACServices() {
   const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId: string }>();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pricings, setPricings] = useState<Pricing[]>([]);
@@ -71,17 +137,58 @@ export default function CACServices() {
       setLoading(true);
       const { data, error } = await supabase.from('cac_pricing').select('*').eq('active', true).order('price', { ascending: true });
       if (error && error.code !== '42P01') {
-        // Ignore 42P01 if table doesn't exist yet in cache
         console.error('Error fetching CAC pricing:', error);
       }
       if (data) {
         setPricings(data);
-        if (data.length > 0) setRegType(data[data.length - 1]); // Default to NGO based on user request
+        if (editId) {
+          await loadEditData(editId as string, data);
+        } else if (data.length > 0) {
+          setRegType(data[data.length - 1]); // Default
+        }
       }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEditData = async (id: string, availablePricings: Pricing[]) => {
+    try {
+      const { data, error } = await supabase.from('cac_requests').select('*').eq('id', id).single();
+      if (error) throw error;
+      if (data) {
+        setProposedName1(data.proposed_names?.name1 || '');
+        setProposedName2(data.proposed_names?.name2 || '');
+        setProposedName3(data.proposed_names?.name3 || '');
+
+        if (data.business_info) {
+          setEmail(data.business_info.email || '');
+          setPhone(data.business_info.phone || '');
+          setNatureOfBusiness(data.business_info.natureOfBusiness || '');
+          setState(data.business_info.state || '');
+          setLga(data.business_info.lga || '');
+          setOfficeNumber(data.business_info.officeNumber || '');
+          setOfficeAddress(data.business_info.officeAddress || '');
+          setTenure(data.business_info.tenure || '');
+        }
+
+        if (data.proprietors && data.proprietors.length > 0) setProprietors(data.proprietors);
+        if (data.chairman && Object.keys(data.chairman).length > 0) setChairman(data.chairman);
+        if (data.secretary && Object.keys(data.secretary).length > 0) setSecretary(data.secretary);
+        if (data.trustees && data.trustees.length > 0) setTrustees(data.trustees);
+        if (data.witness && Object.keys(data.witness).length > 0) setWitness(data.witness);
+        if (data.aims_and_objectives) setAims(data.aims_and_objectives);
+
+        if (data.pricing_id) {
+          const matchedPricing = availablePricings.find(p => p.id === data.pricing_id);
+          if (matchedPricing) setRegType(matchedPricing);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading edit data:', e);
+      Alert.alert('Error', 'Failed to load application data.');
     }
   };
 
@@ -132,11 +239,13 @@ export default function CACServices() {
   const renderPersonForm = (person: any, title: string, setter: Function, isArray: boolean = false, index: number = 0, onRemove?: () => void) => {
     const updateField = (f: string, v: string) => {
       if (isArray) {
-        const newArr = [...(person as any[])];
-        newArr[index][f] = v;
-        setter(newArr);
+        setter((prev: any[]) => {
+          const newArr = [...prev];
+          newArr[index] = { ...newArr[index], [f]: v };
+          return newArr;
+        });
       } else {
-        setter({ ...person, [f]: v });
+        setter((prev: any) => ({ ...prev, [f]: v }));
       }
     };
 
@@ -157,17 +266,11 @@ export default function CACServices() {
             <Text style={s.label}>Full name</Text>
             <TextInput style={s.input} value={data.fullName} onChangeText={t => updateField('fullName', t)} />
           </View>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Date of birth (mm/dd/yyyy)</Text>
-            <TextInput style={s.input} placeholder="mm/dd/yyyy" value={data.dob} onChangeText={t => updateField('dob', t)} />
-          </View>
+          <CustomDatePicker label="Date of birth" value={data.dob} onChange={(v: string) => updateField('dob', v)} />
         </View>
 
         <View style={s.row}>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>Gender</Text>
-            <TextInput style={s.input} value={data.gender} onChangeText={t => updateField('gender', t)} />
-          </View>
+          <CustomDropdown label="Gender" value={data.gender} options={['Male', 'Female']} onSelect={(v: string) => updateField('gender', v)} />
           <View style={s.inputContainer}>
             <Text style={s.label}>Phone number</Text>
             <TextInput style={s.input} keyboardType="phone-pad" value={data.phone} onChangeText={t => updateField('phone', t)} />
@@ -186,14 +289,8 @@ export default function CACServices() {
         </View>
 
         <View style={s.row}>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>State</Text>
-            <TextInput style={s.input} value={data.state} onChangeText={t => updateField('state', t)} />
-          </View>
-          <View style={s.inputContainer}>
-            <Text style={s.label}>LGA and city</Text>
-            <TextInput style={s.input} value={data.lga} onChangeText={t => updateField('lga', t)} />
-          </View>
+          <CustomDropdown label="State" value={data.state} options={STATE_LIST} onSelect={(val: string) => { updateField('state', val); updateField('lga', ''); }} />
+          <CustomDropdown label="LGA and city" value={data.lga} options={data.state ? NIGERIA_STATES[data.state] : []} onSelect={(v: string) => updateField('lga', v)} placeholder="Select State First" />
         </View>
 
         <View style={s.row}>
@@ -303,7 +400,31 @@ export default function CACServices() {
         name3: proposedName3
       };
 
-      // Call RPC
+      // If editing, bypass payment RPC and just update the table directly
+      if (editId) {
+        const { error: updateError } = await supabase.from('cac_requests').update({
+          pricing_id: regType.id,
+          registration_type: regType.name,
+          proposed_names: proposedNames,
+          business_info: businessInfo,
+          proprietors: uploadedProprietors,
+          chairman: uploadedChairman,
+          secretary: uploadedSecretary,
+          trustees: uploadedTrustees,
+          aims_and_objectives: aims,
+          status: 'pending' // Send back to pending for review
+        }).eq('id', editId);
+
+        if (updateError) throw updateError;
+
+        Alert.alert('Success', 'CAC Application updated successfully!', [
+          { text: 'View History', onPress: () => router.push('/cac-history') },
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+        return;
+      }
+
+      // Call RPC for new requests (charges wallet)
       const { data: rpcData, error: rpcError } = await supabase.rpc('submit_cac_request', {
         p_pricing_id: regType.id,
         p_registration_type: regType.name,
@@ -339,7 +460,7 @@ export default function CACServices() {
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
         <View style={s.headerTitleArea}>
-          <Text style={s.headerTitle}>CAC Registration</Text>
+          <Text style={s.headerTitle}>{editId ? 'Edit Application' : 'CAC Registration'}</Text>
           <Text style={s.headerSubTitle}>Register a business name, company or NGO</Text>
         </View>
         <TouchableOpacity style={s.historyBtnTop} onPress={() => router.push('/cac-history')}>
@@ -349,6 +470,8 @@ export default function CACServices() {
       </LinearGradient>
 
       <ScrollView style={s.content} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        {/* Dynamic Banners */}
+        <DynamicBanners placement="cac" />
         
         {/* Info Banner Feature */}
         <View style={s.infoBanner}>
@@ -359,21 +482,29 @@ export default function CACServices() {
           </View>
         </View>
 
-        <View style={s.chargeRow}>
-           <Text style={s.chargeRowLabel}>Service Charge:</Text>
-           <Text style={s.chargeRowAmt}>₦{regType?.price ? regType.price.toLocaleString() : '0.00'}</Text>
-        </View>
+        {!editId && (
+          <View style={s.chargeRow}>
+             <Text style={s.chargeRowLabel}>Service Charge:</Text>
+             <Text style={s.chargeRowAmt}>₦{regType?.price ? regType.price.toLocaleString() : '0.00'}</Text>
+          </View>
+        )}
 
         <View style={s.formCard}>
           
           <View style={s.inputGroup}>
             <Text style={s.labelReq}>Registration Type *</Text>
-            <TouchableOpacity style={s.dropdownBtn} onPress={() => setShowTypeDropdown(!showTypeDropdown)}>
-              <Text style={s.dropdownTxt}>{regType ? regType.name : 'Select Type'}</Text>
-              <Ionicons name="chevron-down" size={20} color={COLORS.textSub} />
+            <TouchableOpacity 
+              style={[s.dropdownBtn, editId ? { backgroundColor: '#f1f5f9' } : {}]} 
+              onPress={() => !editId && setShowTypeDropdown(!showTypeDropdown)}
+              activeOpacity={editId ? 1 : 0.2}
+            >
+              <Text style={[s.dropdownTxt, editId ? { color: COLORS.textSub } : {}]}>
+                {regType ? regType.name : 'Select Type'}
+              </Text>
+              {!editId && <Ionicons name="chevron-down" size={20} color={COLORS.textSub} />}
             </TouchableOpacity>
             
-            {showTypeDropdown && (
+            {showTypeDropdown && !editId && (
               <View style={s.dropdownList}>
                 {loading ? <ActivityIndicator color={COLORS.navy} /> : pricings.map((p) => (
                   <TouchableOpacity 
@@ -428,14 +559,8 @@ export default function CACServices() {
               </View>
 
               <View style={s.row}>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company state</Text>
-                  <TextInput style={s.input} value={state} onChangeText={setState} />
-                </View>
-                <View style={s.inputContainer}>
-                  <Text style={s.label}>Company LGA and city</Text>
-                  <TextInput style={s.input} value={lga} onChangeText={setLga} />
-                </View>
+                <CustomDropdown label="Company state" value={state} options={STATE_LIST} onSelect={(val: string) => { setState(val); setLga(''); }} />
+                <CustomDropdown label="Company LGA and city" value={lga} options={state ? NIGERIA_STATES[state] : []} onSelect={setLga} placeholder="Select State First" />
               </View>
 
               <View style={s.row}>
@@ -618,10 +743,7 @@ export default function CACServices() {
             {submitting ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
-              <>
-                <Ionicons name="document-text" size={18} color={COLORS.white} style={{ marginRight: 6 }} />
-                <Text style={s.submitBtnTxt}>Submit Registration</Text>
-              </>
+              <Text style={s.submitBtnTxt}>{editId ? 'Update Application' : 'Submit Registration'}</Text>
             )}
           </TouchableOpacity>
 
@@ -676,4 +798,10 @@ const s = StyleSheet.create({
   addText: { color: COLORS.goldDk, fontSize: 12, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', paddingVertical: 8, borderWidth: 1, borderColor: COLORS.gold, borderRadius: 6 },
   submitBtn: { backgroundColor: COLORS.navy, flexDirection: 'row', height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 8, width: '60%', alignSelf: 'center' },
   submitBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.navy },
+  modalOption: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  modalOptionText: { fontSize: 16, color: COLORS.textMain },
 });

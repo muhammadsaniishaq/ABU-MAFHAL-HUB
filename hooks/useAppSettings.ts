@@ -11,6 +11,11 @@ export interface AppSettings {
     hide_user_balances: boolean;
     support_whatsapp: string;
     support_email: string;
+    support_facebook: string;
+    support_twitter: string;
+    support_instagram: string;
+    support_telegram: string;
+    support_office_address: string;
     funding_fee_type: string;
     funding_fee_value: string;
     [key: string]: any;
@@ -26,8 +31,15 @@ const DEFAULT_SETTINGS: AppSettings = {
     hide_user_balances: false,
     support_whatsapp: '',
     support_email: '',
+    support_facebook: '',
+    support_twitter: '',
+    support_instagram: '',
+    support_telegram: '',
+    support_office_address: 'No 1. Abu Mafhal Hub Plaza, Kano State, Nigeria.',
     funding_fee_type: 'fixed',
-    funding_fee_value: '0'
+    funding_fee_value: '0',
+    company_name: 'MAFHAL SUB',
+    app_logo: ''
 };
 
 export function useAppSettings() {

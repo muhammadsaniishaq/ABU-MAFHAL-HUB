@@ -6,8 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
+import { createAppNotification } from '../../services/notificationsHelper';
 import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
+import DynamicBanners from '../../components/DynamicBanners';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 
@@ -250,6 +252,16 @@ export default function BillsScreen() {
             }
 
             if (result.success) {
+                // Send Notification
+                await createAppNotification(
+                    user.id,
+                    `${category === 'electricity' ? 'Electricity' : 'TV'} Bill Payment`,
+                    `You successfully paid ₦${amount} for ${provider.toUpperCase()} (${customerId}).`,
+                    "bills",
+                    "normal",
+                    { route: "/(app)/history" }
+                );
+
                 if (category === 'electricity' && (result as any).token) {
                     Alert.alert("Success", `Payment Successful!\n\nToken: ${(result as any).token}`);
                 } else {
@@ -307,6 +319,8 @@ export default function BillsScreen() {
                 keyboardShouldPersistTaps="always"
                 keyboardDismissMode="none"
             >
+                {/* Dynamic Banners */}
+                <DynamicBanners placement="bills" />
                 
                 {/* Recent Beneficiaries Slider */}
                 {(category === 'electricity' ? recentMeters : recentSmartCards).length > 0 && (

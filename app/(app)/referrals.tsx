@@ -123,30 +123,12 @@ export default function Referrals() {
             const { data: { user } } = await supabase.auth.getUser();
             if(!user) throw new Error("No user");
 
-            // 1. Debit Referral Balance
-            const newRefBal = stats.balance - stats.balance; // Withdraw All
-            const { error: debitError } = await supabase
-                .from('profiles')
-                .update({ referral_balance: newRefBal })
-                .eq('id', user.id);
-            
-            if(debitError) throw debitError;
-
-            // 2. Credit Main Balance (Using RPC or direct update if safe - using deducting function reversed for now or direct update)
-            // Ideally we use a transaction. For now, sequential update.
-            const { data: mainProfile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-            const newMainBal = (mainProfile?.balance || 0) + stats.balance;
-            
-            await supabase.from('profiles').update({ balance: newMainBal }).eq('id', user.id);
-
-            // 3. Log Transaction
-             await supabase.from('transactions').insert({
-                user_id: user.id,
-                type: 'referral_withdrawal',
-                amount: stats.balance,
-                status: 'success',
-                description: 'Withdrawal from Referral Earnings'
+            // 1. Withdraw using Secure RPC
+            const { error: rpcError } = await supabase.rpc('withdraw_referral_earnings', {
+                amount: stats.balance
             });
+            
+            if(rpcError) throw rpcError;
 
             Alert.alert("Success", "Earnings transferred to main wallet!");
             fetchReferralData(); // Refresh

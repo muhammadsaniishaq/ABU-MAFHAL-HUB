@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { useIsFocused } from '@react-navigation/native';
+import DynamicBanners from '../../components/DynamicBanners';
 import * as Print from 'expo-print';
 import { Asset } from 'expo-asset';
 import ViewShot from 'react-native-view-shot';
@@ -844,6 +845,9 @@ export default function QRPayScreen() {
                 </TouchableOpacity>
               </View>
             </LinearGradient>
+
+            {/* Dynamic Banners */}
+            <DynamicBanners placement="qr_pay" />
 
             {activeTab === 'scan' ? (
                 <View style={{ flex: 1, marginTop: -16 }}>
