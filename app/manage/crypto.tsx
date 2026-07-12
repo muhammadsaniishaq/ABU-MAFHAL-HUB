@@ -19,12 +19,49 @@ const T = {
 
 export default function CryptoManager() {
     const router = useRouter();
-    const { settings, stats, loading, updateSetting } = useCryptoManager();
+    const { 
+        settings, 
+        stats, 
+        loading, 
+        updateSetting,
+        fetchTradeHistory,
+        fetchUserWallets,
+        fetchPendingWithdrawalsList,
+        approveWithdrawal,
+        updateUserBalance 
+    } = useCryptoManager();
+    
     const [activeTab, setActiveTab] = useState('overview');
+
+    // State for new features
+    const [tradeHistory, setTradeHistory] = useState<any[]>([]);
+    const [userWallets, setUserWallets] = useState<any[]>([]);
+    const [withdrawals, setWithdrawals] = useState<any[]>([]);
+    const [isFetchingData, setIsFetchingData] = useState(false);
 
     // Local state for text inputs to avoid jumping during typing
     const [feeTrc20, setFeeTrc20] = useState('');
     const [feeBtc, setFeeBtc] = useState('');
+
+    useEffect(() => {
+        if (activeTab === 'history') loadHistory();
+        if (activeTab === 'users') loadWallets();
+        if (activeTab === 'withdrawals') loadWithdrawals();
+    }, [activeTab]);
+
+    const loadHistory = async () => { setIsFetchingData(true); setTradeHistory(await fetchTradeHistory()); setIsFetchingData(false); };
+    const loadWallets = async () => { setIsFetchingData(true); setUserWallets(await fetchUserWallets()); setIsFetchingData(false); };
+    const loadWithdrawals = async () => { setIsFetchingData(true); setWithdrawals(await fetchPendingWithdrawalsList()); setIsFetchingData(false); };
+
+    const handleApprove = async (id: string) => {
+        await approveWithdrawal(id);
+        loadWithdrawals(); // refresh list
+    };
+
+    const handleFundUser = async (userId: string, coin: string, amount: number) => {
+        await updateUserBalance(userId, coin, amount);
+        loadWallets(); // refresh balances
+    };
 
     useEffect(() => {
         setFeeTrc20(settings.crypto_fee_trc20_usdt || '1.5');
@@ -95,19 +132,21 @@ export default function CryptoManager() {
             </LinearGradient>
 
             {/* Custom Tab Bar */}
-            <View style={s.tabBar}>
-                {['overview', 'rates', 'p2p', 'networks'].map((tab) => (
-                    <TouchableOpacity 
-                        key={tab} 
-                        onPress={() => setActiveTab(tab)}
-                        style={[s.tabBtn, activeTab === tab && s.tabBtnActive]}
-                    >
-                        <Text style={[s.tabTxt, activeTab === tab && s.tabTxtActive]}>
-                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBarContainer}>
+                <View style={s.tabBar}>
+                    {['overview', 'users', 'history', 'withdrawals', 'rates', 'p2p', 'networks'].map((tab) => (
+                        <TouchableOpacity 
+                            key={tab} 
+                            onPress={() => setActiveTab(tab)}
+                            style={[s.tabBtn, activeTab === tab && s.tabBtnActive]}
+                        >
+                            <Text style={[s.tabTxt, activeTab === tab && s.tabTxtActive]}>
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </ScrollView>
 
             <ScrollView style={s.scrollView} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
                 
@@ -161,6 +200,89 @@ export default function CryptoManager() {
                                 </View>
                             </View>
                         )}
+                    </>
+                )}
+                {activeTab === 'history' && (
+                    <>
+                        <Text style={s.sectionTitle}>Recent Trades & Swaps</Text>
+                        <View style={s.card}>
+                            {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading history...</Text> : tradeHistory.map((trade: any, index: number) => (
+                                <View key={trade.id || index} style={s.historyRow}>
+                                    <View style={s.historyIcon}>
+                                        <Ionicons name={trade.trade_type === 'buy' ? 'arrow-down' : 'arrow-up'} size={18} color={trade.trade_type === 'buy' ? T.green : T.red} />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={s.historyTitle}>{trade.trade_type.toUpperCase()} {trade.coin}</Text>
+                                        <Text style={s.historySub}>{trade.user?.email || 'Unknown User'}</Text>
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text style={s.historyAmt}>₦{trade.fiat_value?.toLocaleString()}</Text>
+                                        <Text style={[s.historyStatus, { color: trade.status === 'completed' ? T.green : '#f5a623' }]}>{trade.status}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                            {tradeHistory.length === 0 && !isFetchingData && <Text style={{padding: 20, textAlign: 'center', color: '#64748B'}}>No trade history found</Text>}
+                        </View>
+                    </>
+                )}
+
+                {activeTab === 'users' && (
+                    <>
+                        <Text style={s.sectionTitle}>User Balances</Text>
+                        {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading wallets...</Text> : userWallets.map((wallet: any, index: number) => (
+                            <View key={wallet.user_id || index} style={s.card}>
+                                <Text style={s.userEmail}>{wallet.user?.email || 'Unknown User'}</Text>
+                                <View style={s.balanceGrid}>
+                                    <View style={s.balanceItem}>
+                                        <Text style={s.balLabel}>BTC</Text>
+                                        <Text style={s.balValue}>{wallet.btc_balance || 0}</Text>
+                                    </View>
+                                    <View style={s.balanceItem}>
+                                        <Text style={s.balLabel}>USDT</Text>
+                                        <Text style={s.balValue}>{wallet.usdt_balance || 0}</Text>
+                                    </View>
+                                    <View style={s.balanceItem}>
+                                        <Text style={s.balLabel}>ETH</Text>
+                                        <Text style={s.balValue}>{wallet.eth_balance || 0}</Text>
+                                    </View>
+                                </View>
+                                <View style={s.fundActions}>
+                                    <TouchableOpacity style={s.fundBtn} onPress={() => handleFundUser(wallet.user_id, 'USDT', 10)}>
+                                        <Text style={s.fundBtnTxt}>+10 USDT</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[s.fundBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleFundUser(wallet.user_id, 'USDT', -10)}>
+                                        <Text style={[s.fundBtnTxt, { color: '#DC2626' }]}>-10 USDT</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                        {userWallets.length === 0 && !isFetchingData && <Text style={{padding: 20, textAlign: 'center', color: '#64748B'}}>No wallets found</Text>}
+                    </>
+                )}
+
+                {activeTab === 'withdrawals' && (
+                    <>
+                        <Text style={s.sectionTitle}>Pending Withdrawals</Text>
+                        <View style={s.card}>
+                            {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading withdrawals...</Text> : withdrawals.map((tx: any, index: number) => (
+                                <View key={tx.id || index} style={s.historyRow}>
+                                    <View style={[s.historyIcon, { backgroundColor: '#FFF7E6' }]}>
+                                        <Ionicons name="time" size={18} color="#f5a623" />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={s.historyTitle}>Crypto Withdrawal</Text>
+                                        <Text style={s.historySub}>{tx.user?.email || 'Unknown User'}</Text>
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                                        <Text style={s.historyAmt}>₦{tx.amount?.toLocaleString()}</Text>
+                                        <TouchableOpacity style={s.approveBtn} onPress={() => handleApprove(tx.id)}>
+                                            <Text style={s.approveBtnTxt}>Approve</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                            {withdrawals.length === 0 && !isFetchingData && <Text style={{padding: 20, textAlign: 'center', color: '#64748B'}}>No pending withdrawals</Text>}
+                        </View>
                     </>
                 )}
 
@@ -423,5 +545,25 @@ const s = StyleSheet.create({
     alertTitle: { fontSize: 14, fontWeight: '800', color: '#991B1B', marginBottom: 2 },
     alertDesc: { fontSize: 12, color: '#B91C1C', lineHeight: 16, marginBottom: 8 },
     alertAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    alertActionTxt: { fontSize: 12, fontWeight: '800', color: '#EF4444' }
+    alertActionTxt: { fontSize: 12, fontWeight: '800', color: '#EF4444' },
+
+    historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    historyIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+    historyTitle: { fontSize: 14, fontWeight: '800', color: '#334155' },
+    historySub: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+    historyAmt: { fontSize: 14, fontWeight: '900', color: T.navy },
+    historyStatus: { fontSize: 10, fontWeight: '800', marginTop: 4, textTransform: 'uppercase' },
+
+    userEmail: { fontSize: 14, fontWeight: '800', color: T.navy, marginBottom: 12 },
+    balanceGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 12 },
+    balanceItem: { alignItems: 'center' },
+    balLabel: { fontSize: 10, color: '#64748B', fontWeight: '800', textTransform: 'uppercase' },
+    balValue: { fontSize: 14, fontWeight: '900', color: '#334155', marginTop: 4 },
+    fundActions: { flexDirection: 'row', gap: 12 },
+    fundBtn: { flex: 1, backgroundColor: '#D1FAE5', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+    fundBtnTxt: { color: '#059669', fontSize: 12, fontWeight: '800' },
+
+    approveBtn: { backgroundColor: T.navy, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    approveBtnTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    tabBarContainer: { paddingHorizontal: 16, marginTop: -20, paddingBottom: 10, zIndex: 20 }
 });

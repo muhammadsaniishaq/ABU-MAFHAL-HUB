@@ -34,3 +34,26 @@ CREATE TABLE IF NOT EXISTS p2p_orders (
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'disputed'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 4. Create Trade History table
+CREATE TABLE IF NOT EXISTS trade_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id),
+    trade_type VARCHAR(20) NOT NULL, -- 'buy', 'sell', 'swap'
+    coin VARCHAR(10) NOT NULL, -- 'BTC', 'USDT', 'ETH'
+    amount DECIMAL NOT NULL,
+    fiat_value DECIMAL NOT NULL,
+    fee DECIMAL NOT NULL DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'completed',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. Create User Wallets table
+CREATE TABLE IF NOT EXISTS user_wallets (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+    btc_balance DECIMAL DEFAULT 0,
+    usdt_balance DECIMAL DEFAULT 0,
+    eth_balance DECIMAL DEFAULT 0,
+    fiat_balance DECIMAL DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

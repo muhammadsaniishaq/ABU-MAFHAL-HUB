@@ -75,11 +75,68 @@ export function useCryptoManager() {
         }
     };
 
+    const fetchTradeHistory = async () => {
+        const { data, error } = await supabase.from('trade_history').select('*, user:user_id(email)').order('created_at', { ascending: false }).limit(50);
+        if (error) { console.error(error); return []; }
+        return data;
+    };
+
+    const fetchUserWallets = async () => {
+        const { data, error } = await supabase.from('user_wallets').select('*, user:user_id(email)');
+        if (error) { console.error(error); return []; }
+        return data;
+    };
+
+    const fetchPendingWithdrawalsList = async () => {
+        const { data, error } = await supabase.from('transactions').select('*, user:user_id(email)').eq('type', 'crypto_withdrawal').eq('status', 'pending');
+        if (error) { console.error(error); return []; }
+        return data;
+    };
+
+    const approveWithdrawal = async (txId: string) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.from('transactions').update({ status: 'completed' }).eq('id', txId);
+            if (error) throw error;
+            alert("Withdrawal Approved!");
+            await fetchStats();
+        } catch (e) {
+            alert("Error approving withdrawal");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const updateUserBalance = async (userId: string, coin: string, amount: number) => {
+        setLoading(true);
+        try {
+            // Get current balance
+            const { data: wallet } = await supabase.from('user_wallets').select('*').eq('user_id', userId).single();
+            if (!wallet) throw new Error("Wallet not found");
+
+            const updateObj: any = {};
+            updateObj[`${coin.toLowerCase()}_balance`] = Number(wallet[`${coin.toLowerCase()}_balance`] || 0) + amount;
+            
+            const { error } = await supabase.from('user_wallets').update(updateObj).eq('user_id', userId);
+            if (error) throw error;
+            alert("Balance Updated Successfully!");
+        } catch (e: any) {
+            alert("Error updating balance: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return {
         settings,
         stats,
         loading,
         updateSetting,
-        refetchStats: fetchStats
+        refetchStats: fetchStats,
+        fetchTradeHistory,
+        fetchUserWallets,
+        fetchPendingWithdrawalsList,
+        approveWithdrawal,
+        updateUserBalance
     };
 }
