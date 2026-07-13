@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAppSettings } from './useAppSettings';
+import { api } from '../services/api';
 
 export function useCryptoManager() {
     const { settings, refetch, setSettings } = useAppSettings();
@@ -14,6 +15,7 @@ export function useCryptoManager() {
         totalRevenue7d: 0,
         totalLiquidity: 0
     });
+    const [livePrices, setLivePrices] = useState<{btc: number, eth: number}>({ btc: 85000, eth: 3000 });
 
     useEffect(() => {
         fetchStats();
@@ -22,6 +24,7 @@ export function useCryptoManager() {
 
     const fetchStats = async () => {
         try {
+            setLoading(true);
             // Count pending crypto withdrawals
             const { count: pendingWithdrawals } = await supabase
                 .from('transactions')
@@ -47,11 +50,28 @@ export function useCryptoManager() {
             const revenue7d = revenueData ? revenueData.reduce((acc, curr) => acc + ((Number(curr.amount) || 0) * 0.015), 0) : 0; // Assuming 1.5% average platform fee
 
             // Calculate Total Liquidity from user wallets
-            const { data: walletsData } = await supabase.from('user_wallets').select('usdt_balance, fiat_balance');
+            const { data: walletsData } = await supabase.from('user_wallets').select('usdt_balance, btc_balance, eth_balance, fiat_balance');
             let liquidity = 0;
+            let btcPrice = 85000;
+            let ethPrice = 3000;
+            let usdtPrice = 1;
+
+            try {
+                const liveRates = await api.crypto.getRates(['bitcoin', 'ethereum', 'tether']);
+                const btc = liveRates.find(r => r.symbol.toLowerCase() === 'btc');
+                const eth = liveRates.find(r => r.symbol.toLowerCase() === 'eth');
+                if (btc) btcPrice = btc.price_usd;
+                if (eth) ethPrice = eth.price_usd;
+                setLivePrices({ btc: btcPrice, eth: ethPrice });
+            } catch (err) {
+                console.log("Could not fetch coingecko rates, using fallback prices.");
+            }
+
             if (walletsData) {
                 walletsData.forEach((w) => {
                     liquidity += Number(w.usdt_balance) || 0;
+                    liquidity += (Number(w.btc_balance) || 0) * btcPrice;
+                    liquidity += (Number(w.eth_balance) || 0) * ethPrice;
                     liquidity += (Number(w.fiat_balance) || 0) / 1600; // Approx NGN to USD
                 });
             }
@@ -156,6 +176,7 @@ export function useCryptoManager() {
         fetchUserWallets,
         fetchPendingWithdrawalsList,
         approveWithdrawal,
-        updateUserBalance
+        updateUserBalance,
+        livePrices
     };
 }

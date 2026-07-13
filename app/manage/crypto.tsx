@@ -28,7 +28,8 @@ export default function CryptoManager() {
         fetchUserWallets,
         fetchPendingWithdrawalsList,
         approveWithdrawal,
-        updateUserBalance 
+        updateUserBalance,
+        livePrices 
     } = useCryptoManager();
     
     const [activeTab, setActiveTab] = useState('overview');
@@ -238,6 +239,14 @@ export default function CryptoManager() {
                                         <View style={{ marginLeft: 12 }}>
                                             <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>User Account</Text>
                                             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{wallet.user?.email || 'Unknown User'}</Text>
+                                            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '600', marginTop: 2 }}>
+                                                Total Est: ${(
+                                                    (Number(wallet.usdt_balance) || 0) + 
+                                                    ((Number(wallet.btc_balance) || 0) * livePrices.btc) + 
+                                                    ((Number(wallet.eth_balance) || 0) * livePrices.eth) + 
+                                                    ((Number(wallet.fiat_balance) || 0) / 1600)
+                                                ).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                            </Text>
                                         </View>
                                     </View>
                                 </LinearGradient>
