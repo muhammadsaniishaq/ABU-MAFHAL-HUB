@@ -526,9 +526,9 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: T.bg },
     scrollView: { flex: 1 },
     header: {
-        paddingBottom: 20,
-        borderBottomLeftRadius: 40,
-        borderBottomRightRadius: 40,
+        paddingBottom: 12,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
         elevation: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
@@ -547,19 +547,19 @@ const s = StyleSheet.create({
         position: 'absolute', top: '20%', left: '30%', width: 100, height: 100, borderRadius: 50, backgroundColor: '#f5a623', opacity: 0.1, filter: 'blur(20px)',
     },
     headerContent: {
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10,
+        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 30 : 5,
     },
     backBtn: {
-        width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
+        width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
     },
     headerActionBtn: {
-        width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(245,166,35,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245,166,35,0.2)'
+        width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245,166,35,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245,166,35,0.2)'
     },
-    badge: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1, borderColor: T.navyDark },
-    headerScreenTitle: { fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
-    headerScreenSubtitle: { fontSize: 11, color: T.goldLight, marginTop: 4, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
+    badge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1, borderColor: T.navyDark },
+    headerScreenTitle: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+    headerScreenSubtitle: { fontSize: 10, color: T.goldLight, marginTop: 2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     
-    statsWrapper: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 30 },
+    statsWrapper: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 16 },
     statBox: { alignItems: 'center', flex: 1 },
     statLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
     statValue: { color: '#fff', fontSize: 16, fontWeight: '900' },
@@ -569,9 +569,9 @@ const s = StyleSheet.create({
     
     headerBottomStrip: { height: 4, backgroundColor: T.gold, width: '100%', position: 'absolute', bottom: 0 },
 
-    tabBarContainer: { paddingHorizontal: 12, marginTop: -15, paddingBottom: 10, zIndex: 20 },
+    tabBarContainer: { paddingHorizontal: 12, marginTop: -15, paddingBottom: 10, zIndex: 20, flexGrow: 0, maxHeight: 50 },
     tabBar: { flexDirection: 'row', gap: 6, paddingHorizontal: 4 },
-    tabBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+    tabBtn: { height: 35, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
     tabBtnActive: { backgroundColor: T.navy, borderColor: T.navy },
     tabTxt: { fontSize: 12, fontWeight: '700', color: '#64748B' },
     tabTxtActive: { color: '#fff' },
