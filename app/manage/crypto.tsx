@@ -136,10 +136,10 @@ export default function CryptoManager() {
                             <View style={s.statDividerDark} />
                             <View style={s.statBox}>
                                 <Text style={s.statLabel}>Total Liquidity</Text>
-                                <Text style={s.statValueDark}>API Syncing...</Text>
-                                <View style={[s.trendTag, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                                    <Ionicons name="sync" size={10} color="#EF4444" />
-                                    <Text style={[s.trendTagTxt, { color: '#EF4444' }]}>Pending</Text>
+                                <Text style={s.statValueDark}>${stats.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                                <View style={[s.trendTag, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+                                    <Ionicons name="checkmark-circle" size={10} color="#10B981" />
+                                    <Text style={[s.trendTagTxt, { color: '#10B981' }]}>Live</Text>
                                 </View>
                             </View>
                         </View>

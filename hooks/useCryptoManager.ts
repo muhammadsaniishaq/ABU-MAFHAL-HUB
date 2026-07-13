@@ -46,6 +46,16 @@ export function useCryptoManager() {
             const { data: revenueData } = await supabase.from('transactions').select('amount').eq('status', 'completed').gte('created_at', lastWeek.toISOString());
             const revenue7d = revenueData ? revenueData.reduce((acc, curr) => acc + ((Number(curr.amount) || 0) * 0.015), 0) : 0; // Assuming 1.5% average platform fee
 
+            // Calculate Total Liquidity from user wallets
+            const { data: walletsData } = await supabase.from('user_wallets').select('usdt_balance, fiat_balance');
+            let liquidity = 0;
+            if (walletsData) {
+                walletsData.forEach((w) => {
+                    liquidity += Number(w.usdt_balance) || 0;
+                    liquidity += (Number(w.fiat_balance) || 0) / 1600; // Approx NGN to USD
+                });
+            }
+
             setStats({
                 pendingWithdrawals: pendingWithdrawals || 0,
                 p2pCompleted: p2pCompleted || 0,
@@ -53,7 +63,7 @@ export function useCryptoManager() {
                 p2pDisputed: p2pDisputed || 0,
                 totalVolume24h: volume24h,
                 totalRevenue7d: revenue7d,
-                totalLiquidity: 0 // Would require fetching from hot wallet balances via API
+                totalLiquidity: liquidity
             });
         } catch (e) {
             console.log("Error fetching crypto stats:", e);
