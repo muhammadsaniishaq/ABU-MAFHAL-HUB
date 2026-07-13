@@ -31,12 +31,15 @@ export default function Login() {
         setLoading(true);
         
         if (isRegistering) {
-            // Validation
-            if (!email || !password || !fullName || !username || !phone) {
+            // Validation (Username is now optional)
+            if (!email || !password || !fullName || !phone) {
                 Alert.alert('Error', 'Please fill in all required fields.');
                 setLoading(false);
                 return;
             }
+
+            // Fallback to email prefix if username is empty, plus remove spaces
+            const finalUsername = (username || email.split('@')[0]).toLowerCase().replace(/\s/g, '');
 
             const { error } = await supabase.auth.signUp({
                 email,
@@ -44,7 +47,7 @@ export default function Login() {
                 options: {
                     data: {
                         full_name: fullName,
-                        username: username.toLowerCase().replace(/\s/g, ''), // Ensure no spaces
+                        username: finalUsername, // Uses fallback
                         phone: phone,
                         referral_code: referralCode, // Trigger will use this to set referrer_id
                     }
@@ -98,10 +101,10 @@ export default function Login() {
                             />
                         </View>
                         <View className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
-                            <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Username (Used as your Referral Code)</Text>
+                            <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Username (Optional)</Text>
                             <TextInput
                                 className="text-white font-medium text-base"
-                                placeholder="umar123"
+                                placeholder="Auto-generated if left blank"
                                 placeholderTextColor="#475569"
                                 autoCapitalize="none"
                                 value={username}
