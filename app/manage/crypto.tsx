@@ -518,7 +518,7 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: T.bg },
     scrollView: { flex: 1 },
     header: {
-        paddingBottom: 12,
+        paddingBottom: 24,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
         elevation: 20,
@@ -539,7 +539,7 @@ const s = StyleSheet.create({
         position: 'absolute', top: '20%', left: '30%', width: 100, height: 100, borderRadius: 50, backgroundColor: '#f5a623', opacity: 0.1, filter: 'blur(20px)',
     },
     headerContent: {
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 30 : 5,
+        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 50 : 20, paddingBottom: 10,
     },
     backBtn: {
         width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'

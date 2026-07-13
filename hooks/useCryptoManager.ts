@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { useAppSettings } from './useAppSettings';
 
 export function useCryptoManager() {
-    const { settings, refetch } = useAppSettings();
+    const { settings, refetch, setSettings } = useAppSettings();
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({
         pendingWithdrawals: 0,
@@ -62,14 +62,23 @@ export function useCryptoManager() {
 
     const updateSetting = async (key: string, value: string | boolean) => {
         setLoading(true);
+        // Optimistic UI update
+        const originalValue = settings[key];
+        const stringValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : value;
+        const boolValue = typeof value === 'boolean' ? value : (value === 'true');
+        
+        setSettings({ ...settings, [key]: boolValue });
+
         try {
-            const stringValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : value;
             const { error } = await supabase.from('app_settings').upsert({ key, value: stringValue }, { onConflict: 'key' });
             if (error) throw error;
-            await refetch(); // Refetch the settings hook context
+            // Background refetch to ensure sync
+            refetch(); 
         } catch (error) {
             console.error('Error updating crypto setting:', error);
             alert("Failed to update setting. Ensure you are connected to internet and have Admin permissions.");
+            // Revert on failure
+            setSettings({ ...settings, [key]: originalValue });
         } finally {
             setLoading(false);
         }

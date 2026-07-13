@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as ExpoClipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 // NativeWind cssInterop for LinearGradient is removed because it causes React Navigation crashes
 // on some Android/iOS configurations. We will use inline styles for LinearGradient exclusively.
@@ -158,6 +159,7 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
     const [hideBalance, setHideBalance] = useState(false);
     const [scannerVisible, setScannerVisible] = useState(false);
     const [scannedData, setScannedData] = useState('');
+    const { settings } = useAppSettings();
 
     // Action Modals State
     const [activeModal, setActiveModal] = useState<'send' | 'receive' | 'buy' | 'sell' | 'deposit' | 'withdraw' | 'gas' | 'pay' | null>(null);
@@ -422,11 +424,11 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
 
                     <View className="flex-row flex-wrap justify-between relative z-10">
                         {/* Row 1 */}
-                        <QuickActionButton icon="arrow-down" label="Receive" color="#10b981" action={() => setActiveModal('receive')} />
-                        <QuickActionButton icon="paper-plane" label="Send" color="#3b82f6" action={() => setActiveModal('send')} />
-                        <QuickActionButton icon="cart" label="Buy" color="#0E1A2E" action={() => setActiveModal('buy')} badge="0%" />
-                        <QuickActionButton icon="cash" label="Sell" color="#ef4444" action={() => setActiveModal('sell')} />
-                        <QuickActionButton icon="swap-horizontal" label="Swap" color="#f59e0b" action={() => setActiveTab('swap')} />
+                        {settings.crypto_receive_enabled && <QuickActionButton icon="arrow-down" label="Receive" color="#10b981" action={() => setActiveModal('receive')} />}
+                        {settings.crypto_send_enabled && <QuickActionButton icon="paper-plane" label="Send" color="#3b82f6" action={() => setActiveModal('send')} />}
+                        {settings.crypto_buy_enabled && <QuickActionButton icon="cart" label="Buy" color="#0E1A2E" action={() => setActiveModal('buy')} badge="0%" />}
+                        {settings.crypto_sell_enabled && <QuickActionButton icon="cash" label="Sell" color="#ef4444" action={() => setActiveModal('sell')} />}
+                        {settings.crypto_swap_enabled && <QuickActionButton icon="swap-horizontal" label="Swap" color="#f59e0b" action={() => setActiveTab('swap')} />}
 
                         {/* Row 2 */}
                         <QuickActionButton icon="diamond" label="Earn" color="#8b5cf6" action={() => { }} badge="NEW" />

@@ -91,5 +91,5 @@ export function useAppSettings() {
         }
     };
 
-    return { settings, loading, refetch: fetchSettings };
+    return { settings, loading, refetch: fetchSettings, setSettings };
 }

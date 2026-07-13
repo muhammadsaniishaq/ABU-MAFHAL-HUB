@@ -63,3 +63,22 @@ CREATE TABLE IF NOT EXISTS user_wallets (
     fiat_balance DECIMAL DEFAULT 0,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 6. FIX FOREIGN KEYS (Run this if you get schema cache errors or relationship errors)
+-- This drops any existing foreign key to auth.users and points them to profiles.
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_user_id_fkey;
+ALTER TABLE transactions ADD CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE p2p_orders DROP CONSTRAINT IF EXISTS p2p_orders_buyer_id_fkey;
+ALTER TABLE p2p_orders ADD CONSTRAINT p2p_orders_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE p2p_orders DROP CONSTRAINT IF EXISTS p2p_orders_seller_id_fkey;
+ALTER TABLE p2p_orders ADD CONSTRAINT p2p_orders_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE trade_history DROP CONSTRAINT IF EXISTS trade_history_user_id_fkey;
+ALTER TABLE trade_history ADD CONSTRAINT trade_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+ALTER TABLE user_wallets DROP CONSTRAINT IF EXISTS user_wallets_user_id_fkey;
+ALTER TABLE user_wallets ADD CONSTRAINT user_wallets_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+-- IMPORTANT: After running this, reload your app or call supabase schema cache reload.
