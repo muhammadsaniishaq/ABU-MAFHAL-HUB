@@ -410,7 +410,17 @@ export default function CryptoManager() {
                                 { key: 'crypto_send_enabled', name: 'Send Crypto', desc: 'Allow users to withdraw to external wallets', icon: 'paper-plane' },
                                 { key: 'crypto_buy_enabled', name: 'Buy Crypto', desc: 'Allow purchasing crypto with fiat', icon: 'cart' },
                                 { key: 'crypto_sell_enabled', name: 'Sell Crypto', desc: 'Allow selling crypto for fiat', icon: 'cash' },
-                                { key: 'crypto_swap_enabled', name: 'Swap Crypto', desc: 'Allow exchanging between crypto assets', icon: 'swap-horizontal' }
+                                { key: 'crypto_swap_enabled', name: 'Swap Crypto', desc: 'Allow exchanging between crypto assets', icon: 'swap-horizontal' },
+                                { key: 'crypto_earn_enabled', name: 'Earn', desc: 'Reward and earning features', icon: 'diamond' },
+                                { key: 'crypto_cards_enabled', name: 'Cards', desc: 'Crypto virtual cards', icon: 'card' },
+                                { key: 'crypto_stake_enabled', name: 'Stake', desc: 'Staking investments', icon: 'leaf' },
+                                { key: 'crypto_loan_enabled', name: 'Loan', desc: 'Crypto backed loans', icon: 'wallet' },
+                                { key: 'crypto_gift_enabled', name: 'Gift', desc: 'Send crypto gifts', icon: 'gift' },
+                                { key: 'crypto_gas_enabled', name: 'Gas', desc: 'Buy gas with fiat', icon: 'flame' },
+                                { key: 'crypto_qrpay_enabled', name: 'QR Pay', desc: 'Pay via QR code', icon: 'qr-code' },
+                                { key: 'crypto_history_enabled', name: 'History', desc: 'Transaction history', icon: 'time' },
+                                { key: 'crypto_support_enabled', name: 'Support', desc: 'Customer support chat', icon: 'chatbubbles' },
+                                { key: 'crypto_more_enabled', name: 'More', desc: 'Additional features menu', icon: 'apps' }
                             ].map((feat, index) => (
                                 <View key={feat.key}>
                                     <View style={s.coinRow}>
@@ -431,7 +441,7 @@ export default function CryptoManager() {
                                             disabled={loading}
                                         />
                                     </View>
-                                    {index < 4 && <View style={s.divider} />}
+                                    {index < 14 && <View style={s.divider} />}
                                 </View>
                             ))}
                         </View>

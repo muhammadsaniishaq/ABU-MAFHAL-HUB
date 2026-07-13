@@ -431,18 +431,18 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                         {settings.crypto_swap_enabled && <QuickActionButton icon="swap-horizontal" label="Swap" color="#f59e0b" action={() => setActiveTab('swap')} />}
 
                         {/* Row 2 */}
-                        <QuickActionButton icon="diamond" label="Earn" color="#8b5cf6" action={() => { }} badge="NEW" />
-                        <QuickActionButton icon="card" label="Cards" color="#06b6d4" action={() => { }} />
-                        <QuickActionButton icon="leaf" label="Stake" color="#22c55e" action={() => { }} />
-                        <QuickActionButton icon="wallet" label="Loan" color="#6366f1" action={() => { }} />
-                        <QuickActionButton icon="gift" label="Gift" color="#ec4899" action={() => { }} />
+                        {settings.crypto_earn_enabled && <QuickActionButton icon="diamond" label="Earn" color="#8b5cf6" action={() => { }} badge="NEW" />}
+                        {settings.crypto_cards_enabled && <QuickActionButton icon="card" label="Cards" color="#06b6d4" action={() => { }} />}
+                        {settings.crypto_stake_enabled && <QuickActionButton icon="leaf" label="Stake" color="#22c55e" action={() => { }} />}
+                        {settings.crypto_loan_enabled && <QuickActionButton icon="wallet" label="Loan" color="#6366f1" action={() => { }} />}
+                        {settings.crypto_gift_enabled && <QuickActionButton icon="gift" label="Gift" color="#ec4899" action={() => { }} />}
 
                         {/* Row 3 */}
-                        <QuickActionButton icon="flame" label="Gas" color="#d946ef" action={() => setActiveModal('gas')} />
-                        <QuickActionButton icon="qr-code" label="QR Pay" color="#14b8a6" action={() => setActiveModal('pay')} />
-                        <QuickActionButton icon="time" label="History" color="#64748b" action={() => { }} />
-                        <QuickActionButton icon="chatbubbles" label="Support" color="#3b82f6" action={() => { }} />
-                        <QuickActionButton icon="apps" label="More" color="#0E1A2E" action={() => setActiveTab('portfolio')} />
+                        {settings.crypto_gas_enabled && <QuickActionButton icon="flame" label="Gas" color="#d946ef" action={() => setActiveModal('gas')} />}
+                        {settings.crypto_qrpay_enabled && <QuickActionButton icon="qr-code" label="QR Pay" color="#14b8a6" action={() => setActiveModal('pay')} />}
+                        {settings.crypto_history_enabled && <QuickActionButton icon="time" label="History" color="#64748b" action={() => { }} />}
+                        {settings.crypto_support_enabled && <QuickActionButton icon="chatbubbles" label="Support" color="#3b82f6" action={() => { }} />}
+                        {settings.crypto_more_enabled && <QuickActionButton icon="apps" label="More" color="#0E1A2E" action={() => setActiveTab('portfolio')} />}
                     </View>
                 </View>
             </View>
