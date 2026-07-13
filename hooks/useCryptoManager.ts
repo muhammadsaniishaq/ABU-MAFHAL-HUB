@@ -6,6 +6,7 @@ import { api } from '../services/api';
 export function useCryptoManager() {
     const { settings, refetch, setSettings } = useAppSettings();
     const [loading, setLoading] = useState(false);
+    const [p2pOrders, setP2pOrders] = useState<any[]>([]);
     const [stats, setStats] = useState({
         pendingWithdrawals: 0,
         p2pCompleted: 0,
@@ -19,7 +20,7 @@ export function useCryptoManager() {
 
     useEffect(() => {
         fetchStats();
-        // Set up real-time subscription for transactions if needed
+        fetchP2pOrders();
     }, []);
 
     const fetchStats = async () => {
@@ -126,6 +127,41 @@ export function useCryptoManager() {
         return data;
     };
 
+    const fetchP2pOrders = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('p2p_orders')
+                .select('*, buyer:profiles!p2p_orders_buyer_id_fkey(email), seller:profiles!p2p_orders_seller_id_fkey(email)')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setP2pOrders(data || []);
+        } catch (e) {
+            console.log("Error fetching p2p orders:", e);
+        }
+    };
+
+    const resolveP2pDispute = async (orderId: string, resolution: 'buyer' | 'seller') => {
+        try {
+            setLoading(true);
+            // Update order status to resolved
+            const { error } = await supabase
+                .from('p2p_orders')
+                .update({ status: `resolved_for_${resolution}` })
+                .eq('id', orderId);
+
+            if (error) throw error;
+            
+            // Re-fetch everything
+            await fetchP2pOrders();
+            await fetchStats();
+        } catch (e) {
+            console.log("Error resolving dispute:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchPendingWithdrawalsList = async () => {
         const { data, error } = await supabase.from('transactions').select('*, user:profiles!user_id(email)').eq('type', 'crypto_withdrawal').eq('status', 'pending');
         if (error) { console.error(error); return []; }
@@ -176,7 +212,11 @@ export function useCryptoManager() {
         fetchUserWallets,
         fetchPendingWithdrawalsList,
         approveWithdrawal,
+        approveWithdrawal,
         updateUserBalance,
-        livePrices
+        livePrices,
+        p2pOrders,
+        fetchP2pOrders,
+        resolveP2pDispute
     };
 }

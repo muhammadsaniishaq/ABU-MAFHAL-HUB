@@ -29,7 +29,10 @@ export default function CryptoManager() {
         fetchPendingWithdrawalsList,
         approveWithdrawal,
         updateUserBalance,
-        livePrices 
+        livePrices,
+        p2pOrders,
+        fetchP2pOrders,
+        resolveP2pDispute
     } = useCryptoManager();
     
     const [activeTab, setActiveTab] = useState('overview');
@@ -519,10 +522,40 @@ export default function CryptoManager() {
                                     <Text style={s.p2pStatLabel}>Disputed</Text>
                                 </View>
                             </View>
-                            <TouchableOpacity style={s.updateRatesBtn}>
-                                <Ionicons name="people-circle" size={16} color="#fff" />
-                                <Text style={s.updateRatesTxt}>Manage Escrow Disputes</Text>
+                            <TouchableOpacity style={s.updateRatesBtn} onPress={() => fetchP2pOrders()}>
+                                <Ionicons name="refresh" size={16} color="#fff" />
+                                <Text style={s.updateRatesTxt}>Refresh P2P Orders</Text>
                             </TouchableOpacity>
+
+                            <View style={{ marginTop: 24, gap: 16 }}>
+                                {p2pOrders.map((order) => (
+                                    <View key={order.id} style={[s.card, { padding: 16 }]}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                            <Text style={{ fontWeight: '800', color: T.navy }}>{order.coin || 'USDT'} Trade</Text>
+                                            <View style={[s.statusBadge, { backgroundColor: order.status === 'disputed' ? '#FEE2E2' : '#F1F5F9' }]}>
+                                                <Text style={[s.historyStatus, { color: order.status === 'disputed' ? T.red : '#64748B' }]}>{order.status.toUpperCase()}</Text>
+                                            </View>
+                                        </View>
+                                        <View style={{ gap: 4, marginBottom: 16 }}>
+                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Crypto Amount: <Text style={{ fontWeight: '700', color: T.navy }}>{order.crypto_amount} {order.coin}</Text></Text>
+                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Fiat Amount: <Text style={{ fontWeight: '700', color: T.navy }}>₦{order.fiat_amount?.toLocaleString()}</Text></Text>
+                                            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Buyer: <Text style={{ fontWeight: '600', color: '#000' }}>{order.buyer?.email || order.buyer_id}</Text></Text>
+                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Seller: <Text style={{ fontWeight: '600', color: '#000' }}>{order.seller?.email || order.seller_id}</Text></Text>
+                                        </View>
+                                        {order.status === 'disputed' && (
+                                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                <TouchableOpacity style={[s.approveBtn, { flex: 1, backgroundColor: '#10B981' }]} onPress={() => resolveP2pDispute(order.id, 'buyer')}>
+                                                    <Text style={[s.approveBtnTxt, { color: '#fff' }]}>Resolve to Buyer</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={[s.approveBtn, { flex: 1, backgroundColor: '#3b82f6' }]} onPress={() => resolveP2pDispute(order.id, 'seller')}>
+                                                    <Text style={[s.approveBtnTxt, { color: '#fff' }]}>Resolve to Seller</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                ))}
+                                {p2pOrders.length === 0 && <Text style={{ textAlign: 'center', padding: 20, color: '#64748B' }}>No P2P orders available.</Text>}
+                            </View>
                         </View>
                     </>
                 )}

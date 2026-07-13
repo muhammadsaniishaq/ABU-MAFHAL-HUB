@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS p2p_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     buyer_id UUID REFERENCES profiles(id),
     seller_id UUID REFERENCES profiles(id),
-    amount DECIMAL NOT NULL,
+    coin VARCHAR(10) NOT NULL DEFAULT 'USDT', -- e.g., 'USDT', 'BTC'
+    crypto_amount DECIMAL NOT NULL DEFAULT 0,
+    fiat_amount DECIMAL NOT NULL DEFAULT 0,
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'disputed'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
