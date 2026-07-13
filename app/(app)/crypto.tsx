@@ -44,7 +44,12 @@ export default function CryptoScreen() {
 
     const fetchInitialData = async () => {
         try {
-            const rates = await api.crypto.getRates(['bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 'the-open-network']);
+            const rates = await api.crypto.getRates([
+                'bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 
+                'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 
+                'the-open-network', 'polkadot', 'chainlink', 'matic-network', 
+                'stellar', 'shiba-inu', 'avalanche-2', 'bitcoin-cash', 'uniswap'
+            ]);
             setAssets(rates);
         } catch (e) {
             console.log("Error fetching stats");
@@ -55,7 +60,12 @@ export default function CryptoScreen() {
 
     const fetchRates = async () => {
         try {
-            const rates = await api.crypto.getRates(['bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 'the-open-network']);
+            const rates = await api.crypto.getRates([
+                'bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 
+                'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 
+                'the-open-network', 'polkadot', 'chainlink', 'matic-network', 
+                'stellar', 'shiba-inu', 'avalanche-2', 'bitcoin-cash', 'uniswap'
+            ]);
             setAssets(rates);
         } catch (error) {
             console.log("Crypto Refresh Skipped");
@@ -200,6 +210,26 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
     const [isSelling, setIsSelling] = useState(false);
     const SELL_RATE = 1450; // We buy from them at 1450 NGN/USDT to make margin
     const expectedNgn = Number(sellAmountCrypto) ? (Number(sellAmountCrypto) * SELL_RATE).toFixed(2) : '0.00';
+
+    // Gas State
+    const [gasType, setGasType] = useState('TRX');
+    const [gasPaymentMethod, setGasPaymentMethod] = useState<'NGN' | 'USDT'>('NGN');
+    const [showGasDropdown, setShowGasDropdown] = useState(false);
+    const [gasAmountInput, setGasAmountInput] = useState('');
+    const [gasWalletAddress, setGasWalletAddress] = useState('');
+    const [isBuyingGas, setIsBuyingGas] = useState(false);
+    
+    // Dynamically calculate gas rates from live market data
+    const activeGasAsset = assets.find(a => a.symbol.toUpperCase() === gasType.toUpperCase());
+    // Adding 2% markup on market rate as part of profit, plus flat fee below
+    const gasRateNgn = activeGasAsset?.price_usd ? (activeGasAsset.price_usd * BUY_RATE) * 1.02 : 150; 
+    
+    // Calculate expected gas with flat platform fee deducted
+    const PLATFORM_FEE_NGN = 150; // Flat 150 NGN fee
+    const gasNgnEquivalent = gasPaymentMethod === 'NGN' ? Number(gasAmountInput) : Number(gasAmountInput) * BUY_RATE;
+    const netNgnEquivalent = Math.max(0, gasNgnEquivalent - PLATFORM_FEE_NGN);
+    const expectedGas = netNgnEquivalent > 0 && gasRateNgn ? (netNgnEquivalent / gasRateNgn).toFixed(4) : '0.00';
+    const displayFee = gasPaymentMethod === 'NGN' ? `₦${PLATFORM_FEE_NGN}` : `$${(PLATFORM_FEE_NGN / BUY_RATE).toFixed(2)}`;
 
     useEffect(() => {
         if (!receiveAddresses[receiveNetwork] && activeModal === 'receive') {
@@ -1291,6 +1321,195 @@ function HomeView({ assets, loading, permission, requestPermission, setActiveTab
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Gas Modal */}
+            <Modal visible={activeModal === 'gas'} animationType="slide" transparent={true} onRequestClose={() => { setActiveModal(null); setShowGasDropdown(false); }}>
+                <View className="flex-1 justify-end bg-black/60">
+                    <View className="bg-slate-50 rounded-t-[24px] p-5 relative">
+                        <View className="flex-row justify-between items-center mb-4">
+                            <View>
+                                <Text className="text-[#0E1A2E] font-black text-xl tracking-tight">Buy Gas</Text>
+                                <Text className="text-slate-500 font-bold text-[10px]">Get network fees instantly</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => { setActiveModal(null); setShowGasDropdown(false); }} className="bg-white p-2 rounded-full shadow-sm border border-slate-100">
+                                <Ionicons name="close" size={18} color="#0E1A2E" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                            
+                            {/* Gas Type Dropdown */}
+                            <View className="bg-white rounded-xl p-3 mb-3 border border-slate-100 shadow-sm z-50">
+                                <Text className="text-slate-400 font-black text-[9px] uppercase tracking-widest mb-1.5">Gas Asset</Text>
+                                <TouchableOpacity 
+                                    onPress={() => setShowGasDropdown(!showGasDropdown)}
+                                    className="flex-row justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200"
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <View className="w-6 h-6 rounded-full items-center justify-center overflow-hidden bg-slate-100 border border-slate-200">
+                                            {assets.find(a => a.symbol.toLowerCase() === gasType.toLowerCase())?.image ? (
+                                                <Image source={{ uri: assets.find(a => a.symbol.toLowerCase() === gasType.toLowerCase())?.image }} className="w-6 h-6" />
+                                            ) : (
+                                                <Ionicons name="flame" size={12} color="#f5a623" />
+                                            )}
+                                        </View>
+                                        <Text className="font-black text-sm text-[#0E1A2E]">{gasType}</Text>
+                                    </View>
+                                    <Ionicons name={showGasDropdown ? "chevron-up" : "chevron-down"} size={16} color="#64748b" />
+                                </TouchableOpacity>
+
+                                {showGasDropdown && (
+                                    <View className="absolute top-[60px] left-3 right-3 bg-white rounded-lg border border-slate-200 shadow-lg z-50 overflow-hidden">
+                                        <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true}>
+                                            {assets.filter(a => a.symbol.toLowerCase() !== 'usdt').map((asset) => {
+                                                const net = asset.symbol.toUpperCase();
+                                                const netIcon = asset.image;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={net}
+                                                        onPress={() => { setGasType(net); setShowGasDropdown(false); }}
+                                                        className={`p-3 flex-row items-center gap-3 border-b border-slate-50 ${gasType === net ? 'bg-[#f5a623]/10' : ''}`}
+                                                    >
+                                                        <View className="w-6 h-6 rounded-full overflow-hidden bg-slate-100 border border-slate-200 items-center justify-center">
+                                                            {netIcon ? <Image source={{ uri: netIcon }} className="w-6 h-6" /> : <Ionicons name="flame" size={12} color="#f5a623" />}
+                                                        </View>
+                                                        <Text className={`font-black text-sm ${gasType === net ? 'text-[#f5a623]' : 'text-slate-700'}`}>{asset.name} ({net})</Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </ScrollView>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Payment Method & Amount */}
+                            <View className="bg-white rounded-xl p-3 mb-3 border border-slate-100 shadow-sm z-0">
+                                <View className="flex-row justify-between items-center mb-1.5">
+                                    <Text className="text-slate-400 font-black text-[9px] uppercase tracking-widest">Pay With</Text>
+                                    <View className="flex-row bg-slate-100 rounded-md p-0.5">
+                                        <TouchableOpacity onPress={() => setGasPaymentMethod('NGN')} className={`px-2 py-1 rounded ${gasPaymentMethod === 'NGN' ? 'bg-white shadow-sm' : ''}`}>
+                                            <Text className={`text-[9px] font-black ${gasPaymentMethod === 'NGN' ? 'text-[#0d1b3e]' : 'text-slate-400'}`}>NGN</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => setGasPaymentMethod('USDT')} className={`px-2 py-1 rounded ${gasPaymentMethod === 'USDT' ? 'bg-white shadow-sm' : ''}`}>
+                                            <Text className={`text-[9px] font-black ${gasPaymentMethod === 'USDT' ? 'text-[#0d1b3e]' : 'text-slate-400'}`}>USDT</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View className="flex-row items-center border-b border-slate-100 pb-1.5 mb-1.5">
+                                    <Text className="text-lg font-black text-slate-800 mr-2">{gasPaymentMethod === 'NGN' ? '₦' : '$'}</Text>
+                                    <TextInput
+                                        className="flex-1 text-2xl font-black text-[#0E1A2E] p-0"
+                                        keyboardType="numeric"
+                                        placeholder="0.00"
+                                        placeholderTextColor="#cbd5e1"
+                                        value={gasAmountInput}
+                                        onChangeText={setGasAmountInput}
+                                    />
+                                </View>
+                                <View className="flex-row justify-between items-center">
+                                    <Text className="text-slate-500 font-bold text-[10px]">Bal: {gasPaymentMethod === 'NGN' ? '₦' : '$'}{gasPaymentMethod === 'NGN' ? walletBalance.toLocaleString() : cryptoWalletBalanceUsdt.toLocaleString()}</Text>
+                                    <TouchableOpacity onPress={() => setGasAmountInput(gasPaymentMethod === 'NGN' ? String(walletBalance) : String(cryptoWalletBalanceUsdt))} className="bg-slate-100 px-1.5 py-0.5 rounded">
+                                        <Text className="text-slate-600 font-black text-[9px]">MAX</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            
+                            {/* Wallet Address */}
+                            <View className="bg-white rounded-xl p-3 mb-4 border border-slate-100 shadow-sm z-0">
+                                <Text className="text-slate-400 font-black text-[9px] uppercase tracking-widest mb-1.5">Receiving Address ({gasType})</Text>
+                                <TextInput
+                                    className="w-full bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700"
+                                    placeholder={`Paste ${gasType} address`}
+                                    placeholderTextColor="#94a3b8"
+                                    value={gasWalletAddress}
+                                    onChangeText={setGasWalletAddress}
+                                />
+                            </View>
+                            <View className="bg-[#0d1b3e] rounded-xl mb-4 shadow-lg p-4 relative overflow-hidden z-0">
+                                <View className="absolute top-0 right-0 w-24 h-24 bg-[#f5a623]/20 rounded-full blur-2xl translate-x-8 -translate-y-8" />
+                                <View className="absolute bottom-0 left-0 w-20 h-20 bg-blue-500/10 rounded-full blur-xl -translate-x-4 translate-y-4" />
+                                
+                                <View className="flex-row justify-between items-end mb-4">
+                                    <View>
+                                        <Text className="text-slate-400 font-medium text-[9px] uppercase tracking-widest mb-1">You Receive</Text>
+                                        <Text className="text-white font-black text-2xl tracking-tighter">{expectedGas} <Text className="text-[#f5a623] text-lg">{gasType}</Text></Text>
+                                    </View>
+                                    <View className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/5">
+                                        <Ionicons name="flame" size={20} color="#f5a623" />
+                                    </View>
+                                </View>
+
+                                <View className="border-t border-white/10 pt-3 space-y-1.5">
+                                    <View className="flex-row justify-between items-center">
+                                        <Text className="text-slate-400 font-medium text-[10px]">Exchange Rate</Text>
+                                        <Text className="text-slate-200 font-bold text-[10px]">1 {gasType} ≈ ₦{gasRateNgn?.toLocaleString(undefined, {maximumFractionDigits: 2})}</Text>
+                                    </View>
+                                    <View className="flex-row justify-between items-center">
+                                        <Text className="text-slate-400 font-medium text-[10px]">Platform Fee</Text>
+                                        <Text className="text-[#f5a623] font-bold text-[10px]">{displayFee}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (isBuyingGas) return;
+                                    const amount = Number(gasAmountInput);
+                                    if (!amount || amount <= 0) return Alert.alert("Error", "Please enter a valid amount");
+                                    const bal = gasPaymentMethod === 'NGN' ? walletBalance : cryptoWalletBalanceUsdt;
+                                    if (amount > bal) return Alert.alert("Error", `Insufficient ${gasPaymentMethod} balance`);
+                                    if (!gasWalletAddress) return Alert.alert("Error", "Please enter a wallet address");
+
+                                    Alert.alert("Confirm Purchase", `Buy ${expectedGas} ${gasType} for ${gasPaymentMethod === 'NGN' ? '₦' : '$'}${amount.toLocaleString()}?`, [
+                                        { text: "Cancel", style: "cancel" },
+                                        {
+                                            text: "Confirm", onPress: async () => {
+                                                try {
+                                                    setIsBuyingGas(true);
+                                                    await api.crypto.buyGas({
+                                                        gasType,
+                                                        walletAddress: gasWalletAddress,
+                                                        paymentMethod: gasPaymentMethod,
+                                                        amountPayment: amount,
+                                                        amountGas: Number(expectedGas)
+                                                    });
+                                                    Alert.alert("Success", "Gas order placed successfully!");
+                                                    setGasAmountInput('');
+                                                    setGasWalletAddress('');
+                                                    setActiveModal(null);
+                                                    getBal();
+                                                } catch (error: any) {
+                                                    Alert.alert("Failed", error.message || "Failed to buy gas");
+                                                } finally {
+                                                    setIsBuyingGas(false);
+                                                }
+                                            }
+                                        }
+                                    ])
+                                }}
+                                activeOpacity={0.8}
+                                className="shadow-lg shadow-[#f5a623]/30 rounded-xl overflow-hidden z-0"
+                                disabled={isBuyingGas}
+                            >
+                                <LinearGradient
+                                    colors={['#f5a623', '#d97706']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    style={{ width: '100%', paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                                >
+                                    {isBuyingGas ? (
+                                        <ActivityIndicator color="white" size="small" />
+                                    ) : (
+                                        <>
+                                            <Text className="text-white font-black text-xs uppercase tracking-widest">Buy Gas</Text>
+                                            <Ionicons name="flame" size={14} color="white" />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>

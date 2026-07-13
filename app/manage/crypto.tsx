@@ -379,7 +379,6 @@ export default function CryptoManager() {
                                     onValueChange={(v) => updateSetting('crypto_enabled_eth', v)}
                                     trackColor={{ false: '#e2e8f0', true: '#10B981' }}
                                     thumbColor="#fff"
-                                    disabled={loading}
                                 />
                             </View>
 
@@ -410,7 +409,6 @@ export default function CryptoManager() {
                                     onValueChange={(v) => updateSetting('crypto_maintenance_mode', v)}
                                     trackColor={{ false: '#e2e8f0', true: '#EF4444' }}
                                     thumbColor="#fff"
-                                    disabled={loading}
                                 />
                             </View>
                         </View>
@@ -450,7 +448,6 @@ export default function CryptoManager() {
                                             onValueChange={(v) => updateSetting(feat.key, v)}
                                             trackColor={{ false: '#e2e8f0', true: '#10B981' }}
                                             thumbColor="#fff"
-                                            disabled={loading}
                                         />
                                     </View>
                                     {index < 14 && <View style={s.divider} />}

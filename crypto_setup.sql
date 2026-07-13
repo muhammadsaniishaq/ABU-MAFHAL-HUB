@@ -53,6 +53,18 @@ CREATE TABLE IF NOT EXISTS p2p_orders (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 4. Table for Crypto Gas Orders
+CREATE TABLE IF NOT EXISTS crypto_gas_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES profiles(id),
+    gas_type VARCHAR(20) NOT NULL, -- e.g., 'TRX', 'ETH', 'TRON_ENERGY'
+    wallet_address VARCHAR(255) NOT NULL,
+    amount_fiat DECIMAL NOT NULL,
+    amount_gas DECIMAL NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'failed'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 4. Create Trade History table
 CREATE TABLE IF NOT EXISTS trade_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

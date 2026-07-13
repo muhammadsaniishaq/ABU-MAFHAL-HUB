@@ -92,7 +92,6 @@ export function useCryptoManager() {
     };
 
     const updateSetting = async (key: string, value: string | boolean) => {
-        setLoading(true);
         // Optimistic UI update
         const originalValue = settings[key];
         const stringValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : value;
@@ -110,8 +109,6 @@ export function useCryptoManager() {
             alert("Failed to update setting. Ensure you are connected to internet and have Admin permissions.");
             // Revert on failure
             setSettings({ ...settings, [key]: originalValue });
-        } finally {
-            setLoading(false);
         }
     };
 
