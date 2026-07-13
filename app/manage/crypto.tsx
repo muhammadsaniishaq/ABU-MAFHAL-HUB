@@ -98,42 +98,13 @@ export default function CryptoManager() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Elite Stats View */}
-                    <View style={s.statsWrapper}>
-                        <View style={s.statBox}>
-                            <Text style={s.statLabel}>24h Volume</Text>
-                            <Text style={s.statValue}>₦ {stats.totalVolume24h.toLocaleString()}</Text>
-                            <View style={s.trendTag}>
-                                <Ionicons name="caret-up" size={10} color="#10B981" />
-                                <Text style={s.trendTagTxt}>Live</Text>
-                            </View>
-                        </View>
-                        <View style={s.statDivider} />
-                        <View style={s.statBox}>
-                            <Text style={s.statLabel}>Total Liquidity</Text>
-                            <Text style={s.statValue}>API Syncing...</Text>
-                            <View style={[s.trendTag, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                                <Ionicons name="sync" size={10} color="#EF4444" />
-                                <Text style={[s.trendTagTxt, { color: '#EF4444' }]}>Pending</Text>
-                            </View>
-                        </View>
-                        <View style={s.statDivider} />
-                        <View style={s.statBox}>
-                            <Text style={s.statLabel}>Active P2P</Text>
-                            <Text style={s.statValue}>{stats.p2pPending} Open</Text>
-                            <View style={[s.trendTag, { backgroundColor: 'rgba(245,166,35,0.1)' }]}>
-                                <Ionicons name="radio-button-on" size={10} color="#f5a623" />
-                                <Text style={[s.trendTagTxt, { color: '#f5a623' }]}>Live</Text>
-                            </View>
-                        </View>
-                    </View>
                 </SafeAreaView>
                 <View style={s.headerBottomStrip} />
             </LinearGradient>
 
             {/* Custom Tab Bar */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBarContainer}>
-                <View style={s.tabBar}>
+            <View style={s.tabBarContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
                     {['overview', 'users', 'history', 'withdrawals', 'rates', 'p2p', 'networks'].map((tab) => (
                         <TouchableOpacity 
                             key={tab} 
@@ -145,13 +116,34 @@ export default function CryptoManager() {
                             </Text>
                         </TouchableOpacity>
                     ))}
-                </View>
-            </ScrollView>
+                </ScrollView>
+            </View>
 
             <ScrollView style={s.scrollView} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
                 
                 {activeTab === 'overview' && (
                     <>
+                        {/* Elite Stats View */}
+                        <View style={s.statsCard}>
+                            <View style={s.statBox}>
+                                <Text style={s.statLabel}>24h Volume</Text>
+                                <Text style={s.statValueDark}>₦ {stats.totalVolume24h.toLocaleString()}</Text>
+                                <View style={s.trendTag}>
+                                    <Ionicons name="caret-up" size={10} color="#10B981" />
+                                    <Text style={s.trendTagTxt}>Live</Text>
+                                </View>
+                            </View>
+                            <View style={s.statDividerDark} />
+                            <View style={s.statBox}>
+                                <Text style={s.statLabel}>Total Liquidity</Text>
+                                <Text style={s.statValueDark}>API Syncing...</Text>
+                                <View style={[s.trendTag, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                                    <Ionicons name="sync" size={10} color="#EF4444" />
+                                    <Text style={[s.trendTagTxt, { color: '#EF4444' }]}>Pending</Text>
+                                </View>
+                            </View>
+                        </View>
+
                         <View style={s.chartCard}>
                             <View style={s.chartHeader}>
                                 <Text style={s.chartTitle}>Platform Revenue (7D)</Text>
@@ -559,19 +551,21 @@ const s = StyleSheet.create({
     headerScreenTitle: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
     headerScreenSubtitle: { fontSize: 10, color: T.goldLight, marginTop: 2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     
-    statsWrapper: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 16 },
+    statsCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
     statBox: { alignItems: 'center', flex: 1 },
-    statLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+    statLabel: { color: '#64748B', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
     statValue: { color: '#fff', fontSize: 16, fontWeight: '900' },
+    statValueDark: { color: T.navy, fontSize: 16, fontWeight: '900' },
     statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'center' },
+    statDividerDark: { width: 1, height: 30, backgroundColor: '#E2E8F0', alignSelf: 'center' },
     trendTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 6 },
     trendTagTxt: { color: '#10B981', fontSize: 9, fontWeight: '800', marginLeft: 2 },
     
     headerBottomStrip: { height: 4, backgroundColor: T.gold, width: '100%', position: 'absolute', bottom: 0 },
 
-    tabBarContainer: { paddingHorizontal: 12, marginTop: -15, paddingBottom: 10, zIndex: 20, flexGrow: 0, maxHeight: 50 },
-    tabBar: { flexDirection: 'row', gap: 6, paddingHorizontal: 4 },
-    tabBtn: { height: 35, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+    tabBarContainer: { paddingHorizontal: 0, marginTop: -20, paddingBottom: 10, zIndex: 20 },
+    tabBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
+    tabBtn: { height: 40, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 20, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
     tabBtnActive: { backgroundColor: T.navy, borderColor: T.navy },
     tabTxt: { fontSize: 12, fontWeight: '700', color: '#64748B' },
     tabTxtActive: { color: '#fff' },
