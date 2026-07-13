@@ -19,7 +19,7 @@ ON CONFLICT (key) DO NOTHING;
 -- 2. Optional: If you don't have a transactions table yet for pending withdrawals, create one:
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),
+    user_id UUID REFERENCES profiles(id),
     type VARCHAR(50) NOT NULL, -- e.g., 'crypto_withdrawal', 'airtime', 'data'
     amount DECIMAL NOT NULL,
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'failed'
@@ -29,8 +29,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 -- 3. Optional: Table for P2P Disputes if you want to track them
 CREATE TABLE IF NOT EXISTS p2p_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    buyer_id UUID REFERENCES auth.users(id),
-    seller_id UUID REFERENCES auth.users(id),
+    buyer_id UUID REFERENCES profiles(id),
+    seller_id UUID REFERENCES profiles(id),
     amount DECIMAL NOT NULL,
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'disputed'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS p2p_orders (
 -- 4. Create Trade History table
 CREATE TABLE IF NOT EXISTS trade_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),
+    user_id UUID REFERENCES profiles(id),
     trade_type VARCHAR(20) NOT NULL, -- 'buy', 'sell', 'swap'
     coin VARCHAR(10) NOT NULL, -- 'BTC', 'USDT', 'ETH'
     amount DECIMAL NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS trade_history (
 
 -- 5. Create User Wallets table
 CREATE TABLE IF NOT EXISTS user_wallets (
-    user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+    user_id UUID PRIMARY KEY REFERENCES profiles(id),
     btc_balance DECIMAL DEFAULT 0,
     usdt_balance DECIMAL DEFAULT 0,
     eth_balance DECIMAL DEFAULT 0,

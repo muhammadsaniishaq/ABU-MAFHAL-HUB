@@ -76,19 +76,19 @@ export function useCryptoManager() {
     };
 
     const fetchTradeHistory = async () => {
-        const { data, error } = await supabase.from('trade_history').select('*, user:user_id(email)').order('created_at', { ascending: false }).limit(50);
+        const { data, error } = await supabase.from('trade_history').select('*, user:profiles!user_id(email)').order('created_at', { ascending: false }).limit(50);
         if (error) { console.error(error); return []; }
         return data;
     };
 
     const fetchUserWallets = async () => {
-        const { data, error } = await supabase.from('user_wallets').select('*, user:user_id(email)');
+        const { data, error } = await supabase.from('user_wallets').select('*, user:profiles!user_id(email)');
         if (error) { console.error(error); return []; }
         return data;
     };
 
     const fetchPendingWithdrawalsList = async () => {
-        const { data, error } = await supabase.from('transactions').select('*, user:user_id(email)').eq('type', 'crypto_withdrawal').eq('status', 'pending');
+        const { data, error } = await supabase.from('transactions').select('*, user:profiles!user_id(email)').eq('type', 'crypto_withdrawal').eq('status', 'pending');
         if (error) { console.error(error); return []; }
         return data;
     };
