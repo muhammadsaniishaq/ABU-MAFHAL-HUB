@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -243,17 +243,23 @@ const sg = StyleSheet.create({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Landing() {
   const router = useRouter();
+  const { ref } = useLocalSearchParams<{ ref?: string }>();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [servicesY, setServicesY] = useState(0);
   const [aboutY, setAboutY] = useState(0);
 
-  // auto-login
+  // auto-login & deep link redirect
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace('/(app)/dashboard');
+      if (data.session) {
+        router.replace('/(app)/dashboard');
+      } else if (ref) {
+        // If there's a referral code, immediately send them to the register screen!
+        router.replace(`/auth/login?ref=${ref}`);
+      }
     });
-  }, []);
+  }, [ref]);
 
   const handleQuickLink = (linkName: string) => {
     switch (linkName) {
