@@ -202,6 +202,28 @@ export default function VerifyPhoneScreen() {
                 let personData = response.data?.data ?? response.data;
                 setResult({ status: 'success', data: personData });
                 await saveHistoryItem(personData);
+
+            // Deduct Wallet Balance
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user) {
+                const { error: deductError } = await supabase.rpc('deduct_balance', {
+                    user_id: authData.user.id,
+                    amount: totalPrice
+                });
+                if (!deductError) {
+                    await supabase.from('transactions').insert({
+                        user_id: authData.user.id,
+                        type: 'nin_service',
+                        amount: totalPrice,
+                        status: 'success',
+                        description: 'NIN Service Deduction',
+                        reference: `NIN-SRV-${Date.now()}`
+                    });
+                } else {
+                    console.error("Wallet deduction failed:", deductError);
+                }
+            }
+
             } else {
                 const msg = response.message || 'Unable to verify this phone number. Please check and try again.';
                 const lowerMsg = msg.toLowerCase();

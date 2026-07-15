@@ -177,6 +177,28 @@ export default function TrackingScreen() {
             const res = await api.identity.getPersonalization(cleanID);
             setResult(res);
             await saveHistoryItem(res);
+
+            // Deduct Wallet Balance
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user) {
+                const { error: deductError } = await supabase.rpc('deduct_balance', {
+                    user_id: authData.user.id,
+                    amount: totalPrice
+                });
+                if (!deductError) {
+                    await supabase.from('transactions').insert({
+                        user_id: authData.user.id,
+                        type: 'nin_service',
+                        amount: totalPrice,
+                        status: 'success',
+                        description: 'NIN Service Deduction',
+                        reference: `NIN-SRV-${Date.now()}`
+                    });
+                } else {
+                    console.error("Wallet deduction failed:", deductError);
+                }
+            }
+
             await fetchWalletBalance(); // Update balance
         } catch (e: any) {
             const errM = e.message || '';
