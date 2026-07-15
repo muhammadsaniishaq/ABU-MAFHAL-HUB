@@ -69,8 +69,7 @@ export default function AppDesigner() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: type === 'icon' ? [1, 1] : [3, 1],
+                allowsEditing: false,
                 quality: 0.8,
                 base64: true,
             });
@@ -116,7 +115,7 @@ export default function AppDesigner() {
                     key: isIcon ? 'app_logo_icon' : 'app_logo',
                     value: { url: publicUrl },
                     description: isIcon ? 'Dynamic App Logo Icon Square' : 'Dynamic App Logo Banner Full'
-                });
+                }, { onConflict: 'key' });
 
             if (dbError) throw dbError;
 

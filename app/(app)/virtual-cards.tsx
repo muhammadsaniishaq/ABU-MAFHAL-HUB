@@ -1,10 +1,12 @@
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 
 export default function VirtualCardsScreen() {
+    const { settings } = useAppSettings();
     const [hasCard, setHasCard] = useState(false);
 
     return (
@@ -17,7 +19,7 @@ export default function VirtualCardsScreen() {
                     {/* Card Visual */}
                     <View className="w-full aspect-[1.586] bg-black rounded-3xl p-8 relative overflow-hidden mb-10 shadow-2xl shadow-indigo-500/30 border border-white/10">
                         <Image
-                            source={require('../../assets/images/logo-icon.png')}
+                            source={(settings?.app_logo_icon ? { uri: typeof settings.app_logo_icon === 'string' ? settings.app_logo_icon : settings.app_logo_icon.url } : require('../../assets/images/logo-icon.png'))}
                             className="absolute right-0 bottom-0 w-64 h-64 opacity-10 -mr-10 -mb-10"
                             resizeMode="contain"
                         />

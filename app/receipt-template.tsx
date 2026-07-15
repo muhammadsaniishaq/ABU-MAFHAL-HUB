@@ -1,8 +1,10 @@
 import { View, Text, Image, StyleSheet, Platform } from 'react-native';
+import { useAppSettings } from '../hooks/useAppSettings';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 export default function ReceiptTemplateScreen() {
+    const { settings } = useAppSettings();
   const { amount, sender, recipient, email, ref, date } = useLocalSearchParams();
 
   const formattedAmount = amount 
@@ -21,7 +23,7 @@ export default function ReceiptTemplateScreen() {
           <View style={s.brandDetails}>
             <View style={s.logoContainer}>
               <Image
-                source={require('../assets/images/logo.png')}
+                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))}
                 style={s.logo}
                 resizeMode="contain"
               />
@@ -133,7 +135,7 @@ export default function ReceiptTemplateScreen() {
           <Text style={s.poweredByLabel}>POWERED BY</Text>
           <View style={s.footerBrandRow}>
             <Image
-              source={require('../assets/images/logo.png')}
+              source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))}
               style={s.footerLogo}
               resizeMode="contain"
             />

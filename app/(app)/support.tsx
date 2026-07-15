@@ -95,12 +95,12 @@ export default function SupportScreen() {
 
                 {/* GRID: TICKETS & COMMUNITY */}
                 <View className="px-5 mb-6 flex-row justify-between">
-                    <TouchableOpacity className="flex-1 bg-white p-4 rounded-[20px] shadow-sm shadow-[#0d1b3e]/5 border border-slate-100 mr-2 items-center" onPress={() => router.push('/manage/tickets')} activeOpacity={0.7}>
+                    <TouchableOpacity className="flex-1 bg-white p-4 rounded-[20px] shadow-sm shadow-[#0d1b3e]/5 border border-slate-100 mr-2 items-center" onPress={() => router.push('/(app)/tickets')} activeOpacity={0.7}>
                         <View className="w-10 h-10 rounded-full bg-rose-50 items-center justify-center mb-2 border border-rose-100">
                             <Ionicons name="ticket" size={16} color="#e11d48" />
                         </View>
-                        <Text className="text-[#0d1b3e] font-black text-[10px] mb-0.5">Open Ticket</Text>
-                        <Text className="text-slate-400 font-medium text-[8px] text-center">Report an issue</Text>
+                        <Text className="text-[#0d1b3e] font-black text-[10px] mb-0.5">My Tickets</Text>
+                        <Text className="text-slate-400 font-medium text-[8px] text-center">View Support Chats</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity className="flex-1 bg-white p-4 rounded-[20px] shadow-sm shadow-[#0d1b3e]/5 border border-slate-100 ml-2 items-center" onPress={() => handleContact('telegram')} activeOpacity={0.7}>

@@ -66,7 +66,7 @@ export default function AboutScreen() {
                     <View className="w-32 h-32 bg-white rounded-[40px] shadow-xl shadow-[#0d1b3e]/30 items-center justify-center overflow-hidden mb-5 border-4 border-white">
                         <View className="absolute inset-0 bg-slate-50 opacity-50" />
                         <Image 
-                            source={require('../../assets/images/logo-icon.png')} 
+                            source={(settings?.app_logo_icon ? { uri: typeof settings.app_logo_icon === 'string' ? settings.app_logo_icon : settings.app_logo_icon.url } : require('../../assets/images/logo-icon.png'))} 
                             className="w-[85%] h-[85%]"
                             resizeMode="contain"
                         />

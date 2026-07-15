@@ -4,7 +4,10 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../services/supabase';
 
+import { useRouter } from 'expo-router';
+
 export function usePushNotifications() {
+  const router = useRouter();
   const [expoPushToken, setExpoPushToken] = useState<string | undefined>('');
   const [notification, setNotification] = useState<any>(undefined);
   const notificationListener = useRef<any>(null);
@@ -123,9 +126,15 @@ export function usePushNotifications() {
                              console.error("Local Notification Schedule Failed:", e);
                         }
                     } else {
-                        // Expo Go Fallback: Just show an Alert (SAFE)
-                        // console.log("Showing Alert fallback for Expo Go");
-                        Alert.alert(title || "New Notification", body);
+                        // Expo Go Fallback: Show an Alert and Navigate if possible
+                        Alert.alert(title || "New Notification", body, [
+                            { text: 'Close', style: 'cancel' },
+                            { text: 'View', onPress: () => {
+                                if (data?.route) {
+                                    router.push(data.route);
+                                }
+                            }}
+                        ]);
                     }
                 }
             )
@@ -147,7 +156,11 @@ export function usePushNotifications() {
         });
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener((response: any) => {
-            console.log(response);
+            console.log("Notification Tapped:", response);
+            const route = response.notification.request.content.data?.route;
+            if (route) {
+                router.push(route);
+            }
         });
     }
 

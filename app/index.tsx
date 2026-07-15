@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useAppSettings } from '../hooks/useAppSettings';
 import {
   View,
   Text,
@@ -123,7 +124,7 @@ function PhoneMockup({ width: customWidth }: { width?: number }) {
             {/* header */}
             <View style={ph.hdr}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Image source={require('../assets/images/logo.png')} style={{ width: 17, height: 17 }} resizeMode="contain" />
+                <Image source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))} style={{ width: 17, height: 17 }} resizeMode="contain" />
                 <Text style={ph.hdrTxt}>MAFHAL SUB</Text>
               </View>
               <View style={ph.bell}>
@@ -172,7 +173,7 @@ function PhoneMockup({ width: customWidth }: { width?: number }) {
 
       {/* navy orb with logo */}
       <View style={[ph.orb, { backgroundColor: T.navy, width: PW * 0.35, height: PW * 0.35, borderRadius: (PW * 0.35) / 2, bottom: -PW * 0.06, right: -PW * 0.14, alignItems: 'center', justifyContent: 'center', zIndex: 10 }]}>
-        <Image source={require('../assets/images/logo.png')} style={{ width: PW * 0.21, height: PW * 0.21 }} resizeMode="contain" />
+        <Image source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))} style={{ width: PW * 0.21, height: PW * 0.21 }} resizeMode="contain" />
       </View>
     </View>
   );
@@ -242,6 +243,7 @@ const sg = StyleSheet.create({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Landing() {
+    const { settings } = useAppSettings();
   const router = useRouter();
   const { ref } = useLocalSearchParams<{ ref?: string }>();
   const insets = useSafeAreaInsets();
@@ -329,7 +331,7 @@ export default function Landing() {
       <View style={[s.navbar, { paddingTop: insets.top + 6 }]}>
         {/* logo */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Image source={require('../assets/images/logo.png')} style={{ width: 36, height: 36 }} resizeMode="contain" />
+          <Image source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))} style={{ width: 36, height: 36 }} resizeMode="contain" />
           <View>
             <Text style={s.navBrand}>MAFHAL</Text>
             <Text style={s.navSub}>SUB</Text>
@@ -537,7 +539,7 @@ export default function Landing() {
         <View style={[s.footer, { paddingBottom: insets.bottom + 24 }]}>
           {/* brand */}
           <View style={s.ftBrand}>
-            <Image source={require('../assets/images/logo.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
+            <Image source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))} style={{ width: 38, height: 38 }} resizeMode="contain" />
             <View>
               <Text style={s.ftBrandTxt}>MAFHAL</Text>
               <Text style={s.ftSubTxt}>SUB</Text>

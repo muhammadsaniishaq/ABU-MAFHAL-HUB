@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
@@ -11,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 export default function PinSetupScreen() {
+    const { settings } = useAppSettings();
     const { action } = useLocalSearchParams(); // could be 'verify' or 'setup' explicitly if needed
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
@@ -233,7 +235,7 @@ export default function PinSetupScreen() {
                     <View style={s.headerContainer}>
                         <View style={s.logoCard}>
                             <Image 
-                                source={require('../../assets/images/logo.png')}
+                                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
                                 style={s.logo}
                                 resizeMode="contain"
                             />

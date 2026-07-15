@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
@@ -10,6 +11,7 @@ import { supabase } from '../../services/supabase';
 const { width, height } = Dimensions.get('window');
 
 export default function OTP() {
+    const { settings } = useAppSettings();
     const { email, tempFullName, tempUsername, tempPhone, tempCustomId, tempReferralCode } = useLocalSearchParams<{ 
         email: string, 
         tempFullName?: string,
@@ -217,7 +219,7 @@ export default function OTP() {
                                     >
                                         <View className="bg-white p-4 rounded-[28px] items-center justify-center" style={{ width: 84, height: 84 }}>
                                             <Image 
-                                                source={require('../../assets/images/logo.png')}
+                                                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
                                                 style={{ width: 60, height: 60 }}
                                                 resizeMode="contain"
                                             />

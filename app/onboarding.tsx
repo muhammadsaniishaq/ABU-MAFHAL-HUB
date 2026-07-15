@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAppSettings } from '../hooks/useAppSettings';
 import {
   View,
   Text,
@@ -119,7 +120,7 @@ function PaymentsIllustration() {
       <Animated.View style={[ill.creditCard, { transform: [{ rotate: rotateStr }] }]}>
         <LinearGradient colors={['#1e293b', '#0f172a']} style={ill.cardGradient}>
           <View style={ill.cardHeader}>
-            <Image source={require('../assets/images/logo.png')} style={ill.cardLogo} resizeMode="contain" />
+            <Image source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))} style={ill.cardLogo} resizeMode="contain" />
             <Ionicons name="phone-portrait-outline" size={14} color={T.gold} />
           </View>
           <View style={ill.cardChip} />
@@ -249,6 +250,7 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen() {
+    const { settings } = useAppSettings();
   const router = useRouter();
   const [activeSlide, setActiveSlide] = useState(0);
   const [lang, setLang] = useState<'en' | 'ha'>('en');
@@ -380,7 +382,7 @@ export default function OnboardingScreen() {
         <View style={s.header}>
           <View style={s.brandRow}>
             <Image
-              source={require('../assets/images/logo.png')}
+              source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))}
               style={s.logo}
               resizeMode="contain"
             />

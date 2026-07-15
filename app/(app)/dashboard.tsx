@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -384,6 +384,7 @@ export default function Dashboard() {
     { icon: 'chevron-forward', label: 'Transfer', color: '#2563eb', route: '/transfer' },
     { icon: 'receipt-outline', label: 'Bills', color: '#eab308', route: '/bills' },
     { icon: 'person-add-outline', label: 'NIN Services', color: '#10b981', route: '/nin-services' },
+    { icon: 'ticket-outline', label: 'My Tickets', color: '#e11d48', route: '/(app)/tickets' },
     { icon: 'tv-outline', label: 'Cable TV', color: '#8b5cf6', route: '/bills' },
     { icon: 'flash-outline', label: 'Electricity', color: '#f5a623', route: '/bills' },
     { icon: 'globe-outline', label: 'Smile Data', color: '#ec4899', route: '/smile' },
@@ -441,7 +442,7 @@ export default function Dashboard() {
             <View style={s.brandRow}>
               <View style={s.logoWrapper}>
                 <Image
-                  source={logoUrl ? { uri: logoUrl } : (settings?.app_logo ? { uri: settings.app_logo } : require('../../assets/images/logo.png'))}
+                  source={logoUrl ? { uri: logoUrl } : ( (settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png')))}
                   style={s.headerLogo as any}
                   resizeMode="contain"
                 />
@@ -533,7 +534,7 @@ export default function Dashboard() {
             {/* Background Logo Watermark */}
             <View style={s.watermarkWrapper}>
               <Image 
-                source={require('../../assets/images/logo.png')} 
+                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))} 
                 style={s.watermarkImage} 
                 resizeMode="contain" 
               />
@@ -838,6 +839,7 @@ export default function Dashboard() {
 
       </ScrollView>
       <GlobalAnnouncementModal />
+
     </View>
   );
 }

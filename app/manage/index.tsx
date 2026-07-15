@@ -177,7 +177,7 @@ export default function AdminBento() {
 
     // Update modules with dynamic badges
     modules.operations[2].badge = counts.kyc;
-    modules.operations[3].badge = counts.tickets;
+    modules.operations[7].badge = counts.tickets;
     modules.banking[1].badge = counts.loans;
     modules.internal[3].badge = counts.chats;
 

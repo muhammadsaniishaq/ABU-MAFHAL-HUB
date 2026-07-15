@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, Alert, Modal, TextInput, Share, Vibration, Image, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -30,6 +31,7 @@ const T = {
 };
 
 export default function QRPayScreen() {
+    const { settings } = useAppSettings();
     const router = useRouter();
     const isFocused = useIsFocused();
     const [activeTab, setActiveTab] = useState<'scan' | 'mycode'>('scan');
@@ -396,7 +398,7 @@ export default function QRPayScreen() {
         // 1. Download logo asset locally for rendering inside the document
         let logoSrc = '';
         try {
-            const logoAsset = Asset.fromModule(require('../../assets/images/logo.png'));
+            const logoAsset = Asset.fromModule((settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png')));
             await logoAsset.downloadAsync();
             logoSrc = logoAsset.localUri || logoAsset.uri;
         } catch (logoErr) {

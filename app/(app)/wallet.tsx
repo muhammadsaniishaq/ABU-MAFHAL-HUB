@@ -235,7 +235,7 @@ export default function WalletScreen() {
         <View style={s.headerTop}>
           <View style={s.brandRow}>
             <Image
-              source={require('../../assets/images/logo.png')}
+              source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
               style={s.headerLogo}
               resizeMode="contain"
             />
@@ -273,7 +273,7 @@ export default function WalletScreen() {
           {/* Background Logo Watermark */}
           <View style={s.watermarkWrapper}>
             <Image
-              source={require('../../assets/images/logo.png')}
+              source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
               style={s.watermarkImage}
               resizeMode="contain"
             />

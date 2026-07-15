@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform, RefreshControl } from 'react-native';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const CACHE_KEY = '@profile_data_v2';
 
 export default function ProfileScreen() {
+    const { settings } = useAppSettings();
     const [profile, setProfile] = useState<{ 
         full_name: string; 
         email: string; 
@@ -380,7 +382,7 @@ export default function ProfileScreen() {
                                     />
                                 ) : (
                                     <Image 
-                                        source={require('../../assets/images/logo-icon.png')} 
+                                        source={(settings?.app_logo_icon ? { uri: typeof settings.app_logo_icon === 'string' ? settings.app_logo_icon : settings.app_logo_icon.url } : require('../../assets/images/logo-icon.png'))} 
                                         style={{ width: '100%', height: '100%', borderRadius: 8 }}
                                         resizeMode="cover"
                                     />

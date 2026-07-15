@@ -226,7 +226,7 @@ export default function Login() {
                             <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                                 <View style={s.brandLogoRow}>
                                     <Image 
-                                        source={require('../../assets/images/logo.png')}
+                                        source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
                                         style={s.brandLogo}
                                         resizeMode="contain"
                                     />
