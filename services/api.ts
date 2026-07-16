@@ -15,8 +15,8 @@ export const API_URL = 'https://api.abumafhal.com.ng/v1';
 // SWAPPED TO CLUBKONNECT AS REQUESTED
 const airtimeProvider: AirtimeProvider = ClubKonnectProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
-const dataProvider: DataProvider = ClubKonnectProvider;
-const cryptoExchange: CryptoExchange = CoingeckoCryptoExchange;
+const dataProvider: ClubKonnectProvider = ClubKonnectProvider;
+const cryptoExchange: CryptoExchange = BinanceCryptoExchange; // Fixed Demo API limit issue
 import { IdProIdentityVerifier } from './idpro';
 const identityVerifier = IdProIdentityVerifier; // Live IdPro Edge Function
 
@@ -741,37 +741,19 @@ export const api = {
             if (!session) throw new Error("Not authenticated");
             const userId = session.user.id;
 
-            if (params.paymentMethod === 'NGN') {
-                const { data: profile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
-                if (!profile || profile.balance < params.amountPayment) {
-                    throw new Error("Insufficient Naira balance to buy Gas.");
-                }
-                const newBalance = profile.balance - params.amountPayment;
-                await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
-            } else {
-                const { data: cryptoWallet } = await supabase.from('crypto_balances').select('balance').eq('user_id', userId).eq('asset', 'USDT').single();
-                if (!cryptoWallet || cryptoWallet.balance < params.amountPayment) {
-                    throw new Error("Insufficient USDT balance to buy Gas.");
-                }
-                const newBalance = cryptoWallet.balance - params.amountPayment;
-                await supabase.from('crypto_balances').update({ balance: newBalance }).eq('user_id', userId).eq('asset', 'USDT');
-            }
-
-            // 3. Call Edge Function to send Gas instantly
+            // Delegate EVERYTHING to Edge Function for security
             const { data: edgeData, error: edgeError } = await supabase.functions.invoke('crypto-payout', {
-                body: { gasType: params.gasType, walletAddress: params.walletAddress, amountGas: params.amountGas }
+                body: { 
+                    gasType: params.gasType, 
+                    walletAddress: params.walletAddress, 
+                    amountGas: params.amountGas,
+                    paymentMethod: params.paymentMethod,
+                    amountPayment: params.amountPayment
+                }
             });
 
             if (edgeError || !edgeData?.success) {
-                // If it fails, refund the user
-                if (params.paymentMethod === 'NGN') {
-                    const { data: profile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
-                    await supabase.from('profiles').update({ balance: (profile?.balance || 0) + params.amountPayment }).eq('id', userId);
-                } else {
-                    const { data: cryptoWallet } = await supabase.from('crypto_balances').select('balance').eq('user_id', userId).eq('asset', 'USDT').single();
-                    await supabase.from('crypto_balances').update({ balance: (cryptoWallet?.balance || 0) + params.amountPayment }).eq('user_id', userId).eq('asset', 'USDT');
-                }
-                throw new Error(edgeData?.error || "Instant payout failed, your money was refunded.");
+                throw new Error(edgeData?.error || "Instant payout failed.");
             }
 
             // 4. Create Gas Order as COMPLETED

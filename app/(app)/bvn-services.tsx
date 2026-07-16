@@ -228,39 +228,24 @@ export default function BVNVerificationScreen() {
         setLoading(true);
         try {
             let res: any;
+            const priceId = getSelectedPriceId();
             if (searchType === 'phone') {
-                res = await api.identity.retrieveBVN(cleanVal);
+                res = await api.identity.retrieveBVN(cleanVal, priceId);
             } else if (searchType === 'card') {
-                res = await api.identity.getBVNCard(cleanVal);
+                res = await api.identity.getBVNCard(cleanVal, priceId);
             } else {
-                res = await api.identity.validateBVN(cleanVal);
+                res = await api.identity.validateBVN(cleanVal, priceId);
             }
 
             if (res.isValid || res.status === 'success') {
                 const finalData = res.data || res.rawData || res;
                 
-                // Deduct Wallet Balance
+                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
+                
                 const { data: authData } = await supabase.auth.getUser();
                 if (authData?.user) {
                     const userId = authData.user.id;
-                    const { data: profile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
-                    if (profile && profile.balance >= totalPrice) {
-                        const { error: deductError } = await supabase.rpc('deduct_balance', {
-                            user_id: userId,
-                            amount: totalPrice
-                        });
-                        
-                        if (deductError) throw deductError;
-                        // Record Transaction
-                        await supabase.from('transactions').insert({
-                            user_id: userId,
-                            type: 'bvn_verification',
-                            amount: totalPrice,
-                            status: 'success',
-                            description: `BVN Search: ${cleanVal}`,
-                            reference: `BVN_${Date.now()}`
-                        });
-                    }
+
 
                     // Send Notification
                     await createAppNotification(

@@ -88,32 +88,33 @@ export const IdProIdentityVerifier = {
 
     // ── VERIFICATIONS ────────────────────────────────────────────────────────
 
-    validateNIN: async (nin: string) => IdProIdentityVerifier.invokeEdge('nin', nin),
-    verifyNINWithPhone: async (phone: string) => IdProIdentityVerifier.invokeEdge('phone', phone),
-    verifyPhone: async (phone: string) => IdProIdentityVerifier.invokeEdge('phone', phone),
-    validateBVN: async (bvn: string) => IdProIdentityVerifier.invokeEdge('bvn', bvn),
-    getBVNCard: async (bvn: string) => IdProIdentityVerifier.invokeEdge('bvn-card', bvn),
+    validateNIN: async (nin: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('nin', nin, { priceId }),
+    verifyNINWithPhone: async (phone: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('phone', phone, { priceId }),
+    verifyPhone: async (phone: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('phone', phone, { priceId }),
+    validateBVN: async (bvn: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('bvn', bvn, { priceId }),
+    getBVNCard: async (bvn: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('bvn-card', bvn, { priceId }),
     
-    verifyDemographic: async (params: DemographicParams) => 
+    verifyDemographic: async (params: DemographicParams, priceId?: string) => 
         IdProIdentityVerifier.invokeEdge('demographic', '', {
             firstname: params.firstname,
             lastname: params.lastname,
             gender: params.gender,
-            dob: params.dob
+            dob: params.dob,
+            priceId
         }),
 
     // ── IPE CLEARANCE ────────────────────────────────────────────────────────
-    runIPEClearance: async (number: string) => IdProIdentityVerifier.invokeEdge('ipe', number),
+    runIPEClearance: async (number: string, priceId?: string, addonPriceId?: string) => IdProIdentityVerifier.invokeEdge('ipe', number, { priceId, addonPriceId }),
 
     // ── VALIDATION ───────────────────────────────────────────────────────────
-    validateIdentity: async (number: string, type?: string) => IdProIdentityVerifier.invokeEdge('val', number, { idType: type }),
+    validateIdentity: async (number: string, type?: string, priceId?: string, addonPriceId?: string) => IdProIdentityVerifier.invokeEdge('val', number, { idType: type, priceId, addonPriceId }),
 
     // ── DELINK & RECOVERY ────────────────────────────────────────────────────
-    delinkAndRetrieve: async (number: string, phone?: string) => IdProIdentityVerifier.invokeEdge('delink', number, { phone }),
-    retrieveBVN: async (number: string) => IdProIdentityVerifier.invokeEdge('bvn-phone', number), // using bvn-phone for retrieval
+    delinkAndRetrieve: async (number: string, phone?: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('delink', number, { phone, priceId }),
+    retrieveBVN: async (number: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('bvn-phone', number, { priceId }), // using bvn-phone for retrieval
 
     // ── USER DETAILS / MODIFICATIONS ─────────────────────────────────────────
-    getPersonalization: async (number: string) => IdProIdentityVerifier.invokeEdge('tracking-id', number),
+    getPersonalization: async (number: string, priceId?: string) => IdProIdentityVerifier.invokeEdge('tracking-id', number, { priceId }),
     
     // Remaining ones just throw not implemented for now, as idpro doesn't have exact counterparts yet in the docs provided
     requestModification: async (params: ModificationParams) => ({ isValid: false, message: 'Not implemented in IdPro yet' }),

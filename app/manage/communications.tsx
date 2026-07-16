@@ -214,20 +214,23 @@ export default function CommunicationManager() {
         if (!aiPrompt) return;
         setAiGenerating(true);
         
-        // Mock AI Generation - In production this would call an Edge Function wrapping OpenAI
-        setTimeout(() => {
-            let generated = "";
-            if (activeTab === 'email') {
-                generated = `Dear User,\n\nBased on your request regarding "${aiPrompt}", we are pleased to inform you that we have updated our policies to better serve you.\n\nThank you for choosing us.\n\nBest,\nAdmin Team`;
-            } else {
-                generated = `Alert: Regarding ${aiPrompt}. Please check your dashboard for details. Thank you.`;
-            }
+        try {
+            const { data, error } = await supabase.functions.invoke('ai-generate', {
+                body: { prompt: aiPrompt, type: activeTab }
+            });
+
+            if (error) throw error;
             
-            setBody(generated);
+            if (data?.generated) {
+                setBody(data.generated);
+            }
+        } catch (e: any) {
+            Alert.alert("AI Generation Failed", e.message || "Failed to connect to AI service.");
+        } finally {
             setAiGenerating(false);
             setShowAiModal(false);
             setAiPrompt('');
-        }, 2000);
+        }
     };
 
     const applyTemplate = (tmpl: any) => {

@@ -11,7 +11,11 @@ serve(async (req) => {
     }
 
     try {
-        const { gasType, walletAddress, amountGas } = await req.json();
+        const { gasType, walletAddress, amountGas, paymentMethod, amountPayment } = await req.json();
+
+        if (!gasType || !walletAddress || !amountGas || !paymentMethod || !amountPayment || amountPayment <= 0) {
+            throw new Error("Invalid payment parameters.");
+        }
 
         // 1. Validate auth
         const authHeader = req.headers.get('Authorization')!;
@@ -21,9 +25,33 @@ serve(async (req) => {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) throw new Error("Unauthorized");
 
+        // 2. SECURELY DEDUCT BALANCE VIA RPC
+        if (paymentMethod === 'NGN') {
+            const { data: deductionResult, error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+                user_id: user.id,
+                amount: amountPayment
+            });
+            if (deductError || !deductionResult?.success) {
+                console.error("NGN Deduction error:", deductError || deductionResult);
+                throw new Error(deductionResult?.error || "Insufficient Naira balance.");
+            }
+        } else if (paymentMethod === 'USDT') {
+            const { data: deductionResult, error: deductError } = await supabaseAdmin.rpc('deduct_crypto_balance', {
+                user_id: user.id,
+                asset: 'usdt',
+                amount: amountPayment
+            });
+            if (deductError || !deductionResult?.success) {
+                console.error("USDT Deduction error:", deductError || deductionResult);
+                throw new Error(deductionResult?.error || "Insufficient USDT balance.");
+            }
+        } else {
+            throw new Error("Invalid payment method.");
+        }
+
         let txId = "";
 
-        // 2. Fetch NowPayments Secrets
+        // 3. Fetch NowPayments Secrets
         let NOWPAYMENTS_API_KEY = Deno.env.get('NOWPAYMENTS_API_KEY');
         let NOWPAYMENTS_EMAIL = Deno.env.get('NOWPAYMENTS_EMAIL');
         let NOWPAYMENTS_PASSWORD = Deno.env.get('NOWPAYMENTS_PASSWORD');
@@ -41,10 +69,16 @@ serve(async (req) => {
         }
 
         if (!NOWPAYMENTS_API_KEY || !NOWPAYMENTS_EMAIL || !NOWPAYMENTS_PASSWORD) {
+            // REFUND IF MISSING SECRETS
+            if (paymentMethod === 'NGN') {
+                await supabaseAdmin.rpc('fund_wallet', { p_user_id: user.id, p_amount: amountPayment });
+            } else if (paymentMethod === 'USDT') {
+                await supabaseAdmin.rpc('credit_crypto_balance', { user_id: user.id, asset: 'usdt', amount: amountPayment });
+            }
             throw new Error("NowPayments configuration is missing in Admin settings.");
         }
 
-        // 3. Process Payout using NowPayments
+        // 4. Process Payout using NowPayments
         const authRes = await fetch('https://api.nowpayments.io/v1/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -52,7 +86,11 @@ serve(async (req) => {
         });
         
         const authData = await authRes.json();
-        if (!authData.token) throw new Error("NowPayments Auth failed");
+        if (!authData.token) {
+            if (paymentMethod === 'NGN') await supabaseAdmin.rpc('fund_wallet', { p_user_id: user.id, p_amount: amountPayment });
+            else if (paymentMethod === 'USDT') await supabaseAdmin.rpc('credit_crypto_balance', { user_id: user.id, asset: 'usdt', amount: amountPayment });
+            throw new Error("NowPayments Auth failed");
+        }
 
         const payoutRes = await fetch('https://api.nowpayments.io/v1/payout', {
             method: 'POST',
@@ -77,6 +115,8 @@ serve(async (req) => {
             txId = payoutData.withdrawals[0].id;
         } else {
             console.error("Payout API failed:", payoutData);
+            if (paymentMethod === 'NGN') await supabaseAdmin.rpc('fund_wallet', { p_user_id: user.id, p_amount: amountPayment });
+            else if (paymentMethod === 'USDT') await supabaseAdmin.rpc('credit_crypto_balance', { user_id: user.id, asset: 'usdt', amount: amountPayment });
             throw new Error(payoutData.message || 'Unknown NowPayments error');
         }
 

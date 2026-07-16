@@ -70,36 +70,83 @@ const DEFAULT_SETTINGS: AppSettings = {
     crypto_rate_eth_sell: '4300000'
 };
 
+let globalSettings: AppSettings = DEFAULT_SETTINGS;
+let isFetching = false;
+let fetchPromise: Promise<void> | null = null;
+
 export function useAppSettings() {
-    const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-    const [loading, setLoading] = useState(true);
+    const [settings, setSettings] = useState<AppSettings>(globalSettings);
+    const [loading, setLoading] = useState(!fetchPromise && !isFetching);
 
     useEffect(() => {
-        fetchSettings();
+        let mounted = true;
+
+        const initFetch = async () => {
+            if (!fetchPromise) {
+                isFetching = true;
+                fetchPromise = (async () => {
+                    try {
+                        const { data, error } = await supabase.from('app_settings').select('key, value');
+                        if (error) throw error;
+
+                        if (data) {
+                            const newSettings = { ...DEFAULT_SETTINGS };
+                            data.forEach((item: any) => {
+                                if (item.value === 'true' || item.value === 'false') {
+                                    newSettings[item.key] = item.value === 'true';
+                                } else {
+                                    newSettings[item.key] = item.value;
+                                }
+                            });
+                            globalSettings = newSettings;
+                        }
+                    } catch (error: any) {
+                        // Suppress excessive logging, just warn once
+                        console.warn('Could not fetch app settings from Supabase:', error?.message || error);
+                    } finally {
+                        isFetching = false;
+                    }
+                })();
+            }
+
+            await fetchPromise;
+            
+            if (mounted) {
+                setSettings(globalSettings);
+                setLoading(false);
+            }
+        };
+
+        initFetch();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
-    const fetchSettings = async () => {
+    const refetch = async () => {
+        fetchPromise = null; // force refetch
+        setLoading(true);
+        // We just let the next render or manual call trigger it
         try {
             const { data, error } = await supabase.from('app_settings').select('key, value');
             if (error) throw error;
-
             if (data) {
                 const newSettings = { ...DEFAULT_SETTINGS };
                 data.forEach((item: any) => {
-                    if (item.value === 'true' || item.value === 'false') {
-                        newSettings[item.key] = item.value === 'true';
-                    } else {
-                        newSettings[item.key] = item.value;
-                    }
+                    newSettings[item.key] = item.value === 'true' || item.value === 'false' 
+                        ? item.value === 'true' 
+                        : item.value;
                 });
-                setSettings(newSettings);
+                globalSettings = newSettings;
+                setSettings(globalSettings);
             }
-        } catch (error) {
-            console.error('Error fetching app settings:', error);
+        } catch (error: any) {
+            console.warn('Refetch app settings failed:', error?.message || error);
         } finally {
             setLoading(false);
         }
     };
 
-    return { settings, loading, refetch: fetchSettings, setSettings };
+    return { settings, loading, refetch, setSettings };
 }

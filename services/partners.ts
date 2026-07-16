@@ -42,16 +42,16 @@ export interface VerificationResult {
 }
 
 export interface IdentityVerifier {
-    validateNIN(nin: string): Promise<VerificationResult>;
-    validateBVN(bvn: string): Promise<VerificationResult>;
-    verifyNINWithPhone?(phone: string): Promise<VerificationResult>;
-    verifyNINDemo?(params: DemographicParams): Promise<VerificationResult>;
-    getBVNCard?(bvn: string): Promise<VerificationResult>;
-    runIPEClearance?(number: string): Promise<VerificationResult>;
-    validateIdentity?(number: string, type?: string): Promise<VerificationResult>;
-    delinkAndRetrieve?(number: string, phone?: string): Promise<VerificationResult>;
-    retrieveBVN?(number: string): Promise<VerificationResult>;
-    getPersonalization?(number: string): Promise<VerificationResult>;
+    validateNIN(nin: string, priceId?: string): Promise<VerificationResult>;
+    validateBVN(bvn: string, priceId?: string): Promise<VerificationResult>;
+    verifyNINWithPhone?(phone: string, priceId?: string): Promise<VerificationResult>;
+    verifyNINDemo?(params: DemographicParams, priceId?: string): Promise<VerificationResult>;
+    getBVNCard?(bvn: string, priceId?: string): Promise<VerificationResult>;
+    runIPEClearance?(number: string, priceId?: string, addonPriceId?: string): Promise<VerificationResult>;
+    validateIdentity?(number: string, type?: string, priceId?: string, addonPriceId?: string): Promise<VerificationResult>;
+    delinkAndRetrieve?(number: string, phone?: string, priceId?: string): Promise<VerificationResult>;
+    retrieveBVN?(number: string, priceId?: string): Promise<VerificationResult>;
+    getPersonalization?(number: string, priceId?: string): Promise<VerificationResult>;
     requestModification?(params: ModificationParams): Promise<VerificationResult>;
     requestDOBModification?(number: string, dob: string): Promise<VerificationResult>;
     attestBirth?(params: BirthAttestationParams): Promise<VerificationResult>;

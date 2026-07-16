@@ -198,30 +198,11 @@ export default function IPEClearanceScreen() {
 
         setLoading(true);
         try {
-            const res = await api.identity.runIPEClearance(cleanNin);
+            const res = await api.identity.runIPEClearance(cleanNin, selectedStatus, selectedSlip);
             setResult(res);
             await saveHistoryItem(res);
 
-            // Deduct Wallet Balance
-            const { data: authData } = await supabase.auth.getUser();
-            if (authData?.user) {
-                const { error: deductError } = await supabase.rpc('deduct_balance', {
-                    user_id: authData.user.id,
-                    amount: totalPrice
-                });
-                if (!deductError) {
-                    await supabase.from('transactions').insert({
-                        user_id: authData.user.id,
-                        type: 'nin_service',
-                        amount: totalPrice,
-                        status: 'success',
-                        description: 'NIN Service Deduction',
-                        reference: `NIN-SRV-${Date.now()}`
-                    });
-                } else {
-                    console.error("Wallet deduction failed:", deductError);
-                }
-            }
+            // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
 
             await fetchWalletBalance(); // Update balance
         } catch (e: any) {

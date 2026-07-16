@@ -55,46 +55,64 @@ serve(async (req: Request) => {
     }
 
 
-    let FEE_AMOUNT = 0; // Set to 0 for development testing/bypassing insufficient balance
+    const priceId = requestData.priceId;
+    if (!priceId) {
+      return jsonOk({ error: 'Missing priceId for verification service.' })
+    }
 
-    // We need to use a transaction-like approach or just update if balance >= FEE_AMOUNT
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('balance')
-      .eq('id', user.id)
+    const addonPriceId = requestData.addonPriceId;
+
+    // Fetch dynamic pricing for base price
+    const { data: pricing, error: pricingError } = await supabaseAdmin
+      .from('service_pricing')
+      .select('markup_price, name')
+      .eq('id', priceId)
       .single()
 
-    if (profileError || !profile) {
-      console.error('Profile fetch error:', profileError?.message)
-      return jsonOk({ error: 'Failed to fetch user profile. Please try again.' })
+    if (pricingError || !pricing) {
+      console.error('Pricing lookup error:', pricingError?.message)
+      return jsonOk({ error: 'Failed to retrieve pricing for this service.' })
     }
 
-    const currentBalance = parseFloat(profile.balance?.toString() || '0');
+    let FEE_AMOUNT = parseFloat(pricing.markup_price?.toString() || '0');
+    let description = `Verification: ${pricing.name}`;
 
-    if (currentBalance < FEE_AMOUNT) {
-      return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT} but have ₦${currentBalance.toFixed(2)}.` })
+    // Fetch dynamic pricing for addon if provided
+    if (addonPriceId && addonPriceId !== 'val_slip_none') {
+        const { data: addonPricing } = await supabaseAdmin
+          .from('service_pricing')
+          .select('markup_price, name')
+          .eq('id', addonPriceId)
+          .single();
+          
+        if (addonPricing) {
+            FEE_AMOUNT += parseFloat(addonPricing.markup_price?.toString() || '0');
+            description += ` + ${addonPricing.name}`;
+        }
     }
 
-    // Deduct the balance
-    const newBalance = currentBalance - FEE_AMOUNT;
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({ balance: newBalance })
-      .eq('id', user.id)
+    // Secure Atomic Deduction via RPC
+    const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+      user_id: user.id,
+      amount: FEE_AMOUNT
+    });
 
-    if (updateError) {
-      console.error('Balance update error:', updateError.message)
+    if (deductError) {
+      console.error('Balance deduction error:', deductError.message)
+      if (deductError.message.toLowerCase().includes('insufficient')) {
+         return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT}.` })
+      }
       return jsonOk({ error: 'Failed to deduct wallet balance. Please try again.' })
     }
 
-    // Record the transaction for the deduction
+    // Record the transaction for the deduction securely on the backend
     await supabaseAdmin.from('transactions').insert({
         user_id: user.id,
         amount: FEE_AMOUNT,
         type: 'payment',
         status: 'success',
         reference: `id_verify_${searchType}_${Date.now()}`,
-        description: `Verification Fee (${searchType.toUpperCase()})`
+        description: description
     });
 
     // 2. Call IDPRO API

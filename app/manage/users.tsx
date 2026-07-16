@@ -479,29 +479,21 @@ export default function UserManagement() {
 
         setCreatingUser(true);
         try {
-            await new Promise(r => setTimeout(r, 1000));
-            
-            const mockUser: UserProfile = {
-                id: `new-${Date.now()}`,
-                full_name: newUserForm.fullName,
-                email: newUserForm.email,
-                phone: newUserForm.phone,
-                role: newUserForm.role,
-                username: newUserForm.username,
-                status: 'active',
-                balance: 0,
-                credit_balance: 0,
-                created_at: new Date().toISOString(),
-                kyc_verified: false,
-                gender: newUserForm.gender,
-                dob: newUserForm.dob,
-                address: newUserForm.address,
-                state: newUserForm.state,
-                next_of_kin_name: newUserForm.next_of_kin_name,
-                next_of_kin_phone: newUserForm.next_of_kin_phone
-            };
-            
-            setUsers([mockUser, ...users]);
+            // Call actual Edge Function to create user in Auth & profiles
+            const { data, error } = await supabase.functions.invoke('admin-create-user', {
+                body: newUserForm
+            });
+
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
+
+            // Refetch or add real user from response to state
+            if (data?.user) {
+                setUsers([data.user, ...users]);
+            } else {
+                fetchUsers(); // Fallback if no user object returned
+            }
+
             Alert.alert("User Created", `Successfully created account for ${newUserForm.fullName}. Credentials sent to email.`);
             
             setShowCreateUser(false);

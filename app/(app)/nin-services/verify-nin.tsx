@@ -1960,7 +1960,7 @@ export default function VerifyNINScreen() {
 
         setLoading(true);
         try {
-            const response = await api.identity.validateNIN(nin);
+            const response = await api.identity.validateNIN(nin, layoutItem?.db_id);
             
             if (response.isValid && response.data) {
                 // Flatten nested data if needed (IDPro returns { data: { firstname, ... } } sometimes)
@@ -1975,29 +1975,7 @@ export default function VerifyNINScreen() {
                 setResult({ status: 'success', data: personData });
                 await saveHistoryItem(personData);
 
-            // Deduct Wallet Balance
-            const { data: authData } = await supabase.auth.getUser();
-            if (authData?.user) {
-                const { error: deductError } = await supabase.rpc('deduct_balance', {
-                    user_id: authData.user.id,
-                    amount: totalPrice
-                });
-                if (!deductError) {
-                    await supabase.from('transactions').insert({
-                        user_id: authData.user.id,
-                        type: 'nin_service',
-                        amount: totalPrice,
-                        status: 'success',
-                        description: 'NIN Service Deduction',
-                        reference: `NIN-SRV-${Date.now()}`
-                    });
-                } else {
-                    console.error("Wallet deduction failed:", deductError);
-                }
-            }
-
-
-            } else {
+                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function            } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
                 if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {

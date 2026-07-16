@@ -8,21 +8,34 @@ import { supabase } from '../../services/supabase';
 
 const { width } = Dimensions.get('window');
 
-// Simulated Login Data
-const MOCK_LOGINS = [
-    { id: 1, ip: '197.210.45.22', location: 'Lagos, NG', device: 'iPhone 14 Pro', status: 'success', time: 'Just now' },
-    { id: 2, ip: '102.12.33.19', location: 'Abuja, NG', device: 'Samsung S23', status: 'success', time: '2m ago' },
-    { id: 3, ip: '45.22.11.90', location: 'Kaduna, NG', device: 'Chrome / Win', status: 'failed', time: '5m ago' },
-    { id: 4, ip: '197.210.22.11', location: 'Kano, NG', device: 'Tecno Spark', status: 'success', time: '12m ago' },
-    { id: 5, ip: '105.11.22.33', location: 'Port Harcourt, NG', device: 'Infinix Hot', status: 'success', time: '15m ago' },
-];
+// We will fetch real user data instead of Mock Logins
 
 export default function ForensicsScreen() {
     const router = useRouter();
-    const [systemHealth, setSystemHealth] = useState(98);
+    const [systemHealth, setSystemHealth] = useState(100);
     const [activeThreats, setActiveThreats] = useState(0);
     const [isFrozen, setIsFrozen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [liveUsers, setLiveUsers] = useState<any[]>([]);
+    const [userCount, setUserCount] = useState(0);
+
+    useEffect(() => {
+        fetchLiveUsers();
+    }, []);
+
+    const fetchLiveUsers = async () => {
+        try {
+            const { data, count } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .limit(5);
+            if (data) setLiveUsers(data);
+            if (count !== null) setUserCount(count);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const handleFreeze = async () => {
         if (isFrozen) {
@@ -91,11 +104,11 @@ export default function ForensicsScreen() {
                     {/* Radar Sweep Animation (Simulated with View for simplicity) */}
                     <View className="absolute top-1/2 left-1/2 w-4 h-4 bg-indigo-500 rounded-full shadow-[0_0_20px_10px_rgba(99,102,241,0.5)] animate-ping" />
                     
-                    {/* Map Dots */}
-                    {MOCK_LOGINS.map((login, i) => (
+                    {/* Map Dots (Real Users proxy) */}
+                    {liveUsers.map((user, i) => (
                         <View 
                             key={i} 
-                            className={`absolute w-2 h-2 rounded-full ${login.status === 'success' ? 'bg-emerald-400' : 'bg-red-500'}`}
+                            className="absolute w-2 h-2 rounded-full bg-emerald-400"
                             style={{ top: `${20 + i * 15}%`, left: `${30 + i * 12}%` }}
                         />
                     ))}
@@ -112,12 +125,12 @@ export default function ForensicsScreen() {
                         <Text className="text-emerald-400 text-3xl font-black">{systemHealth}%</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Active Sessions</Text>
-                        <Text className="text-blue-400 text-3xl font-black">1.2k</Text>
+                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Total Users</Text>
+                        <Text className="text-blue-400 text-3xl font-black">{userCount}</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Failed Auth</Text>
-                        <Text className="text-amber-500 text-3xl font-black">23</Text>
+                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">New Signups</Text>
+                        <Text className="text-amber-500 text-3xl font-black">{liveUsers.length}</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
                         <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Threat Level</Text>
@@ -126,20 +139,21 @@ export default function ForensicsScreen() {
                 </View>
 
                 {/* Login Feed */}
-                <Text className="text-white font-bold text-lg mb-4">Live Login Feed</Text>
+                <Text className="text-white font-bold text-lg mb-4">Live User Activity Feed</Text>
                 <View className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden mb-8">
-                    {MOCK_LOGINS.map((login, i) => (
-                        <View key={i} className={`p-4 border-b border-slate-800 flex-row items-center justify-between ${i === MOCK_LOGINS.length - 1 ? 'border-b-0' : ''}`}>
+                    {liveUsers.length === 0 && <Text className="text-slate-500 p-4 text-center">No recent users found.</Text>}
+                    {liveUsers.map((user, i) => (
+                        <View key={i} className={`p-4 border-b border-slate-800 flex-row items-center justify-between ${i === liveUsers.length - 1 ? 'border-b-0' : ''}`}>
                             <View className="flex-row items-center">
-                                <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${login.status === 'success' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                                    <Ionicons name={login.status === 'success' ? 'checkmark' : 'close'} size={14} color={login.status === 'success' ? '#10B981' : '#EF4444'} />
+                                <View className="w-8 h-8 rounded-full items-center justify-center mr-3 bg-emerald-500/10">
+                                    <Ionicons name="person" size={14} color="#10B981" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-200 font-bold text-sm">{login.ip}</Text>
-                                    <Text className="text-slate-500 text-xs">{login.location} • {login.device}</Text>
+                                    <Text className="text-slate-200 font-bold text-sm">{user.full_name || 'Anonymous User'}</Text>
+                                    <Text className="text-slate-500 text-xs">{user.phone || 'No Phone'}</Text>
                                 </View>
                             </View>
-                            <Text className="text-slate-600 text-[10px] font-bold">{login.time}</Text>
+                            <Text className="text-slate-600 text-[10px] font-bold">{new Date(user.created_at).toLocaleDateString()}</Text>
                         </View>
                     ))}
                 </View>

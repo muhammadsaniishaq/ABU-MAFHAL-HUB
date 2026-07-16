@@ -24,6 +24,7 @@ export default function SmileScreen() {
     const [verifiedName, setVerifiedName] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [balance, setBalance] = useState<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [showSecurityModal, setShowSecurityModal] = useState(false);
     const [showConfirmation, setShowConfirmation] = useState(false);
@@ -153,24 +154,32 @@ export default function SmileScreen() {
     const executePayment = async () => {
         setShowSecurityModal(false);
         saveRecentAccount(accountId);
-        setTimeout(() => {
-            router.push({
-                pathname: '/processing',
-                params: {
-                    type: 'smile',
-                    accountId,
-                    planId: selectedPackage.id,
-                    amount: selectedPackage.price,
-                    network: 'smile-direct',
-                    autoRenew: autoRenew ? 'true' : 'false',
-                    saveBeneficiary: saveBeneficiary ? 'true' : 'false',
-                    sendReceipt: sendReceipt ? 'true' : 'false',
-                    scheduleRecharge: scheduleRecharge ? 'true' : 'false',
-                    purchaseMode,
-                    promoCode: promoCode || ''
-                }
+        setIsSubmitting(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            const result = await api.smile.purchase({
+                accountId,
+                planId: selectedPackage.id,
+                amount: selectedPackage.price
             });
-        }, 500);
+
+            if (result.success) {
+                router.replace({
+                    pathname: '/success',
+                    params: {
+                        amount: `₦${selectedPackage.price.toLocaleString()}`,
+                        type: 'Smile Subscription',
+                        reference: result.reference || 'SMILE-' + Date.now()
+                    }
+                });
+            }
+        } catch (e: any) {
+            Alert.alert("Transaction Failed", e.message || "An error occurred");
+        } finally {
+            setIsSubmitting(false);
+        }
     };    return (
         <View style={s.container}>
             <StatusBar style="dark" />
@@ -484,12 +493,12 @@ export default function SmileScreen() {
                         <Text style={s.totalAmount}>₦{selectedPackage ? selectedPackage.price.toLocaleString() : '0'}</Text>
                     </View>
                     <TouchableOpacity
-                        style={[s.payBtn, (!accountId || !selectedPackage || !verifiedName) && s.payBtnDisabled]}
-                        disabled={!accountId || !selectedPackage || !verifiedName}
+                        style={[s.payBtn, (!accountId || !selectedPackage || !verifiedName || isSubmitting) && s.payBtnDisabled]}
+                        disabled={!accountId || !selectedPackage || !verifiedName || isSubmitting}
                         onPress={handleProcess}
                     >
                         <LinearGradient
-                            colors={(!accountId || !selectedPackage || !verifiedName) ? ['#cbd5e1', '#94a3b8'] : ['#f5a623', '#d4890e']}
+                            colors={(!accountId || !selectedPackage || !verifiedName || isSubmitting) ? ['#cbd5e1', '#94a3b8'] : ['#f5a623', '#d4890e']}
                             style={s.payBtnGradient}
                             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                         >
