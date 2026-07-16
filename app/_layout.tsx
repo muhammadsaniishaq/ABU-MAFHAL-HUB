@@ -154,6 +154,11 @@ export default function RootLayout() {
                 if (userRole && !['admin', 'super_admin'].includes(userRole)) {
                     router.replace('/(app)/dashboard');
                 }
+            } else if (!isAppGroup) {
+                // If on landing page (/) or onboarding and authenticated, go to dashboard
+                if (userRole) {
+                    router.replace('/(app)/dashboard');
+                }
             }
         } else {
             if (isManagementGroup || isAppGroup) {
