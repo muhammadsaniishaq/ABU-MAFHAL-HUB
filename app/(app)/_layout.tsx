@@ -143,7 +143,7 @@ export default function AppLayout() {
                 />
             )}
             
-            <View style={{ position: 'absolute', bottom: 72, right: 20, zIndex: 50, alignItems: 'center' }}>
+            <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 72, right: 20, zIndex: 50, alignItems: 'center' }}>
                 {isFabOpen && (
                     <View style={{ alignItems: 'center', marginBottom: 12 }}>
                         <TouchableOpacity 

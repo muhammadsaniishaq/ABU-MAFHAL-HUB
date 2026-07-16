@@ -22,6 +22,10 @@ LogBox.ignoreLogs([
     'SafeAreaView has been deprecated',
     '[Reanimated] Reading from `value`',
     'setLayoutAnimationEnabledExperimental is currently a no-op',
+    'AuthApiError: Invalid Refresh Token',
+    '[AuthApiError: Invalid Refresh Token',
+    'Invalid Refresh Token: Refresh Token Not Found',
+    '[expo-av]: Expo AV has been deprecated',
 ]);
 import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -139,13 +143,16 @@ export default function RootLayout() {
     useEffect(() => {
         if (!initialized || !loaded) return;
 
+        const currentScreen = segments[segments.length - 1] || 'index';
         const isAuthGroup = segments.includes('(auth)');
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
         const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
 
+        const publicScreens = ['index', 'onboarding', 'privacy', 'terms'];
+        const isPublicScreen = publicScreens.includes(currentScreen);
+
         if (session) {
             if (isAuthGroup) {
-                const currentScreen = segments[segments.length - 1];
                 const allowedAuthScreens = ['otp', 'pin-setup'];
                 if (userRole && !allowedAuthScreens.includes(currentScreen)) {
                     router.replace('/(app)/dashboard');
@@ -154,12 +161,12 @@ export default function RootLayout() {
                 if (userRole && !['admin', 'super_admin'].includes(userRole)) {
                     router.replace('/(app)/dashboard');
                 }
-            } else if (!isAppGroup) {
+            } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
                 // If on landing page (/) or onboarding and authenticated, go to dashboard immediately
                 router.replace('/(app)/dashboard');
             }
         } else {
-            if (isManagementGroup || isAppGroup) {
+            if (!isPublicScreen && !isAuthGroup) {
                 router.replace('/');
             }
         }
