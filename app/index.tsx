@@ -47,17 +47,11 @@ export default function Splash() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        router.replace('/(app)/dashboard');
-      } else if (ref) {
-        router.replace(`/auth/login?ref=${ref}`);
-      } else {
-        setIsReady(true);
-      }
-    };
-    checkAuth();
+    if (ref) {
+      router.replace(`/auth/login?ref=${ref}`);
+    } else {
+      setIsReady(true);
+    }
   }, [ref]);
 
   const r1 = useReveal(200);

@@ -155,10 +155,8 @@ export default function RootLayout() {
                     router.replace('/(app)/dashboard');
                 }
             } else if (!isAppGroup) {
-                // If on landing page (/) or onboarding and authenticated, go to dashboard
-                if (userRole) {
-                    router.replace('/(app)/dashboard');
-                }
+                // If on landing page (/) or onboarding and authenticated, go to dashboard immediately
+                router.replace('/(app)/dashboard');
             }
         } else {
             if (isManagementGroup || isAppGroup) {
