@@ -39,6 +39,33 @@ function useReveal(delay = 0) {
   return { opacity, transform: [{ translateY }] };
 }
 
+function useFloat(delay = 0, duration = 3000) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, { toValue: -15, duration, delay, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return { transform: [{ translateY }] };
+}
+
+function useRotate(duration = 20000) {
+  const rotate = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotate, { toValue: 1, duration, useNativeDriver: true })
+    ).start();
+  }, []);
+  const spin = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+  return { transform: [{ rotate: spin }] };
+}
+
 export default function Splash() {
   const { settings } = useAppSettings();
   const router = useRouter();
@@ -59,6 +86,12 @@ export default function Splash() {
   const r3 = useReveal(600);
   const r4 = useReveal(800);
 
+  const float1 = useFloat(0, 3000);
+  const float2 = useFloat(500, 4000);
+  const float3 = useFloat(1000, 3500);
+  const float4 = useFloat(1500, 4500);
+  const rotateAnim = useRotate();
+
   if (!isReady) return <View style={{ flex: 1, backgroundColor: T.navy }} />;
 
   return (
@@ -77,16 +110,17 @@ export default function Splash() {
       <View style={s.glow1} />
 
       {/* Floating Particles for extra decoration */}
-      <View style={[s.particle, { top: '15%', left: '15%', width: 8, height: 8 }]} />
-      <View style={[s.particle, { top: '35%', right: '12%', width: 6, height: 6, opacity: 0.8 }]} />
-      <View style={[s.particle, { top: '55%', left: '8%', width: 10, height: 10, opacity: 0.6 }]} />
-      <View style={[s.particle, { bottom: '25%', right: '20%', width: 7, height: 7 }]} />
+      <Animated.View style={[s.particle, { top: '15%', left: '15%', width: 8, height: 8 }, float1]} />
+      <Animated.View style={[s.particle, { top: '35%', right: '12%', width: 6, height: 6, opacity: 0.8 }, float2]} />
+      <Animated.View style={[s.particle, { top: '55%', left: '8%', width: 10, height: 10, opacity: 0.6 }, float3]} />
+      <Animated.View style={[s.particle, { bottom: '25%', right: '20%', width: 7, height: 7 }, float4]} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <View style={s.content}>
           {/* Logo Area with Rich Decorations Restored */}
           <Animated.View style={[s.logoWrapper, r1]}>
             <View style={s.logoCircle}>
+              <Animated.View style={[s.logoDashedRing, rotateAnim]} />
               <View style={s.logoInnerCircle}>
                 <Image 
                   source={require('../assets/images/logo.png')} 
@@ -128,7 +162,7 @@ export default function Splash() {
               ].map((item, i) => (
                 <View key={i} style={s.gridItem}>
                   <View style={s.iconBox}>
-                    <Ionicons name={item.icon as any} size={22} color={T.gold} />
+                    <Ionicons name={item.icon as any} size={18} color={T.gold} />
                   </View>
                   <Text style={s.iconLabel}>{item.label}</Text>
                 </View>
@@ -147,7 +181,7 @@ export default function Splash() {
                 activeOpacity={0.9}
               >
                 <Text style={s.btnText}>Get Started</Text>
-                <Ionicons name="arrow-forward" size={18} color={T.navy} />
+                <Ionicons name="arrow-forward" size={15} color={T.navy} />
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>
@@ -199,38 +233,44 @@ const s = StyleSheet.create({
   // Logo Adjustments (BEAUTIFUL BOLD DECORATIONS)
   logoWrapper: { alignItems: 'center', marginTop: '12%', zIndex: 20 },
   logoCircle: { 
-    width: 180, height: 180, borderRadius: 90, 
-    backgroundColor: '#0a1931', 
+    width: 140, height: 140, borderRadius: 70, 
+    backgroundColor: 'rgba(10, 25, 49, 0.6)', 
     alignItems: 'center', justifyContent: 'center', 
-    borderWidth: 4, borderColor: '#f5a623', 
-    marginBottom: 20, 
-    shadowColor: '#f5a623', shadowOpacity: 1, shadowRadius: 30, elevation: 20 
+    borderWidth: 2, borderColor: 'rgba(245, 166, 35, 0.4)', 
+    marginBottom: 16, 
+    shadowColor: '#f5a623', shadowOpacity: 0.8, shadowRadius: 20, elevation: 15 
+  },
+  logoDashedRing: {
+    position: 'absolute',
+    width: 156, height: 156, borderRadius: 78,
+    borderWidth: 1.5, borderColor: 'rgba(247, 201, 72, 0.4)',
+    borderStyle: 'dashed',
   },
   logoInnerCircle: {
-    width: 150, height: 150, borderRadius: 75,
-    backgroundColor: '#ffffff',
+    width: 116, height: 116, borderRadius: 58,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 5, borderColor: '#d4890e', 
+    borderWidth: 3, borderColor: '#d4890e', 
     shadowColor: '#ffffff', shadowOpacity: 0.5, shadowRadius: 10, elevation: 10
   },
-  logoImg: { width: 100, height: 100 },
+  logoImg: { width: 76, height: 76 },
 
-  brandTitle: { color: T.white, fontSize: 34, fontWeight: '900', letterSpacing: 1.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  brandTitle: { color: T.white, fontSize: 26, fontWeight: '900', letterSpacing: 1.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   
   // New SUB Decorations
-  subWrapper: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 4 },
-  subLine: { height: 2, width: 50, backgroundColor: 'rgba(247, 201, 72, 0.6)', borderRadius: 2 },
+  subWrapper: { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
+  subLine: { height: 2, width: 40, backgroundColor: 'rgba(247, 201, 72, 0.6)', borderRadius: 2 },
   brandSub: { 
     color: '#f5a623', 
-    fontSize: 26, 
+    fontSize: 20, 
     fontWeight: '900', 
-    letterSpacing: 10,
+    letterSpacing: 8,
     textShadowColor: 'rgba(245, 166, 35, 0.8)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
   
-  tagline: { color: T.white, fontSize: 15, marginTop: 16, fontWeight: '500', opacity: 0.9 },
+  tagline: { color: T.white, fontSize: 13, marginTop: 12, fontWeight: '500', opacity: 0.9 },
 
   bottomSection: { alignItems: 'center', paddingBottom: 10, zIndex: 20 },
   dotsContainer: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 35 },
@@ -242,20 +282,20 @@ const s = StyleSheet.create({
   },
   gridItem: { alignItems: 'center', gap: 10 },
   iconBox: {
-    width: 54, height: 54, borderRadius: 16,
-    borderWidth: 1.5, borderColor: 'rgba(247, 201, 72, 0.4)',
-    backgroundColor: 'rgba(10, 30, 74, 0.7)',
+    width: 44, height: 44, borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(247, 201, 72, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, elevation: 5
+    shadowColor: '#F7C948', shadowOpacity: 0.15, shadowRadius: 8, elevation: 3
   },
-  iconLabel: { color: T.white, fontSize: 11, fontWeight: '600' },
+  iconLabel: { color: T.white, fontSize: 9.5, fontWeight: '600' },
   
-  footerText: { textAlign: 'center', color: T.white, fontSize: 15, fontWeight: '700', marginBottom: 35 },
+  footerText: { textAlign: 'center', color: T.white, fontSize: 13, fontWeight: '700', marginBottom: 25 },
 
   btn: { 
-    backgroundColor: T.gold, flexDirection: 'row', alignItems: 'center', gap: 10, 
-    paddingHorizontal: 40, paddingVertical: 18, borderRadius: 24, 
+    backgroundColor: T.gold, flexDirection: 'row', alignItems: 'center', gap: 8, 
+    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 18, 
     elevation: 8, shadowColor: T.gold, shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: { width: 0, height: 6 } 
   },
-  btnText: { color: T.navy, fontSize: 17, fontWeight: '900' },
+  btnText: { color: T.navy, fontSize: 14, fontWeight: '900' },
 });

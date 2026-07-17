@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [featureFlags, setFeatureFlags] = useState<Record<string, any>>({});
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeBanners, setActiveBanners] = useState<any[]>([]);
+  const [activePartners, setActivePartners] = useState<any[]>([]);
   const bannerRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
@@ -98,6 +99,7 @@ export default function Dashboard() {
           if (cached.featureFlags) setFeatureFlags(cached.featureFlags);
           if (cached.logoUrl) setLogoUrl(cached.logoUrl);
           if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
+          if (cached.activePartners) setActivePartners(cached.activePartners);
         } else {
           console.log("Cached feature flags are stale (older than 1 hour). Skipping cache load for flags.");
         }
@@ -132,7 +134,8 @@ export default function Dashboard() {
         fetchFeatureFlags(),
         fetchAppSettings(),
         fetchUnreadCount(user.id),
-        fetchActiveBanners()
+        fetchActiveBanners(),
+        fetchActivePartners()
       ]);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -175,6 +178,22 @@ export default function Dashboard() {
       if (data) setActiveBanners(data);
     } catch (e) {
       console.warn("Error fetching banners", e);
+    }
+  };
+
+  const fetchActivePartners = async () => {
+    try {
+      const { data } = await supabase
+        .from('partners')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (data) {
+        setActivePartners(data);
+        saveCache({ activePartners: data });
+      }
+    } catch (e) {
+      console.warn("Error fetching partners", e);
     }
   };
 
@@ -820,6 +839,33 @@ export default function Dashboard() {
             ))}
           </ScrollView>
         </View>
+
+        {/* ─── Our Partners ─── */}
+        {activePartners.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Our Partners</Text>
+            </View>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 10, alignItems: 'center' }}
+            >
+              {activePartners.map((partner, i) => (
+                <View key={partner.id || i} className="mr-4 items-center justify-center">
+                  <View className="w-16 h-16 bg-white rounded-2xl items-center justify-center shadow-sm border border-slate-100 p-2 mb-1.5">
+                    {partner.logo_url ? (
+                      <Image source={{ uri: partner.logo_url }} className="w-full h-full" resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="business" size={24} color="#CBD5E1" />
+                    )}
+                  </View>
+                  <Text className="text-[9px] font-bold text-slate-500">{partner.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ─── Secure Banner ─── */}
         <TouchableOpacity style={s.secureBanner} activeOpacity={0.9}>
