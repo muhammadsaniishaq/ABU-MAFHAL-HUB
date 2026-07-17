@@ -8,6 +8,7 @@ import {
   Dimensions,
   StyleSheet,
   Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -72,6 +73,21 @@ export default function Splash() {
   const { ref } = useLocalSearchParams<{ ref?: string }>();
   
   const [isReady, setIsReady] = useState(false);
+  const [partners, setPartners] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPartners = async () => {
+      try {
+        const { data } = await supabase
+          .from('partners')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        if (data && data.length > 0) setPartners(data);
+      } catch (e) {}
+    };
+    fetchPartners();
+  }, []);
 
   useEffect(() => {
     if (ref) {
@@ -91,6 +107,25 @@ export default function Splash() {
   const float3 = useFloat(1000, 3500);
   const float4 = useFloat(1500, 4500);
   const rotateAnim = useRotate();
+
+  const scrollAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (partners.length > 0) {
+      Animated.loop(
+        Animated.timing(scrollAnim, {
+          toValue: 1,
+          duration: partners.length * 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    }
+  }, [partners.length]);
+
+  const translateX = scrollAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [W, -W * 2] 
+  });
 
   if (!isReady) return <View style={{ flex: 1, backgroundColor: T.navy }} />;
 
@@ -172,6 +207,26 @@ export default function Splash() {
             <Animated.Text style={[s.footerText, r3]}>
               Fast. <Text style={{ color: T.gold }}>Secure.</Text> Reliable.
             </Animated.Text>
+
+            {/* Auto Scrolling Partners (Small) */}
+            {partners.length > 0 && (
+              <Animated.View style={[r3, { overflow: 'hidden', height: 24, width: '100%', marginBottom: 16 }]}>
+                <Animated.View style={{ flexDirection: 'row', transform: [{ translateX }] }}>
+                  {[...partners, ...partners, ...partners].map((p, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 24 }}>
+                      {p.logo_url ? (
+                         <Image source={{ uri: p.logo_url }} style={{ width: 14, height: 14, borderRadius: 4, marginRight: 6 }} resizeMode="contain" />
+                      ) : (
+                         <Ionicons name="business" size={12} color={T.gold} style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>
+                        {p.name}
+                      </Text>
+                    </View>
+                  ))}
+                </Animated.View>
+              </Animated.View>
+            )}
 
             {/* Get Started Button */}
             <Animated.View style={r4}>
