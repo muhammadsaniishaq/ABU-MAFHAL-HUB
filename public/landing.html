@@ -648,27 +648,32 @@
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
+      .hero-badge { margin: 0 auto 20px auto; }
       .services-grid {
-        display: flex;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        gap: 16px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
         padding-bottom: 24px;
-        margin: 0 -5%; /* edge-to-edge scroll */
-        padding: 0 5% 24px 5%;
-        -webkit-overflow-scrolling: touch;
       }
-      .services-grid::-webkit-scrollbar { display: none; } /* Hide scrollbar for cleaner look */
       .service-card {
-        flex: 0 0 80%;
-        scroll-snap-align: center;
-        box-shadow: var(--shadow-md);
+        padding: 16px 10px;
+        border-radius: 12px;
+        box-shadow: var(--shadow-sm);
       }
+      .service-icon {
+        width: 40px; height: 40px; font-size: 20px; margin: 0 auto 12px; border-radius: 12px;
+      }
+      .service-name { font-size: 13px; margin-bottom: 4px; }
+      .service-desc { font-size: 11px; line-height: 1.4; }
       .footer-top { grid-template-columns: 1fr; }
-      .phone-frame { width: 230px; }
+      .phone-container { width: 100%; display: flex; justify-content: center; }
+      .phone-frame { width: 90vw; max-width: 320px; margin: 0 auto; }
       .phone-orb-big { display: none; }
       .phone-orb-small { display: none; }
       .phone-glow { display: none; }
+      .networks-banner { padding: 20px 5%; }
+      .networks-label { font-size: 13px; min-width: auto; margin-bottom: 8px; }
+      .network-logo-img { width: 45px !important; height: 45px !important; }
     }
 
     /* ===================== SCROLL ANIMATIONS ===================== */
@@ -933,11 +938,11 @@
   <section class="networks-banner" aria-label="Mobile networks">
     <div class="networks-inner">
       <p class="networks-label">Top Up Airtime &amp; Buy Data</p>
-      <div class="networks-logos">
-        <div class="network-chip mtn-chip">MTN</div>
-        <div class="network-chip airtel-chip">AIRTEL</div>
-        <div class="network-chip glo-chip">GLO</div>
-        <div class="network-chip mobile9-chip">9MOBILE</div>
+      <div class="networks-logos" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;">
+        <img class="network-logo-img" src="https://upload.wikimedia.org/wikipedia/commons/9/93/New-mtn-logo.jpg" alt="MTN" style="width:50px;height:50px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="https://upload.wikimedia.org/wikipedia/commons/f/fb/Airtel_logo_2010.svg" alt="Airtel" style="width:50px;height:50px;border-radius:50%;object-fit:contain;background:#fff;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="https://upload.wikimedia.org/wikipedia/commons/4/42/Globacom_Limited_Logo.svg" alt="Glo" style="width:50px;height:50px;border-radius:50%;object-fit:cover;background:#fff;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/9mobile_Logo.png/800px-9mobile_Logo.png" alt="9Mobile" style="width:50px;height:50px;border-radius:50%;object-fit:contain;background:#006600;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
       </div>
       <a href="#" class="networks-cta" id="buynow-btn">
         Buy Now
@@ -1269,6 +1274,28 @@
         document.getElementById('partners-ticker-section').style.display = 'block';
       })
       .catch(err => console.error('Error fetching partners:', err));
+    });
+
+    // Fade-up Animations on Scroll
+    document.addEventListener("DOMContentLoaded", () => {
+      const observerOptions = {
+        root: null,
+        rootMargin: "0px",
+        threshold: 0.15
+      };
+
+      const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, observerOptions);
+
+      document.querySelectorAll('.fade-up').forEach(element => {
+        observer.observe(element);
+      });
     });
   </script>
 </body>
