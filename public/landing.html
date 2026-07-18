@@ -389,11 +389,15 @@
     }
     .network-chip {
       background: var(--white); border-radius: var(--radius-sm);
-      padding: 10px 18px; display: flex; align-items: center; justify-content: center;
-      min-width: 80px; height: 52px; transition: all var(--transition);
+      padding: 8px 16px; display: flex; align-items: center; justify-content: center;
+      min-width: 70px; height: 44px; transition: all var(--transition);
+      font-weight: 800; font-size: 14px; letter-spacing: 1px;
     }
+    .mtn-chip { background: #ffcc00; color: #000; border: none; }
+    .airtel-chip { background: #ff0000; color: #fff; border: none; }
+    .glo-chip { background: #009900; color: #fff; border: none; }
+    .mobile9-chip { background: #006600; color: #fff; border: none; }
     .network-chip:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(255,255,255,0.2); }
-    .network-chip img { max-height: 28px; max-width: 70px; object-fit: contain; }
 
     .networks-cta {
       display: inline-flex; align-items: center; gap: 8px;
@@ -637,8 +641,10 @@
       .trust-inner { flex-direction: column; text-align: center; }
       .trust-badges { justify-content: center; }
       .footer-top { grid-template-columns: 1fr 1fr; }
-      .networks-inner { flex-direction: column; align-items: flex-start; }
-      .networks-cta { margin-left: 0; }
+      .networks-inner { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
+      .networks-logos { justify-content: center; gap: 8px; }
+      .network-chip { height: 36px; padding: 6px 12px; font-size: 12px; min-width: 60px; }
+      .networks-cta { margin: 0 auto; width: 100%; justify-content: center; }
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
@@ -928,18 +934,10 @@
     <div class="networks-inner">
       <p class="networks-label">Top Up Airtime &amp; Buy Data</p>
       <div class="networks-logos">
-        <div class="network-chip">
-          <img src="assets/images/mtn.png" alt="MTN Nigeria" />
-        </div>
-        <div class="network-chip">
-          <img src="assets/images/airtel.png" alt="Airtel Nigeria" />
-        </div>
-        <div class="network-chip">
-          <img src="assets/images/glo.png" alt="Glo Nigeria" />
-        </div>
-        <div class="network-chip">
-          <img src="assets/images/9mobile.png" alt="9mobile Nigeria" />
-        </div>
+        <div class="network-chip mtn-chip">MTN</div>
+        <div class="network-chip airtel-chip">AIRTEL</div>
+        <div class="network-chip glo-chip">GLO</div>
+        <div class="network-chip mobile9-chip">9MOBILE</div>
       </div>
       <a href="#" class="networks-cta" id="buynow-btn">
         Buy Now
