@@ -161,7 +161,8 @@ export default function ContentManager() {
             if (selectedPartnerLogo && selectedPartnerLogo.base64) {
                 const ext = selectedPartnerLogo.uri.split('.').pop() || 'png';
                 const filePath = `partner_${Date.now()}.${ext}`; 
-                await supabase.storage.from('partners').upload(filePath, decode(selectedPartnerLogo.base64), { contentType: `image/${ext}` });
+                const { error: uploadError } = await supabase.storage.from('partners').upload(filePath, decode(selectedPartnerLogo.base64), { contentType: `image/${ext}` });
+                if (uploadError) throw new Error("Upload failed: " + uploadError.message);
                 const { data: { publicUrl } } = supabase.storage.from('partners').getPublicUrl(filePath);
                 finalLogoUrl = publicUrl;
             }
@@ -228,7 +229,8 @@ export default function ContentManager() {
             if (selectedImage && selectedImage.base64) {
                 const ext = selectedImage.uri.split('.').pop() || 'jpg';
                 const filePath = `uploads/${Date.now()}.${ext}`;
-                await supabase.storage.from('banners').upload(filePath, decode(selectedImage.base64), { contentType: `image/${ext}` });
+                const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, decode(selectedImage.base64), { contentType: `image/${ext}` });
+                if (uploadError) throw new Error("Upload failed: " + uploadError.message);
                 const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(filePath);
                 finalImageUrl = publicUrl;
             }
