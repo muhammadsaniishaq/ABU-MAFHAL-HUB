@@ -648,9 +648,13 @@
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
-      .hero-badge { margin: 0 0 16px 0; font-size: 10px; padding: 4px 10px; }
-      .hero-title { font-size: 30px; }
-      .hero-desc { font-size: 14px; margin-bottom: 24px; }
+      .hero-inner { grid-template-columns: 1.3fr 1fr; gap: 16px; padding: 30px 5%; align-items: center; }
+      .hero-badge { margin: 0 0 10px 0; font-size: 8px; padding: 4px 8px; }
+      .hero-title { font-size: 22px; line-height: 1.1; margin-bottom: 8px; }
+      .hero-desc { font-size: 12px; margin-bottom: 16px; line-height: 1.4; }
+      .btn-primary { padding: 8px 14px; font-size: 12px; }
+      .btn-secondary { padding: 8px 14px; font-size: 12px; }
+      .hero-trust { display: none; } /* Hide trust badges to save space on side-by-side mobile */
       .services-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -668,8 +672,8 @@
       .service-name { font-size: 13px; margin-bottom: 4px; }
       .service-desc { font-size: 11px; line-height: 1.4; }
       .footer-top { grid-template-columns: 1fr; }
-      .phone-container { width: 100%; display: flex; justify-content: flex-start; }
-      .phone-frame { width: 220px; max-width: 100%; margin: 0; }
+      .phone-container { width: 100%; display: flex; justify-content: flex-end; }
+      .phone-frame { width: 130px; max-width: 100%; margin: 0; }
       .phone-orb-big { display: none; }
       .phone-orb-small { display: none; }
       .phone-glow { display: none; }
