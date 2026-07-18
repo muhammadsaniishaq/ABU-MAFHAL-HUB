@@ -631,12 +631,12 @@
       .nav-links { display: none; }
       .nav-cta { display: none; }
       .hamburger { display: flex; }
-      .hero-inner { grid-template-columns: 1fr; text-align: center; gap: 48px; }
+      .hero-inner { grid-template-columns: 1fr; text-align: left; gap: 32px; }
       .hero-title { font-size: 38px; }
-      .hero-actions { justify-content: center; }
-      .hero-trust { justify-content: center; }
+      .hero-actions { justify-content: flex-start; }
+      .hero-trust { justify-content: flex-start; }
       .hero-desc { max-width: 100%; }
-      .hero-visual { order: -1; }
+      .hero-visual { order: 1; }
       .services-grid { grid-template-columns: repeat(2, 1fr); }
       .trust-inner { flex-direction: column; text-align: center; }
       .trust-badges { justify-content: center; }
@@ -648,7 +648,9 @@
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
-      .hero-badge { margin: 0 auto 20px auto; }
+      .hero-badge { margin: 0 0 16px 0; font-size: 10px; padding: 4px 10px; }
+      .hero-title { font-size: 30px; }
+      .hero-desc { font-size: 14px; margin-bottom: 24px; }
       .services-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -666,8 +668,8 @@
       .service-name { font-size: 13px; margin-bottom: 4px; }
       .service-desc { font-size: 11px; line-height: 1.4; }
       .footer-top { grid-template-columns: 1fr; }
-      .phone-container { width: 100%; display: flex; justify-content: center; }
-      .phone-frame { width: 90vw; max-width: 320px; margin: 0 auto; }
+      .phone-container { width: 100%; display: flex; justify-content: flex-start; }
+      .phone-frame { width: 220px; max-width: 100%; margin: 0; }
       .phone-orb-big { display: none; }
       .phone-orb-small { display: none; }
       .phone-glow { display: none; }
