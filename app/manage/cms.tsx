@@ -168,10 +168,12 @@ export default function ContentManager() {
             }
             const payload = { name: newPartnerName, logo_url: finalLogoUrl, is_active: true };
             if (editingPartnerId) {
-                const { data } = await supabase.from('partners').update(payload).eq('id', editingPartnerId).select().single();
+                const { data, error: updateError } = await supabase.from('partners').update(payload).eq('id', editingPartnerId).select().single();
+                if (updateError) throw new Error("Update failed: " + updateError.message);
                 if (data) setPartners(prev => prev.map(p => p.id === editingPartnerId ? data : p));
             } else {
-                const { data } = await supabase.from('partners').insert(payload).select().single();
+                const { data, error: insertError } = await supabase.from('partners').insert(payload).select().single();
+                if (insertError) throw new Error("Insert failed: " + insertError.message);
                 if (data) setPartners([...partners, data]);
             }
             closePartnerModal();
@@ -236,10 +238,12 @@ export default function ContentManager() {
             }
             const payload = { title: newTitle, image_url: finalImageUrl, target_url: newTargetUrl || null, placement: newPlacements.join(','), is_active: true };
             if (editingBannerId) {
-                const { data } = await supabase.from('banners').update(payload).eq('id', editingBannerId).select().single();
+                const { data, error: updateError } = await supabase.from('banners').update(payload).eq('id', editingBannerId).select().single();
+                if (updateError) throw new Error("Update failed: " + updateError.message);
                 if (data) setBanners(prev => prev.map(b => b.id === editingBannerId ? data : b));
             } else {
-                const { data } = await supabase.from('banners').insert(payload).select().single();
+                const { data, error: insertError } = await supabase.from('banners').insert(payload).select().single();
+                if (insertError) throw new Error("Insert failed: " + insertError.message);
                 if (data) setBanners([data, ...banners]);
             }
             closeModal();
