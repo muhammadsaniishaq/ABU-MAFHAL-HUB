@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
+import { Platform } from 'react-native';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -90,6 +91,13 @@ export default function Splash() {
   }, []);
 
   useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.location.pathname === '/' && !ref) {
+        window.location.replace('/landing.html');
+        return;
+      }
+    }
+
     if (ref) {
       router.replace(`/auth/login?ref=${ref}`);
     } else {
@@ -111,10 +119,11 @@ export default function Splash() {
   const scrollAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (partners.length > 0) {
+      scrollAnim.setValue(0);
       Animated.loop(
         Animated.timing(scrollAnim, {
           toValue: 1,
-          duration: partners.length * 4000,
+          duration: Math.max(10000, partners.length * 6000), // smooth speed
           easing: Easing.linear,
           useNativeDriver: true,
         })
@@ -124,7 +133,7 @@ export default function Splash() {
 
   const translateX = scrollAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [W, -W * 2] 
+    outputRange: [W, -W * 4] // ensures it scrolls completely
   });
 
   if (!isReady) return <View style={{ flex: 1, backgroundColor: T.navy }} />;
@@ -208,18 +217,19 @@ export default function Splash() {
               Fast. <Text style={{ color: T.gold }}>Secure.</Text> Reliable.
             </Animated.Text>
 
-            {/* Auto Scrolling Partners (Small) */}
+            {/* Auto Scrolling Partners (Enlarged) */}
             {partners.length > 0 && (
-              <Animated.View style={[r3, { overflow: 'hidden', height: 24, width: '100%', marginBottom: 16 }]}>
+              <Animated.View style={[r3, { overflow: 'hidden', height: 40, width: '100%', marginBottom: 20 }]}>
                 <Animated.View style={{ flexDirection: 'row', transform: [{ translateX }] }}>
-                  {[...partners, ...partners, ...partners].map((p, i) => (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 24 }}>
+                  {/* Repeat multiple times to avoid empty gaps */}
+                  {[...partners, ...partners, ...partners, ...partners, ...partners].map((p, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 32, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
                       {p.logo_url ? (
-                         <Image source={{ uri: p.logo_url }} style={{ width: 14, height: 14, borderRadius: 4, marginRight: 6 }} resizeMode="contain" />
+                         <Image source={{ uri: p.logo_url }} style={{ width: 20, height: 20, borderRadius: 4, marginRight: 8 }} resizeMode="contain" />
                       ) : (
-                         <Ionicons name="business" size={12} color={T.gold} style={{ marginRight: 6 }} />
+                         <Ionicons name="business" size={16} color={T.gold} style={{ marginRight: 8 }} />
                       )}
-                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>
                         {p.name}
                       </Text>
                     </View>

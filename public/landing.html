@@ -664,6 +664,53 @@
     .fade-up:nth-child(6) { transition-delay: 0.5s; }
     .fade-up:nth-child(7) { transition-delay: 0.6s; }
     .fade-up:nth-child(8) { transition-delay: 0.7s; }
+
+    /* ===================== PARTNERS TICKER ===================== */
+    .partners-ticker-wrap {
+      background: var(--navy-mid);
+      padding: 16px 0;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+    .partners-ticker-wrap::before, .partners-ticker-wrap::after {
+      content: '';
+      position: absolute; top: 0; bottom: 0; width: 50px; z-index: 2;
+    }
+    .partners-ticker-wrap::before {
+      left: 0; background: linear-gradient(to right, var(--navy-mid), transparent);
+    }
+    .partners-ticker-wrap::after {
+      right: 0; background: linear-gradient(to left, var(--navy-mid), transparent);
+    }
+    .partners-ticker {
+      display: inline-block;
+      animation: ticker 40s linear infinite;
+    }
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .partner-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 40px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 16px;
+      border-radius: 20px;
+    }
+    .partner-item img {
+      width: 24px; height: 24px; border-radius: 4px; object-fit: contain;
+    }
+    .partner-item span {
+      color: rgba(255,255,255,0.8);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -849,6 +896,15 @@
             <img src="assets/images/logo.png" alt="Mafhal Sub" />
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== PARTNERS TICKER ==================== -->
+  <section class="partners-ticker-section" id="partners-ticker-section" style="display: none;" aria-label="Our Partners">
+    <div class="partners-ticker-wrap">
+      <div class="partners-ticker" id="partners-ticker-content">
+        <!-- Injected via JS -->
       </div>
     </div>
   </section>
@@ -1168,6 +1224,40 @@
         link.style.color = link.getAttribute('href') === '#' + current ? 'var(--navy)' : '';
       });
     }, { passive: true });
+  </script>
+  <!-- Fetch Partners Script -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const url = 'https://uagcxrtdqttayulvgpwg.supabase.co/rest/v1/partners?select=*&is_active=eq.true&order=sort_order.asc';
+      const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ2N4cnRkcXR0YXl1bHZncHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2Mzc3OTIsImV4cCI6MjA4NDIxMzc5Mn0.7AzXKou9G3tHFIduDL5TQ3fkski6P9CBGdlqfi_pMI8';
+      
+      fetch(url, {
+        headers: {
+          'apikey': key,
+          'Authorization': 'Bearer ' + key
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data || data.length === 0) return;
+        const ticker = document.getElementById('partners-ticker-content');
+        if (!ticker) return;
+        
+        let html = '';
+        data.forEach(p => {
+          const logo = p.logo_url 
+            ? `<img src="${p.logo_url}" alt="${p.name}" />`
+            : `<div style="width:24px;height:24px;background:var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--navy);font-weight:bold;">${p.name.charAt(0)}</div>`;
+            
+          html += `<div class="partner-item">${logo}<span>${p.name}</span></div>`;
+        });
+        
+        // Duplicate multiple times for a seamless infinite loop
+        ticker.innerHTML = html + html + html + html + html + html;
+        document.getElementById('partners-ticker-section').style.display = 'block';
+      })
+      .catch(err => console.error('Error fetching partners:', err));
+    });
   </script>
 </body>
 </html>
