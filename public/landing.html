@@ -642,7 +642,22 @@
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
-      .services-grid { grid-template-columns: repeat(2, 1fr); }
+      .services-grid {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        gap: 16px;
+        padding-bottom: 24px;
+        margin: 0 -5%; /* edge-to-edge scroll */
+        padding: 0 5% 24px 5%;
+        -webkit-overflow-scrolling: touch;
+      }
+      .services-grid::-webkit-scrollbar { display: none; } /* Hide scrollbar for cleaner look */
+      .service-card {
+        flex: 0 0 80%;
+        scroll-snap-align: center;
+        box-shadow: var(--shadow-md);
+      }
       .footer-top { grid-template-columns: 1fr; }
       .phone-frame { width: 230px; }
       .phone-orb-big { display: none; }
