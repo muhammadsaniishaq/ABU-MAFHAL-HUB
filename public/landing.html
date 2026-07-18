@@ -639,11 +639,9 @@
       .hero-visual { order: 1; }
       .services-grid { grid-template-columns: repeat(2, 1fr); }
       .trust-inner { flex-direction: column; text-align: center; }
-      .trust-badges { justify-content: center; }
-      .footer-top { grid-template-columns: 1fr 1fr; }
-      .networks-inner { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
-      .networks-logos { justify-content: center; gap: 12px; }
-      .networks-cta { margin: 0 auto; width: auto; justify-content: center; padding: 12px 32px; }
+      .networks-inner { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+      .networks-logos { justify-content: center; gap: 8px; }
+      .networks-cta { margin: 0; width: auto; justify-content: center; padding: 10px 20px; font-size: 13px; }
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
@@ -693,9 +691,12 @@
       .phone-orb-big { display: none; }
       .phone-orb-small { display: none; }
       .phone-glow { display: none; }
-      .networks-banner { padding: 20px 5%; }
-      .networks-label { font-size: 13px; min-width: auto; margin-bottom: 8px; }
-      .network-logo-img { width: 45px !important; height: 45px !important; }
+      .networks-banner { padding: 12px 5%; }
+      .networks-label { display: none; } /* Hide the text to keep it thin and one line */
+      .networks-inner { justify-content: space-between; gap: 8px; }
+      .networks-logos { gap: 6px; }
+      .network-logo-img { width: 32px !important; height: 32px !important; }
+      .networks-cta { padding: 8px 16px; font-size: 12px; }
     }
 
     /* ===================== SCROLL ANIMATIONS ===================== */
@@ -960,11 +961,11 @@
   <section class="networks-banner" aria-label="Mobile networks">
     <div class="networks-inner">
       <p class="networks-label">Top Up Airtime &amp; Buy Data</p>
-      <div class="networks-logos" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center;">
-        <img class="network-logo-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23FFCC00'/><text x='50' y='60' font-family='Arial' font-weight='900' font-size='32' text-anchor='middle' fill='%23000'>MTN</text></svg>" alt="MTN" style="width:50px;height:50px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.15);" />
-        <img class="network-logo-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23FF0000'/><text x='50' y='60' font-family='Arial' font-weight='bold' font-size='26' text-anchor='middle' fill='%23FFF'>airtel</text></svg>" alt="Airtel" style="width:50px;height:50px;border-radius:25%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.15);" />
-        <img class="network-logo-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23009900'/><text x='50' y='60' font-family='Arial' font-weight='bold' font-size='34' text-anchor='middle' fill='%23FFF'>glo</text></svg>" alt="Glo" style="width:50px;height:50px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.15);" />
-        <img class="network-logo-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23006600'/><text x='50' y='65' font-family='Arial' font-weight='bold' font-size='48' text-anchor='middle' fill='%23FFF'>9</text></svg>" alt="9Mobile" style="width:50px;height:50px;border-radius:25%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.15);" />
+      <div class="networks-logos" style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;justify-content:center;">
+        <img class="network-logo-img" src="assets/images/mtn.png" alt="MTN" style="width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="assets/images/airtel.png" alt="Airtel" style="width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="assets/images/glo.png" alt="Glo" style="width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
+        <img class="network-logo-img" src="assets/images/9mobile.png" alt="9Mobile" style="width:40px;height:40px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />
       </div>
       <a href="#" class="networks-cta" id="buynow-btn">
         Buy Now
