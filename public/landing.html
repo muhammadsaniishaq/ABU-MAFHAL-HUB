@@ -648,32 +648,46 @@
       .download-inner { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 600px) {
-      .hero-inner { grid-template-columns: 1.3fr 1fr; gap: 16px; padding: 30px 5%; align-items: center; }
+      .hero-inner { grid-template-columns: 1.4fr 1fr; gap: 10px; padding: 20px 5% 40px; align-items: center; }
       .hero-badge { margin: 0 0 10px 0; font-size: 8px; padding: 4px 8px; }
-      .hero-title { font-size: 22px; line-height: 1.1; margin-bottom: 8px; }
-      .hero-desc { font-size: 12px; margin-bottom: 16px; line-height: 1.4; }
-      .btn-primary { padding: 8px 14px; font-size: 12px; }
-      .btn-secondary { padding: 8px 14px; font-size: 12px; }
-      .hero-trust { display: none; } /* Hide trust badges to save space on side-by-side mobile */
+      .hero-title { font-size: 20px; line-height: 1.15; margin-bottom: 8px; }
+      .hero-desc { font-size: 11px; margin-bottom: 16px; line-height: 1.3; }
+      .btn-primary { padding: 8px 12px; font-size: 11px; }
+      .btn-secondary { display: none; }
+      .hero-trust { display: none; } 
       .services-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 12px;
         padding-bottom: 24px;
       }
-      .service-card {
-        padding: 16px 10px;
-        border-radius: 12px;
-        box-shadow: var(--shadow-sm);
-      }
-      .service-icon {
-        width: 40px; height: 40px; font-size: 20px; margin: 0 auto 12px; border-radius: 12px;
-      }
+      .service-card { padding: 16px 10px; border-radius: 12px; box-shadow: var(--shadow-sm); }
+      .service-icon { width: 40px; height: 40px; font-size: 20px; margin: 0 auto 12px; border-radius: 12px; }
       .service-name { font-size: 13px; margin-bottom: 4px; }
       .service-desc { font-size: 11px; line-height: 1.4; }
       .footer-top { grid-template-columns: 1fr; }
       .phone-container { width: 100%; display: flex; justify-content: flex-end; }
-      .phone-frame { width: 130px; max-width: 100%; margin: 0; }
+      .phone-frame { width: 130px; border-radius: 20px; padding: 4px; margin: 0; box-shadow: var(--shadow-sm); }
+      .phone-inner { min-height: 250px; border-radius: 16px; }
+      .phone-screen { min-height: 220px; }
+      .phone-status { padding: 6px 10px 4px; font-size: 8px; }
+      .phone-header { padding: 8px 8px 6px; }
+      .phone-logo img { width: 14px; height: 14px; }
+      .phone-logo-txt { font-size: 8px; }
+      .phone-notif { width: 18px; height: 18px; }
+      .phone-notif svg { width: 10px; height: 10px; }
+      .wallet-card { margin: 8px; padding: 10px; border-radius: 10px; }
+      .wallet-label { font-size: 7px; margin-bottom: 2px; }
+      .wallet-amount { font-size: 12px; margin-bottom: 6px; }
+      .wallet-fund-btn { font-size: 7px; padding: 4px 8px; }
+      .wallet-fund-btn svg { width: 8px; height: 8px; }
+      .quick-actions-title { font-size: 8px; padding: 8px 10px 4px; }
+      .quick-icon { width: 20px; height: 20px; font-size: 10px; border-radius: 6px; }
+      .quick-item span { font-size: 6px; }
+      .quick-grid, .quick-grid-2 { gap: 4px; padding: 0 8px 6px; }
+      .phone-nav { padding: 6px 4px; }
+      .phone-nav-item svg { width: 12px; height: 12px; }
+      .phone-nav-item span { font-size: 5px; }
       .phone-orb-big { display: none; }
       .phone-orb-small { display: none; }
       .phone-glow { display: none; }
