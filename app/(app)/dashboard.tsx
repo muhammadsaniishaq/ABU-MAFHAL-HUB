@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,22 @@ export default function Dashboard() {
   const [activePartners, setActivePartners] = useState<any[]>([]);
   const bannerRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  const partnerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (activePartners.length > 0) {
+      const totalWidth = activePartners.length * 100; // estimated width
+      Animated.loop(
+        Animated.timing(partnerAnim, {
+          toValue: -totalWidth,
+          duration: Math.max(10000, activePartners.length * 5000),
+          useNativeDriver: true,
+          easing: Easing.linear,
+        })
+      ).start();
+    }
+  }, [activePartners.length]);
 
   useEffect(() => {
     if (activeBanners.length > 1) {
@@ -846,24 +862,20 @@ export default function Dashboard() {
             <View style={s.sectionHeader}>
               <Text style={s.sectionTitle}>Our Partners</Text>
             </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 10, alignItems: 'center' }}
-            >
-              {activePartners.map((partner, i) => (
-                <View key={partner.id || i} className="mr-4 items-center justify-center">
-                  <View className="w-16 h-16 bg-white rounded-2xl items-center justify-center shadow-sm border border-slate-100 p-2 mb-1.5">
+            <View style={{ overflow: 'hidden', height: 60, width: '100%', marginTop: 8 }}>
+              <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: partnerAnim }] }}>
+                {[...activePartners, ...activePartners, ...activePartners, ...activePartners].map((partner, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#f1f5f9' }}>
                     {partner.logo_url ? (
-                      <Image source={{ uri: partner.logo_url }} className="w-full h-full" resizeMode="contain" />
+                      <Image source={{ uri: partner.logo_url }} style={{ width: 22, height: 22, borderRadius: 6, marginRight: 8 }} resizeMode="contain" />
                     ) : (
-                      <Ionicons name="business" size={24} color="#CBD5E1" />
+                      <Ionicons name="business" size={18} color="#CBD5E1" style={{ marginRight: 8 }} />
                     )}
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{partner.name}</Text>
                   </View>
-                  <Text className="text-[9px] font-bold text-slate-500">{partner.name}</Text>
-                </View>
-              ))}
-            </ScrollView>
+                ))}
+              </Animated.View>
+            </View>
           </View>
         )}
 
