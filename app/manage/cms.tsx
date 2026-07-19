@@ -159,7 +159,8 @@ export default function ContentManager() {
         try {
             let finalLogoUrl = existingPartnerLogoUrl;
             if (selectedPartnerLogo && selectedPartnerLogo.base64) {
-                const ext = selectedPartnerLogo.uri.split('.').pop() || 'png';
+                let ext = 'png';
+                if (selectedPartnerLogo.uri.includes('.jpg') || selectedPartnerLogo.uri.includes('.jpeg') || selectedPartnerLogo.uri.includes('image/jpeg')) ext = 'jpg';
                 const filePath = `partner_${Date.now()}.${ext}`; 
                 const { error: uploadError } = await supabase.storage.from('partners').upload(filePath, decode(selectedPartnerLogo.base64), { contentType: `image/${ext}` });
                 if (uploadError) throw new Error("Upload failed: " + uploadError.message);
@@ -229,7 +230,8 @@ export default function ContentManager() {
         try {
             let finalImageUrl = existingImageUrl;
             if (selectedImage && selectedImage.base64) {
-                const ext = selectedImage.uri.split('.').pop() || 'jpg';
+                let ext = 'png';
+                if (selectedImage.uri.includes('.jpg') || selectedImage.uri.includes('.jpeg') || selectedImage.uri.includes('image/jpeg')) ext = 'jpg';
                 const filePath = `uploads/${Date.now()}.${ext}`;
                 const { error: uploadError } = await supabase.storage.from('banners').upload(filePath, decode(selectedImage.base64), { contentType: `image/${ext}` });
                 if (uploadError) throw new Error("Upload failed: " + uploadError.message);
