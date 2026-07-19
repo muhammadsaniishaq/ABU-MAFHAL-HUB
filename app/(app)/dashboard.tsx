@@ -865,11 +865,11 @@ export default function Dashboard() {
             <View style={{ overflow: 'hidden', height: 60, width: '100%', marginTop: 8 }}>
               <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: partnerAnim }] }}>
                 {[...activePartners, ...activePartners, ...activePartners, ...activePartners].map((partner, i) => (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 14, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#f1f5f9' }}>
                     {partner.logo_url ? (
-                      <Image source={{ uri: partner.logo_url }} style={{ width: 22, height: 22, borderRadius: 6, marginRight: 8 }} resizeMode="contain" />
+                      <Image source={{ uri: partner.logo_url }} style={{ width: 28, height: 28, borderRadius: 6, marginRight: 8 }} resizeMode="contain" />
                     ) : (
-                      <Ionicons name="business" size={18} color="#CBD5E1" style={{ marginRight: 8 }} />
+                      <Ionicons name="business" size={24} color="#CBD5E1" style={{ marginRight: 8 }} />
                     )}
                     <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{partner.name}</Text>
                   </View>
