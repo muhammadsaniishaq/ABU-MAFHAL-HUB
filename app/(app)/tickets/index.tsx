@@ -59,7 +59,7 @@ export default function UserTicketsScreen() {
                 .single();
 
             if (data && !error) {
-                router.push(`/ai-chat?ticketId=${data.id}`);
+                router.push(`/tickets/${data.id}`);
             }
         } catch (e) {
             console.log(e);
@@ -107,7 +107,7 @@ export default function UserTicketsScreen() {
                     }
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            onPress={() => router.push(`/ai-chat?ticketId=${item.id}`)}
+                            onPress={() => router.push(`/tickets/${item.id}`)}
                             className="bg-white p-4 rounded-2xl mb-3 shadow-sm border border-slate-100"
                         >
                             <View className="flex-row justify-between mb-2">
