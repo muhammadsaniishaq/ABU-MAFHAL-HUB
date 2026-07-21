@@ -201,7 +201,7 @@ export default function BulkSMS() {
                 sender_id: senderId,
                 sender: senderId,
                 message: message,
-                recipients: numbersArray,
+                recipients: numbersArray.join(','),
                 pin: pinObj?.value || '1234',
                 pin_code: pinObj?.value || '1234'
             };

@@ -243,7 +243,7 @@ export default function UserBulkSMS() {
                                 sender_id: senderId.substring(0, 11),
                                 sender: senderId.substring(0, 11),
                                 message: message,
-                                recipients: numbersArray,
+                                recipients: numbersArray.join(','),
                                 pin: pinObj?.value || '1234',
                                 pin_code: pinObj?.value || '1234'
                             };
