@@ -79,15 +79,15 @@ export default function UserTicketChatScreen() {
                     <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 20 }}>
                         {messages.length > 0 ? (
                             messages.map((m) => (
-                                <View key={m.id} className={`mb-4 w-full items-${m.sender_id === userId ? 'end' : 'start'}`}>
-                                    <View className={`p-3 rounded-2xl shadow-sm max-w-[80%] ${m.sender_id === userId
-                                        ? 'bg-[#0d1b3e] rounded-tr-none'
-                                        : 'bg-white rounded-tl-none border border-gray-100'
+                                <View key={m.id} className={`mb-3 w-full items-${m.sender_id === userId ? 'end' : 'start'}`}>
+                                    <View className={`p-2.5 rounded-2xl shadow-sm max-w-[80%] ${m.sender_id === userId
+                                        ? 'bg-[#0A192F] rounded-tr-sm'
+                                        : 'bg-white rounded-tl-sm border border-slate-100'
                                         }`}>
-                                        <Text className={`${m.sender_id === userId ? 'text-white' : 'text-slate-700'} mb-1 text-[15px]`}>
+                                        <Text className={`${m.sender_id === userId ? 'text-white' : 'text-slate-800'} mb-1 text-[13px] font-medium`}>
                                             {m.message}
                                         </Text>
-                                        <Text className={`text-[10px] ${m.sender_id === userId ? 'text-blue-200' : 'text-gray-400'}`}>
+                                        <Text className={`text-[9px] font-bold ${m.sender_id === userId ? 'text-[#D4AF37]' : 'text-slate-400'}`}>
                                             {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             {m.sender_id !== userId && ' • Support'}
                                         </Text>
@@ -97,17 +97,17 @@ export default function UserTicketChatScreen() {
                         ) : (
                             <View className="flex-1 items-center justify-center pt-20">
                                 <Ionicons name="chatbubbles-outline" size={40} color="#CBD5E1" />
-                                <Text className="text-gray-400 mt-2">A support agent will be with you shortly.</Text>
+                                <Text className="text-slate-400 mt-3 font-medium text-xs">A support agent will be with you shortly.</Text>
                             </View>
                         )}
                     </ScrollView>
 
-                    <View className="p-4 bg-white border-t border-gray-100 pb-8">
-                        <View className="flex-row items-center bg-[#f8fafc] rounded-full px-4 py-2 border border-slate-200">
+                    <View className="p-3 bg-white border-t border-slate-100 pb-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                        <View className="flex-row items-center bg-slate-50 rounded-full pl-4 pr-1.5 py-1.5 border border-slate-200">
                             <TextInput
                                 placeholder="Type a message..."
                                 placeholderTextColor="#94A3B8"
-                                className="flex-1 h-10 font-medium text-slate-800"
+                                className="flex-1 h-9 font-medium text-slate-800 text-[13px]"
                                 value={reply}
                                 onChangeText={setReply}
                                 multiline
@@ -115,9 +115,9 @@ export default function UserTicketChatScreen() {
                             {reply.trim().length > 0 && (
                                 <TouchableOpacity
                                     onPress={sendMessage}
-                                    className="bg-[#0d1b3e] w-8 h-8 rounded-full items-center justify-center ml-2"
+                                    className="bg-[#0A192F] w-9 h-9 rounded-full items-center justify-center ml-2 shadow-sm"
                                 >
-                                    <Ionicons name="arrow-up" size={16} color="white" />
+                                    <Ionicons name="send" size={14} color="#D4AF37" style={{ marginLeft: 2 }} />
                                 </TouchableOpacity>
                             )}
                         </View>

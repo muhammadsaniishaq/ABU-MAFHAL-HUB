@@ -94,42 +94,46 @@ export default function UserTicketsScreen() {
                 <FlatList
                     data={tickets}
                     keyExtractor={item => item.id}
-                    contentContainerStyle={{ padding: 16 }}
+                    contentContainerStyle={{ padding: 12, paddingBottom: 150 }}
                     ListEmptyComponent={
                         <View className="flex-1 items-center justify-center pt-20">
                             <Ionicons name="ticket-outline" size={48} color="#CBD5E1" />
-                            <Text className="text-gray-400 mt-4 text-center">No support tickets found.</Text>
+                            <Text className="text-slate-400 mt-4 text-center font-medium">No support tickets found.</Text>
                             <TouchableOpacity 
                                 onPress={createNewTicket}
                                 disabled={isCreating}
-                                className="mt-4 bg-[#0d1b3e] px-4 py-2 rounded-lg flex-row items-center"
+                                className="mt-6 bg-[#0A192F] px-5 py-2.5 rounded-xl flex-row items-center shadow-sm"
                             >
-                                {isCreating ? <ActivityIndicator color="#fff" size="small" className="mr-2" /> : <Ionicons name="add" size={18} color="#fff" className="mr-1" />}
-                                <Text className="text-white font-bold">Create New Ticket</Text>
+                                {isCreating ? <ActivityIndicator color="#D4AF37" size="small" className="mr-2" /> : <Ionicons name="add" size={18} color="#D4AF37" className="mr-2" />}
+                                <Text className="text-[#D4AF37] font-bold text-sm">Create New Ticket</Text>
                             </TouchableOpacity>
                         </View>
                     }
                     renderItem={({ item }) => (
                         <TouchableOpacity
                             onPress={() => router.push(`/tickets/${item.id}`)}
-                            className="bg-white p-4 rounded-2xl mb-3 shadow-sm border border-slate-100"
+                            className="bg-white p-3.5 rounded-xl mb-3 border border-slate-100"
+                            style={{ shadowColor: '#0A192F', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 }}
                         >
-                            <View className="flex-row justify-between mb-2">
-                                <Text className="text-slate-800 font-bold text-sm flex-1 mr-2" numberOfLines={1}>{item.subject}</Text>
-                                <Text className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</Text>
+                            <View className="flex-row justify-between mb-3 items-center">
+                                <Text className="text-slate-800 font-bold text-[13px] flex-1 mr-2" numberOfLines={1}>{item.subject}</Text>
+                                <Text className="text-[10px] text-slate-400 font-medium">{new Date(item.created_at).toLocaleDateString()}</Text>
                             </View>
 
                             <View className="flex-row items-center justify-between">
-                                <View className={`px-2 py-1 rounded text-[10px] ${
-                                    item.status === 'open' ? 'bg-red-100' :
-                                    item.status === 'in_progress' ? 'bg-blue-100' : 'bg-green-100'
+                                <View className={`px-2.5 py-1 rounded-md ${
+                                    item.status === 'open' ? 'bg-red-50 border border-red-100' :
+                                    item.status === 'in_progress' ? 'bg-blue-50 border border-blue-100' : 'bg-emerald-50 border border-emerald-100'
                                 }`}>
-                                    <Text className={`text-[10px] font-bold ${
-                                        item.status === 'open' ? 'text-red-700' :
-                                        item.status === 'in_progress' ? 'text-blue-700' : 'text-green-700'
+                                    <Text className={`text-[9px] font-extrabold ${
+                                        item.status === 'open' ? 'text-red-600' :
+                                        item.status === 'in_progress' ? 'text-blue-600' : 'text-emerald-600'
                                     }`}>{item.status.toUpperCase()}</Text>
                                 </View>
-                                <Text className="text-[10px] text-gray-400 font-mono">ID: {item.id.split('-')[0]}</Text>
+                                <View className="flex-row items-center">
+                                    <Ionicons name="finger-print" size={10} color="#94a3b8" className="mr-1" />
+                                    <Text className="text-[10px] text-slate-400 font-medium">ID: {item.id.split('-')[0]}</Text>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     )}
