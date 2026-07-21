@@ -132,6 +132,7 @@ export default function AppLayout() {
                 <Tabs.Screen name="nin-services" options={{ href: null }} />
                 <Tabs.Screen name="about" options={{ href: null }} />
                 <Tabs.Screen name="tickets/index" options={{ href: null }} />
+                <Tabs.Screen name="tickets/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
             </Tabs>
 
             {/* FLOATING ACTION BUTTON (FAB) */}
