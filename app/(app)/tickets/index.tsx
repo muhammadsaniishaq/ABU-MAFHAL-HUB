@@ -60,9 +60,13 @@ export default function UserTicketsScreen() {
 
             if (data && !error) {
                 router.push(`/tickets/${data.id}`);
+            } else if (error) {
+                console.error("Ticket Insert Error:", error);
+                alert("Failed to create ticket: " + error.message);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.log(e);
+            alert("Error: " + e.message);
         } finally {
             setIsCreating(false);
         }
