@@ -84,6 +84,7 @@ export default function AdminSettings() {
     const [welcomeBonus, setWelcomeBonus] = useState('0');
     const [fundingFeeValue, setFundingFeeValue] = useState('0');
     const [fundingFeeType, setFundingFeeType] = useState('percentage');
+    const [userBulkSmsPrice, setUserBulkSmsPrice] = useState('10.00');
 
     // Comms
     const [supportWhatsapp, setSupportWhatsapp] = useState('');
@@ -105,13 +106,12 @@ export default function AdminSettings() {
     const [keysLoading, setKeysLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'system' | 'features' | 'economics' | 'api'>('system');
 
-    // Feature Flags
     const allKnownFeatures = [
       'feature_transfer', 'feature_airtime', 'feature_data', 'feature_education',
       'feature_bills', 'feature_cards', 'feature_savings', 'feature_loans',
       'feature_crypto', 'feature_analytics', 'feature_rewards', 'feature_qr',
       'feature_invest', 'feature_insurance', 'feature_bvn', 'feature_nin', 'feature_cac',
-      'feature_smile', 'feature_social'
+      'feature_smile', 'feature_social', 'feature_bulk_sms'
     ];
     
     const [features, setFeatures] = useState<Record<string, boolean>>(
@@ -127,14 +127,16 @@ export default function AdminSettings() {
     const [monnifyKey, setMonnifyKey] = useState('');
     const [flutterwaveKey, setFlutterwaveKey] = useState('');
 
-    // VTU & Bills Keys
-    const [vtpassKey, setVtpassKey] = useState('');
-    const [vtpassPublicKey, setVtpassPublicKey] = useState('');
-    
     // Identity & Communication Keys
     const [identityApiKey, setIdentityApiKey] = useState('');
     const [smileIdKey, setSmileIdKey] = useState('');
     const [termiiKey, setTermiiKey] = useState('');
+    const [openAiKey, setOpenAiKey] = useState('');
+    const [bigiToken, setBigiToken] = useState('');
+    const [bigiPin, setBigiPin] = useState('');
+
+    // Bigi API & Vendor Setting
+    const [vtuVendor, setVtuVendor] = useState('clubkonnect');
 
     useEffect(() => {
         fetchSettings();
@@ -165,6 +167,7 @@ export default function AdminSettings() {
                     if (s.key === 'funding_fee_percentage') setFundingFeeValue(s.value); // Legacy migration
                     if (s.key === 'funding_fee_value') setFundingFeeValue(s.value);
                     if (s.key === 'funding_fee_type') setFundingFeeType(s.value);
+                    if (s.key === 'user_bulk_sms_price') setUserBulkSmsPrice(s.value);
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
                     if (s.key === 'support_email') setSupportEmail(s.value);
@@ -194,6 +197,7 @@ export default function AdminSettings() {
                             });
                         } catch (e) { }
                     }
+                    if (s.key === 'vtu_vendor') setVtuVendor(s.value || 'clubkonnect');
                 });
             }
 
@@ -207,13 +211,12 @@ export default function AdminSettings() {
                     if (secret.key === 'PAYVESSEL_API_SECRET') setPayvesselSecret(secret.value);
                     if (secret.key === 'PAYVESSEL_BUSINESS_ID') setPayvesselBusinessId(secret.value);
                     if (secret.key === 'FLUTTERWAVE_SECRET_KEY') setFlutterwaveKey(secret.value);
-                    
-                    if (secret.key === 'VTPASS_API_KEY') setVtpassKey(secret.value);
-                    if (secret.key === 'VTPASS_PUBLIC_KEY') setVtpassPublicKey(secret.value);
-                    
                     if (secret.key === 'IDENTITY_API_KEY') setIdentityApiKey(secret.value);
                     if (secret.key === 'SMILE_ID_KEY') setSmileIdKey(secret.value);
                     if (secret.key === 'TERMII_API_KEY') setTermiiKey(secret.value);
+                    if (secret.key === 'OPENAI_API_KEY') setOpenAiKey(secret.value);
+                    if (secret.key === 'BIGI_API_TOKEN') setBigiToken(secret.value);
+                    if (secret.key === 'BIGI_API_PIN') setBigiPin(secret.value);
                 });
             }
         } catch (e) { console.error(e); }
@@ -230,11 +233,12 @@ export default function AdminSettings() {
                 { key: 'PAYVESSEL_API_SECRET', value: payvesselSecret, description: 'Payvessel API Secret' },
                 { key: 'PAYVESSEL_BUSINESS_ID', value: payvesselBusinessId, description: 'Payvessel Business ID' },
                 { key: 'FLUTTERWAVE_SECRET_KEY', value: flutterwaveKey, description: 'Flutterwave Secret Key' },
-                { key: 'VTPASS_API_KEY', value: vtpassKey, description: 'VTPass Secret Key' },
-                { key: 'VTPASS_PUBLIC_KEY', value: vtpassPublicKey, description: 'VTPass Public Key' },
                 { key: 'IDENTITY_API_KEY', value: identityApiKey, description: 'Identity Provider API Key' },
                 { key: 'SMILE_ID_KEY', value: smileIdKey, description: 'SmileID API Key' },
-                { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' }
+                { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' },
+                { key: 'OPENAI_API_KEY', value: openAiKey, description: 'OpenAI API Key for Cortex AI' },
+                { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigisub SMS API Token' },
+                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigisub SMS API PIN' }
             ].filter(k => k.value && k.value.trim() !== '');
 
             if (keysToSave.length > 0) {
@@ -281,6 +285,7 @@ export default function AdminSettings() {
                 { key: 'welcome_bonus', value: welcomeBonus },
                 { key: 'funding_fee_value', value: fundingFeeValue },
                 { key: 'funding_fee_type', value: fundingFeeType },
+                { key: 'user_bulk_sms_price', value: userBulkSmsPrice },
                 { key: 'support_whatsapp', value: supportWhatsapp },
                 { key: 'support_email', value: supportEmail },
                 { key: 'support_facebook', value: supportFacebook },
@@ -288,6 +293,7 @@ export default function AdminSettings() {
                 { key: 'support_instagram', value: supportInstagram },
                 { key: 'support_telegram', value: supportTelegram },
                 { key: 'support_office_address', value: supportOfficeAddress },
+                { key: 'vtu_vendor', value: vtuVendor },
                 { key: 'global_announcement', value: JSON.stringify({
                     text: announcementText,
                     mediaUrl: announcementUrl,
@@ -301,6 +307,22 @@ export default function AdminSettings() {
             
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('Success', 'System preferences saved and synced across all devices.');
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+    const handleSaveVtuVendor = async () => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.from('app_settings').upsert([
+                { key: 'vtu_vendor', value: vtuVendor }
+            ], { onConflict: 'key' });
+            
+            if (error) throw error;
+            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Success', `VTU Vendor successfully switched to ${vtuVendor.toUpperCase()}`);
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {
@@ -534,6 +556,8 @@ export default function AdminSettings() {
 
                         <Text style={s.groupLabel}>Extras & Analytics</Text>
                         <View style={s.card}>
+                            <ToggleRow title="Bulk SMS" subtitle="Toggle mass SMS campaigns" icon="chatbubbles" color="#3b82f6" value={features['feature_bulk_sms'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_bulk_sms: val})} />
+                            <View style={s.divider} />
                             <ToggleRow title="Social Boost" subtitle="Toggle social media boosting" icon="rocket" color="#ec4899" value={features['feature_social'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_social: val})} />
                             <View style={s.divider} />
                             <ToggleRow title="Analytics" subtitle="Toggle user analytics dashboard" icon="pie-chart" color="#8b5cf6" value={features['feature_analytics'] ?? true} onValueChange={(val: boolean) => setFeatures({...features, feature_analytics: val})} />
@@ -589,10 +613,11 @@ export default function AdminSettings() {
                             <InputRow label="Minimum Withdrawal" value={minWithdrawal} onChangeText={setMinWithdrawal} prefix="₦" keyboardType="numeric" />
                         </View>
 
-                        <Text style={s.groupLabel}>Bonuses</Text>
+                        <Text style={s.groupLabel}>Bonuses & Services</Text>
                         <View style={s.card}>
                             <InputRow label="Referral Bonus" value={referralBonus} onChangeText={setReferralBonus} prefix="₦" keyboardType="numeric" />
                             <InputRow label="Welcome Bonus (New Users)" value={welcomeBonus} onChangeText={setWelcomeBonus} prefix="₦" keyboardType="numeric" />
+                            <InputRow label="Bulk SMS Price (Per Page)" value={userBulkSmsPrice} onChangeText={setUserBulkSmsPrice} prefix="₦" keyboardType="numeric" />
                         </View>
                         
                         <TouchableOpacity onPress={handleUpdateSettings} style={s.saveBtn} activeOpacity={0.8}>
@@ -629,18 +654,43 @@ export default function AdminSettings() {
                             </View>
                         )}
 
-                        {/* VTPASS Accordion */}
+                        {/* VTU Provider Accordion */}
                         <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'vtu' ? null : 'vtu')} style={[s.accordionHeader, expandedApi === 'vtu' && s.accordionHeaderActive]} activeOpacity={0.8}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="phone-portrait" size={18} color={expandedApi === 'vtu' ? '#fff' : '#0d1b3e'} style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, expandedApi === 'vtu' && { color: '#fff' }]}>VTU & Bills (VTPass)</Text>
+                                <Text style={[s.accordionTitle, expandedApi === 'vtu' && { color: '#fff' }]}>VTU & Bills Provider Setup</Text>
                             </View>
                             <Ionicons name={expandedApi === 'vtu' ? "chevron-up" : "chevron-down"} size={18} color={expandedApi === 'vtu' ? '#fff' : '#64748b'} />
                         </TouchableOpacity>
                         {expandedApi === 'vtu' && (
                             <View style={s.accordionBody}>
-                                <ApiInputRow placeholder="VTPass Public Key" value={vtpassPublicKey} onChangeText={setVtpassPublicKey} />
-                                <ApiInputRow placeholder="VTPass Secret Key" value={vtpassKey} onChangeText={setVtpassKey} isSecret={true} />
+                                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                    <Text style={[s.label, { color: '#334155' }]}>Select Active VTU Vendor</Text>
+                                    <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 12, lineHeight: 16 }}>Choose the provider that will handle Airtime and Data requests. Make sure the API keys for the chosen provider are set in the API Vault.</Text>
+                                    <View style={{ flexDirection: 'row' }}>
+                                        <TouchableOpacity 
+                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1, marginRight: 8 }]} 
+                                            onPress={() => setVtuVendor('clubkonnect')}
+                                        >
+                                            <Text style={[s.typeText, vtuVendor === 'clubkonnect' && { color: '#fff' }]}>ClubKonnect</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1, marginLeft: 8 }]} 
+                                            onPress={() => setVtuVendor('bigi')}
+                                        >
+                                            <Text style={[s.typeText, vtuVendor === 'bigi' && { color: '#fff' }]}>Bigi API</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    
+                                    <TouchableOpacity onPress={handleSaveVtuVendor} style={[s.saveBtn, { marginTop: 16, backgroundColor: '#3b82f6' }]} activeOpacity={0.8}>
+                                        {loading ? <ActivityIndicator color="#fff" size="small" /> : (
+                                            <>
+                                                <Ionicons name="swap-horizontal" size={16} color="#fff" style={{ marginRight: 6 }} />
+                                                <Text style={[s.saveBtnText, { fontSize: 13 }]}>Switch Provider</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
 
@@ -660,6 +710,24 @@ export default function AdminSettings() {
                                 <ApiInputRow placeholder="Termii SMS API Key" value={termiiKey} onChangeText={setTermiiKey} isSecret={true} />
                             </View>
                         )}
+
+                        {/* AI & Bulk SMS Accordion */}
+                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'cortex' ? null : 'cortex')} style={[s.accordionHeader, expandedApi === 'cortex' && s.accordionHeaderActive]} activeOpacity={0.8}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="sparkles" size={18} color={expandedApi === 'cortex' ? '#fff' : '#0d1b3e'} style={{ marginRight: 8 }} />
+                                <Text style={[s.accordionTitle, expandedApi === 'cortex' && { color: '#fff' }]}>AI & Bulk SMS</Text>
+                            </View>
+                            <Ionicons name={expandedApi === 'cortex' ? "chevron-up" : "chevron-down"} size={18} color={expandedApi === 'cortex' ? '#fff' : '#64748b'} />
+                        </TouchableOpacity>
+                        {expandedApi === 'cortex' && (
+                            <View style={s.accordionBody}>
+                                <ApiInputRow placeholder="OpenAI API Key (Cortex AI)" value={openAiKey} onChangeText={setOpenAiKey} isSecret={true} />
+                                <View style={s.divider} />
+                                <ApiInputRow placeholder="Bigisub API Token" value={bigiToken} onChangeText={setBigiToken} isSecret={true} />
+                                <ApiInputRow placeholder="Bigisub API PIN" value={bigiPin} onChangeText={setBigiPin} isSecret={true} />
+                            </View>
+                        )}
+
 
                         <TouchableOpacity onPress={handleSaveKeys} style={s.saveBtn} activeOpacity={0.8}>
                             {keysLoading ? <ActivityIndicator color="#fff" size="small" /> : (

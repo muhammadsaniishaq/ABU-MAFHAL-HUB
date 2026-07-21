@@ -239,6 +239,14 @@ export default function UserManagement() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
+            // Auto-maintenance: Mark users as inactive if they haven't logged in for 7 days
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            await supabase
+                .from('profiles')
+                .update({ status: 'inactive' })
+                .eq('status', 'active')
+                .lt('last_login', sevenDaysAgo);
+
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*, virtual_accounts(account_number, bank_name)')

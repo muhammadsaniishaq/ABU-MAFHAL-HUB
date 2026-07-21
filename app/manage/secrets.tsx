@@ -36,7 +36,9 @@ const REQUIRED_SECRETS = [
     { key: 'ALCHEMY_API_KEY', desc: 'Alchemy Node RPC API Key', provider: 'Crypto' },
     { key: 'NINE_BOOST_API_KEY', desc: '9Boost API Key for Social Media Panel', provider: '9Boost' },
     { key: 'NOWPAYMENTS_API_KEY', desc: 'NowPayments API Key for Crypto Receive', provider: 'NowPayments' },
-    { key: 'NOWPAYMENTS_IPN_SECRET', desc: 'NowPayments IPN Secret for Webhook', provider: 'NowPayments' }
+    { key: 'NOWPAYMENTS_IPN_SECRET', desc: 'NowPayments IPN Secret for Webhook', provider: 'NowPayments' },
+    { key: 'BIGI_API_TOKEN', desc: 'Bigi API Token for VTU Services', provider: 'Bigi' },
+    { key: 'BIGI_API_PIN', desc: 'Bigi 4-digit Transaction PIN', provider: 'Bigi' }
 ];
 
 export default function SecretsManager() {

@@ -1,1 +1,1 @@
-SELECT * FROM feature_flags;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS vtu_vendor VARCHAR(50) DEFAULT 'clubkonnect'; ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS bigi_api_token VARCHAR(255); ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS bigi_api_pin VARCHAR(255);

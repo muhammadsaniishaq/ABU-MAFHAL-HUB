@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { ClubKonnectClient, type ClubKonnectResponse } from "../_shared/clubkonnect.ts";
+import { BigiClient } from "../_shared/bigi.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -66,10 +67,19 @@ Deno.serve(async (req: Request) => {
         const { data: secretsData } = await rpcClient
             .from('system_secrets')
             .select('key, value')
-            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY']);
+            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN']);
             
         const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
         const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
+        const bigiToken = secretsData?.find(s => s.key === 'BIGI_API_TOKEN')?.value;
+        const bigiPin = secretsData?.find(s => s.key === 'BIGI_API_PIN')?.value;
+
+        // Fetch VTU vendor from app_settings
+        const { data: settingsData } = await rpcClient
+            .from('app_settings')
+            .select('key, value')
+            .eq('key', 'vtu_vendor');
+        const vtuVendor = settingsData && settingsData.length > 0 ? settingsData[0].value : 'clubkonnect';
 
         // 2. Determine Pricing & Parameters
         let amountToCharge = 0;
@@ -120,41 +130,88 @@ Deno.serve(async (req: Request) => {
              amountToCharge = Number(data.amount) * (Number(data.quantity) || 1);
              if (amountToCharge < 500) throw new Error("Invalid Education Amount");
              providerParams = { examType: data.examType, phone: data.phone, profileId: data.profileId, quantity: data.quantity || 1 };
+        } else if (type === 'get_plans') {
+             // Just pass through
         } else {
              throw new Error(`Unsupported service type: ${type}`);
         }
 
         console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
 
-        // 3. Deduct Balance
-        const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
-            user_id: userId,
-            amount: amountToCharge
-        });
+        console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
 
-        if (deductError) {
-             console.error("[Bills] Balance Deduction Failed:", deductError.message);
-             return new Response(JSON.stringify({ success: false, error: deductError.message || "Insufficient balance" }), {
-                 headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-                 status: 200
-             });
+        if (type !== 'get_plans') {
+            // 3. Deduct Balance
+            const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
+                user_id: userId,
+                amount: amountToCharge
+            });
+
+            if (deductError) {
+                 console.error("[Bills] Balance Deduction Failed:", deductError.message);
+                 return new Response(JSON.stringify({ success: false, error: deductError.message || "Insufficient balance" }), {
+                     headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                     status: 200
+                 });
+            }
+            console.log(`[Bills] Balance Deducted. New Balance: ₦${newBalance}`);
         }
-        console.log(`[Bills] Balance Deducted. New Balance: ₦${newBalance}`);
 
-        // 4. Call Provider (ClubKonnect)
-        let result: ClubKonnectResponse;
+        // 4. Call Provider (ClubKonnect or Bigi)
+        let result: any;
         try {
+            if (type === 'get_plans') {
+                if (vtuVendor === 'bigi') {
+                    if (!bigiToken) throw new Error("Bigi API Token missing in settings");
+                    const bigiClient = new BigiClient(bigiToken, bigiPin || '');
+                    
+                    // Bigi network IDs
+                    const netLower = data.network.toLowerCase();
+                    let netId = 1;
+                    if (netLower.includes('glo')) netId = 2;
+                    if (netLower.includes('airtel')) netId = 3;
+                    if (netLower.includes('9mobile') || netLower.includes('etisalat')) netId = 4;
+                    
+                    const res = await fetch(`https://api.bigisub.ng/api/v2/vtu/data/plans/?network=${netId}`, {
+                        headers: { 'Authorization': `Token ${bigiToken}` }
+                    });
+                    const plansData = await res.json();
+                    if (!plansData.success) throw new Error(plansData.message || 'Failed to fetch Bigi plans');
+                    
+                    return new Response(JSON.stringify({ success: true, data: plansData.data }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                        status: 200
+                    });
+                } else {
+                    const res = await fetch(`https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${ckUserId}`);
+                    const plansData = await res.json();
+                    return new Response(JSON.stringify({ success: true, data: plansData }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                        status: 200
+                    });
+                }
+            }
+
             if (type === 'airtime') {
-                result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+                if (vtuVendor === 'bigi') {
+                    if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
+                    const bigiClient = new BigiClient(bigiToken, bigiPin);
+                    result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
+                } else {
+                    result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+                }
             } else if (type === 'data') {
-                result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                if (vtuVendor === 'bigi') {
+                    if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
+                    const bigiClient = new BigiClient(bigiToken, bigiPin);
+                    result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                } else {
+                    result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                }
             } else if (type === 'smile') {
                 result = await client.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
             } else if (type === 'education') {
                 result = await client.buyEPin(providerParams.examType as string, providerParams.phone as string, requestId, providerParams.profileId as string);
-                // For quantity > 1, ClubKonnect usually returns them in carddetails or multiple calls are needed.
-                // Assuming the API handles quantity natively or we send multiple requests (if we sent multiple, we'd loop).
-                // APIWAECV1.asp docs only show single PIN buy. We assume quantity is 1 for now or API supports it.
             } else {
                 throw new Error("Invalid service type reached execution");
             }

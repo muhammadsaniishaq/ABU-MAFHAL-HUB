@@ -27,13 +27,17 @@ const TEMPLATES = {
     ]
 };
 
+import { useLocalSearchParams } from 'expo-router';
+
 export default function CommunicationManager() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'push'>('email');
+    const params = useLocalSearchParams();
+    
+    const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'push'>((params.tab as any) || 'email');
     const [recipientMode, setRecipientMode] = useState<'single' | 'all' | 'admins'>('single');
     
     // Form State
-    const [recipientInput, setRecipientInput] = useState('');
+    const [recipientInput, setRecipientInput] = useState((params.recipient as string) || '');
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [actionRoute, setActionRoute] = useState('');
@@ -241,57 +245,58 @@ export default function CommunicationManager() {
     // --- RENDERERS ---
 
     const renderTabs = () => (
-        <View className="flex-row bg-[#f8fafc] border border-slate-200 p-1 rounded-xl mb-4 shadow-sm">
-            <TouchableOpacity 
-                onPress={() => setActiveTab('email')}
-                className={`flex-1 py-1.5 items-center rounded-lg ${activeTab === 'email' ? 'bg-[#0d1b3e] shadow-sm' : ''}`}
-            >
-                <Text className={`font-bold capitalize text-[11px] ${activeTab === 'email' ? 'text-[#f5a623]' : 'text-slate-500'}`}>Email</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                onPress={() => setActiveTab('sms')}
-                className={`flex-1 py-1.5 items-center rounded-lg ${activeTab === 'sms' ? 'bg-[#0d1b3e] shadow-sm' : ''}`}
-            >
-                <Text className={`font-bold capitalize text-[11px] ${activeTab === 'sms' ? 'text-[#f5a623]' : 'text-slate-500'}`}>SMS</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-                onPress={() => setActiveTab('push')}
-                className={`flex-1 py-1.5 items-center rounded-lg ${activeTab === 'push' ? 'bg-[#0d1b3e] shadow-sm' : ''}`}
-            >
-                <Text className={`font-bold capitalize text-[11px] ${activeTab === 'push' ? 'text-[#f5a623]' : 'text-slate-500'}`}>Push</Text>
-            </TouchableOpacity>
+        <View className="flex-row bg-white border border-slate-100 p-1.5 rounded-2xl mb-6 shadow-sm shadow-slate-200/50">
+            {['email', 'sms', 'push'].map((tab) => {
+                const isActive = activeTab === tab;
+                const icons: any = { email: 'mail', sms: 'chatbubble-ellipses', push: 'notifications' };
+                return (
+                    <TouchableOpacity 
+                        key={tab}
+                        onPress={() => setActiveTab(tab as any)}
+                        className={`flex-1 flex-row py-3 items-center justify-center rounded-xl ${isActive ? 'bg-[#0d1b3e] shadow-md shadow-[#0d1b3e]/30' : ''}`}
+                    >
+                        <Ionicons name={icons[tab]} size={16} color={isActive ? '#f5a623' : '#64748b'} />
+                        <Text className={`font-black uppercase ml-2 text-[11px] tracking-wider ${isActive ? 'text-[#f5a623]' : 'text-slate-500'}`}>{tab}</Text>
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 
     const renderRecipientSelector = () => (
-        <View className="mb-4 z-10">
-            <Text className="text-slate-500 text-[10px] font-bold uppercase mb-1.5">To Recipient(s)</Text>
-            <View className="flex-row gap-1.5 mb-1.5">
+        <View className="bg-white rounded-3xl p-5 mb-6 shadow-sm shadow-slate-200/50 border border-slate-100">
+            <Text className="text-slate-800 text-[12px] font-black uppercase tracking-wider mb-4">Select Audience</Text>
+            <View className="flex-row gap-2 mb-4">
                 {[
-                    { id: 'single', label: 'Single', icon: 'person' },
-                    { id: 'all', label: 'All', icon: 'people' },
-                    { id: 'admins', label: 'Admins', icon: 'shield' }
-                ].map((mode: any) => (
-                    <TouchableOpacity 
-                        key={mode.id}
-                        onPress={() => setRecipientMode(mode.id)}
-                        className={`flex-1 flex-row items-center justify-center py-1.5 rounded-lg border ${recipientMode === mode.id ? 'bg-[#f5a623]/10 border-[#f5a623]' : 'bg-white border-slate-200'}`}
-                    >
-                        <Ionicons name={mode.icon} size={12} color={recipientMode === mode.id ? '#d4890e' : '#64748B'} />
-                        <Text className={`ml-1 text-[10px] font-bold ${recipientMode === mode.id ? 'text-[#0d1b3e]' : 'text-slate-600'}`}>{mode.label}</Text>
-                    </TouchableOpacity>
-                ))}
+                    { id: 'single', label: 'Single User', icon: 'person-outline' },
+                    { id: 'all', label: 'All Users', icon: 'people-outline' },
+                    { id: 'admins', label: 'Admins Only', icon: 'shield-checkmark-outline' }
+                ].map((mode: any) => {
+                    const isActive = recipientMode === mode.id;
+                    return (
+                        <TouchableOpacity 
+                            key={mode.id}
+                            onPress={() => setRecipientMode(mode.id)}
+                            className={`flex-1 flex-col items-center justify-center p-3 rounded-2xl border-2 ${isActive ? 'bg-[#0d1b3e]/5 border-[#0d1b3e]' : 'bg-slate-50 border-transparent'}`}
+                        >
+                            <Ionicons name={mode.icon} size={20} color={isActive ? '#0d1b3e' : '#64748B'} />
+                            <Text className={`mt-2 text-[10px] font-bold text-center ${isActive ? 'text-[#0d1b3e]' : 'text-slate-500'}`}>{mode.label}</Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
 
             {recipientMode === 'single' && (
-                <TextInput 
-                    className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs shadow-sm"
-                    placeholder={activeTab === 'email' ? "Enter email address..." : "Enter Phone or User ID..."}
-                    value={recipientInput}
-                    onChangeText={setRecipientInput}
-                />
+                <View className="bg-slate-50 border border-slate-200 rounded-2xl flex-row items-center px-4 h-14 shadow-sm">
+                    <Ionicons name="search-outline" size={18} color="#94a3b8" />
+                    <TextInput 
+                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-sm h-full"
+                        placeholder={activeTab === 'email' ? "Enter exact email address..." : "Enter Phone or User UUID..."}
+                        placeholderTextColor="#94a3b8"
+                        value={recipientInput}
+                        onChangeText={setRecipientInput}
+                    />
+                </View>
             )}
         </View>
     );
@@ -368,82 +373,88 @@ export default function CommunicationManager() {
                 {renderRecipientSelector()}
 
                 {/* Templates Quick Bar */}
-                <View className="mb-4">
-                    <Text className="text-slate-500 text-[10px] font-bold uppercase mb-1.5">Quick Templates</Text>
+                <View className="mb-6">
+                    <Text className="text-slate-800 text-[12px] font-black uppercase tracking-wider mb-3 px-1">Quick Templates</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                         {(TEMPLATES[activeTab] || []).map((tmpl: any) => (
                             <TouchableOpacity 
                                 key={tmpl.id} 
                                 onPress={() => applyTemplate(tmpl)}
-                                className="mr-2 bg-white border border-[#f5a623]/50 px-3 py-1.5 rounded-full shadow-sm"
+                                className="mr-3 bg-white border border-slate-200 px-4 py-3 rounded-2xl shadow-sm shadow-slate-200/50 flex-row items-center gap-2"
                             >
-                                <Text className="text-[#0d1b3e] text-[10px] font-bold">{tmpl.title}</Text>
+                                <View className="w-8 h-8 rounded-full bg-[#f5a623]/10 items-center justify-center">
+                                    <Ionicons name="flash-outline" size={14} color="#f5a623" />
+                                </View>
+                                <Text className="text-[#0d1b3e] text-[12px] font-bold">{tmpl.title}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
 
-                <View className="flex-row justify-between mb-4 gap-2">
+                {/* Advanced Settings Row */}
+                <View className="flex-row gap-4 mb-6">
                     {/* Scheduling */}
-                    <View className="flex-1 bg-white border border-slate-200 p-2.5 rounded-xl shadow-sm">
-                        <View className="flex-row justify-between items-center mb-1.5">
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Schedule</Text>
-                            <Switch value={isScheduled} onValueChange={setIsScheduled} trackColor={{false: '#E2E8F0', true: '#f5a623'}} thumbColor={isScheduled ? '#0d1b3e' : '#f8fafc'} />
+                    <TouchableOpacity 
+                        onPress={() => setIsScheduled(!isScheduled)}
+                        className={`flex-1 p-4 rounded-3xl border-2 flex-row justify-between items-center ${isScheduled ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 shadow-sm shadow-slate-200/50'}`}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <View className={`w-8 h-8 rounded-full items-center justify-center ${isScheduled ? 'bg-indigo-500' : 'bg-slate-100'}`}>
+                                <Ionicons name="time-outline" size={16} color={isScheduled ? '#fff' : '#64748b'} />
+                            </View>
+                            <Text className={`font-bold text-[11px] uppercase tracking-wider ${isScheduled ? 'text-indigo-800' : 'text-slate-500'}`}>Schedule</Text>
                         </View>
-                        {isScheduled ? (
-                            <TouchableOpacity className="bg-[#f5a623]/10 p-1.5 rounded-lg items-center border border-[#f5a623]/30">
-                                <Text className="text-[#0d1b3e] text-[10px] font-bold">Tomorrow, 9:00 AM</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <Text className="text-slate-400 text-[10px] italic">Send immediately</Text>
-                        )}
-                    </View>
+                        <Switch value={isScheduled} onValueChange={setIsScheduled} trackColor={{false: '#e2e8f0', true: '#818cf8'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
+                    </TouchableOpacity>
 
                     {/* Priority */}
-                    <View className="flex-1 bg-white border border-slate-200 p-2.5 rounded-xl shadow-sm">
-                        <View className="flex-row justify-between items-center mb-1.5">
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase">Priority</Text>
-                            <Switch value={isHighPriority} onValueChange={setIsHighPriority} trackColor={{false: '#E2E8F0', true: '#EF4444'}} />
+                    <TouchableOpacity 
+                        onPress={() => setIsHighPriority(!isHighPriority)}
+                        className={`flex-1 p-4 rounded-3xl border-2 flex-row justify-between items-center ${isHighPriority ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100 shadow-sm shadow-slate-200/50'}`}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <View className={`w-8 h-8 rounded-full items-center justify-center ${isHighPriority ? 'bg-rose-500' : 'bg-slate-100'}`}>
+                                <Ionicons name="alert-outline" size={16} color={isHighPriority ? '#fff' : '#64748b'} />
+                            </View>
+                            <Text className={`font-bold text-[11px] uppercase tracking-wider ${isHighPriority ? 'text-rose-800' : 'text-slate-500'}`}>Urgent</Text>
                         </View>
-                        <View className="flex-row items-center gap-1">
-                            {isHighPriority && <Ionicons name="alert-circle" size={12} color="#EF4444" />}
-                            <Text className={`text-[10px] font-bold ${isHighPriority ? 'text-red-500' : 'text-slate-400 italic'}`}>
-                                {isHighPriority ? 'High Importance' : 'Normal'}
-                            </Text>
-                        </View>
-                    </View>
+                        <Switch value={isHighPriority} onValueChange={setIsHighPriority} trackColor={{false: '#e2e8f0', true: '#f43f5e'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Editor */}
-                <View className="bg-white rounded-xl p-3 border border-[#0d1b3e]/10 mb-6 shadow-sm">
-                    <View className="flex-row justify-between items-center mb-3">
-                        <Text className="text-[#0d1b3e] font-bold text-sm">Message Content</Text>
+                <View className="bg-white rounded-3xl p-5 border border-slate-100 mb-8 shadow-sm shadow-slate-200/50">
+                    <View className="flex-row justify-between items-center mb-5">
+                        <Text className="text-slate-800 font-black text-sm uppercase tracking-wider">Message Editor</Text>
                         <TouchableOpacity 
                             onPress={() => setShowAiModal(true)}
-                            className="bg-[#f5a623]/10 px-2.5 py-1 rounded-lg border border-[#f5a623]/30 flex-row items-center gap-1 shadow-sm"
+                            className="bg-[#0d1b3e] px-3 py-2 rounded-xl flex-row items-center gap-1.5 shadow-md shadow-[#0d1b3e]/20"
                         >
-                            <Ionicons name="sparkles" size={12} color="#0d1b3e" />
-                            <Text className="text-[#0d1b3e] font-bold text-[10px]">AI Drafter</Text>
+                            <Ionicons name="sparkles" size={12} color="#f5a623" />
+                            <Text className="text-[#f5a623] font-black text-[10px] uppercase tracking-wider">AI Writer</Text>
                         </TouchableOpacity>
                     </View>
 
                     {activeTab === 'email' && (
-                        <View className="mb-3">
-                            <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1 ml-1">Subject Line</Text>
-                            <TextInput 
-                                className="bg-[#f8fafc] border border-slate-200 rounded-lg px-3 py-2 text-[#0d1b3e] font-bold text-xs shadow-sm"
-                                placeholder="Compelling subject..."
-                                value={subject}
-                                onChangeText={setSubject}
-                            />
+                        <View className="mb-4">
+                            <View className="bg-slate-50 border border-slate-200 rounded-2xl flex-row items-center px-4 h-14">
+                                <Ionicons name="text-outline" size={18} color="#94a3b8" />
+                                <TextInput 
+                                    className="flex-1 ml-3 text-[#0d1b3e] font-bold text-sm h-full"
+                                    placeholder="Enter a compelling subject line..."
+                                    placeholderTextColor="#94a3b8"
+                                    value={subject}
+                                    onChangeText={setSubject}
+                                />
+                            </View>
                         </View>
                     )}
 
-                    <View>
-                        <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1 ml-1">Message Body</Text>
+                    <View className="bg-slate-50 border border-slate-200 rounded-2xl p-4 min-h-[150px]">
                         <TextInput 
-                            className="bg-[#f8fafc] border border-slate-200 rounded-lg px-3 py-2 text-[#0d1b3e] min-h-[100px] text-xs shadow-sm"
-                            placeholder={`Type your ${activeTab} content here...`}
+                            className="flex-1 text-[#0d1b3e] font-medium text-sm leading-6"
+                            placeholder={`Type your ${activeTab} content here...\n\nBe clear and concise. Use AI Writer for suggestions.`}
+                            placeholderTextColor="#94a3b8"
                             multiline
                             textAlignVertical="top"
                             value={body}
@@ -452,21 +463,22 @@ export default function CommunicationManager() {
                     </View>
 
                     {activeTab === 'push' && (
-                        <View className="mt-3">
-                            <Text className="text-slate-400 text-[10px] font-bold uppercase mb-1 ml-1">Action Route (Optional)</Text>
-                            <View className="flex-row gap-1">
-                                <TextInput 
-                                    className="flex-1 bg-[#f8fafc] border border-slate-200 rounded-lg px-3 py-2 text-[#0d1b3e] text-xs shadow-sm"
-                                    placeholder="e.g. /transfer"
-                                    value={actionRoute}
-                                    onChangeText={setActionRoute}
-                                />
-                                {/* New Feature: Quick Routes */}
-                                <TouchableOpacity 
-                                    onPress={() => setActionRoute('/wallet')}
-                                    className="bg-[#0d1b3e] px-2 py-2 rounded-lg items-center justify-center shadow-sm"
-                                >
-                                    <Text className="text-[#f5a623] text-[9px] font-bold uppercase">Wallet</Text>
+                        <View className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                            <Text className="text-slate-500 text-[10px] font-bold uppercase mb-3">Action Route (Deep Link)</Text>
+                            <View className="flex-row gap-2">
+                                <View className="flex-1 bg-white border border-slate-200 rounded-xl px-3 flex-row items-center h-12 shadow-sm">
+                                    <Ionicons name="link-outline" size={16} color="#94a3b8" />
+                                    <TextInput 
+                                        className="flex-1 ml-2 text-[#0d1b3e] text-xs font-bold"
+                                        placeholder="e.g. /wallet"
+                                        placeholderTextColor="#94a3b8"
+                                        value={actionRoute}
+                                        onChangeText={setActionRoute}
+                                    />
+                                </View>
+                                {/* Quick Routes */}
+                                <TouchableOpacity onPress={() => setActionRoute('/wallet')} className="bg-[#0d1b3e] px-4 rounded-xl items-center justify-center shadow-md">
+                                    <Text className="text-[#f5a623] text-[10px] font-bold uppercase tracking-wider">Wallet</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

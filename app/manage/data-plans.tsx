@@ -22,6 +22,7 @@ export default function ManageDataPlans() {
     const [selectedNetwork, setSelectedNetwork] = useState('mtn');
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
+    const [activeVendor, setActiveVendor] = useState('clubkonnect');
 
     // Markup configs states
     const [configs, setConfigs] = useState<any[]>([]);
@@ -42,6 +43,12 @@ export default function ManageDataPlans() {
 
     const fetchConfigs = async () => {
         try {
+            // Fetch VTU Vendor
+            const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
+            if (vendorData) {
+                setActiveVendor(vendorData.value);
+            }
+
             const { data, error } = await supabase
                 .from('data_configs')
                 .select('*')
@@ -115,13 +122,19 @@ export default function ManageDataPlans() {
             return;
         }
 
-        const { error } = await supabase
-            .from('data_configs')
-            .update({
-                markup_type: newMarkupType,
-                markup_value: val
-            })
-            .eq('id', editingConfig.id);
+        let error;
+        if (editingConfig.id) {
+            const { error: err } = await supabase
+                .from('data_configs')
+                .update({ markup_type: newMarkupType, markup_value: val })
+                .eq('id', editingConfig.id);
+            error = err;
+        } else {
+            const { error: err } = await supabase
+                .from('data_configs')
+                .insert({ network: editingConfig.network, markup_type: newMarkupType, markup_value: val });
+            error = err;
+        }
 
         if (error) {
             Alert.alert('Error', error.message);
@@ -129,7 +142,7 @@ export default function ManageDataPlans() {
             setEditingConfig(null);
             setNewMarkupValue('');
             fetchConfigs();
-            Alert.alert('Success', 'Markup settings updated. Click "Apply Markup (Daura Riba)" to update existing plans.');
+            Alert.alert('Success', 'Markup settings updated. Click "Apply Markup" to update existing plans.');
         }
     };
 
@@ -154,8 +167,8 @@ export default function ManageDataPlans() {
                 return;
             }
 
-            // Apply markup formulas in bulk
-            const updatedPlans = activePlans.map(plan => {
+            // Apply markup formulas individually to avoid generated column issues
+            for (const plan of activePlans) {
                 const cost = parseFloat(plan.cost_price);
                 let selling = cost;
                 if (config.markup_type === 'percentage') {
@@ -165,20 +178,15 @@ export default function ManageDataPlans() {
                 }
                 selling = Math.round(selling);
 
-                return {
-                    ...plan,
-                    selling_price: selling
-                };
-            });
+                const { error: updateErr } = await supabase
+                    .from('data_plans')
+                    .update({ selling_price: selling })
+                    .eq('id', plan.id);
+                
+                if (updateErr) throw updateErr;
+            }
 
-            // Push in a single bulk upsert query
-            const { error: upsertErr } = await supabase
-                .from('data_plans')
-                .upsert(updatedPlans);
-
-            if (upsertErr) throw upsertErr;
-
-            Alert.alert("Success", `Daura Riba: Selling prices for ${selectedNetwork.toUpperCase()} plans updated successfully using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
+            Alert.alert("Success", `Apply Markup: Selling prices for ${selectedNetwork.toUpperCase()} plans updated successfully using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
             fetchPlans();
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to apply markup");
@@ -209,8 +217,11 @@ export default function ManageDataPlans() {
             {/* Header Controls */}
             <View className="px-4 py-3 bg-white border-b border-gray-100 flex-row justify-between items-center">
                 <View>
-                    <Text className="text-sm font-extrabold text-[#0d1b3e]">Daura Riba & pricing</Text>
-                    <Text className="text-[10px] text-slate-400">Configure margins and data plans</Text>
+                    <Text className="text-sm font-extrabold text-[#0d1b3e]">Apply Markup & Pricing</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 4 }} />
+                        <Text className="text-[10px] font-bold text-emerald-600 uppercase">API: {activeVendor}</Text>
+                    </View>
                 </View>
                 <TouchableOpacity 
                     onPress={handleSync} 
@@ -222,7 +233,7 @@ export default function ManageDataPlans() {
                     ) : (
                         <Ionicons name="refresh" size={13} color={T.white} className="mr-1.5" />
                     )}
-                    <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync ClubKonnect</Text>
+                    <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync {activeVendor === 'bigi' ? 'Bigi' : 'ClubKonnect'}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -231,7 +242,7 @@ export default function ManageDataPlans() {
                 <View className="flex-row justify-between items-center mb-2.5">
                     <View className="flex-row items-center">
                         <Ionicons name="trending-up" size={15} color={T.gold} className="mr-1.5" />
-                        <Text className="font-extrabold text-xs text-[#0d1b3e]">Riba Configurations</Text>
+                        <Text className="font-extrabold text-xs text-[#0d1b3e]">Markup Configurations</Text>
                     </View>
                     <TouchableOpacity 
                         onPress={handleApplyMarkups}
@@ -244,12 +255,12 @@ export default function ManageDataPlans() {
                         ) : (
                             <Ionicons name="flash" size={11} color={T.gold} className="mr-1.5" />
                         )}
-                        <Text className="text-white text-[10px] font-extrabold">Apply Riba ({selectedNetwork.toUpperCase()})</Text>
+                        <Text className="text-white text-[10px] font-extrabold">Apply Markup ({selectedNetwork.toUpperCase()})</Text>
                     </TouchableOpacity>
                 </View>
                 <View className="flex-row justify-between gap-1.5">
                     {networks.map(net => {
-                        const conf = configs.find(c => c.network === net) || { markup_type: 'fixed', markup_value: 50 };
+                        const conf = configs.find(c => c.network === net) || { network: net, markup_type: 'fixed', markup_value: 0 };
                         return (
                             <TouchableOpacity
                                 key={net}
@@ -306,16 +317,17 @@ export default function ManageDataPlans() {
                                         </Text>
                                     </View>
                                 </View>
-                                <View className="flex-row items-center gap-1.5 mt-0.5">
-                                    <Text className="text-slate-400 text-[10px]">Cost: ₦{plan.cost_price}</Text>
-                                    <Text className="text-slate-300 text-[10px]">|</Text>
+                                <View className="mt-1 bg-blue-50 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
+                                    <Text className="text-slate-500 text-[10px] font-bold">API Price: ₦{plan.cost_price}</Text>
                                     <Text className="text-[#0d1b3e] font-extrabold text-xs">Selling: ₦{plan.selling_price}</Text>
-                                    {plan.profit && (
+                                </View>
+                                <View className="flex-row items-center mt-1">
+                                    {plan.profit ? (
                                         <>
                                             <Text className="text-slate-300 text-[10px]">|</Text>
-                                            <Text className="text-emerald-600 text-[9px] font-bold">Riba: ₦{plan.profit}</Text>
+                                            <Text className="text-emerald-600 text-[9px] font-bold">Profit: ₦{plan.profit}</Text>
                                         </>
-                                    )}
+                                    ) : null}
                                 </View>
                             </View>
 
@@ -356,7 +368,7 @@ export default function ManageDataPlans() {
                             <Text className="text-slate-400 text-[11px] mb-3" numberOfLines={1}>{editingPlan.name}</Text>
                             
                             <View className="mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                 <Text className="text-[9px] text-slate-400 uppercase font-extrabold">Cost Price</Text>
+                                 <Text className="text-[9px] text-slate-400 uppercase font-extrabold">API Original Price</Text>
                                  <Text className="text-sm font-extrabold text-slate-600">₦{editingPlan.cost_price}</Text>
                             </View>
 
@@ -396,7 +408,7 @@ export default function ManageDataPlans() {
                         <View className="bg-white w-full max-w-sm rounded-xl p-5 border border-slate-100 shadow-xl">
                             <View className="flex-row items-center mb-1">
                                 <Ionicons name="settings-outline" size={16} color={T.gold} className="mr-1.5" />
-                                <Text className="font-extrabold text-sm text-[#0d1b3e]">Markup (Riba) Config</Text>
+                                <Text className="font-extrabold text-sm text-[#0d1b3e]">Markup Config</Text>
                             </View>
                             <Text className="text-slate-400 text-[11px] mb-3">Adjust default markup for {editingConfig.network.toUpperCase()}</Text>
                             

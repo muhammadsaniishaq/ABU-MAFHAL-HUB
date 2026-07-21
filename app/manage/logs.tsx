@@ -8,10 +8,11 @@ import { supabase } from '../../services/supabase';
 interface Log {
     id: string;
     action: string;
-    admin_id: string; // Or expand to profile name
+    admin_id: string;
     details: any;
     created_at: string;
     target_resource?: string;
+    profiles?: { full_name: string; avatar_url: string; };
 }
 
 export default function AuditLogs() {
@@ -27,7 +28,7 @@ export default function AuditLogs() {
         setLoading(true);
         const { data, error } = await supabase
             .from('audit_logs')
-            .select('*')
+            .select('*, profiles!audit_logs_admin_id_fkey(full_name, avatar_url)')
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -85,7 +86,7 @@ export default function AuditLogs() {
                         const severity = getSeverity(item.action);
                         return (
                             <View className="bg-white p-4 items-start rounded-xl mb-3 border border-gray-100 shadow-sm">
-                                <View className="flex-row justify-between w-full mb-2">
+                                <View className="flex-row justify-between w-full mb-3">
                                     <View className="flex-row items-center gap-2">
                                         <View className={`w-2 h-2 rounded-full ${severity === 'critical' ? 'bg-red-500' :
                                             severity === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
@@ -94,18 +95,34 @@ export default function AuditLogs() {
                                     </View>
                                     <Text className="text-xs text-gray-400 font-medium">{formatTime(item.created_at)}</Text>
                                 </View>
-                                <Text className="text-gray-500 text-xs mb-2 leading-5">
+                                
+                                <Text className="text-gray-500 text-[13px] mb-3 leading-5">
                                     {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
                                 </Text>
-                                <View className="flex-row justify-between w-full items-center border-t border-gray-50 pt-2">
+
+                                <View className="flex-row justify-between w-full items-center border-t border-gray-50 pt-3 mt-1">
+                                    <View className="flex-row items-center gap-2">
+                                        {item.profiles?.avatar_url ? (
+                                            <View className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden border border-slate-200">
+                                                <Text className="hidden" />
+                                                {/* In a real app we'd use Image, but using a View for now to avoid import issues if Image wasn't imported */}
+                                                <View className="w-full h-full bg-blue-100 items-center justify-center">
+                                                    <Text className="text-[8px] font-bold text-blue-700">{item.profiles.full_name?.charAt(0) || 'A'}</Text>
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <View className="w-6 h-6 rounded-full bg-slate-100 items-center justify-center border border-slate-200">
+                                                <Text className="font-bold text-slate-500 text-[10px]">{item.profiles?.full_name?.charAt(0) || 'S'}</Text>
+                                            </View>
+                                        )}
+                                        <Text className="text-xs font-bold text-slate-600">{item.profiles?.full_name || 'System'}</Text>
+                                    </View>
+                                    
                                     <View className="bg-gray-100 px-2 py-1 rounded">
-                                        <Text className="text-[10px] text-gray-500 font-bold uppercase" numberOfLines={1}>
-                                            {item.id.split('-')[0]}...
+                                        <Text className="text-[9px] text-gray-500 font-bold uppercase" numberOfLines={1}>
+                                            RES: {item.target_resource || 'System'}
                                         </Text>
                                     </View>
-                                    <Text className="text-[10px] text-slate-400 font-bold">
-                                        ID: {item.admin_id ? item.admin_id.substring(0, 8) : 'SYSTEM'}
-                                    </Text>
                                 </View>
                             </View>
                         );

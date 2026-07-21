@@ -36,6 +36,7 @@ const modules = {
         { title: 'Data Plans', icon: 'wifi-outline', route: '/manage/data-plans', color: '#0EA5E9' },
         { title: 'Airtime', icon: 'call-outline', route: '/manage/airtime', color: '#10B981' },
         { title: 'Localization', icon: 'language-outline', route: '/manage/localization', color: '#8B5CF6' },
+        { title: 'Bulk SMS', icon: 'chatbubbles-outline', route: '/manage/bulk-sms', color: '#3B82F6' },
     ],
     banking: [
         { title: 'Cards', icon: 'card-outline', route: '/manage/cards', color: '#EC4899' },
@@ -114,6 +115,7 @@ export default function AdminBento() {
         tickets: 0,
         chats: 0
     });
+    const [adminProfile, setAdminProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [logoIconUrl, setLogoIconUrl] = useState<string | null>(null);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -147,6 +149,12 @@ export default function AdminBento() {
 
     const fetchCounts = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+                setAdminProfile(profile);
+            }
+
             const [
                 { count: userCount },
                 { count: kycCount },
@@ -315,16 +323,27 @@ export default function AdminBento() {
                                 </TouchableOpacity>
                                 
                                 {/* Double Gold Ring Avatar */}
-                                <View style={{ position: 'relative' }}>
+                                <TouchableOpacity 
+                                    style={{ position: 'relative' }}
+                                    activeOpacity={0.8}
+                                    onPress={() => router.push('/manage/profile')}
+                                >
                                     <View style={s.avatarDoubleRing}>
                                         <View style={s.avatarMiddleRing}>
                                             <View style={s.avatarInnerCircle}>
-                                                <Text style={s.avatarLetters}>AD</Text>
+                                                {adminProfile?.avatar_url ? (
+                                                    <Image 
+                                                        source={{ uri: adminProfile.avatar_url }} 
+                                                        style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                                                    />
+                                                ) : (
+                                                    <Text style={s.avatarLetters}>{adminProfile?.full_name?.[0]?.toUpperCase() || 'A'}</Text>
+                                                )}
                                             </View>
                                         </View>
                                     </View>
                                     <View style={s.avatarActiveDot} />
-                                </View>
+                                </TouchableOpacity>
                             </View>
                         </View>
 
@@ -332,7 +351,7 @@ export default function AdminBento() {
                         <View style={s.welcomeStatusRow}>
                             <View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                    <Text style={s.welcomeText}>Welcome back, Sani 👋</Text>
+                                    <Text style={s.welcomeText}>Welcome back, {adminProfile?.full_name?.split(' ')[0] || 'Admin'} 👋</Text>
                                     <View style={s.adminBadgePill}>
                                         <Text style={s.adminBadgeText}>SUPER ADMIN</Text>
                                     </View>

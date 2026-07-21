@@ -15,7 +15,7 @@ export const API_URL = 'https://api.abumafhal.com.ng/v1';
 // SWAPPED TO CLUBKONNECT AS REQUESTED
 const airtimeProvider: AirtimeProvider = ClubKonnectProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
-const dataProvider: ClubKonnectProvider = ClubKonnectProvider;
+const dataProvider: DataProvider = ClubKonnectProvider;
 const cryptoExchange: CryptoExchange = BinanceCryptoExchange; // Fixed Demo API limit issue
 import { IdProIdentityVerifier } from './idpro';
 const identityVerifier = IdProIdentityVerifier; // Live IdPro Edge Function
@@ -111,53 +111,37 @@ export const api = {
     data: {
         getPlans: async (network: string) => {
             try {
-                const response = await fetch('https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=CK101269551');
-                const data = await response.json();
-                
-                // Map the frontend network ID to the ClubKonnect API keys
-                let apiNetworkKey = 'MTN';
-                const netLower = network.toLowerCase();
-                if (netLower.includes('mtn')) apiNetworkKey = 'MTN';
-                else if (netLower.includes('glo')) apiNetworkKey = 'Glo';
-                else if (netLower.includes('airtel')) apiNetworkKey = 'Airtel';
-                else if (netLower.includes('mobile') || netLower.includes('etisalat') || netLower.includes('t2mobile')) apiNetworkKey = 'm_9mobile';
-                else apiNetworkKey = 'MTN';
+                // Normalize network (mtn, glo, airtel, 9mobile)
+                let netLower = network.toLowerCase();
+                if (netLower.includes('mtn')) netLower = 'mtn';
+                else if (netLower.includes('glo')) netLower = 'glo';
+                else if (netLower.includes('airtel')) netLower = 'airtel';
+                else if (netLower.includes('mobile') || netLower.includes('etisalat')) netLower = '9mobile';
+                else netLower = 'mtn';
 
-                if (data && data.MOBILE_NETWORK && data.MOBILE_NETWORK[apiNetworkKey] && data.MOBILE_NETWORK[apiNetworkKey][0] && data.MOBILE_NETWORK[apiNetworkKey][0].PRODUCT) {
-                    let products = data.MOBILE_NETWORK[apiNetworkKey][0].PRODUCT;
-                    if (!Array.isArray(products)) products = [products];
-                    
-                    return products.map((pkg: any) => {
-                        let inferredValidity = '30 Days';
-                        const nameLower = pkg.PRODUCT_NAME.toLowerCase();
-                        if (nameLower.includes('daily') || nameLower.includes('24hr')) inferredValidity = '1 Day';
-                        else if (nameLower.includes('weekly') || nameLower.includes('7 days')) inferredValidity = '7 Days';
-                        else if (nameLower.includes('monthly') || nameLower.includes('30 days')) inferredValidity = '30 Days';
-                        else {
-                            const match = pkg.PRODUCT_NAME.match(/(\d+)\s*(day|week|month|hr)/i);
-                            if (match) inferredValidity = match[0];
-                        }
+                const { data: plans, error } = await supabase
+                    .from('data_plans')
+                    .select('*')
+                    .eq('network', netLower)
+                    .eq('is_active', true)
+                    .order('cost_price', { ascending: true });
 
-                        // Clean up the name for display
-                        const cleanName = pkg.PRODUCT_NAME.replace(/\b(Daily|Weekly|Monthly|Day|Week|Month|Days|Weeks|Months|Hour|Hours|Hr|Hrs)\b/gi, '').replace(/\d+(hr|hrs)/gi, '').replace(/\-\s*/g, '').trim();
+                if (error) throw new Error(error.message);
+                if (!plans || plans.length === 0) throw new Error(`No data plans available for ${netLower}`);
 
-                        return {
-                            id: pkg.PRODUCT_ID || pkg.PRODUCT_CODE,
-                            code: pkg.PRODUCT_CODE,
-                            name: cleanName,
-                            originalName: pkg.PRODUCT_NAME,
-                            price: parseFloat(pkg.PRODUCT_AMOUNT),
-                            validity: inferredValidity,
-                            volume: '', // Can extract if needed, but display relies on name
-                            network: network,
-                            icon: ''
-                        };
-                    });
-                }
-                
-                throw new Error("Invalid API structure or no plans found");
+                return plans.map(p => ({
+                    id: p.plan_id,
+                    code: p.plan_id,
+                    name: p.name,
+                    originalName: p.original_name || p.name,
+                    price: p.selling_price,
+                    validity: p.validity || '30 Days',
+                    volume: p.volume || '',
+                    network: p.network,
+                    icon: ''
+                }));
             } catch (e) {
-                console.error("Failed to fetch Data plans from API", e);
+                console.error("Failed to fetch Data plans from database", e);
                 throw new Error("Could not load Data packages. Please try again later.");
             }
         },
@@ -337,7 +321,7 @@ export const api = {
         },
         getMarkup: async () => {
             const { data } = await supabase.from('app_settings').select('value').eq('key', 'electricity_markup_fee').maybeSingle();
-            return data && data.value ? parseFloat(data.value) : 50; // Default ₦50 markup
+            return data && data.value ? parseFloat(data.value) : 0; // Default ₦0 markup
         },
         verifyMeter: async (meterNumber: string, provider: string) => {
             try {
@@ -420,7 +404,7 @@ export const api = {
         },
         getMarkup: async () => {
             const { data } = await supabase.from('app_settings').select('value').eq('key', 'tv_markup_fee').maybeSingle();
-            return data && data.value ? parseFloat(data.value) : 100; // Default ₦100 markup
+            return data && data.value ? parseFloat(data.value) : 0; // Default ₦0 markup
         },
         verifySmartCard: async (smartCard: string, provider: string) => {
             try {

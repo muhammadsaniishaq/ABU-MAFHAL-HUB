@@ -396,7 +396,8 @@ export default function Dashboard() {
     '/nin-services': 'feature_nin',
     '/cac-services': 'feature_cac',
     '/smile': 'feature_smile',
-    '/social-boost': 'feature_social'
+    '/social-boost': 'feature_social',
+    '/bulk-sms': 'feature_bulk_sms'
   };
 
   const handleActionPress = (action: any) => {
@@ -420,6 +421,7 @@ export default function Dashboard() {
     { icon: 'receipt-outline', label: 'Bills', color: '#eab308', route: '/bills' },
     { icon: 'person-add-outline', label: 'NIN Services', color: '#10b981', route: '/nin-services' },
     { icon: 'ticket-outline', label: 'My Tickets', color: '#e11d48', route: '/(app)/tickets' },
+    { icon: 'chatbubbles-outline', label: 'Bulk SMS', color: '#3B82F6', route: '/bulk-sms' },
     { icon: 'tv-outline', label: 'Cable TV', color: '#8b5cf6', route: '/bills' },
     { icon: 'flash-outline', label: 'Electricity', color: '#f5a623', route: '/bills' },
     { icon: 'globe-outline', label: 'Smile Data', color: '#ec4899', route: '/smile' },

@@ -1,6 +1,6 @@
 
 import { createClient } from "@supabase/supabase-js";
-import { CLUBKONNECT_USER_ID, CLUBKONNECT_API_KEY as _CLUBKONNECT_API_KEY } from "../_shared/clubkonnect.ts";
+import { DEFAULT_CLUBKONNECT_USER_ID, DEFAULT_CLUBKONNECT_API_KEY as _CLUBKONNECT_API_KEY } from "../_shared/clubkonnect.ts";
 
 interface ClubKonnectPlan {
     PRODUCT?: ClubKonnectPlan | ClubKonnectPlan[];
@@ -56,9 +56,49 @@ Deno.serve(async (req) => {
         if (adminError) throw new Error(`Database Error (is_admin): ${adminError.message}`);
         if (!isAdmin) throw new Error("Unauthorized: Access Denied (Admins Only)");
 
-        const url = `https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${CLUBKONNECT_USER_ID}`;
-        const response = await fetch(url);
-        const data = await response.json();
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        // Get Active Vendor
+        const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
+        const vtuVendor = vendorSetting?.value || 'clubkonnect';
+
+        let networksData: any = {};
+
+        if (vtuVendor === 'bigi') {
+            // Bigi Logic
+            const { data: bigiTokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
+            const bigiToken = bigiTokenSetting?.value;
+            if (!bigiToken) throw new Error('Missing Bigi API Token');
+
+            const bigiNetworks = [
+                { id: 1, name: 'MTN' },
+                { id: 2, name: 'GLO' },
+                { id: 3, name: 'AIRTEL' },
+                { id: 4, name: '9MOBILE' }
+            ];
+
+            for (const net of bigiNetworks) {
+                const res = await fetch(`https://api.bigisub.ng/api/v2/vtu/data/plans/?network=${net.id}`, {
+                    headers: { 'Authorization': `Token ${bigiToken}` }
+                });
+                const bigiRes = await res.json();
+                if (bigiRes.success && bigiRes.data) {
+                    networksData[net.name] = bigiRes.data.map((p: any) => ({
+                        PRODUCT_ID: p.id.toString(),
+                        PRODUCT_AMOUNT: p.amount.toString(),
+                        PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity}`,
+                        validity: p.validity,
+                        volume: p.size
+                    }));
+                }
+            }
+        } else {
+            // ClubKonnect Logic
+            const url = `https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${DEFAULT_CLUBKONNECT_USER_ID}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            networksData = data.MOBILE_NETWORK;
+        }
 
         // ClubKonnect Format:
         // { 
@@ -84,13 +124,10 @@ Deno.serve(async (req) => {
         // If we can't fetch in this environment due to IP, we might need to parse the user provided list.
         // User provided the link, so I assume we can fetch.
         
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
         // Fetch Markup Configs
         const { data: configs } = await supabaseAdmin.from('data_configs').select('*');
         const configMap = new Map(configs?.map((c: any) => [c.network.toLowerCase(), c]) || []);
 
-        const networksData = data.MOBILE_NETWORK;
         let totalInserted = 0;
 
         const networksFound: string[] = [];
@@ -154,13 +191,27 @@ Deno.serve(async (req) => {
                     const rawName = plan.PRODUCT_NAME || plan.NAME || plan.TITLE || plan.PACKAGE_NAME || getVal(/name|title|package/i);
                     
                     // Construct Name if missing
-                    const name = rawName || `${networkName.toUpperCase()} ${planId}`;
+                    let name = rawName || `${networkName.toUpperCase()} ${planId}`;
 
-                    // Debugging removed for production
+                    // Extract validity from name/payload if available for better display
+                    let validity = plan.validity || plan.VALIDITY;
+                    if (!validity) {
+                        const nameLower = name.toLowerCase();
+                        if (nameLower.includes('daily') || nameLower.includes('24hr')) validity = '1 Day';
+                        else if (nameLower.includes('weekly') || nameLower.includes('7 days')) validity = '7 Days';
+                        else if (nameLower.includes('monthly') || nameLower.includes('30 days')) validity = '30 Days';
+                        else {
+                            const match = name.match(/(\d+)\s*(day|week|month|hr)/i);
+                            if (match) validity = match[0];
+                            else validity = '30 Days'; // default
+                        }
+                    }
 
+                    // Clean name (optional formatting logic if desired)
+                    const cleanName = name.replace(/\b(Daily|Weekly|Monthly|Day|Week|Month|Days|Weeks|Months|Hour|Hours|Hr|Hrs)\b/gi, '').replace(/\d+(hr|hrs)/gi, '').replace(/\-\s*/g, '').trim();
 
                     const config = configMap.get(networkName);
-                    let finalSellingPrice = costPrice + 50.00; // Default Markup
+                    let finalSellingPrice = costPrice; // Default Markup is 0 (direct API price)
                     if (config) {
                         if (config.markup_type === 'percentage') {
                             finalSellingPrice = costPrice * (1 + (parseFloat(config.markup_value) / 100));
@@ -182,7 +233,7 @@ Deno.serve(async (req) => {
                     if (existingPlan) {
                         const { error } = await supabaseAdmin.from('data_plans')
                             .update({
-                                name: name,
+                                name: cleanName,
                                 cost_price: costPrice,
                                 selling_price: finalSellingPrice,
                                 is_active: true
@@ -194,7 +245,7 @@ Deno.serve(async (req) => {
                             .insert({
                                 network: networkName,
                                 plan_id: planId,
-                                name: name,
+                                name: cleanName,
                                 cost_price: costPrice,
                                 selling_price: finalSellingPrice,
                                 is_active: true

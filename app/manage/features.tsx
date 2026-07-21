@@ -36,7 +36,8 @@ const KNOWN_FEATURES = [
     { key: 'feature_biometrics', label: 'Biometrics', icon: 'finger-print' },
     { key: 'feature_forensics', label: 'Forensics', icon: 'search' },
     { key: 'feature_wealth', label: 'Wealth', icon: 'briefcase' },
-    { key: 'feature_automation', label: 'Automation', icon: 'cog' }
+    { key: 'feature_automation', label: 'Automation', icon: 'cog' },
+    { key: 'feature_bulk_sms', label: 'Bulk SMS', icon: 'chatbubbles' }
 ];
 
 interface FeatureFlag {

@@ -117,9 +117,22 @@ export default function Login() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('role')
+                    .select('role, status')
                     .eq('id', data.user.id)
                     .single();
+
+                if (profile && profile.status === 'suspended') {
+                    Alert.alert('Account Suspended', 'Your account has been suspended. Please contact support.');
+                    await supabase.auth.signOut();
+                    setLoading(false);
+                    return;
+                }
+
+                // Automatically mark as active if they were inactive, and update last_login
+                await supabase.from('profiles').update({ 
+                    last_login: new Date().toISOString(),
+                    status: profile?.status === 'inactive' ? 'active' : profile?.status || 'active'
+                }).eq('id', data.user.id);
 
                 await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
