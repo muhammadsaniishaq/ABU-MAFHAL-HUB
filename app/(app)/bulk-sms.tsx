@@ -316,12 +316,12 @@ export default function UserBulkSMS() {
                 headerBackTitle: 'Back'
             }} />
 
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
                 
                 {/* Slim Balance Card */}
                 <LinearGradient 
                     colors={[NAVY, LIGHT_NAVY]} 
-                    style={{ padding: 16, borderRadius: 12, marginBottom: 16 }}
+                    style={{ padding: 14, borderRadius: 12, marginBottom: 16, shadowColor: NAVY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 }}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 >
@@ -357,7 +357,7 @@ export default function UserBulkSMS() {
                 </View>
 
                 {activeTab === 'Templates' && (
-                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: '#f1f5f9' }}>
                         <Text style={{ color: NAVY, fontWeight: 'bold', fontSize: 13, textTransform: 'uppercase', marginBottom: 12 }}>Message Templates</Text>
                         {Object.keys(QUICK_TEMPLATES).map((key) => (
                             <TouchableOpacity 
@@ -373,7 +373,7 @@ export default function UserBulkSMS() {
                 )}
 
                 {activeTab === 'History' && (
-                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: '#f1f5f9' }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                             <Text style={{ color: NAVY, fontWeight: 'bold', fontSize: 13, textTransform: 'uppercase' }}>Recent Campaigns</Text>
                             <TouchableOpacity onPress={fetchHistory} style={{ padding: 4 }}>
@@ -407,32 +407,32 @@ export default function UserBulkSMS() {
 
                 {activeTab === 'Send' && (
                     <>
-                        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 }}>
+                        <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: '#f1f5f9' }}>
                             
-                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: NAVY, marginBottom: 8, textTransform: 'uppercase' }}>Sender ID</Text>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: NAVY, marginBottom: 6, textTransform: 'uppercase' }}>Sender ID</Text>
                             <TextInput
-                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 12, fontSize: 14, color: NAVY, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}
+                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, fontSize: 13, color: NAVY, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' }}
                                 value={senderId}
                                 onChangeText={(t) => setSenderId(t.substring(0, 11))}
                                 placeholder="e.g. MAFHAL"
                                 maxLength={11}
                             />
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
-                                <Text style={{ fontSize: 11, fontWeight: 'bold', color: NAVY, textTransform: 'uppercase' }}>Recipients</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <TouchableOpacity onPress={handleValidateNumbers} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef3c7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: NAVY, textTransform: 'uppercase' }}>Recipients</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <TouchableOpacity onPress={handleValidateNumbers} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }}>
                                         <Ionicons name="shield-checkmark-outline" size={12} color="#d97706" style={{ marginRight: 4 }} />
-                                        <Text style={{ fontSize: 10, color: '#d97706', fontWeight: 'bold' }}>Validate</Text>
+                                        <Text style={{ fontSize: 9, color: '#d97706', fontWeight: 'bold' }}>Validate</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity onPress={handleImportCSV} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                    <TouchableOpacity onPress={handleImportCSV} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }}>
                                         <Ionicons name="document-attach-outline" size={12} color="#3b82f6" style={{ marginRight: 4 }} />
-                                        <Text style={{ fontSize: 10, color: '#3b82f6', fontWeight: 'bold' }}>Import CSV</Text>
+                                        <Text style={{ fontSize: 9, color: '#3b82f6', fontWeight: 'bold' }}>Import CSV</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
                             <TextInput
-                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 12, fontSize: 14, color: NAVY, marginBottom: 4, borderWidth: 1, borderColor: '#e2e8f0', minHeight: 80 }}
+                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, fontSize: 13, color: NAVY, marginBottom: 4, borderWidth: 1, borderColor: '#e2e8f0', minHeight: 70 }}
                                 value={recipients}
                                 onChangeText={setRecipients}
                                 placeholder="08031234567, 09012345678"
@@ -445,56 +445,50 @@ export default function UserBulkSMS() {
                                 <Text style={{ fontSize: 11, color: recipientCount > 0 ? NAVY : '#94a3b8', fontWeight: 'bold' }}>{recipientCount} Found</Text>
                             </View>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
-                                <Text style={{ fontSize: 11, fontWeight: 'bold', color: NAVY, textTransform: 'uppercase' }}>Message</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: NAVY, textTransform: 'uppercase' }}>Message</Text>
                                 <TouchableOpacity onPress={() => setShowAIModal(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Ionicons name="sparkles" size={12} color={GOLD} />
-                                    <Text style={{ fontSize: 11, color: GOLD, fontWeight: 'bold' }}>AI Assist</Text>
+                                    <Ionicons name="sparkles" size={12} color="#8b5cf6" />
+                                    <Text style={{ fontSize: 10, color: '#8b5cf6', fontWeight: 'bold' }}>AI Write</Text>
                                 </TouchableOpacity>
                             </View>
                             <TextInput
-                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 12, fontSize: 14, color: NAVY, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0', minHeight: 100 }}
+                                style={{ backgroundColor: '#f8fafc', borderRadius: 8, padding: 8, fontSize: 12, color: NAVY, marginBottom: 4, borderWidth: 1, borderColor: '#e2e8f0', minHeight: 90 }}
                                 value={message}
                                 onChangeText={setMessage}
                                 placeholder="Type your message here..."
                                 multiline
                                 textAlignVertical="top"
                             />
-                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                                <Text style={{ fontSize: 11, color: pageCount > 1 ? '#eab308' : '#64748b' }}>
-                                    {message.length} chars ({pageCount} {pageCount === 1 ? 'page' : 'pages'})
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingHorizontal: 2 }}>
+                                <Text style={{ fontSize: 10, color: pageCount > 1 ? '#ef4444' : '#94a3b8' }}>
+                                    {message.length} chars ({pageCount} page{pageCount !== 1 ? 's' : ''})
                                 </Text>
+                                <Text style={{ fontSize: 10, color: '#94a3b8' }}>1 page = 160 chars</Text>
                             </View>
                         </View>
 
                         {/* Summary & Send Button */}
                         <View style={{ marginTop: 16, backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                                <Text style={{ color: '#64748b', fontSize: 13 }}>Total Recipients</Text>
-                                <Text style={{ color: NAVY, fontSize: 13, fontWeight: 'bold' }}>{recipientCount}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                                <Text style={{ color: '#64748b', fontSize: 13 }}>Pages per SMS</Text>
-                                <Text style={{ color: NAVY, fontSize: 13, fontWeight: 'bold' }}>{pageCount}</Text>
-                            </View>
-                            <View style={{ height: 1, backgroundColor: '#f1f5f9', marginVertical: 8 }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={{ color: NAVY, fontSize: 15, fontWeight: 'bold' }}>Total Cost</Text>
-                                <Text style={{ color: GOLD, fontSize: 18, fontWeight: 'bold' }}>₦{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                            
+                            {/* Total Cost Highlight */}
+                            <View style={{ backgroundColor: '#f0fdf4', borderRadius: 8, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#bbf7d0' }}>
+                                <Text style={{ color: '#166534', fontWeight: 'bold', fontSize: 11 }}>Total Cost</Text>
+                                <Text style={{ color: '#15803d', fontWeight: 'bold', fontSize: 14 }}>₦{totalCost.toLocaleString()}</Text>
                             </View>
 
                             <TouchableOpacity 
-                                style={{ backgroundColor: NAVY, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 20, opacity: (recipientCount === 0 || !message) ? 0.5 : 1 }}
                                 onPress={executeSendSMS}
                                 disabled={loading || recipientCount === 0 || !message}
-                                activeOpacity={0.8}
+                                style={{ backgroundColor: (loading || recipientCount === 0 || !message) ? '#94a3b8' : NAVY, padding: 14, borderRadius: 10, alignItems: 'center', shadowColor: NAVY, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 }}
                             >
                                 {loading ? (
-                                    <ActivityIndicator color={GOLD} />
+                                    <ActivityIndicator color="#fff" />
                                 ) : (
-                                    <Text style={{ color: GOLD, fontSize: 14, fontWeight: 'bold' }}>
-                                        Pay ₦{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })} & Send
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="send" size={16} color="#fff" />
+                                        <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Send SMS Now</Text>
+                                    </View>
                                 )}
                             </TouchableOpacity>
                         </View>
