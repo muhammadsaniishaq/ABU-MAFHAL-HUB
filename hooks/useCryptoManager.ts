@@ -209,7 +209,6 @@ export function useCryptoManager() {
         fetchUserWallets,
         fetchPendingWithdrawalsList,
         approveWithdrawal,
-        approveWithdrawal,
         updateUserBalance,
         livePrices,
         p2pOrders,

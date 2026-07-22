@@ -565,35 +565,35 @@ export const api = {
     identity: {
         // ── Verifications ─────────────────────────────────────────────
         /** Verify a National Identification Number */
-        validateNIN: (nin: string) => identityVerifier.validateNIN(nin),
+        validateNIN: (nin: string, priceId?: string) => identityVerifier.validateNIN(nin, priceId),
         /** Verify BVN via Aijalon /api/bvn/ */
-        validateBVN: (bvn: string) => identityVerifier.validateBVN(bvn),
+        validateBVN: (bvn: string, priceId?: string) => identityVerifier.validateBVN(bvn, priceId),
         /** Get full BVN card/record details */
-        getBVNCard: (bvn: string) => identityVerifier.getBVNCard?.(bvn),
+        getBVNCard: (bvn: string, priceId?: string) => identityVerifier.getBVNCard?.(bvn, priceId),
         /** Verify NIN by linked phone number */
-        verifyNINWithPhone: (phone: string) => identityVerifier.verifyNINWithPhone?.(phone),
+        verifyNINWithPhone: (phone: string, priceId?: string) => identityVerifier.verifyNINWithPhone?.(phone, priceId),
         /** Verify phone number via /api/phone/ */
-        verifyPhone: (phone: string) => identityVerifier.verifyPhone(phone),
+        verifyPhone: (phone: string, priceId?: string) => identityVerifier.verifyPhone(phone, priceId),
         /** Verify identity using demographic data (name, gender, DOB) */
-        verifyDemographic: (params: DemographicParams) => identityVerifier.verifyDemographic(params),
+        verifyDemographic: (params: DemographicParams, priceId?: string) => identityVerifier.verifyDemographic(params, priceId),
 
         // ── IPE Clearance ──────────────────────────────────────────────
         /** Run instant pre-employment clearance check */
-        runIPEClearance: (number: string) => identityVerifier.runIPEClearance?.(number),
+        runIPEClearance: (number: string, priceId?: string, addonPriceId?: string) => identityVerifier.runIPEClearance?.(number, priceId, addonPriceId),
 
         // ── Validation ─────────────────────────────────────────────────
         /** Run instant identity/document validation */
-        validateIdentity: (number: string, type?: string) => identityVerifier.validateIdentity?.(number, type),
+        validateIdentity: (number: string, type?: string, priceId?: string, addonPriceId?: string) => identityVerifier.validateIdentity?.(number, type, priceId, addonPriceId),
 
         // ── Delink & Recovery ──────────────────────────────────────────
         /** Delink phone from NIN or retrieve linked info */
-        delinkAndRetrieve: (number: string, phone?: string) => identityVerifier.delinkAndRetrieve?.(number, phone),
+        delinkAndRetrieve: (number: string, phone?: string, priceId?: string) => identityVerifier.delinkAndRetrieve?.(number, phone, priceId),
         /** Retrieve BVN by phone number or NIN */
-        retrieveBVN: (number: string) => identityVerifier.retrieveBVN?.(number),
+        retrieveBVN: (number: string, priceId?: string) => identityVerifier.retrieveBVN?.(number, priceId),
 
         // ── User Details / Modifications ───────────────────────────────
         /** Retrieve NIN personalization/enrollment details */
-        getPersonalization: (number: string) => identityVerifier.getPersonalization?.(number),
+        getPersonalization: (number: string, priceId?: string) => identityVerifier.getPersonalization?.(number, priceId),
         /** Request name or contact modification on NIN */
         requestModification: (params: ModificationParams) => identityVerifier.requestModification?.(params),
         /** Request date of birth correction */
