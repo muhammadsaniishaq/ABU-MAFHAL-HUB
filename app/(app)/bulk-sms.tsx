@@ -146,15 +146,17 @@ export default function UserBulkSMS() {
     };
 
     const handleValidateNumbers = () => {
-        if (!recipients.trim()) return Alert.alert('Notice', 'Please enter some numbers first.');
+        const notify = (title: string, msg: string) => Platform.OS === 'web' ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
+        
+        if (!recipients.trim()) return notify('Notice', 'Please enter some numbers first.');
         const phoneNumbers = recipients.match(/\b\d{10,15}\b/g);
         if (phoneNumbers && phoneNumbers.length > 0) {
             const uniqueNumbers = Array.from(new Set(phoneNumbers));
             setRecipients(uniqueNumbers.join(', '));
-            Alert.alert('Validation Complete', `Found and cleaned ${uniqueNumbers.length} valid phone number(s).`);
+            notify('Validation Complete', `Found and cleaned ${uniqueNumbers.length} valid phone number(s).`);
         } else {
             setRecipients('');
-            Alert.alert('Notice', 'No valid numbers found.');
+            notify('Notice', 'No valid numbers found.');
         }
     };
 
@@ -209,90 +211,108 @@ export default function UserBulkSMS() {
     const pageCount = message.length > 0 ? Math.ceil(message.length / 160) : 0;
     const totalCost = recipientCount * pageCount * pricePerPage;
 
+    const sendSMSLogic = async () => {
+        setLoading(true);
+        try {
+            const { data: secretData, error: secretError } = await supabase
+                .from('system_secrets')
+                .select('key, value')
+                .in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
+
+            const tokenObj = secretData?.find(s => s.key === 'BIGI_API_TOKEN');
+            const pinObj = secretData?.find(s => s.key === 'BIGI_API_PIN');
+
+            if (secretError || !tokenObj?.value) throw new Error('System SMS Configuration Error (Token Missing)');
+
+            const payload = {
+                sender_id: senderId.substring(0, 11),
+                sender: senderId.substring(0, 11),
+                message: message,
+                recipients: numbersArray,
+                pin: pinObj?.value || '1234',
+                pin_code: pinObj?.value || '1234'
+            };
+
+            const response = await fetch(BIGIHUB_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Token ${tokenObj.value}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const textResponse = await response.text();
+            let result: any = {};
+            try { result = textResponse ? JSON.parse(textResponse) : {}; } catch (e) {}
+
+            if (response.ok || result.status === 'success') {
+                const newBalance = userBalance - totalCost;
+                await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
+                setUserBalance(newBalance);
+                
+                await supabase.from('transactions').insert({
+                    user_id: userId,
+                    type: 'payment',
+                    amount: totalCost,
+                    status: 'successful',
+                    description: `Bulk SMS (${pageCount} pages to ${recipientCount} numbers)`,
+                    reference: `SMS-${Date.now()}`
+                });
+
+                if (Platform.OS === 'web') {
+                    window.alert(`Success!\nSMS sent successfully to ${recipientCount} recipients! Cost: ₦${totalCost.toLocaleString()}`);
+                } else {
+                    Alert.alert('Success', `SMS sent successfully to ${recipientCount} recipients! Cost: ₦${totalCost.toLocaleString()}`);
+                }
+                
+                setMessage('');
+                setRecipients('');
+            } else {
+                let errorMsg = result.message || textResponse;
+                if (response.status === 400 && result.errors) errorMsg += ' - Details: ' + JSON.stringify(result.errors);
+                throw new Error(errorMsg || `HTTP ${response.status}`);
+            }
+        } catch (error: any) {
+            console.error('SMS Send Error:', error);
+            if (Platform.OS === 'web') {
+                window.alert('Error: Failed to send SMS.\n\n' + error.message);
+            } else {
+                Alert.alert('Error', 'Failed to send SMS.\n\n' + error.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const executeSendSMS = async () => {
-        if (!senderId) return Alert.alert('Error', 'Sender ID is required.');
-        if (!message) return Alert.alert('Error', 'Message cannot be empty.');
-        if (recipientCount === 0) return Alert.alert('Error', 'Please enter at least one valid phone number.');
+        const notify = (title: string, msg: string) => Platform.OS === 'web' ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
+
+        if (!senderId) return notify('Error', 'Sender ID is required.');
+        if (!message) return notify('Error', 'Message cannot be empty.');
+        if (recipientCount === 0) return notify('Error', 'Please enter at least one valid phone number.');
         
         if (userBalance < totalCost) {
-            return Alert.alert('Insufficient Balance', `You need ₦${totalCost.toLocaleString()} but your balance is ₦${userBalance.toLocaleString()}. Please fund your wallet.`);
+            return notify('Insufficient Balance', `You need ₦${totalCost.toLocaleString()} but your balance is ₦${userBalance.toLocaleString()}. Please fund your wallet.`);
         }
 
-        Alert.alert(
-            'Confirm Send',
-            `Send SMS to ${recipientCount} recipient(s)?\nTotal Cost: ₦${totalCost.toLocaleString()}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Send Now', 
-                    style: 'default',
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const { data: secretData, error: secretError } = await supabase
-                                .from('system_secrets')
-                                .select('key, value')
-                                .in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
+        const confirmMsg = `Send SMS to ${recipientCount} recipient(s)?\nTotal Cost: ₦${totalCost.toLocaleString()}`;
 
-                            const tokenObj = secretData?.find(s => s.key === 'BIGI_API_TOKEN');
-                            const pinObj = secretData?.find(s => s.key === 'BIGI_API_PIN');
-
-                            if (secretError || !tokenObj?.value) throw new Error('System SMS Configuration Error (Token Missing)');
-
-                            const payload = {
-                                sender_id: senderId.substring(0, 11),
-                                sender: senderId.substring(0, 11),
-                                message: message,
-                                recipients: numbersArray,
-                                pin: pinObj?.value || '1234',
-                                pin_code: pinObj?.value || '1234'
-                            };
-
-                            const response = await fetch(BIGIHUB_API_URL, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Token ${tokenObj.value}`
-                                },
-                                body: JSON.stringify(payload)
-                            });
-
-                            const textResponse = await response.text();
-                            let result: any = {};
-                            try { result = textResponse ? JSON.parse(textResponse) : {}; } catch (e) {}
-
-                            if (response.ok || result.status === 'success') {
-                                const newBalance = userBalance - totalCost;
-                                await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
-                                setUserBalance(newBalance);
-                                
-                                await supabase.from('transactions').insert({
-                                    user_id: userId,
-                                    type: 'payment',
-                                    amount: totalCost,
-                                    status: 'successful',
-                                    description: `Bulk SMS (${pageCount} pages to ${recipientCount} numbers)`,
-                                    reference: `SMS-${Date.now()}`
-                                });
-
-                                Alert.alert('Success', `SMS sent successfully to ${recipientCount} recipients! Cost: ₦${totalCost.toLocaleString()}`);
-                                setMessage('');
-                                setRecipients('');
-                            } else {
-                                let errorMsg = result.message || textResponse;
-                                if (response.status === 400 && result.errors) errorMsg += ' - Details: ' + JSON.stringify(result.errors);
-                                throw new Error(errorMsg || `HTTP ${response.status}`);
-                            }
-                        } catch (error: any) {
-                            console.error('SMS Send Error:', error);
-                            Alert.alert('Error', 'Failed to send SMS.\n\n' + error.message);
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm(confirmMsg);
+            if (confirmed) {
+                sendSMSLogic();
+            }
+        } else {
+            Alert.alert(
+                'Confirm Send',
+                confirmMsg,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Send Now', style: 'default', onPress: sendSMSLogic }
+                ]
+            );
+        }
     };
 
     if (initializing) {
