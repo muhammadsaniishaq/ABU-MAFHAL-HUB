@@ -7,7 +7,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 
-const BIGIHUB_API_URL = process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/';
+const BIGIHUB_API_URL = Platform.OS === 'web' 
+    ? '/api/bigisub/communications/sms/send/' 
+    : (process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/');
 
 // Premium Colors
 const NAVY = '#0A192F';

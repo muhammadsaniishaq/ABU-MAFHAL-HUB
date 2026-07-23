@@ -6,7 +6,9 @@ import { supabase } from '../../services/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 
-const BIGIHUB_API_URL = process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/';
+const BIGIHUB_API_URL = Platform.OS === 'web' 
+    ? '/api/bigisub/communications/sms/send/' 
+    : (process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/');
 
 const QUICK_TEMPLATES = {
     Promotion: 'Hello {name}, enjoy 20% off on all data plans this weekend! Visit MAFHAL App now.',

@@ -5,6 +5,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/bigisub/:path*",
+      "destination": "https://api.bigisub.ng/api/v2/:path*"
+    },
+    {
       "source": "/((?!api/|_expo/.*).*)",
       "destination": "/index.html"
     }
