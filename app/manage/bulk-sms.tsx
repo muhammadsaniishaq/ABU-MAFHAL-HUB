@@ -7,7 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 
 const BIGIHUB_API_URL = Platform.OS === 'web' 
-    ? '/api/bigisub/communications/sms/send/' 
+    ? 'https://corsproxy.io/?' + encodeURIComponent(process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/')
     : (process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/');
 
 const QUICK_TEMPLATES = {
