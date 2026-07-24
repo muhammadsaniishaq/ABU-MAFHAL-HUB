@@ -163,7 +163,9 @@ export default function UserBulkSMS() {
     };
 
     const handleAIGenerate = async () => {
-        if (!aiPrompt.trim()) return Alert.alert('Notice', 'Please enter a description for the SMS.');
+        const notify = (title: string, msg: string) => Platform.OS === 'web' ? window.alert(`${title}\n${msg}`) : Alert.alert(title, msg);
+
+        if (!aiPrompt.trim()) return notify('Notice', 'Please enter a description for the SMS.');
         
         setAiLoading(true);
         try {
@@ -171,7 +173,7 @@ export default function UserBulkSMS() {
             const apiKey = secretData?.value || process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
             if (!apiKey) {
-                throw new Error('OpenAI API Key not found in system secrets or environment variables.');
+                throw new Error('OpenAI API Key not found. Please contact admin.');
             }
 
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -181,12 +183,12 @@ export default function UserBulkSMS() {
                     'Authorization': `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
+                    model: 'gpt-4o-mini',
                     messages: [
-                        { role: 'system', content: 'You are an expert marketing assistant. Write a short, engaging SMS message (max 160 characters) based on the user prompt. Keep it professional but persuasive.' },
+                        { role: 'system', content: 'You are an expert marketing assistant and copywriter. Write a professional, engaging SMS message exactly based on the user\'s instructions. Format it beautifully with clear spacing if needed. Do not include quotes or unnecessary pleasantries, just the exact SMS text. Ensure all the details from the user prompt are included.' },
                         { role: 'user', content: aiPrompt }
                     ],
-                    max_tokens: 60,
+                    max_tokens: 300,
                     temperature: 0.7
                 })
             });
@@ -201,7 +203,7 @@ export default function UserBulkSMS() {
                 throw new Error(data.error?.message || 'Failed to generate message.');
             }
         } catch (error: any) {
-            Alert.alert('AI Error', error.message);
+            notify('AI Error', error.message);
         } finally {
             setAiLoading(false);
         }
