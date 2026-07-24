@@ -187,41 +187,20 @@ export default function BulkSMS() {
         const numbersArray = recipients.split(/[\s,]+/).map(n => n.trim()).filter(n => n.length > 8);
 
         try {
-            const { data: secretData, error: secretError } = await supabase
-                .from('system_secrets')
-                .select('key, value')
-                .in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
-
-            const tokenObj = secretData?.find(s => s.key === 'BIGI_API_TOKEN');
-            const pinObj = secretData?.find(s => s.key === 'BIGI_API_PIN');
-
-            if (secretError || !tokenObj?.value) {
-                throw new Error('BIGI_API_TOKEN not found in API Vault.');
-            }
-
             const payload = {
                 sender_id: senderId,
                 sender: senderId,
                 message: message,
                 recipients: numbersArray,
-                pin: pinObj?.value || '1234',
-                pin_code: pinObj?.value || '1234'
             };
 
-            const response = await fetch(BIGIHUB_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Token ${tokenObj.value}`
-                },
-                body: JSON.stringify(payload)
+            const { data: result, error: invokeError } = await supabase.functions.invoke('send-bigisub-sms', {
+                body: { payload, BIGIHUB_API_URL: process.env.EXPO_PUBLIC_BIGIHUB_SMS_URL || 'https://api.bigisub.ng/api/v2/communications/sms/send/' }
             });
 
-            const textResponse = await response.text();
-            let result: any = {};
-            try { result = textResponse ? JSON.parse(textResponse) : {}; } catch (e) {}
+            if (invokeError) throw new Error(invokeError.message || 'Failed to call Edge Function');
 
-            if (response.ok || result.status === 'success') {
+            if (result && result.status === 'success') {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     await supabase.from('audit_logs').insert({
@@ -234,13 +213,11 @@ export default function BulkSMS() {
                 setMessage('');
                 setRecipients('');
             } else {
-                let errorMsg = result.message || textResponse;
-                if (response.status === 400 && result.errors) {
+                let errorMsg = result?.message || 'Unknown Error';
+                if (result?.errors) {
                     errorMsg += ' - Details: ' + JSON.stringify(result.errors);
-                } else if (response.status === 400 && typeof result === 'object') {
-                    errorMsg += ' - Payload Details: ' + JSON.stringify(result);
-                }
-                throw new Error(errorMsg || `HTTP ${response.status}`);
+                } 
+                throw new Error(errorMsg);
             }
         } catch (error: any) {
             console.error('Bigihub Error:', error);
