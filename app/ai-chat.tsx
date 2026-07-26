@@ -594,30 +594,34 @@ CRITICAL SECURITY RULES:
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-            {/* CHATGPT STYLE HEADER */}
+        <SafeAreaView className="flex-1 bg-[#040814]" edges={['top']}>
+            {/* ULTRA-MODERN GLASSMORPHIC HEADER */}
             <View className="z-20">
-                <LinearGradient colors={['#ffffff', 'rgba(255,255,255,0.9)']} className="border-b border-slate-100 px-4 py-3 pb-4 flex-row items-center justify-between shadow-sm shadow-slate-200/50">
-                    <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-slate-50 rounded-full active:bg-slate-100">
-                        <Ionicons name="arrow-back" size={20} color="#0d1b3e" />
+                <LinearGradient colors={['#060d21', '#0b132b']} className="border-b border-slate-800/80 px-3.5 py-2.5 flex-row items-center justify-between shadow-md">
+                    <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-slate-900/80 border border-slate-800 rounded-full active:bg-slate-800">
+                        <Ionicons name="chevron-back" size={18} color="#f5a623" />
                     </TouchableOpacity>
                     
                     <View className="items-center flex-row gap-2">
-                        <View className="w-8 h-8 rounded-full bg-[#0d1b3e] items-center justify-center shadow-sm">
-                            <Ionicons name="sparkles" size={14} color="#f5a623" />
+                        <View className="w-7 h-7 rounded-full bg-slate-900 border border-[#f5a623]/40 items-center justify-center shadow-sm">
+                            <Ionicons name="sparkles" size={13} color="#f5a623" />
                         </View>
                         <View className="items-start">
-                            <Text className="text-[#0d1b3e] font-extrabold text-[16px] tracking-tight">Cotex AI</Text>
+                            <Text className="text-white font-extrabold text-[14px] tracking-tight">Cotex AI</Text>
                             <View className="flex-row items-center gap-1">
-                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                <Text className="text-slate-500 text-[11px] font-medium">Always Online</Text>
+                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <Text className="text-slate-400 text-[10px] font-semibold">Online • GPT-4o</Text>
                             </View>
                         </View>
                     </View>
 
-                    <View className="flex-row items-center gap-1">
-                        <TouchableOpacity onPress={handleClearChat} className="p-2 bg-slate-50 rounded-full active:bg-slate-100">
-                            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                    <View className="flex-row items-center gap-2">
+                        <View className="bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-full flex-row items-center gap-1">
+                            <Ionicons name="wallet-outline" size={12} color="#f5a623" />
+                            <Text className="text-amber-400 font-bold text-[11px]">{userData.balance}</Text>
+                        </View>
+                        <TouchableOpacity onPress={handleClearChat} className="p-1.5 bg-slate-900/80 border border-slate-800 rounded-full active:bg-slate-800">
+                            <Ionicons name="trash-outline" size={16} color="#ef4444" />
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
@@ -627,18 +631,18 @@ CRITICAL SECURITY RULES:
             <KeyboardAvoidingView 
                 behavior="padding"
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 25}
-                className="flex-1 bg-[#f8fafc]"
+                className="flex-1 bg-[#040814]"
             >
                 <ScrollView 
                     ref={scrollViewRef}
-                    className="flex-1 px-4"
-                    contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 }}
+                    className="flex-1 px-3.5"
+                    contentContainerStyle={{ paddingTop: 14, paddingBottom: 20 }}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View className="items-center mb-6">
-                        <View className="bg-slate-200/60 px-3 py-1 rounded-full">
-                            <Text className="text-slate-500 text-[10px] font-semibold uppercase tracking-widest">
-                                {new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'})}
+                    <View className="items-center mb-4">
+                        <View className="bg-slate-900/80 border border-slate-800/80 px-3 py-0.5 rounded-full shadow-sm">
+                            <Text className="text-slate-400 text-[9.5px] font-bold uppercase tracking-wider">
+                                {new Date().toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'})}
                             </Text>
                         </View>
                     </View>
@@ -648,10 +652,10 @@ CRITICAL SECURITY RULES:
                         
                         if (isUser) {
                             return (
-                                <View key={msg.id} className="mb-6 flex-row justify-end">
-                                    <View className="max-w-[80%] rounded-2xl rounded-tr-sm overflow-hidden shadow-sm shadow-indigo-200/50">
-                                        <LinearGradient colors={['#0d1b3e', '#1a367d']} className="px-4 py-3">
-                                            <Text className="text-[15px] leading-6 text-white font-medium">
+                                <View key={msg.id} className="mb-4 flex-row justify-end">
+                                    <View className="max-w-[82%] rounded-2xl rounded-tr-xs overflow-hidden shadow-md shadow-blue-950/40 border border-blue-500/20">
+                                        <LinearGradient colors={['#1e3a8a', '#1d4ed8']} className="px-3.5 py-2.5">
+                                            <Text className="text-[13.5px] leading-5 text-white font-medium">
                                                 {msg.text}
                                             </Text>
                                         </LinearGradient>
@@ -659,61 +663,61 @@ CRITICAL SECURITY RULES:
                                 </View>
                             );
                         } else {
-                            // ChatGPT AI Message Style (No bubble, avatar on left, actions below)
                             return (
-                                <View key={msg.id} className="mb-6 flex-row justify-start w-full">
-                                    <View className="w-8 h-8 rounded-full bg-[#0d1b3e] items-center justify-center mr-3 mt-1 shadow-sm border border-black/5">
-                                        <Ionicons name="sparkles" size={16} color="#f5a623" />
+                                <View key={msg.id} className="mb-4 flex-row justify-start w-full">
+                                    <View className="w-7 h-7 rounded-full bg-slate-900 border border-[#f5a623]/40 items-center justify-center mr-2.5 mt-0.5 shadow-sm">
+                                        <Ionicons name="sparkles" size={13} color="#f5a623" />
                                     </View>
                                     
-                                    <View className="flex-1 max-w-[90%]">
-                                        <TouchableOpacity 
-                                            onLongPress={() => handleCopy(msg.text)}
-                                            activeOpacity={0.9}
-                                            className="pt-1 pb-2"
-                                        >
-                                            <Text className="text-[15px] leading-6 text-slate-800">
-                                                {msg.text}
-                                                {msg.isStreaming && <Text className="text-[#f5a623] font-bold"> ▋</Text>} 
-                                            </Text>
-                                            
-                                            {/* SMART ACTION BUTTON */}
-                                            {msg.action && !msg.isStreaming && (
-                                                <TouchableOpacity 
-                                                    onPress={() => router.push(msg.action?.route as any)}
-                                                    className="mt-3 bg-white py-2 px-3 rounded-lg flex-row items-center border border-slate-200 self-start shadow-sm"
-                                                >
-                                                    <Ionicons name="flash" size={14} color="#0d1b3e" />
-                                                    <Text className="text-slate-700 font-semibold text-[13px] ml-2 mr-2">{msg.action.label}</Text>
-                                                    <Ionicons name="chevron-forward" size={14} color="#64748b" />
-                                                </TouchableOpacity>
-                                            )}
-                                        </TouchableOpacity>
-                                        
-                                        {/* MESSAGE FOOTER (Copy / Regenerate / Feedback icons) */}
-                                        <View className="flex-row items-center mt-1 justify-between w-full pr-4">
+                                    <View className="flex-1 max-w-[88%]">
+                                        <View className="bg-slate-900/90 border border-slate-800/90 rounded-2xl rounded-tl-xs p-3 shadow-md shadow-black/30">
+                                            <TouchableOpacity 
+                                                onLongPress={() => handleCopy(msg.text)}
+                                                activeOpacity={0.9}
+                                            >
+                                                <Text className="text-[13.5px] leading-5 text-slate-100 font-normal">
+                                                    {msg.text}
+                                                    {msg.isStreaming && <Text className="text-[#f5a623] font-bold"> ▋</Text>} 
+                                                </Text>
+                                                
+                                                {/* SMART ACTION BUTTON */}
+                                                {msg.action && !msg.isStreaming && (
+                                                    <TouchableOpacity 
+                                                        onPress={() => router.push(msg.action?.route as any)}
+                                                        className="mt-2.5 bg-gradient-to-r from-amber-500/20 to-blue-600/20 border border-amber-500/40 py-2 px-3 rounded-xl flex-row items-center justify-between active:scale-[0.98]"
+                                                    >
+                                                        <View className="flex-row items-center gap-2">
+                                                            <Ionicons name="flash" size={13} color="#f5a623" />
+                                                            <Text className="text-amber-400 font-bold text-[12.5px]">{msg.action.label}</Text>
+                                                        </View>
+                                                        <Ionicons name="chevron-forward" size={14} color="#f5a623" />
+                                                    </TouchableOpacity>
+                                                )}
+                                            </TouchableOpacity>
+
+                                            {/* MESSAGE TOOLBAR */}
                                             {!msg.isStreaming && (
-                                                <View className="flex-row items-center gap-3">
-                                                    <TouchableOpacity onPress={() => handleSpeak(msg.id, msg.text)} className="p-1">
-                                                        <Ionicons name={speakingId === msg.id ? "volume-high" : "volume-medium-outline"} size={16} color={speakingId === msg.id ? "#0d1b3e" : "#94a3b8"} />
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity onPress={() => handleCopy(msg.text)} className="p-1">
-                                                        <Ionicons name="copy-outline" size={15} color="#94a3b8" />
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity onPress={() => handleRegenerate(msg.id, msg.text)} className="p-1">
-                                                        <Ionicons name="refresh-outline" size={15} color="#94a3b8" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            )}
-                                            
-                                            {!msg.isStreaming && (
-                                                <View className="flex-row items-center gap-2">
-                                                    <TouchableOpacity onPress={() => handleFeedback(msg.id, 'up')} className="p-1">
-                                                        <Ionicons name={msg.feedback === 'up' ? "thumbs-up" : "thumbs-up-outline"} size={15} color={msg.feedback === 'up' ? "#10b981" : "#94a3b8"} />
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity onPress={() => handleFeedback(msg.id, 'down')} className="p-1">
-                                                        <Ionicons name={msg.feedback === 'down' ? "thumbs-down" : "thumbs-down-outline"} size={15} color={msg.feedback === 'down' ? "#ef4444" : "#94a3b8"} />
-                                                    </TouchableOpacity>
+                                                <View className="flex-row items-center mt-2.5 pt-2 border-t border-slate-800/80 justify-between w-full">
+                                                    <View className="flex-row items-center gap-2.5">
+                                                        <TouchableOpacity onPress={() => handleSpeak(msg.id, msg.text)} className="p-1 rounded-md active:bg-slate-800">
+                                                            <Ionicons name={speakingId === msg.id ? "volume-high" : "volume-medium-outline"} size={14} color={speakingId === msg.id ? "#f5a623" : "#64748b"} />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity onPress={() => handleCopy(msg.text)} className="p-1 rounded-md active:bg-slate-800">
+                                                            <Ionicons name="copy-outline" size={13} color="#64748b" />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity onPress={() => handleRegenerate(msg.id, msg.text)} className="p-1 rounded-md active:bg-slate-800">
+                                                            <Ionicons name="refresh-outline" size={13} color="#64748b" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                    
+                                                    <View className="flex-row items-center gap-2">
+                                                        <TouchableOpacity onPress={() => handleFeedback(msg.id, 'up')} className="p-1 rounded-md active:bg-slate-800">
+                                                            <Ionicons name={msg.feedback === 'up' ? "thumbs-up" : "thumbs-up-outline"} size={13} color={msg.feedback === 'up' ? "#10b981" : "#64748b"} />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity onPress={() => handleFeedback(msg.id, 'down')} className="p-1 rounded-md active:bg-slate-800">
+                                                            <Ionicons name={msg.feedback === 'down' ? "thumbs-down" : "thumbs-down-outline"} size={13} color={msg.feedback === 'down' ? "#ef4444" : "#64748b"} />
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 </View>
                                             )}
                                         </View>
@@ -724,80 +728,77 @@ CRITICAL SECURITY RULES:
                     })}
 
                     {isTyping && (
-                        <View className="mb-6 flex-row justify-start w-full">
-                            <View className="w-8 h-8 rounded-full bg-[#0d1b3e] items-center justify-center mr-3 shadow-sm border border-black/5">
-                                <Ionicons name="sparkles" size={16} color="#f5a623" />
+                        <View className="mb-4 flex-row justify-start w-full">
+                            <View className="w-7 h-7 rounded-full bg-slate-900 border border-[#f5a623]/40 items-center justify-center mr-2.5 shadow-sm">
+                                <Ionicons name="sparkles" size={13} color="#f5a623" />
                             </View>
-                            <View className="pt-2 flex-row gap-1">
-                                <View className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" />
-                                <View className="w-2 h-2 bg-slate-300 rounded-full animate-bounce delay-75" />
-                                <View className="w-2 h-2 bg-slate-300 rounded-full animate-bounce delay-150" />
+                            <View className="bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-2xl flex-row items-center gap-1.5">
+                                <View className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" />
+                                <View className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce delay-75" />
+                                <View className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce delay-150" />
                             </View>
                         </View>
                     )}
                 </ScrollView>
 
-                {/* QUICK PROMPTS */}
+                {/* QUICK PROMPTS CAROUSEL */}
                 {!isTyping && (
-                    <View className="pb-3 pt-2 bg-[#f8fafc]">
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal: 16, gap: 10}}>
+                    <View className="pb-2 pt-1.5 bg-[#040814]/90 border-t border-slate-900">
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal: 12, gap: 8}}>
                             {QUICK_PROMPTS.map((prompt, i) => (
                                 <TouchableOpacity 
                                     key={i} 
                                     onPress={() => handleSend(prompt)}
-                                    className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl active:bg-slate-50 shadow-sm shadow-slate-200/50 flex-row items-center gap-2"
+                                    className="bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full active:bg-slate-800 flex-row items-center gap-1.5 shadow-sm"
                                 >
-                                    <Ionicons name="flash-outline" size={14} color="#a855f7" />
-                                    <Text className="text-slate-700 text-[13px] font-semibold">{prompt}</Text>
+                                    <Ionicons name="flash" size={11} color="#f5a623" />
+                                    <Text className="text-slate-300 text-[11.5px] font-semibold">{prompt}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
                 )}
 
-                {/* INPUT AREA */}
-                <View className="bg-white px-4 pb-6 pt-3 border-t border-[#0d1b3e]/10 shadow-[0_-10px_40px_rgba(13,27,62,0.06)]">
-                    <View className="flex-row items-end gap-2 bg-[#f8fafc] px-1.5 py-1.5 rounded-[24px] border border-[#0d1b3e]/15 shadow-sm shadow-[#0d1b3e]/5">
+                {/* FLOATING COMPACT INPUT BAR */}
+                <View className="bg-[#060d21] px-3 pb-5 pt-2 border-t border-slate-800/80 shadow-2xl">
+                    <View className="flex-row items-center gap-2 bg-slate-900/90 px-2 py-1 rounded-full border border-slate-800 shadow-inner">
                         
-                        {/* Attach Button */}
                         <TouchableOpacity 
-                            className="m-0.5 p-2 bg-white rounded-full shadow-sm shadow-slate-200/50" 
-                            onPress={() => Alert.alert("Coming Soon", "Attachment feature will be available soon.")}
+                            className="p-1.5 bg-slate-800/90 rounded-full active:scale-95" 
+                            onPress={() => Alert.alert("Upload Image", "Image analysis feature is coming soon.")}
                         >
-                            <Ionicons name="add-circle" size={24} color="#0d1b3e" />
+                            <Ionicons name="add" size={18} color="#f5a623" />
                         </TouchableOpacity>
                         
-                        {/* Text Input */}
                         <TextInput 
-                            className="flex-1 py-3.5 px-2 text-[#0d1b3e] text-[15px] max-h-28 leading-5 font-medium"
-                            placeholder="Message Cotex AI..."
-                            placeholderTextColor="#94a3b8"
+                            className="flex-1 py-2 px-1 text-slate-100 text-[13.5px] max-h-24 leading-4 font-medium"
+                            placeholder="Ask Cotex AI in Hausa or English..."
+                            placeholderTextColor="#64748b"
                             multiline
                             value={inputText}
                             onChangeText={setInputText}
                         />
 
-                        {/* Send / Mic button */}
                         {inputText.trim().length > 0 ? (
                             <TouchableOpacity 
                                 onPress={() => handleSend()}
-                                className="m-0.5 rounded-full overflow-hidden active:scale-95 shadow-md shadow-[#0d1b3e]/40"
+                                className="rounded-full overflow-hidden active:scale-95 shadow-md shadow-amber-500/20"
                             >
                                 <LinearGradient 
-                                    colors={['#0d1b3e', '#1a367d']} 
+                                    colors={['#f5a623', '#d97706']} 
                                     start={{ x: 0, y: 0 }} 
                                     end={{ x: 1, y: 1 }} 
-                                    className="h-[38px] w-[38px] items-center justify-center"
+                                    className="h-[34px] w-[34px] items-center justify-center rounded-full"
                                 >
-                                    <Ionicons name="arrow-up" size={20} color="white" />
+                                    <Ionicons name="arrow-up" size={18} color="#060d21" />
                                 </LinearGradient>
                             </TouchableOpacity>
                         ) : (
                             <TouchableOpacity 
                                 onPress={handleMicPress}
-                                className="m-0.5 h-[38px] w-[38px] items-center justify-center bg-white rounded-full shadow-sm shadow-slate-200/50 active:scale-95"
+                                className="h-[34px] w-[34px] items-center justify-center bg-slate-800/90 rounded-full active:scale-95"
                             >
-                                <Ionicons name="mic" size={20} color="#0d1b3e" />
+                                <Ionicons name="mic" size={16} color="#94a3b8" />
                             </TouchableOpacity>
                         )}
                     </View>
