@@ -10,15 +10,31 @@ export default function HTML({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no, maximum-scale=1.0, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-        {/* 
-          Disable body scrolling on web. This makes Sheets and modal overlays work more like a native app.
-          Filters out extra styles on mobile web.
-        */}
         <ScrollViewStyleReset />
 
-        {/* Add any additional <head> elements here */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          html, body, #root {
+            touch-action: manipulation !important;
+            -webkit-text-size-adjust: 100% !important;
+            overflow-x: hidden !important;
+          }
+          @media screen and (max-width: 768px) {
+            input, select, textarea, [role="textbox"], [contenteditable="true"] {
+              font-size: 16px !important;
+            }
+          }
+        `}} />
+
+        <script dangerouslySetInnerHTML={{ __html: `
+          document.addEventListener('gesturestart', function (e) {
+            e.preventDefault();
+          });
+          document.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+          }, { passive: false });
+        `}} />
       </head>
       <body>{children}</body>
     </html>
