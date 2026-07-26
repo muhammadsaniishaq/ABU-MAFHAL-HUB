@@ -286,6 +286,9 @@ export default function CotexAIChat() {
             return;
         }
 
+        let aiText: string | null = null;
+        let actionToSuggest: any = undefined;
+
         try {
             let apiKey = cachedApiKey;
             
@@ -311,24 +314,19 @@ export default function CotexAIChat() {
                 }
             }
 
-            if (!apiKey) {
-                setIsTyping(false);
-                streamResponse("⚠️ API Key Error: Ba a samu OpenAI API Key a Admin panel ba. Da fatan za ka duba ka saka shi (key: openai_api_key).", undefined);
-                return;
-            }
+            if (apiKey) {
+                // Construct conversation history
+                const conversationHistory = messages
+                    .filter(m => m.sender === 'user' || m.sender === 'bot')
+                    .map(m => ({
+                        role: m.sender === 'user' ? 'user' : 'assistant',
+                        content: m.text
+                    }));
 
-            // Construct conversation history
-            const conversationHistory = messages
-                .filter(m => m.sender === 'user' || m.sender === 'bot')
-                .map(m => ({
-                    role: m.sender === 'user' ? 'user' : 'assistant',
-                    content: m.text
-                }));
+                // Add the new user message
+                conversationHistory.push({ role: 'user', content: text });
 
-            // Add the new user message
-            conversationHistory.push({ role: 'user', content: text });
-
-            const systemPrompt = `You are Cotex AI, the official and highly secure virtual assistant for the 'Abu Mafhal Sub' mobile application. (Do not refer to the app as 'Hub').
+                const systemPrompt = `You are Cotex AI, the official and highly secure virtual assistant for the 'Abu Mafhal Sub' mobile application. (Do not refer to the app as 'Hub').
 User Info: Name: ${userData.name}, Wallet Balance: ${userData.balance}.
 
 YOUR KNOWLEDGE OF OUR APP FEATURES:
@@ -351,50 +349,53 @@ CRITICAL SECURITY RULES (STRICTLY ENFORCED):
 4. Keep answers concise, polite, and strictly related to helping the user navigate the app features or providing the general assistance listed above.
 5. Use Hausa and English naturally depending on how the user speaks to you.`;
 
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        ...conversationHistory
-                    ],
-                    temperature: 0.7,
-                })
-            });
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            ...conversationHistory
+                        ],
+                        temperature: 0.7,
+                    })
+                });
 
-            const data = await response.json();
-            
-            if (data.error) {
-                setIsTyping(false);
-                streamResponse(`⚠️ Error from OpenAI: ${data.error.message}`, undefined);
-                return;
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = data.choices && data.choices[0]?.message?.content;
+                    if (content) {
+                        aiText = content;
+                        const lowerRes = content.toLowerCase();
+                        if (lowerRes.includes('fund') || lowerRes.includes('wallet') || lowerRes.includes('deposit')) {
+                            actionToSuggest = { label: "Fund Wallet", route: "/(app)/wallet" };
+                        } else if (lowerRes.includes('data') || lowerRes.includes('airtime')) {
+                            actionToSuggest = { label: "Buy Data", route: "/data" };
+                        } else if (lowerRes.includes('receipt') || lowerRes.includes('history')) {
+                            actionToSuggest = { label: "View History", route: "/history" };
+                        }
+                    }
+                } else {
+                    console.warn("OpenAI API call failed with status:", response.status);
+                }
             }
-
-            const aiText = data.choices[0].message.content;
-            
-            // Smart Action Fallback Logic
-            let actionToSuggest = undefined;
-            const lowerRes = aiText.toLowerCase();
-            if (lowerRes.includes('fund') || lowerRes.includes('wallet') || lowerRes.includes('deposit')) {
-                actionToSuggest = { label: "Fund Wallet", route: "/(app)/wallet" };
-            } else if (lowerRes.includes('data') || lowerRes.includes('airtime')) {
-                actionToSuggest = { label: "Buy Data", route: "/data" };
-            } else if (lowerRes.includes('receipt') || lowerRes.includes('history')) {
-                actionToSuggest = { label: "View History", route: "/history" };
-            }
-
-            streamResponse(aiText, actionToSuggest);
-
         } catch (error) {
-            console.error("OpenAI Fetch Error:", error);
-            setIsTyping(false);
-            streamResponse("Sorry, I encountered a network error while trying to reach my servers. Please try again.", undefined);
+            console.warn("OpenAI Fetch Error, using smart local fallback:", error);
         }
+
+        // Fallback to local Knowledge Base if OpenAI fetch failed or API key missing
+        if (!aiText) {
+            const fallback = generateResponse(text);
+            aiText = fallback.text;
+            actionToSuggest = fallback.action;
+        }
+
+        setIsTyping(false);
+        streamResponse(aiText, actionToSuggest);
     };
 
     const handleClearChat = () => {

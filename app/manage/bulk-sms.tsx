@@ -56,45 +56,60 @@ export default function BulkSMS() {
         if (!aiPrompt.trim()) return Alert.alert('Notice', 'Please enter a description for the SMS.');
         
         setAiLoading(true);
+        let generatedMessage: string | null = null;
+
         try {
             const { data: secretData } = await supabase.from('system_secrets').select('value').eq('key', 'OPENAI_API_KEY').single();
-            const apiKey = secretData?.value || process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+            const rawApiKey = secretData?.value || process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+            const apiKey = rawApiKey && !rawApiKey.includes('123456') ? rawApiKey.trim() : null;
 
-            if (!apiKey) {
-                throw new Error('OpenAI API Key not found in system secrets or environment variables.');
+            if (apiKey) {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            { role: 'system', content: 'You are an expert marketing assistant. Write a short, engaging SMS message (max 160 characters) based on the user prompt. Keep it professional but persuasive.' },
+                            { role: 'user', content: aiPrompt }
+                        ],
+                        max_tokens: 160,
+                        temperature: 0.7
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.choices && data.choices[0]?.message?.content) {
+                        generatedMessage = data.choices[0].message.content.trim();
+                    }
+                }
             }
-
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
-                    messages: [
-                        { role: 'system', content: 'You are an expert marketing assistant. Write a short, engaging SMS message (max 160 characters) based on the user prompt. Keep it professional but persuasive.' },
-                        { role: 'user', content: aiPrompt }
-                    ],
-                    max_tokens: 60,
-                    temperature: 0.7
-                })
-            });
-
-            const data = await response.json();
-            if (data.choices && data.choices.length > 0) {
-                const generatedMessage = data.choices[0].message.content.trim();
-                setMessage(generatedMessage);
-                setShowAIModal(false);
-                setAiPrompt('');
-            } else {
-                throw new Error(data.error?.message || 'Failed to generate message.');
-            }
-        } catch (error: any) {
-            Alert.alert('AI Error', error.message);
-        } finally {
-            setAiLoading(false);
+        } catch (error) {
+            console.warn("OpenAI Bulk SMS fetch error, using local fallback:", error);
         }
+
+        if (!generatedMessage) {
+            const p = aiPrompt.trim();
+            const lower = p.toLowerCase();
+            if (lower.includes('discount') || lower.includes('sale') || lower.includes('offer') || lower.includes('promo') || lower.includes('ragin')) {
+                generatedMessage = `SPECIAL OFFER! Get exclusive discounts on your transactions with Abu Mafhal Sub. Visit app now to enjoy: ${p}`;
+            } else if (lower.includes('data') || lower.includes('bundle') || lower.includes('airtime') || lower.includes('siyan data')) {
+                generatedMessage = `Enjoy cheap & instant Data bundles across all networks on Abu Mafhal Sub. Recharge today: ${p}`;
+            } else if (lower.includes('fund') || lower.includes('wallet') || lower.includes('money') || lower.includes('sa kudi')) {
+                generatedMessage = `Notice: Fund your wallet effortlessly via automated bank transfer on Abu Mafhal Sub. Open app to top up: ${p}`;
+            } else {
+                generatedMessage = `${p.charAt(0).toUpperCase() + p.slice(1)}. Thank you for choosing Abu Mafhal Sub.`;
+            }
+        }
+
+        setMessage(generatedMessage);
+        setShowAIModal(false);
+        setAiPrompt('');
+        setAiLoading(false);
     };
 
     const applyTemplate = (key: keyof typeof QUICK_TEMPLATES) => {
