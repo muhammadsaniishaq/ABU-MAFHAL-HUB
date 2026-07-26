@@ -56,12 +56,42 @@ const KNOWLEDGE_BASE = [
       action: { label: "Buy Edu Pins / Pins din Karatu", route: "/education" }
   },
   { 
+      keywords: ['cac', 'registration', 'business name', 'company', 'sajilar kamfani', 'sajila', 'sunan kamfani', 'incorporation', 'bn', 'rc'], 
+      response: "Kuna buƙatar Yin Rajistar Kamfani ko Sunan Kasuwanci a hukumar CAC (Corporate Affairs Commission)? 📜\n\nMuna taimaka muku yin rajistar Business Name ko Limited Company cikin sauki da sauri abun alfahari!\n\nClick below to start your CAC Registration.",
+      action: { label: "CAC Registration / Rajistar CAC", route: "/kyc" }
+  },
+  { 
+      keywords: ['crypto', 'bitcoin', 'usdt', 'trading', 'deriv', 'coin', 'trade', 'siyan crypto', 'sayar da crypto', 'ethereum', 'binance'], 
+      response: "Kuna son siyan ko sayar da Crypto (USDT, Bitcoin, Ethereum) ko yin Trading a Deriv? 🪙\n\nMuna ba da hanzari wajen siyan Crypto da biyan kudi cikin sakanni.\n\nClick below to access Crypto Trading.",
+      action: { label: "Crypto Trading / Kasuwancin Crypto", route: "/crypto" }
+  },
+  { 
+      keywords: ['boost', 'social', 'followers', 'likes', 'views', 'tiktok', 'instagram', 'facebook', 'youtube', '9boost', 'shafuka'], 
+      response: "Kuna son haɓaka shafukan sadarwa (Increase Instagram/TikTok Followers, Likes, Views & Engagement)? 🚀\n\nMuna ba da sabis na 9Boost Panel na take!",
+      action: { label: "Social Media Boost / Boost Shafuka", route: "/(app)/social-boost" }
+  },
+  { 
+      keywords: ['pos', 'terminal', 'machine', 'pos machine', 'merchant', 'kudin hannu', 'agent'], 
+      response: "Kuna buƙatar POS Machine don kasuwancinku ko zama Agent na Abu Mafhal Sub? 💳\n\nNemi POS Terminal ɗinka cikin sauƙi yanzu.",
+      action: { label: "POS Terminal Request / Nemi POS", route: "/support" }
+  },
+  { 
+      keywords: ['save', 'savings', 'invest', 'investment', 'ajiye kudi', 'ribar kudi', 'interest'], 
+      response: "Kuna son ajiye kuɗi (Savings) domin samun riba mai yawa a kowace rana? 💰\n\nAjiye kuɗinku cikin aminci tare da tsarin Savings ɗinmu.",
+      action: { label: "Savings & Investment", route: "/savings" }
+  },
+  { 
+      keywords: ['airtime to cash', 'kati zuwa kudi', 'mayar da kati', 'convert airtime'], 
+      response: "Kuna da katin waya (Airtime) da kuke son maidawa kudi a asusunku na banki? 📲\n\nMuna maida Airtime zuwa Cash cikin mintuna biyar!",
+      action: { label: "Airtime to Cash / Kati Zuwa Kudi", route: "/airtime" }
+  },
+  { 
       keywords: ['dollar', 'usd', 'virtual card', 'mastercard', 'visa', 'siyan kayan waje', 'online shopping'], 
       response: "Kuna son Katin Dollar (Virtual Dollar Card) domin siyan kayayyaki a yanar gizo (AliExpress, Facebook Ads, Netflix, ChatGPT)? 💳\n\nClick below to create your instant Virtual Dollar Card.",
       action: { label: "Virtual Card / Katin Dollar", route: "/cards" }
   },
   { 
-      keywords: ['nin', 'bvn', 'slip', 'identity', 'verification', 'tattace', 'katartattace'], 
+      keywords: ['nin', 'bvn', 'slip', 'identity', 'verification', 'tattace', 'katartattace', 'sunan nin'], 
       response: "Kuna buƙatar Tantance NIN, BVN ko Buga NIN Slip? 🆔 Muna ba da ingantaccen sabis na gaggawa.",
       action: { label: "NIN/BVN Verification", route: "/kyc" }
   },
@@ -100,6 +130,9 @@ const KNOWLEDGE_BASE = [
 const QUICK_PROMPTS = [
   "💳 Sa Kudi", 
   "📶 Buy Data", 
+  "📜 CAC Rajista",
+  "🪙 Crypto Trade",
+  "🚀 Social Boost",
   "📱 Buy Airtime", 
   "📄 Shaida (Receipt)", 
   "⚡ Pay NEPA", 
@@ -107,6 +140,7 @@ const QUICK_PROMPTS = [
   "🎓 WAEC/NECO Pin",
   "💳 Dollar Card",
   "🆔 NIN/BVN", 
+  "💳 POS Machine",
   "👥 Gayyata", 
   "👨‍💻 Support Admin"
 ];
