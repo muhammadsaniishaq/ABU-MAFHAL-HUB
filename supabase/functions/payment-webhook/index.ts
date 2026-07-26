@@ -1,5 +1,6 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { sendEmail } from "../_shared/email.ts";
 
 // Environment variables are now fetched inside Deno.serve for better error handling/logging
 
@@ -314,7 +315,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
 
     // A. Try finding by Explicit ID first
     if (explicitUserId) {
-        const { data, error } = await supabaseAdmin.from('profiles').select('id, balance').eq('id', explicitUserId).single();
+        const { data, error } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('id', explicitUserId).single();
         if (data && !error) {
             profile = data;
             method = 'specific_id_from_ref';
@@ -338,7 +339,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
         }
 
         if (va) {
-            const { data } = await supabaseAdmin.from('profiles').select('id, balance').eq('id', va.user_id).single();
+            const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('id', va.user_id).single();
             if (data) {
                 profile = data;
                 method = 'virtual_account_number';
@@ -363,7 +364,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     }
 
     if (!profile && email) {
-        const { data } = await supabaseAdmin.from('profiles').select('id, balance').eq('email', email).single();
+        const { data } = await supabaseAdmin.from('profiles').select('id, balance, email, full_name').eq('email', email).single();
         if (data) {
             profile = data;
             method = 'email_fallback';
@@ -500,11 +501,60 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     }
 
     if (eventResult.status === 'rejected') {
-        console.error(`[FundWallet] Pyament Event Log FAILED:`, eventResult.reason);
+        console.error(`[FundWallet] Payment Event Log FAILED:`, eventResult.reason);
     } else if (eventResult.value.error) {
         console.error(`[FundWallet] Payment Event Log DB Error:`, eventResult.value.error);
     } else {
         console.log(`[FundWallet] Payment Event Saved`);
+    }
+
+    // 5. Send Email Receipt Notification to User
+    try {
+        const userEmail = email || profile.email;
+        if (userEmail && userEmail.includes('@')) {
+            const formattedAmount = creditedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+            const formattedBalance = finalBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+            const customerName = profile.full_name || 'Valued Customer';
+            
+            const subject = `Wallet Funding Notification - ₦${formattedAmount}`;
+            const plainText = `Hi ${customerName},\n\nYour wallet has been credited with ₦${formattedAmount}.\n\nReference: ${reference}\nProvider: ${provider.toUpperCase()}\nNew Balance: ₦${formattedBalance}\n\nThank you for choosing Abu Mafhal Sub!`;
+            
+            const htmlBody = `
+                <div style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 20px; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="background: linear-gradient(135deg, #060d21 0%, #0d1b3e 100%); color: #f5a623; padding: 20px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 22px;">Abu Mafhal Sub</h1>
+                            <p style="margin: 5px 0 0; font-size: 14px; color: #ffffff;">Wallet Funding Receipt</p>
+                        </div>
+                        <div style="padding: 24px;">
+                            <h2 style="color: #107c10; font-size: 20px; margin-top: 0;">Deposit Successful! 🎉</h2>
+                            <p>Hello <b>${customerName}</b>,</p>
+                            <p>We are pleased to inform you that your wallet funding has been successfully processed.</p>
+                            
+                            <div style="background: #f8fafc; border-left: 4px solid #107c10; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 4px 0;"><b>Amount Credited:</b> <span style="color: #107c10; font-weight: bold;">₦${formattedAmount}</span></p>
+                                <p style="margin: 4px 0;"><b>New Balance:</b> ₦${formattedBalance}</p>
+                                <p style="margin: 4px 0;"><b>Payment Provider:</b> ${provider.toUpperCase()}</p>
+                                <p style="margin: 4px 0;"><b>Transaction Reference:</b> ${reference}</p>
+                                <p style="margin: 4px 0;"><b>Date:</b> ${new Date().toLocaleString()}</p>
+                            </div>
+                            
+                            <p style="font-size: 13px; color: #64748b;">If you have any questions or did not initiate this transaction, please contact our support team immediately.</p>
+                        </div>
+                        <div style="background: #060d21; color: #94a3b8; padding: 15px; text-align: center; font-size: 12px;">
+                            &copy; ${new Date().getFullYear()} Abu Mafhal Sub. All rights reserved.
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            console.log(`[FundWallet] Dispatching funding receipt email to ${userEmail}...`);
+            sendEmail(userEmail, subject, plainText, htmlBody).catch(err => {
+                console.warn("[FundWallet Email Dispatch Warning]:", err?.message || err);
+            });
+        }
+    } catch (emailErr) {
+        console.warn("[FundWallet Email Exception]:", emailErr);
     }
 
     return new Response("Wallet Funded", { status: 200 });
