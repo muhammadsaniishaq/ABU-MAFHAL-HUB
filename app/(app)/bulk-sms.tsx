@@ -184,7 +184,7 @@ FORMATTING & STYLE RULES:
 2. Use relevant emojis (🔥, 📲, ⚡, 💰, 🎉, 🚀, 🌐) naturally to grab attention.
 3. Structure with clear spacing, line breaks, or bullet points if multi-line.
 4. Keep the language natural matching the user's tone (Hausa, English, or mixed Hausa-English).
-5. Include a powerful Call To Action (CTA) at the end (e.g. "Visit app now: https://abumafhal.com").
+5. Include a powerful Call To Action (CTA) at the end (e.g. "Visit app now: https://abumafhal.com.ng").
 6. Output ONLY the exact final SMS text without surrounding quotes or conversational introductions.`;
 
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {

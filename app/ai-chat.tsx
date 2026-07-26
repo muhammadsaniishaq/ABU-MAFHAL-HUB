@@ -22,7 +22,7 @@ let cachedApiKey: string | null = null;
 const KNOWLEDGE_BASE = [
   { 
       keywords: ['hello', 'hi', 'hey', 'start', 'sannu', 'slm', 'yaya', 'barka', 'inawuni', 'ina kwana', 'ina wuni'], 
-      response: "Barka da zuwa, {{name}}! 👋 Welcome!\nI am **Cotex AI**, your personal Virtual Customer Assistant for Abu Mafhal Sub.\n\n💰 Your Wallet Balance: **{{balance}}**\n\nHow can I help you today?\n• 💳 **Wallet Funding / Sa Kudi A Wallet**\n• 📶 **Data & Airtime / Siyan Data da Kati**\n• 📄 **Receipts & History / Samun Shaida da Tarihi**\n• ⚡ **NEPA & Cable TV / Biya Wuta da Cable**",
+      response: "Barka da zuwa, {{name}}! 👋 Welcome!\nI am **Cotex AI**, your personal Virtual Customer Assistant for Abu Mafhal Sub.\n\n💰 Your Wallet Balance: **{{balance}}**\n\nHow can I help you today?\n• 💳 **Wallet Funding / Sa Kudi A Wallet**\n• 📶 **Data & Airtime / Siyan Data da Kati**\n• 📄 **Receipts & History / Samun Shaida da Tarihi**\n• ⚡ **NEPA & Cable TV / Biya Wuta da Cable**\n• 💳 **Virtual Dollar Card / Katin Dollar**\n• 🎓 **WAEC/NECO Pins / Pins din Karatu**\n• 🆔 **NIN & BVN Verification**",
       action: undefined 
   },
   { 
@@ -51,6 +51,21 @@ const KNOWLEDGE_BASE = [
       action: { label: "Contact Support / Magana da Admin", route: "/support" }
   },
   { 
+      keywords: ['waec', 'neco', 'jamb', 'result', 'pin', 'checker', 'exam', 'karatu', 'nortification'], 
+      response: "Kuna buƙatar Result Checker Pin na WAEC, NECO ko JAMB? 🎓 Muna da su a shirye na take.\n\nClick below to buy your exam pin.",
+      action: { label: "Buy Edu Pins / Pins din Karatu", route: "/education" }
+  },
+  { 
+      keywords: ['dollar', 'usd', 'virtual card', 'mastercard', 'visa', 'siyan kayan waje', 'online shopping'], 
+      response: "Kuna son Katin Dollar (Virtual Dollar Card) domin siyan kayayyaki a yanar gizo (AliExpress, Facebook Ads, Netflix, ChatGPT)? 💳\n\nClick below to create your instant Virtual Dollar Card.",
+      action: { label: "Virtual Card / Katin Dollar", route: "/cards" }
+  },
+  { 
+      keywords: ['nin', 'bvn', 'slip', 'identity', 'verification', 'tattace', 'katartattace'], 
+      response: "Kuna buƙatar Tantance NIN, BVN ko Buga NIN Slip? 🆔 Muna ba da ingantaccen sabis na gaggawa.",
+      action: { label: "NIN/BVN Verification", route: "/kyc" }
+  },
+  { 
       keywords: ['refer', 'friend', 'invite', 'gayyata', 'bonus', 'earn'], 
       response: "Gayyaci abokanka ka sami kyautar Bonus! 🎁\nYi sharing din link din ka daga **Referral Dashboard** domin samun kudi a duk lokacin da suka yi ciniki.",
       action: { label: "Refer & Earn", route: "/referrals" }
@@ -77,12 +92,24 @@ const KNOWLEDGE_BASE = [
   },
   {
     keywords: ['help', 'support', 'taimako', 'admin', 'human', 'magana'],
-    response: "Zan iya taimaka muku wajen:\n• 💳 **Wallet Funding (Sa Kudi)**\n• 📶 **Data/Airtime (Kati & Data)**\n• 📄 **Receipts (Shaida)**\n• 🆔 **NIN & BVN**\n\nKuna son magana da Admin kai tsaye? 👩‍💻",
+    response: "Zan iya taimaka muku wajen:\n• 💳 **Wallet Funding (Sa Kudi)**\n• 📶 **Data/Airtime (Kati & Data)**\n• 📄 **Receipts (Shaida)**\n• 🎓 **WAEC/NECO Pins**\n• 🆔 **NIN & BVN**\n\nKuna son magana da Admin kai tsaye? 👩‍💻",
     action: { label: "Contact Support / Magana da Admin", route: "/support" }
   }
 ];
 
-const QUICK_PROMPTS = ["Sa Kudi", "Buy Data", "Buy Airtime", "Get Receipt", "Check Balance", "Pending Transaction", "Pay NEPA", "Refer Friend", "Speak to Admin"];
+const QUICK_PROMPTS = [
+  "💳 Sa Kudi", 
+  "📶 Buy Data", 
+  "📱 Buy Airtime", 
+  "📄 Shaida (Receipt)", 
+  "⚡ Pay NEPA", 
+  "📺 Cable TV", 
+  "🎓 WAEC/NECO Pin",
+  "💳 Dollar Card",
+  "🆔 NIN/BVN", 
+  "👥 Gayyata", 
+  "👨‍💻 Support Admin"
+];
 
 export default function CotexAIChat() {
     const router = useRouter(); 
