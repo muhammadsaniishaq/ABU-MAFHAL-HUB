@@ -549,7 +549,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
             `;
 
             console.log(`[FundWallet] Dispatching funding receipt email to ${userEmail}...`);
-            sendEmail(userEmail, subject, plainText, htmlBody).catch(err => {
+            sendEmail(userEmail, subject, plainText, htmlBody, supabaseAdmin).catch(err => {
                 console.warn("[FundWallet Email Dispatch Warning]:", err?.message || err);
             });
         }

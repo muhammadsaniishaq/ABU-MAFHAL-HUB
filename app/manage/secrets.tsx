@@ -38,7 +38,12 @@ const REQUIRED_SECRETS = [
     { key: 'NOWPAYMENTS_API_KEY', desc: 'NowPayments API Key for Crypto Receive', provider: 'NowPayments' },
     { key: 'NOWPAYMENTS_IPN_SECRET', desc: 'NowPayments IPN Secret for Webhook', provider: 'NowPayments' },
     { key: 'BIGI_API_TOKEN', desc: 'Bigi API Token for VTU Services', provider: 'Bigi' },
-    { key: 'BIGI_API_PIN', desc: 'Bigi 4-digit Transaction PIN', provider: 'Bigi' }
+    { key: 'BIGI_API_PIN', desc: 'Bigi 4-digit Transaction PIN', provider: 'Bigi' },
+    { key: 'RESEND_API_KEY', desc: 'Resend.com API Key for Automatic Email Receipts', provider: 'Email & Notifications' },
+    { key: 'ZOHO_EMAIL', desc: 'Zoho / SMTP Email Address (e.g. support@abumafhal.com)', provider: 'Email & Notifications' },
+    { key: 'ZOHO_PASSWORD', desc: 'Zoho / SMTP Password or App Password', provider: 'Email & Notifications' },
+    { key: 'SMTP_HOST', desc: 'SMTP Host Server (Default: smtp.zoho.com)', provider: 'Email & Notifications' },
+    { key: 'SMTP_PORT', desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' }
 ];
 
 export default function SecretsManager() {
