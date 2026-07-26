@@ -13,9 +13,12 @@ export default async function handler(req) {
     const headers = new Headers();
     headers.set("Content-Type", "application/json");
     
-    // Tura Payvessel-Signature idan akwai
-    if (req.headers.has('payvessel-http-signature')) {
-      headers.set("payvessel-http-signature", req.headers.get('payvessel-http-signature'));
+    // Copy all request headers from Payvessel (except host and content-length)
+    for (const [key, value] of req.headers.entries()) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey !== 'host' && lowerKey !== 'content-length') {
+        headers.set(key, value);
+      }
     }
 
     // Dauki ainihin asalin rubutun da suka aiko (Raw Body) ba tare da an canza shi ba
