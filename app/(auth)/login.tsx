@@ -115,11 +115,21 @@ export default function Login() {
                     });
                 } catch (e) { console.log("Communication function invocation failed", e); }
 
+                const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
+                const userEmail = data.user.email ? data.user.email.toLowerCase().trim() : '';
+                const isAdminEmail = userEmail && (KNOWN_ADMIN_EMAILS.includes(userEmail) || userEmail.includes('admin'));
+
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('role, status')
                     .eq('id', data.user.id)
-                    .single();
+                    .maybeSingle();
+
+                let resolvedRole = profile?.role;
+                if (isAdminEmail) {
+                    resolvedRole = 'admin';
+                    try { await supabase.from('profiles').update({ role: 'admin' }).eq('id', data.user.id); } catch (err) {}
+                }
 
                 if (profile && profile.status === 'suspended') {
                     Alert.alert('Account Suspended', 'Your account has been suspended. Please contact support.');
@@ -134,10 +144,13 @@ export default function Login() {
                     status: profile?.status === 'inactive' ? 'active' : profile?.status || 'active'
                 }).eq('id', data.user.id);
 
+                await AsyncStorage.setItem(`user_role_${data.user.id}`, resolvedRole || 'user');
                 await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
                 if (redirectTo) {
                     router.replace(redirectTo as any);
+                } else if (resolvedRole === 'admin' || resolvedRole === 'super_admin') {
+                    router.replace('/manage/dashboard' as any);
                 } else {
                     router.replace('/(app)/dashboard');
                 }

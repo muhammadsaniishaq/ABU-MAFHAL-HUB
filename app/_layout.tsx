@@ -52,8 +52,13 @@ export default function RootLayout() {
     const segments = useSegments();
     const { settings, loading: settingsLoading } = useAppSettings();
 
-    const fetchUserRole = async (userId: string) => {
+    const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
+
+    const fetchUserRole = async (userId: string, userEmail?: string | null) => {
         try {
+            const lowerEmail = userEmail ? userEmail.toLowerCase().trim() : '';
+            const isAdminEmail = lowerEmail && (KNOWN_ADMIN_EMAILS.includes(lowerEmail) || lowerEmail.includes('admin'));
+
             // Load from cache first if state not set, keeping screen immediately interactive
             const cachedRole = await AsyncStorage.getItem(`user_role_${userId}`);
             if (cachedRole && !userRole) {
@@ -62,31 +67,26 @@ export default function RootLayout() {
 
             const { data, error } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, email')
                 .eq('id', userId)
-                .single();
+                .maybeSingle();
             
-            if (error) {
-                const err = error as any;
-                if (err.code === 'PGRST116') {
-                    // No profile exists yet: default to 'user' role cleanly
-                    setUserRole('user');
-                    await AsyncStorage.setItem(`user_role_${userId}`, 'user');
-                } else if (err.code === 'PGRST301' || err.message?.includes('JWT') || err.status === 401 || err.status === 400 || err.code === '401' || err.code === '400') {
-                    console.log("Forcing logout due to session error...");
-                    await forceSignOut();
-                    setSession(null);
-                } else {
-                    // Downgrade to console.log to avoid yellow screen warnings when network is offline
-                    console.log("Network info - Using offline cache. Role fetch status:", error.message);
+            let roleToSet = data?.role;
+            const profileEmail = data?.email || userEmail;
+            const checkEmail = profileEmail ? profileEmail.toLowerCase().trim() : '';
+            const isConfirmedAdmin = checkEmail && (KNOWN_ADMIN_EMAILS.includes(checkEmail) || checkEmail.includes('admin'));
+
+            if (isConfirmedAdmin) {
+                roleToSet = 'admin';
+                if (data && data.role !== 'admin') {
+                    try { await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId); } catch (err) {}
                 }
-                return;
+            } else if (!roleToSet) {
+                roleToSet = 'user';
             }
 
-            if (data) {
-                setUserRole(data.role);
-                await AsyncStorage.setItem(`user_role_${userId}`, data.role);
-            }
+            setUserRole(roleToSet);
+            await AsyncStorage.setItem(`user_role_${userId}`, roleToSet);
         } catch (e) {
             console.log('Error fetching role in layout:', e);
         }
@@ -106,7 +106,7 @@ export default function RootLayout() {
                     // Restore role from local cache immediately
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
-                    await fetchUserRole(session.user.id);
+                    await fetchUserRole(session.user.id, session.user.email);
                 }
             }
             setInitialized(true);
@@ -125,7 +125,7 @@ export default function RootLayout() {
             if (session?.user) {
                 const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                 if (cached) setUserRole(cached);
-                fetchUserRole(session.user.id);
+                fetchUserRole(session.user.id, session.user.email);
             } else {
                 setUserRole(null);
             }

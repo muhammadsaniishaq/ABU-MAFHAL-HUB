@@ -38,6 +38,18 @@
   * {
     box-sizing: border-box;
   }
+
+  html, body {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+
+  @media screen and (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
 }
 
 /* ── Component Layer ─────────────────────────────────────────────────────── */
