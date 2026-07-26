@@ -176,6 +176,17 @@ export default function UserBulkSMS() {
             const apiKey = rawApiKey && !rawApiKey.includes('123456') ? rawApiKey.trim() : null;
 
             if (apiKey) {
+                const systemPrompt = `You are a world-class SMS copywriter & marketing genius for 'Abu Mafhal Sub'.
+Your task: Craft an EXTREMELY BEAUTIFUL, HIGHLY PERSUASIVE, and ENGAGING SMS message based on the user's prompt.
+
+FORMATTING & STYLE RULES:
+1. Make it look super professional, attractive, and high-converting!
+2. Use relevant emojis (🔥, 📲, ⚡, 💰, 🎉, 🚀, 🌐) naturally to grab attention.
+3. Structure with clear spacing, line breaks, or bullet points if multi-line.
+4. Keep the language natural matching the user's tone (Hausa, English, or mixed Hausa-English).
+5. Include a powerful Call To Action (CTA) at the end (e.g. "Visit app now: https://abumafhal.com").
+6. Output ONLY the exact final SMS text without surrounding quotes or conversational introductions.`;
+
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
@@ -185,10 +196,10 @@ export default function UserBulkSMS() {
                     body: JSON.stringify({
                         model: 'gpt-4o-mini',
                         messages: [
-                            { role: 'system', content: 'You are an expert marketing assistant and copywriter. Write a professional, engaging SMS message exactly based on the user\'s instructions. Format it beautifully with clear spacing if needed. Do not include quotes or unnecessary pleasantries, just the exact SMS text. Ensure all the details from the user prompt are included.' },
+                            { role: 'system', content: systemPrompt },
                             { role: 'user', content: aiPrompt }
                         ],
-                        max_tokens: 300,
+                        max_tokens: 350,
                         temperature: 0.7
                     })
                 });
@@ -204,18 +215,22 @@ export default function UserBulkSMS() {
             console.warn("OpenAI Bulk SMS fetch error, using local fallback:", error);
         }
 
-        // Local Smart Generator Fallback
+        // Local Smart Generator Fallback (Rich & Beautiful Templates)
         if (!generatedMessage) {
             const p = aiPrompt.trim();
             const lower = p.toLowerCase();
-            if (lower.includes('discount') || lower.includes('sale') || lower.includes('offer') || lower.includes('promo') || lower.includes('ragin')) {
-                generatedMessage = `SPECIAL OFFER! Get exclusive discounts on your transactions with Abu Mafhal Sub. Don't miss out! Visit the app now to enjoy: ${p}`;
-            } else if (lower.includes('data') || lower.includes('bundle') || lower.includes('airtime') || lower.includes('siyan data')) {
-                generatedMessage = `Enjoy cheap & instant Data bundles across all networks on Abu Mafhal Sub. Buy now and stay connected: ${p}`;
-            } else if (lower.includes('fund') || lower.includes('wallet') || lower.includes('money') || lower.includes('sa kudi')) {
-                generatedMessage = `Notice: Fund your wallet effortlessly via automated bank transfer on Abu Mafhal Sub. Open app to top up: ${p}`;
+            if (lower.includes('discount') || lower.includes('sale') || lower.includes('offer') || lower.includes('promo') || lower.includes('ragin') || lower.includes('sauki')) {
+                generatedMessage = `🔥 SPECIAL DISCOUNT OFFER! 🔥\n\n${p}\n\nDon't miss out! Enjoy instant discounts & fast transactions on Abu Mafhal Sub.\n\n📲 Open App Now: https://abumafhal.com`;
+            } else if (lower.includes('data') || lower.includes('bundle') || lower.includes('internet') || lower.includes('siyan data') || lower.includes('mtn') || lower.includes('glo') || lower.includes('airtel')) {
+                generatedMessage = `🌐 CHEAPEST DATA BUNDLES! 🚀\n\n${p}\n\nGet instant MTN, Glo, Airtel & 9mobile data at giveaway prices.\n\n⚡ Buy Instantly on Abu Mafhal Sub!`;
+            } else if (lower.includes('fund') || lower.includes('wallet') || lower.includes('money') || lower.includes('sa kudi') || lower.includes('sanya kudi')) {
+                generatedMessage = `💳 WALLET FUNDING NOTICE 💰\n\n${p}\n\nTop up your wallet easily via instant bank transfer on Abu Mafhal Sub.\n\n📲 Fund Your Wallet Now!`;
+            } else if (lower.includes('nepa') || lower.includes('wuta') || lower.includes('light') || lower.includes('electricity') || lower.includes('cable') || lower.includes('tv')) {
+                generatedMessage = `⚡ INSTANT BILL PAYMENTS 📺\n\n${p}\n\nPay Electricity Bills & Cable TV subscriptions in seconds with zero delay.\n\n🚀 Pay Now on Abu Mafhal Sub!`;
+            } else if (lower.includes('sannu') || lower.includes('barka') || lower.includes('welcome') || lower.includes('hello') || lower.includes('notice') || lower.includes('sanarwa')) {
+                generatedMessage = `📢 IMPORTANT ANNOUNCEMENT 📢\n\n${p}\n\nThank you for choosing Abu Mafhal Sub as your trusted VTU partner! ❤️`;
             } else {
-                generatedMessage = `${p.charAt(0).toUpperCase() + p.slice(1)}. Thank you for using Abu Mafhal Sub.`;
+                generatedMessage = `✨ ABU MAFHAL SUB NOTICE ✨\n\n${p.charAt(0).toUpperCase() + p.slice(1)}\n\n📲 Experience fast & reliable services today on Abu Mafhal Sub!`;
             }
         }
 
