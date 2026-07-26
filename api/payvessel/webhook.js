@@ -3,10 +3,6 @@ export const config = {
 };
 
 export default async function handler(req) {
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
-  }
-
   try {
     const supabaseWebhookUrl = 'https://uagcxrtdqttayulvgpwg.supabase.co/functions/v1/payment-webhook';
 
@@ -27,12 +23,10 @@ export default async function handler(req) {
       headers.set('authorization', `Bearer ${anonKey}`);
     }
 
-    // Dauki ainihin asalin rubutun da suka aiko (Raw Body) ba tare da an canza shi ba
-    // Wannan shi ne sirrin da zai sa Signature ya yi daidai!
-    const rawBody = await req.text();
+    const rawBody = req.method !== 'GET' && req.method !== 'HEAD' ? await req.text() : undefined;
 
     const response = await fetch(supabaseWebhookUrl, {
-      method: 'POST',
+      method: req.method || 'POST',
       headers: headers,
       body: rawBody
     });
