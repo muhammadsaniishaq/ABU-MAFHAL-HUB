@@ -21,6 +21,12 @@ export default async function handler(req) {
       }
     }
 
+    // Always ensure Authorization header is present so Supabase Edge Gateway does not reject with 401 Unauthorized
+    if (!headers.has('authorization')) {
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ2N4cnRkcXR0YXl1bHZncHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2Mzc3OTIsImV4cCI6MjA4NDIxMzc5Mn0.7AzXKou9G3tHFIduDL5TQ3fkski6P9CBGdlqfi_pMI8';
+      headers.set('authorization', `Bearer ${anonKey}`);
+    }
+
     // Dauki ainihin asalin rubutun da suka aiko (Raw Body) ba tare da an canza shi ba
     // Wannan shi ne sirrin da zai sa Signature ya yi daidai!
     const rawBody = await req.text();
