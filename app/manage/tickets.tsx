@@ -295,52 +295,65 @@ export default function SupportTickets() {
     };
 
     const renderTicketList = () => (
-        <View className="flex-1 bg-slate-50">
-            {/* Ultra-Modern Compact Header */}
-            <View className="bg-white pt-12 pb-4 px-5 border-b border-slate-100 shadow-sm z-10">
-                <View className="flex-row justify-between items-center mb-4">
-                    <View className="flex-row items-center gap-3">
-                        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-slate-50 rounded-full items-center justify-center border border-slate-100">
-                            <Ionicons name="chevron-back" size={20} color="#0d1b3e" />
+        <View className="flex-1 bg-[#040814]">
+            {/* Ultra-Modern Compact Glass Header */}
+            <View className="bg-[#060d21] pt-12 pb-3 px-4 border-b border-slate-800/80 shadow-lg">
+                <View className="flex-row justify-between items-center mb-3">
+                    <View className="flex-row items-center gap-2.5">
+                        <TouchableOpacity onPress={() => router.back()} className="w-9 h-9 bg-slate-900 rounded-full items-center justify-center border border-slate-800">
+                            <Ionicons name="chevron-back" size={18} color="#f5a623" />
                         </TouchableOpacity>
                         <View>
-                            <Text className="text-xl font-black text-[#0d1b3e] tracking-tight">Support Desk</Text>
+                            <Text className="text-lg font-black text-white tracking-tight">Admin Support Desk</Text>
                             <View className="flex-row items-center gap-1.5 mt-0.5">
-                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider">{openCount} Actionable</Text>
+                                <View className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">{openCount} Needs Action</Text>
                             </View>
                         </View>
                     </View>
-                    <View className="flex-row gap-2">
-                        <TouchableOpacity className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center border border-slate-100">
-                            <Ionicons name="download-outline" size={18} color="#0d1b3e" />
-                        </TouchableOpacity>
-                        <TouchableOpacity className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center border border-slate-100">
-                            <Ionicons name="options-outline" size={18} color="#0d1b3e" />
+                    <View className="flex-row gap-1.5">
+                        <TouchableOpacity onPress={() => fetchTickets(true)} className="w-9 h-9 rounded-full bg-slate-900 items-center justify-center border border-slate-800">
+                            <Ionicons name="refresh" size={16} color="#f5a623" />
                         </TouchableOpacity>
                     </View>
                 </View>
 
+                {/* METRICS ROW */}
+                <View className="flex-row gap-2 mb-3">
+                    <View className="flex-1 bg-slate-900/90 border border-slate-800 p-2 rounded-xl items-center">
+                        <Text className="text-slate-400 text-[9px] font-bold uppercase">Total</Text>
+                        <Text className="text-white font-extrabold text-[13px]">{totalCount}</Text>
+                    </View>
+                    <View className="flex-1 bg-rose-500/10 border border-rose-500/30 p-2 rounded-xl items-center">
+                        <Text className="text-rose-400 text-[9px] font-bold uppercase">🔴 Open</Text>
+                        <Text className="text-rose-400 font-extrabold text-[13px]">{openCount}</Text>
+                    </View>
+                    <View className="flex-1 bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl items-center">
+                        <Text className="text-emerald-400 text-[9px] font-bold uppercase">🟢 Closed</Text>
+                        <Text className="text-emerald-400 font-extrabold text-[13px]">{resolvedCount}</Text>
+                    </View>
+                </View>
+
                 {/* Search Bar */}
-                <View className="bg-slate-50 border border-slate-200 rounded-2xl flex-row items-center px-4 h-12">
-                    <Ionicons name="search" size={18} color="#94a3b8" />
+                <View className="bg-slate-900 border border-slate-800 rounded-full flex-row items-center px-3.5 h-10">
+                    <Ionicons name="search" size={16} color="#64748b" />
                     <TextInput 
                         placeholder="Search tickets, names, or IDs..."
-                        placeholderTextColor="#94a3b8"
-                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-sm h-full"
+                        placeholderTextColor="#64748b"
+                        className="flex-1 ml-2 text-white font-bold text-[12.5px] h-full"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         autoCapitalize="none"
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={18} color="#cbd5e1" />
+                            <Ionicons name="close-circle" size={16} color="#64748b" />
                         </TouchableOpacity>
                     )}
                 </View>
 
                 {/* Filters */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4 flex-row gap-2">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2.5 flex-row">
                     {['All', 'Open', 'In Progress', 'Resolved'].map((filter) => {
                         const isActive = activeFilter === filter;
                         return (
@@ -350,9 +363,15 @@ export default function SupportTickets() {
                                     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                     setActiveFilter(filter);
                                 }}
-                                className={`px-4 py-2 rounded-xl border mr-2 ${isActive ? 'bg-[#0d1b3e] border-[#0d1b3e] shadow-md shadow-[#0d1b3e]/20' : 'bg-white border-slate-200'}`}
+                                className={`px-3 py-1 rounded-full border mr-1.5 ${
+                                    isActive 
+                                        ? 'bg-[#f5a623]/20 border-[#f5a623]' 
+                                        : 'bg-slate-900 border-slate-800'
+                                }`}
                             >
-                                <Text className={`font-bold text-[11px] uppercase tracking-wider ${isActive ? 'text-[#f5a623]' : 'text-slate-500'}`}>{filter}</Text>
+                                <Text className={`font-bold text-[10.5px] uppercase ${isActive ? 'text-[#f5a623]' : 'text-slate-400'}`}>
+                                    {filter}
+                                </Text>
                             </TouchableOpacity>
                         );
                     })}
@@ -360,44 +379,43 @@ export default function SupportTickets() {
             </View>
 
             {selectMode && (
-                <View className="bg-indigo-600 px-4 py-3 flex-row justify-between items-center z-20">
-                    <Text className="text-white font-bold">{selectedIds.length} Selected</Text>
+                <View className="bg-indigo-900 px-4 py-2 flex-row justify-between items-center z-20 border-b border-indigo-700">
+                    <Text className="text-white font-bold text-[12px]">{selectedIds.length} Selected</Text>
                     <View className="flex-row gap-2">
-                        <TouchableOpacity onPress={() => { setSelectMode(false); setSelectedIds([]); }} className="px-3 py-1.5 bg-white/20 rounded-full">
-                            <Text className="text-white text-xs font-bold">Cancel</Text>
+                        <TouchableOpacity onPress={() => { setSelectMode(false); setSelectedIds([]); }} className="px-2.5 py-1 bg-white/20 rounded-full">
+                            <Text className="text-white text-[11px] font-bold">Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={resolveSelectedTickets} className="px-3 py-1.5 bg-emerald-500 rounded-full">
-                            <Text className="text-white text-xs font-bold uppercase tracking-wider">Resolve</Text>
+                        <TouchableOpacity onPress={resolveSelectedTickets} className="px-3 py-1 bg-emerald-500 rounded-full">
+                            <Text className="text-white text-[11px] font-bold uppercase">Resolve All</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             )}
 
             {loading ? (
-                <View className="flex-1 justify-center items-center pt-20">
-                    <ActivityIndicator size="large" color="#0d1b3e" />
+                <View className="flex-1 justify-center items-center">
+                    <ActivityIndicator size="small" color="#f5a623" />
                 </View>
             ) : (
                 <FlatList
                     data={filteredTickets}
                     keyExtractor={item => item.id}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    contentContainerStyle={{ padding: 10, paddingBottom: 90 }}
                     refreshControl={
                         <RefreshControl 
                             refreshing={refreshing} 
                             onRefresh={() => fetchTickets(true)} 
-                            tintColor="#0d1b3e" 
-                            colors={['#0d1b3e']} 
+                            tintColor="#f5a623" 
                         />
                     }
                     ListEmptyComponent={() => (
                         <View className="items-center justify-center mt-20">
-                            <View className="w-20 h-20 bg-slate-200/40 rounded-full items-center justify-center mb-3">
-                                <Ionicons name="file-tray-outline" size={36} color="#94a3b8" />
+                            <View className="w-14 h-14 bg-slate-900 border border-slate-800 rounded-full items-center justify-center mb-3">
+                                <Ionicons name="file-tray-outline" size={28} color="#f5a623" />
                             </View>
-                            <Text className="text-base font-bold text-slate-700">No Tickets Found</Text>
-                            <Text className="text-slate-400 mt-1 text-[12px] text-center px-10">
-                                {searchQuery ? 'No tickets match your search.' : 'There are no tickets matching your current filter.'}
+                            <Text className="text-base font-bold text-white">No Support Tickets Found</Text>
+                            <Text className="text-slate-400 mt-1 text-[11px] text-center px-10">
+                                {searchQuery ? 'No tickets match your search query.' : 'There are no active tickets matching your filter.'}
                             </Text>
                         </View>
                     )}
@@ -413,55 +431,55 @@ export default function SupportTickets() {
                                 if (selectMode) toggleSelection(item.id);
                                 else setSelectedTicket(item);
                             }}
-                            className={`bg-white p-3 rounded-2xl mb-2.5 border ${isSelected ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-100'} shadow-sm shadow-slate-200/40`}
+                            className={`bg-slate-900/90 p-3 rounded-xl mb-2 border ${
+                                isSelected ? 'border-indigo-500 bg-indigo-950/40' : 'border-slate-800/80'
+                            } shadow-md active:scale-[0.99]`}
                         >
-                            <View className="flex-row justify-between items-start mb-2">
-                                <View className="flex-row items-center gap-2.5">
+                            <View className="flex-row justify-between items-start mb-1.5">
+                                <View className="flex-row items-center gap-2">
                                     {selectMode ? (
-                                        <View className={`w-9 h-9 rounded-full items-center justify-center border-2 ${isSelected ? 'bg-[#0d1b3e] border-[#0d1b3e]' : 'border-slate-200'}`}>
-                                            {isSelected && <Ionicons name="checkmark" size={16} color="#f5a623" />}
+                                        <View className={`w-8 h-8 rounded-full items-center justify-center border-2 ${isSelected ? 'bg-[#f5a623] border-[#f5a623]' : 'border-slate-700'}`}>
+                                            {isSelected && <Ionicons name="checkmark" size={14} color="#060d21" />}
                                         </View>
                                     ) : item.profiles?.avatar_url ? (
-                                        <Image source={{ uri: item.profiles.avatar_url }} className="w-9 h-9 rounded-full border border-slate-100" />
+                                        <Image source={{ uri: item.profiles.avatar_url }} className="w-8 h-8 rounded-full border border-slate-700" />
                                     ) : (
-                                        <View className="w-9 h-9 rounded-full bg-slate-100 items-center justify-center border border-slate-200">
-                                            <Text className="font-black text-slate-500 text-xs">{getInitials(item.profiles?.full_name || 'Anonym')}</Text>
+                                        <View className="w-8 h-8 rounded-full bg-slate-800 items-center justify-center border border-slate-700">
+                                            <Text className="font-black text-slate-300 text-[10px]">{getInitials(item.profiles?.full_name || 'Anonym')}</Text>
                                         </View>
                                     )}
                                     <View>
-                                        <Text className="font-black text-slate-800 text-sm">{item.profiles?.full_name || 'Anonymous User'}</Text>
-                                        <Text className="text-[10px] font-bold text-slate-400 mt-0.5">#{item.id.split('-')[0]} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
+                                        <Text className="font-extrabold text-white text-[13px]">{item.profiles?.full_name || 'Anonymous User'}</Text>
+                                        <Text className="text-[9.5px] font-semibold text-slate-400 mt-0.5">#{item.id.split('-')[0]} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
                                     </View>
                                 </View>
 
                                 {/* Priority Badge */}
                                 <View className={`px-2 py-0.5 rounded-full border ${
-                                    item.priority === 'high' ? 'bg-rose-50 border-rose-200' :
-                                    item.priority === 'medium' ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'
+                                    item.priority === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
+                                    item.priority === 'medium' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800 border-slate-700'
                                 }`}>
                                     <Text className={`text-[8px] uppercase font-black tracking-wider ${
-                                        item.priority === 'high' ? 'text-rose-600' :
-                                        item.priority === 'medium' ? 'text-orange-600' : 'text-slate-500'
+                                        item.priority === 'high' ? 'text-rose-400' :
+                                        item.priority === 'medium' ? 'text-amber-400' : 'text-slate-400'
                                     }`}>{item.priority}</Text>
                                 </View>
                             </View>
                             
-                            <Text className="text-slate-600 font-medium text-xs mb-3 leading-4 pl-[46px]" numberOfLines={2}>{item.subject}</Text>
+                            <Text className="text-slate-300 font-medium text-[12px] mb-2 leading-4 pl-[40px]" numberOfLines={2}>{item.subject}</Text>
 
-                            {/* Features: Action Row */}
-                            <View className="flex-row items-center justify-between pt-2.5 border-t border-slate-50 ml-[46px]">
-                                <View className={`px-2 py-1 rounded-md flex-row items-center gap-1 ${
-                                    item.status === 'open' ? 'bg-rose-50' :
-                                    item.status === 'in_progress' ? 'bg-blue-50' : 'bg-emerald-50'
+                            {/* Action Row */}
+                            <View className="flex-row items-center justify-between pt-2 border-t border-slate-800/60 ml-[40px]">
+                                <View className={`px-2 py-0.5 rounded-full border ${
+                                    item.status === 'open' ? 'bg-rose-500/10 border-rose-500/30' :
+                                    item.status === 'in_progress' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-emerald-500/10 border-emerald-500/30'
                                 }`}>
-                                    <View className={`w-1 h-1 rounded-full ${
-                                        item.status === 'open' ? 'bg-rose-500' :
-                                        item.status === 'in_progress' ? 'bg-blue-500' : 'bg-emerald-500'
-                                    }`} />
-                                    <Text className={`text-[9px] font-black uppercase tracking-wider ${
-                                        item.status === 'open' ? 'text-rose-600' :
-                                        item.status === 'in_progress' ? 'text-blue-600' : 'text-emerald-600'
-                                    }`}>{item.status}</Text>
+                                    <Text className={`text-[8.5px] font-extrabold ${
+                                        item.status === 'open' ? 'text-rose-400' :
+                                        item.status === 'in_progress' ? 'text-blue-400' : 'text-emerald-400'
+                                    }`}>
+                                        {item.status === 'open' ? '🔴 OPEN' : item.status === 'in_progress' ? '🔵 ACTIVE' : '🟢 CLOSED'}
+                                    </Text>
                                 </View>
 
                                 {/* Direct Actions */}
@@ -472,18 +490,18 @@ export default function SupportTickets() {
                                                 const { error } = await supabase.from('tickets').update({ status: 'resolved' }).eq('id', item.id);
                                                 if (!error) fetchTickets();
                                             }}
-                                            className="bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 flex-row items-center gap-1"
+                                            className="bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 flex-row items-center gap-1"
                                         >
-                                            <Ionicons name="checkmark" size={10} color="#10b981" />
-                                            <Text className="text-emerald-600 text-[9px] font-black uppercase tracking-wider">Resolve</Text>
+                                            <Ionicons name="checkmark" size={10} color="#34d399" />
+                                            <Text className="text-emerald-400 text-[8.5px] font-black uppercase">Resolve</Text>
                                         </TouchableOpacity>
                                     )}
                                     <TouchableOpacity 
                                         onPress={() => setSelectedTicket(item)}
-                                        className="bg-[#0d1b3e] px-3 py-1 rounded-md flex-row items-center gap-1 shadow-sm shadow-[#0d1b3e]/20"
+                                        className="bg-[#f5a623] px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shadow-sm"
                                     >
-                                        <Ionicons name="chatbubbles" size={10} color="#f5a623" />
-                                        <Text className="text-[#f5a623] text-[9px] font-black uppercase tracking-wider">Reply</Text>
+                                        <Ionicons name="chatbubbles" size={10} color="#060d21" />
+                                        <Text className="text-[#060d21] text-[8.5px] font-black uppercase">Reply</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
