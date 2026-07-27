@@ -33,10 +33,12 @@ function useReveal(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(24)).current;
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 800, delay, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 800, delay, useNativeDriver: true }),
-    ]).start();
+    const anim = Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 600, delay, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => anim.stop();
   }, []);
   return { opacity, transform: [{ translateY }] };
 }
@@ -44,12 +46,14 @@ function useReveal(delay = 0) {
 function useFloat(delay = 0, duration = 3000) {
   const translateY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(translateY, { toValue: -15, duration, delay, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: 0, duration, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    anim.start();
+    return () => anim.stop();
   }, []);
   return { transform: [{ translateY }] };
 }
@@ -57,9 +61,11 @@ function useFloat(delay = 0, duration = 3000) {
 function useRotate(duration = 20000) {
   const rotate = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    const anim = Animated.loop(
       Animated.timing(rotate, { toValue: 1, duration, useNativeDriver: true })
-    ).start();
+    );
+    anim.start();
+    return () => anim.stop();
   }, []);
   const spin = rotate.interpolate({
     inputRange: [0, 1],
@@ -120,14 +126,16 @@ export default function Splash() {
   useEffect(() => {
     if (partners.length > 0) {
       scrollAnim.setValue(0);
-      Animated.loop(
+      const anim = Animated.loop(
         Animated.timing(scrollAnim, {
           toValue: 1,
           duration: Math.max(10000, partners.length * 6000), // smooth speed
           easing: Easing.linear,
           useNativeDriver: true,
         })
-      ).start();
+      );
+      anim.start();
+      return () => anim.stop();
     }
   }, [partners.length]);
 
