@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../services/supabase';
+import { sendAdminReplyEmail } from '../../services/ticketEmail';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -68,7 +69,7 @@ export default function SupportTickets() {
         try {
             const { data, error } = await supabase
                 .from('tickets')
-                .select('*, profiles(full_name, avatar_url)')
+                .select('*, profiles(full_name, avatar_url, email)')
                 .order('created_at', { ascending: false });
             if (data) setTickets(data as any);
         } finally {
@@ -132,6 +133,17 @@ export default function SupportTickets() {
                     data: { route: `/ai-chat?ticketId=${selectedTicket.id}` },
                     read: false
                 }).then();
+
+                // 📧 AUTOMATIC EMAIL NOTIFICATION TO USER
+                if (selectedTicket.profiles?.email) {
+                    sendAdminReplyEmail(
+                        selectedTicket.id,
+                        selectedTicket.subject,
+                        text.trim(),
+                        selectedTicket.profiles.email,
+                        selectedTicket.profiles.full_name
+                    );
+                }
             }
         } catch (e: any) {
             Alert.alert('Error', e.message || 'Failed to send message');

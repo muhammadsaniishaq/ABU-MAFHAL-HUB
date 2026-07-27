@@ -158,16 +158,16 @@ export default function UserTicketChatScreen() {
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-[#040814]">
             <Stack.Screen options={{ 
-                title: ticketDetails?.subject || 'Live Support Chat',
+                title: ticketDetails?.subject || 'Live Chat',
                 headerShown: true,
                 headerStyle: { backgroundColor: '#060d21' },
                 headerTintColor: '#f5a623',
-                headerTitleStyle: { fontWeight: '800' },
+                headerTitleStyle: { fontWeight: '800', fontSize: 14 },
                 headerRight: () => (
                     <View className="flex-row items-center gap-1">
                         <View className="bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full flex-row items-center gap-1 mr-1">
                             <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <Text className="text-emerald-400 font-bold text-[10px]">Realtime</Text>
+                            <Text className="text-emerald-400 font-bold text-[9.5px]">Live</Text>
                         </View>
                     </View>
                 )
@@ -175,28 +175,28 @@ export default function UserTicketChatScreen() {
 
             {loading ? (
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#f5a623" />
+                    <ActivityIndicator size="small" color="#f5a623" />
                 </View>
             ) : (
                 <>
                     {/* TICKET DETAILS HEADER BANNER */}
-                    <View className="bg-slate-900/90 border-b border-slate-800 px-3.5 py-2 flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-2">
-                            <Ionicons name="headset" size={14} color="#f5a623" />
-                            <Text className="text-slate-200 text-[11.5px] font-bold" numberOfLines={1}>
+                    <View className="bg-slate-900/90 border-b border-slate-800/80 px-3 py-1.5 flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="headset" size={13} color="#f5a623" />
+                            <Text className="text-slate-200 text-[10.5px] font-bold" numberOfLines={1}>
                                 #{id ? (id as string).split('-')[0] : ''} • {ticketDetails?.subject || 'Live Ticket'}
                             </Text>
                         </View>
-                        <TouchableOpacity onPress={fetchMessages} className="p-1">
-                            <Ionicons name="refresh-outline" size={15} color="#94a3b8" />
+                        <TouchableOpacity onPress={fetchMessages} className="p-0.5">
+                            <Ionicons name="refresh-outline" size={14} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
 
                     {/* MESSAGES LIST */}
                     <ScrollView 
                         ref={scrollViewRef}
-                        className="flex-1 px-3.5 py-3" 
-                        contentContainerStyle={{ paddingBottom: 24 }}
+                        className="flex-1 px-3 py-2.5" 
+                        contentContainerStyle={{ paddingBottom: 20 }}
                         showsVerticalScrollIndicator={false}
                     >
                         {messages.length > 0 ? (
@@ -206,22 +206,22 @@ export default function UserTicketChatScreen() {
                                 const imageUrl = isImage ? m.message.replace('[IMAGE]', '').trim() : null;
 
                                 return (
-                                    <View key={m.id} className={`mb-3.5 w-full flex-row ${isUser ? 'justify-end' : 'justify-start'}`}>
+                                    <View key={m.id} className={`mb-2.5 w-full flex-row ${isUser ? 'justify-end' : 'justify-start'}`}>
                                         {!isUser && (
-                                            <View className="w-7 h-7 rounded-full bg-slate-900 border border-[#f5a623]/40 items-center justify-center mr-2 mt-0.5 shadow-sm">
-                                                <Ionicons name="shield-checkmark" size={13} color="#f5a623" />
+                                            <View className="w-6 h-6 rounded-full bg-slate-900 border border-[#f5a623]/40 items-center justify-center mr-1.5 mt-0.5 shadow-sm">
+                                                <Ionicons name="shield-checkmark" size={11} color="#f5a623" />
                                             </View>
                                         )}
 
-                                        <View className={`max-w-[84%] rounded-2xl p-3 border shadow-md ${
+                                        <View className={`max-w-[85%] rounded-2xl p-2.5 border shadow-sm ${
                                             isUser 
                                                 ? 'bg-blue-900/80 border-blue-600/40 rounded-tr-xs' 
                                                 : 'bg-slate-900/90 border-slate-800/90 rounded-tl-xs'
                                         }`}>
                                             {!isUser && (
-                                                <View className="flex-row items-center gap-1 mb-1 pb-1 border-b border-slate-800/80">
-                                                    <Ionicons name="headset" size={11} color="#f5a623" />
-                                                    <Text className="text-[#f5a623] font-bold text-[10px] uppercase">Admin Agent</Text>
+                                                <View className="flex-row items-center gap-1 mb-1 pb-0.5 border-b border-slate-800/80">
+                                                    <Ionicons name="headset" size={10} color="#f5a623" />
+                                                    <Text className="text-[#f5a623] font-bold text-[9.5px] uppercase">Admin Agent</Text>
                                                 </View>
                                             )}
 
@@ -229,22 +229,22 @@ export default function UserTicketChatScreen() {
                                                 {isImage && imageUrl ? (
                                                     <Image 
                                                         source={{ uri: imageUrl }} 
-                                                        className="w-52 h-52 rounded-xl mb-1 bg-slate-800"
+                                                        className="w-48 h-48 rounded-xl mb-1 bg-slate-800"
                                                         resizeMode="cover" 
                                                     />
                                                 ) : (
-                                                    <Text className={`text-[13.5px] leading-5 font-normal ${isUser ? 'text-white' : 'text-slate-100'}`}>
+                                                    <Text className={`text-[12.5px] leading-4 font-normal ${isUser ? 'text-white' : 'text-slate-100'}`}>
                                                         {m.message}
                                                     </Text>
                                                 )}
                                             </TouchableOpacity>
 
-                                            <View className="flex-row items-center justify-between mt-1.5 pt-1 border-t border-slate-800/50">
-                                                <Text className="text-[9.5px] font-semibold text-slate-400">
+                                            <View className="flex-row items-center justify-between mt-1 pt-0.5 border-t border-slate-800/50">
+                                                <Text className="text-[9px] font-semibold text-slate-400">
                                                     {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </Text>
                                                 {isUser && (
-                                                    <Ionicons name="checkmark-done" size={12} color="#60a5fa" />
+                                                    <Ionicons name="checkmark-done" size={11} color="#60a5fa" />
                                                 )}
                                             </View>
                                         </View>
@@ -252,12 +252,12 @@ export default function UserTicketChatScreen() {
                                 );
                             })
                         ) : (
-                            <View className="flex-1 items-center justify-center pt-24 px-6">
-                                <View className="w-14 h-14 rounded-full bg-slate-900 border border-slate-800 items-center justify-center mb-3">
-                                    <Ionicons name="chatbubbles-outline" size={28} color="#f5a623" />
+                            <View className="flex-1 items-center justify-center pt-20 px-6">
+                                <View className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 items-center justify-center mb-2">
+                                    <Ionicons name="chatbubbles-outline" size={24} color="#f5a623" />
                                 </View>
-                                <Text className="text-white font-extrabold text-[14px] text-center">Support Chat Active</Text>
-                                <Text className="text-slate-400 mt-1 font-medium text-[12px] text-center leading-4">
+                                <Text className="text-white font-extrabold text-[13px] text-center">Support Chat Active</Text>
+                                <Text className="text-slate-400 mt-1 font-medium text-[11px] text-center leading-4">
                                     Send your message below. A support agent will reply you in real-time.
                                 </Text>
                             </View>
@@ -265,20 +265,20 @@ export default function UserTicketChatScreen() {
                     </ScrollView>
 
                     {/* FLOATING COMPACT INPUT BAR */}
-                    <View className="bg-[#060d21] px-3 pb-5 pt-2 border-t border-slate-800/80 shadow-2xl">
-                        <View className="flex-row items-center gap-2 bg-slate-900/90 px-2 py-1 rounded-full border border-slate-800 shadow-inner">
+                    <View className="bg-[#060d21] px-2.5 pb-4 pt-1.5 border-t border-slate-800/80 shadow-2xl">
+                        <View className="flex-row items-center gap-1.5 bg-slate-900/90 px-2 py-0.5 rounded-full border border-slate-800">
                             
                             <TouchableOpacity 
                                 onPress={pickImage} 
-                                className="p-1.5 bg-slate-800/90 rounded-full active:scale-95"
+                                className="p-1 bg-slate-800/90 rounded-full active:scale-95"
                             >
-                                <Ionicons name="attach" size={18} color="#f5a623" />
+                                <Ionicons name="attach" size={16} color="#f5a623" />
                             </TouchableOpacity>
 
                             <TextInput
-                                placeholder="Write a message to support..."
+                                placeholder="Message support..."
                                 placeholderTextColor="#64748b"
-                                className="flex-1 py-2 px-1 text-slate-100 text-[13.5px] max-h-24 leading-4 font-medium"
+                                className="flex-1 py-1.5 px-1 text-slate-100 text-[12.5px] max-h-20 leading-4 font-medium"
                                 value={reply}
                                 onChangeText={setReply}
                                 multiline
@@ -287,16 +287,16 @@ export default function UserTicketChatScreen() {
                             <TouchableOpacity
                                 onPress={() => sendMessage()}
                                 disabled={sending || !reply.trim()}
-                                className="rounded-full overflow-hidden active:scale-95 shadow-md shadow-amber-500/20"
+                                className="rounded-full overflow-hidden active:scale-95 shadow-md"
                             >
                                 <LinearGradient
                                     colors={sending || !reply.trim() ? ['#334155', '#1e293b'] : ['#f5a623', '#d97706']}
-                                    className="h-[34px] w-[34px] items-center justify-center rounded-full"
+                                    className="h-[30px] w-[30px] items-center justify-center rounded-full"
                                 >
                                     {sending ? (
                                         <ActivityIndicator color="#060d21" size="small" />
                                     ) : (
-                                        <Ionicons name="paper-plane" size={16} color="#060d21" style={{ marginLeft: 2 }} />
+                                        <Ionicons name="paper-plane" size={14} color="#060d21" style={{ marginLeft: 1 }} />
                                     )}
                                 </LinearGradient>
                             </TouchableOpacity>
