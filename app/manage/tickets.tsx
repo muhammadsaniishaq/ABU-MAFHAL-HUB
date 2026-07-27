@@ -696,45 +696,52 @@ export default function SupportTickets() {
             {selectedTicket?.status !== 'resolved' && (
                 <View className="bg-[#f8fafc] border-t border-slate-200/50">
                     
-                    {/* Quick Replies */}
-                    <View className="px-3 py-2 border-b border-slate-100/50">
+                    {/* Quick Replies (100% Professional English) */}
+                    <View className="px-3 py-2 border-b border-slate-800/80 bg-slate-950">
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                             {[
-                                "Muna duba wannan yanzu.", 
-                                "An gyara matsalar, ka sake gwadawa.", 
-                                "Don Allah ka turo mana screenshot.", 
-                                "Za mu tuntube ka nan ba da jimawa ba."
+                                "We are reviewing your request now.", 
+                                "The issue has been resolved. Please try again.", 
+                                "Please send us a payment screenshot or receipt.", 
+                                "Your wallet has been credited successfully.",
+                                "A support agent will contact you shortly."
                             ].map((qr, index) => (
                                 <TouchableOpacity 
                                     key={index} 
                                     onPress={() => sendMessage(qr)} 
-                                    className="bg-white border border-slate-200 px-3 py-1.5 rounded-full mr-2 shadow-sm shadow-slate-100"
+                                    className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full mr-2 shadow-sm"
                                 >
-                                    <Text className="text-[11px] text-[#0d1b3e] font-medium">{qr}</Text>
+                                    <Text className="text-[11px] text-slate-300 font-medium">{qr}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
 
-                    <View className="px-4 pb-10 pt-3 flex-row items-end gap-2">
+                    <View className="px-4 pb-10 pt-3 flex-row items-end gap-2 bg-[#060d21]">
                         {selectedTicket?.profiles?.avatar_url ? (
-                            <Image source={{ uri: selectedTicket.profiles.avatar_url }} className="h-12 w-12 rounded-full border border-slate-200 shadow-sm" />
+                            <Image source={{ uri: selectedTicket.profiles.avatar_url }} className="h-10 w-10 rounded-full border border-slate-800 shadow-sm" />
                         ) : (
-                            <View className="h-12 w-12 rounded-full bg-[#0d1b3e] items-center justify-center border border-[#d4af37] shadow-sm">
-                                <Text className="font-bold text-[#d4af37] text-lg">{getInitials(selectedTicket?.profiles?.full_name || 'U')}</Text>
+                            <View className="h-10 w-10 rounded-full bg-slate-900 items-center justify-center border border-slate-800 shadow-sm">
+                                <Text className="font-bold text-[#f5a623] text-sm">{getInitials(selectedTicket?.profiles?.full_name || 'U')}</Text>
                             </View>
                         )}
-                        <View className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm shadow-slate-100 overflow-hidden">
+                        <View className="flex-1 bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden">
                             {/* Toolbar (AI, Private Note) */}
-                            <View className="flex-row justify-between items-center px-3 py-2 border-b border-slate-100 bg-slate-50">
-                                <TouchableOpacity className="flex-row items-center gap-1 bg-[#0d1b3e]/5 px-2 py-1 rounded-full">
-                                    <Ionicons name="sparkles" size={12} color="#f5a623" />
-                                    <Text className="text-[#f5a623] text-[9px] font-black uppercase tracking-wider">AI Draft</Text>
+                            <View className="flex-row justify-between items-center px-3 py-1.5 border-b border-slate-800/80 bg-slate-950">
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        const draft = `Hello! Thank you for reaching out regarding "${selectedTicket?.subject || 'your ticket'}". We are currently processing your request and will provide an update shortly.`;
+                                        setReply(draft);
+                                    }}
+                                    className="flex-row items-center gap-1 bg-[#f5a623]/20 border border-[#f5a623]/40 px-2 py-0.5 rounded-full active:opacity-80"
+                                >
+                                    <Ionicons name="sparkles" size={11} color="#f5a623" />
+                                    <Text className="text-[#f5a623] text-[9.5px] font-black uppercase tracking-wider">AI Draft (English)</Text>
                                 </TouchableOpacity>
                                 
                                 <View className="flex-row items-center gap-2">
                                     <Text className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Internal Note</Text>
-                                    <Switch trackColor={{false: '#e2e8f0', true: '#f5a623'}} thumbColor="#fff" style={{ transform: [{ scale: 0.6 }] }} />
+                                    <Switch trackColor={{false: '#334155', true: '#f5a623'}} thumbColor="#fff" style={{ transform: [{ scale: 0.6 }] }} />
                                 </View>
                             </View>
 
