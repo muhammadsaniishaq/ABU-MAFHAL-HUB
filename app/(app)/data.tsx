@@ -963,7 +963,12 @@ export default function DataScreen() {
                                         return (
                                         <TouchableOpacity
                                             key={plan.id}
-                                            onPress={() => setSelectedPlan(plan)}
+                                            onPress={() => {
+                                                if (Platform.OS !== 'web') {
+                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                }
+                                                setSelectedPlan(plan);
+                                            }}
                                             style={[s.planListCard, isSelected && s.planListCardSelected]}
                                             activeOpacity={0.7}
                                         >
@@ -1448,11 +1453,11 @@ const s = StyleSheet.create({
     maxWidth: 450,
   },
   headerContainer: {
-    paddingTop: Platform.OS === 'ios' ? 54 : 40,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 44 : 26,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 16,
     width: '100%',
   },
   headerTop: {

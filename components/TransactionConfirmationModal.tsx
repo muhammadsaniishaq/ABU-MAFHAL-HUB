@@ -31,98 +31,82 @@ export default function TransactionConfirmationModal({
     visible, 
     onClose, 
     onConfirm, 
-    title = 'Confirm Transaction',
+    title = 'Confirm Data Purchase',
     details,
     network
 }: TransactionConfirmationModalProps) {
+    const totalItem = details.find(d => d.isTotal) || details.find(d => d.isAmount);
     
     return (
         <Modal
-            animationType="slide"
+            animationType="fade"
             transparent={true}
             visible={visible}
             onRequestClose={onClose}
         >
-            <View className="flex-1 justify-end bg-black/60">
-                <View className="bg-white rounded-t-3xl p-6 min-h-[50%]">
+            <View className="flex-1 justify-center items-center px-4 bg-black/80">
+                <View className="bg-[#060d21] border border-slate-800 rounded-3xl p-5 w-full max-w-[360px] shadow-2xl overflow-hidden">
                     
-                    {/* Handle Bar */}
-                    <View className="items-center mb-6">
-                        <View className="w-16 h-1.5 bg-gray-200 rounded-full" />
-                    </View>
-
-                    {/* Header */}
-                    <View className="flex-row items-center justify-between mb-6">
-                        <View>
-                            <Text className="text-2xl font-bold text-gray-800">{title}</Text>
-                            <Text className="text-gray-500 text-sm">Review details before proceeding</Text>
+                    {/* Header bar */}
+                    <View className="flex-row items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
+                        <View className="flex-row items-center gap-2">
+                            <View className="w-2 h-2 rounded-full bg-[#f5a623]" />
+                            <Text className="text-white font-extrabold text-[15px]">{title}</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} className="bg-gray-100 p-2 rounded-full">
-                            <Ionicons name="close" size={24} color="#374151" />
+                        <TouchableOpacity onPress={onClose} className="w-7 h-7 bg-slate-900 rounded-full items-center justify-center border border-slate-800">
+                            <Ionicons name="close" size={16} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Network Logo & Summary */}
-                    <View className="items-center mb-6">
-                        <View className="w-20 h-20 rounded-2xl bg-gray-50 items-center justify-center shadow-sm border border-gray-100 mb-3 relative">
+                    {/* Network & Amount Hero Card */}
+                    <View className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl items-center mb-3">
+                        <View className="w-12 h-12 rounded-full bg-slate-800 items-center justify-center border border-slate-700 mb-2">
                             {network && NETWORK_LOGOS[network.toLowerCase()] ? (
-                                <Image source={NETWORK_LOGOS[network.toLowerCase()]} className="w-12 h-12 rounded-full" resizeMode="contain" />
+                                <Image source={NETWORK_LOGOS[network.toLowerCase()]} className="w-8 h-8 rounded-full" resizeMode="contain" />
                             ) : (
-                                <Ionicons name="wallet" size={32} color="#9CA3AF" />
+                                <Ionicons name="cellular" size={20} color="#f5a623" />
                             )}
-                            <View className="absolute -bottom-2 -right-2 bg-[#f5a623] rounded-full p-1.5 border-2 border-white">
-                                <Ionicons name="checkmark" size={12} color="white" />
-                            </View>
                         </View>
-                        <Text className="font-bold text-gray-800 text-lg capitalize">{network || 'Transaction'}</Text>
+                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Payable Amount</Text>
+                        <Text className="text-[#f5a623] font-black text-2xl mt-0.5">{totalItem?.value || '₦0.00'}</Text>
                     </View>
 
-                    {/* Details List */}
-                    <View className="bg-gray-50 rounded-2xl p-4 mb-8 border border-gray-100">
-                        {details.map((item, index) => (
-                            <View key={index} className={`flex-row justify-between items-center py-3 ${index !== details.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                                <Text className={`font-medium text-sm ${item.isTotal ? 'text-gray-800 font-bold' : 'text-gray-500'}`}>
+                    {/* Compact Details List */}
+                    <View className="bg-slate-950/80 rounded-xl p-3 border border-slate-800/60 mb-4">
+                        {details.filter(d => !d.isTotal).map((item, index) => (
+                            <View key={index} className={`flex-row justify-between items-center py-1.5 ${index !== details.length - 2 ? 'border-b border-slate-900' : ''}`}>
+                                <Text className="text-slate-400 font-bold text-[11px]">
                                     {item.label}
                                 </Text>
-                                
-                                {item.isDiscount ? (
-                                    <View className="bg-green-100 px-2 py-1 rounded-md">
-                                        <Text className="text-green-700 font-bold text-sm">{item.value}</Text>
-                                    </View>
-                                ) : (
-                                    <Text className={`font-bold text-right ${
-                                        item.isTotal ? 'text-[#0d1b3e] text-xl' : 
-                                        item.isAmount ? 'text-gray-800 text-base' : 'text-gray-800'
-                                    } ${item.label.includes('Original') ? 'line-through text-gray-400' : ''}`}>
-                                        {item.value}
-                                    </Text>
-                                )}
+                                <Text className="text-white font-bold text-[11px] text-right" numberOfLines={1}>
+                                    {item.value}
+                                </Text>
                             </View>
                         ))}
                     </View>
 
-                    {/* Actions */}
-                    <View className="mt-auto">
-                         <TouchableOpacity
+                    {/* Action Buttons */}
+                    <View className="gap-2">
+                        <TouchableOpacity
                             onPress={onConfirm}
                             activeOpacity={0.8}
-                            className="mb-3"
                         >
                             <LinearGradient
-                                colors={['#0d1b3e', '#142258']}
+                                colors={['#f5a623', '#d97706']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
-                                className="h-14 rounded-2xl items-center justify-center shadow-lg shadow-slate-300"
+                                className="h-11 rounded-xl items-center justify-center shadow-lg flex-row gap-1.5"
                             >
-                                <Text className="text-white font-bold text-lg">Confirm & Pay</Text>
+                                <Ionicons name="checkmark-circle" size={18} color="#060d21" />
+                                <Text className="text-[#060d21] font-black text-[13px] uppercase tracking-wider">Confirm & Pay Now</Text>
                             </LinearGradient>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={onClose}
-                            className="h-14 rounded-2xl items-center justify-center border border-gray-200 bg-white"
+                            className="h-10 rounded-xl items-center justify-center border border-slate-800 bg-slate-900"
                         >
-                            <Text className="text-gray-600 font-bold text-lg">Cancel</Text>
+                            <Text className="text-slate-400 font-bold text-[12px]">Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -130,3 +114,4 @@ export default function TransactionConfirmationModal({
         </Modal>
     );
 }
+
