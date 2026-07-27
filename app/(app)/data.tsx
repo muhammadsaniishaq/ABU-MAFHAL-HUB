@@ -156,12 +156,14 @@ export default function DataScreen() {
     const router = useRouter();
     const isWeb = Platform.OS === 'web';
 
-    // Initial Data Load
+    // Initial Data Load (Parallel Execution)
     useEffect(() => {
-        fetchUserData();
-        fetchBeneficiaries();
-        fetchLastTransaction();
-        loadFavorites();
+        Promise.allSettled([
+            fetchUserData(),
+            fetchBeneficiaries(),
+            fetchLastTransaction(),
+            loadFavorites()
+        ]).catch(e => console.warn('Data init error:', e));
     }, []);
 
     const loadFavorites = async () => {

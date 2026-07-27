@@ -64,45 +64,35 @@ export default function AirtimeScreen() {
     const fetchData = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            // Fetch Beneficiaries
-            const { data: bens } = await supabase.from('beneficiaries').select('*').eq('user_id', user.id);
-            if (bens) setBeneficiaries(bens);
-
-            // Fetch Balance & Profile Info
-            const { data: profile } = await supabase.from('profiles').select('balance, phone').eq('id', user.id).single();
-            if (profile) {
-                setBalance(profile.balance);
-                if (profile.phone) setUserPhone(profile.phone);
-            }
-
-            // Fetch Recents (Success Airtime Txns)
-            const { data: txns } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('type', 'airtime')
-                .eq('status', 'success')
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (txns) {
-                const uniqueRecents: any[] = [];
-                const seenPhones = new Set();
-                
-                txns.forEach((t: any) => {
-                    // Desc format: "Airtime Purchase: MTN 080..."
-                    const match = t.description?.match(/:\s*(\w+)\s+([\d+]+)/);
-                    if (match) {
-                        const net = match[1].toLowerCase(); // 'mtn'
-                        const pho = match[2];
-                        if (!seenPhones.has(pho)) {
-                            seenPhones.add(pho);
-                            uniqueRecents.push({ id: t.id, network: net, phone: pho });
-                        }
+            await Promise.allSettled([
+                supabase.from('beneficiaries').select('*').eq('user_id', user.id).then(({ data: bens }) => {
+                    if (bens) setBeneficiaries(bens);
+                }),
+                supabase.from('profiles').select('balance, phone').eq('id', user.id).single().then(({ data: profile }) => {
+                    if (profile) {
+                        setBalance(profile.balance);
+                        if (profile.phone) setUserPhone(profile.phone);
                     }
-                });
-                setRecents(uniqueRecents.slice(0, 5)); // Keep top 5
-            }
+                }),
+                supabase.from('transactions').select('*').eq('user_id', user.id).eq('type', 'airtime').eq('status', 'success').order('created_at', { ascending: false }).limit(20).then(({ data: txns }) => {
+                    if (txns) {
+                        const uniqueRecents: any[] = [];
+                        const seenPhones = new Set();
+                        txns.forEach((t: any) => {
+                            const match = t.description?.match(/:\s*(\w+)\s+([\d+]+)/);
+                            if (match) {
+                                const net = match[1].toLowerCase();
+                                const pho = match[2];
+                                if (!seenPhones.has(pho)) {
+                                    seenPhones.add(pho);
+                                    uniqueRecents.push({ id: t.id, network: net, phone: pho });
+                                }
+                            }
+                        });
+                        setRecents(uniqueRecents.slice(0, 5));
+                    }
+                })
+            ]);
         }
     };
 

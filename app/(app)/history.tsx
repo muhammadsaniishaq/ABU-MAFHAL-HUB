@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -58,7 +58,7 @@ export default function HistoryScreen() {
         }
     };
 
-    const getGroupedTransactions = () => {
+    const sections = useMemo(() => {
         let filtered = history;
         if (filter === 'In') filtered = history.filter(tx => tx.isIncome);
         if (filter === 'Out') filtered = history.filter(tx => !tx.isIncome);
@@ -81,9 +81,7 @@ export default function HistoryScreen() {
             title,
             data: groups[title]
         }));
-    };
-
-    const sections = getGroupedTransactions();
+    }, [history, filter]);
 
     if (loading && history.length === 0) {
         return (
@@ -150,6 +148,10 @@ export default function HistoryScreen() {
                 refreshing={loading}
                 showsVerticalScrollIndicator={false}
                 stickySectionHeadersEnabled={false}
+                initialNumToRender={15}
+                maxToRenderPerBatch={10}
+                windowSize={7}
+                removeClippedSubviews={Platform.OS !== 'web'}
                 renderSectionHeader={({ section: { title } }) => (
                     <Text style={s.sectionHeader}>{title}</Text>
                 )}
