@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 /**
- * Sends an email notification to the user when they create a new support ticket.
+ * Sends an email notification to the user when they create a new support ticket (100% English).
  */
 export async function sendTicketCreatedEmail(ticketId: string, subject: string, userEmail?: string, userName?: string) {
     try {
@@ -19,8 +19,8 @@ export async function sendTicketCreatedEmail(ticketId: string, subject: string, 
         if (!email) return;
 
         const ticketRef = ticketId.split('-')[0].toUpperCase();
-        const emailTitle = `🎫 Support Ticket Created: #${ticketRef}`;
-        const emailBody = `Sannu ${name || 'Customer'}! 👋\n\nSupport Ticket ɗinka domin: "${subject}" (Ticket ID: #${ticketRef}) ya samu nasarar buɗewa.\n\nMasu agajinmu na Admin za su duba tambayarka da wuri kuma za mu sanar da kai ta email da zarar an amsa!\n\n------------------------------\nAbu Mafhal Sub Support Team`;
+        const emailTitle = `🎫 Support Ticket Received: #${ticketRef}`;
+        const emailBody = `Hello ${name || 'Valued Customer'}! 👋\n\nYour support ticket regarding "${subject}" (Ticket ID: #${ticketRef}) has been successfully logged.\n\nOur dedicated support agents are actively reviewing your request and will respond as soon as possible. You will receive an instant email notification once an agent replies.\n\nThank you for choosing Abu Mafhal Sub!\n\nBest regards,\nAbu Mafhal Sub Customer Support Team`;
 
         await supabase.functions.invoke('send-communication', {
             body: {
@@ -37,7 +37,7 @@ export async function sendTicketCreatedEmail(ticketId: string, subject: string, 
 }
 
 /**
- * Sends an email notification to the user containing the EXACT content of what the admin replied.
+ * Sends an email notification to the user containing the EXACT content of what the admin replied (100% English).
  */
 export async function sendAdminReplyEmail(ticketId: string, ticketSubject: string, replyMessage: string, userEmail?: string, userName?: string) {
     try {
@@ -68,7 +68,7 @@ export async function sendAdminReplyEmail(ticketId: string, ticketSubject: strin
             : replyMessage;
 
         const emailTitle = `💬 New Admin Reply - Ticket #${ticketRef}`;
-        const emailBody = `Sannu ${name || 'Valued Customer'}! 👋\n\nAdmin ya turo maka da sabon amsa dangane da Support Ticket ɗinka: "${ticketSubject}" (ID: #${ticketRef}).\n\n=========================================\n💬 SAKON AMASAR ADMIN (ADMIN'S REPLY):\n\n"${cleanMessage}"\n=========================================\n\nDa fatan za ka shiga manhajarmu ta Abu Mafhal Sub don ci gaba da magana da Admin ko bincika saƙonninka.\n\nNagode,\nAbu Mafhal Sub Support Desk`;
+        const emailBody = `Hello ${name || 'Valued Customer'}! 👋\n\nAn admin agent has just replied to your support ticket regarding: "${ticketSubject}" (Ticket ID: #${ticketRef}).\n\n=========================================\n💬 ADMIN REPLY MESSAGE:\n\n"${cleanMessage}"\n=========================================\n\nYou can log into the Abu Mafhal Sub mobile app anytime to continue chatting with support or review your full transaction history.\n\nThank you,\nAbu Mafhal Sub Customer Support Desk`;
 
         await supabase.functions.invoke('send-communication', {
             body: {
@@ -83,4 +83,5 @@ export async function sendAdminReplyEmail(ticketId: string, ticketSubject: strin
         console.log("[sendAdminReplyEmail] Error:", e);
     }
 }
+
 
