@@ -18,19 +18,24 @@ import DynamicBanners from '../../components/DynamicBanners';
 const parseVolumeToGB = (volume: any, name: string): number => {
     const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();
     
-    // Check for GB first
-    const gbMatch = text.match(/(\d+(\.\d+)?)\s*(gb|gig|g)/i);
+    // Check for MB first to avoid false GB matches from words starting with G (e.g. gifting, glo)
+    const mbMatch = text.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)\b/i);
+    if (mbMatch) {
+        return parseFloat(mbMatch[1]) / 1024;
+    }
+
+    // Check for GB with strict word boundary
+    const gbMatch = text.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)\b/i);
     if (gbMatch) {
         return parseFloat(gbMatch[1]);
     }
     
-    // Check for MB
-    const mbMatch = text.match(/(\d+)\s*(mb|meg|m)/i);
-    if (mbMatch) {
-        return parseFloat(mbMatch[1]) / 1024;
+    // Fallback if numeric string
+    const numOnly = parseFloat(String(volume).replace(/[^0-9.]/g, ''));
+    if (!isNaN(numOnly) && numOnly > 0) {
+        return numOnly > 50 ? numOnly / 1024 : numOnly;
     }
-    
-    // Default fallback if we can't parse it
+
     return 0;
 };
 

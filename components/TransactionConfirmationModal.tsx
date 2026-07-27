@@ -44,69 +44,69 @@ export default function TransactionConfirmationModal({
             visible={visible}
             onRequestClose={onClose}
         >
-            <View className="flex-1 justify-center items-center px-4 bg-black/80">
-                <View className="bg-[#060d21] border border-slate-800 rounded-3xl p-5 w-full max-w-[360px] shadow-2xl overflow-hidden">
+            <View className="flex-1 justify-center items-center px-4 bg-slate-900/40">
+                <View className="bg-white border border-slate-100 rounded-2xl p-3.5 w-full max-w-[290px] shadow-xl overflow-hidden">
                     
                     {/* Header bar */}
-                    <View className="flex-row items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
-                        <View className="flex-row items-center gap-2">
+                    <View className="flex-row items-center justify-between pb-2 border-b border-slate-100 mb-2.5">
+                        <View className="flex-row items-center gap-1.5">
                             <View className="w-2 h-2 rounded-full bg-[#f5a623]" />
-                            <Text className="text-white font-extrabold text-[15px]">{title}</Text>
+                            <Text className="text-[#0d1b3e] font-black text-[13px]">{title}</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} className="w-7 h-7 bg-slate-900 rounded-full items-center justify-center border border-slate-800">
-                            <Ionicons name="close" size={16} color="#94a3b8" />
+                        <TouchableOpacity onPress={onClose} className="w-6 h-6 bg-slate-100 rounded-full items-center justify-center">
+                            <Ionicons name="close" size={14} color="#64748b" />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Network & Amount Hero Card */}
-                    <View className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl items-center mb-3">
-                        <View className="w-12 h-12 rounded-full bg-slate-800 items-center justify-center border border-slate-700 mb-2">
+                    {/* Network & Amount Mini Hero Card */}
+                    <View className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl items-center mb-2.5">
+                        <View className="w-8 h-8 rounded-full bg-white items-center justify-center border border-slate-200 mb-1 shadow-xs">
                             {network && NETWORK_LOGOS[network.toLowerCase()] ? (
-                                <Image source={NETWORK_LOGOS[network.toLowerCase()]} className="w-8 h-8 rounded-full" resizeMode="contain" />
+                                <Image source={NETWORK_LOGOS[network.toLowerCase()]} className="w-5 h-5 rounded-full" resizeMode="contain" />
                             ) : (
-                                <Ionicons name="cellular" size={20} color="#f5a623" />
+                                <Ionicons name="cellular" size={14} color="#0d1b3e" />
                             )}
                         </View>
-                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Payable Amount</Text>
-                        <Text className="text-[#f5a623] font-black text-2xl mt-0.5">{totalItem?.value || '₦0.00'}</Text>
+                        <Text className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Total Amount</Text>
+                        <Text className="text-[#0d1b3e] font-black text-xl mt-0.5">{totalItem?.value || '₦0.00'}</Text>
                     </View>
 
                     {/* Compact Details List */}
-                    <View className="bg-slate-950/80 rounded-xl p-3 border border-slate-800/60 mb-4">
+                    <View className="bg-slate-50/80 rounded-lg p-2.5 border border-slate-100 mb-3">
                         {details.filter(d => !d.isTotal).map((item, index) => (
-                            <View key={index} className={`flex-row justify-between items-center py-1.5 ${index !== details.length - 2 ? 'border-b border-slate-900' : ''}`}>
-                                <Text className="text-slate-400 font-bold text-[11px]">
+                            <View key={index} className={`flex-row justify-between items-center py-1 ${index !== details.length - 2 ? 'border-b border-slate-100' : ''}`}>
+                                <Text className="text-slate-500 font-bold text-[10px]">
                                     {item.label}
                                 </Text>
-                                <Text className="text-white font-bold text-[11px] text-right" numberOfLines={1}>
+                                <Text className="text-[#0d1b3e] font-black text-[10px] text-right" numberOfLines={1}>
                                     {item.value}
                                 </Text>
                             </View>
                         ))}
                     </View>
 
-                    {/* Action Buttons */}
-                    <View className="gap-2">
+                    {/* Mini Action Buttons */}
+                    <View className="gap-1.5">
                         <TouchableOpacity
                             onPress={onConfirm}
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={['#f5a623', '#d97706']}
+                                colors={['#0d1b3e', '#142258']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
-                                className="h-11 rounded-xl items-center justify-center shadow-lg flex-row gap-1.5"
+                                className="h-9 rounded-lg items-center justify-center shadow-xs flex-row gap-1"
                             >
-                                <Ionicons name="checkmark-circle" size={18} color="#060d21" />
-                                <Text className="text-[#060d21] font-black text-[13px] uppercase tracking-wider">Confirm & Pay Now</Text>
+                                <Ionicons name="checkmark-circle" size={14} color="#f5a623" />
+                                <Text className="text-white font-black text-[11px] uppercase tracking-wider">Confirm & Pay</Text>
                             </LinearGradient>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={onClose}
-                            className="h-10 rounded-xl items-center justify-center border border-slate-800 bg-slate-900"
+                            className="h-8 rounded-lg items-center justify-center border border-slate-200 bg-white"
                         >
-                            <Text className="text-slate-400 font-bold text-[12px]">Cancel</Text>
+                            <Text className="text-slate-500 font-bold text-[11px]">Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -114,4 +114,5 @@ export default function TransactionConfirmationModal({
         </Modal>
     );
 }
+
 
