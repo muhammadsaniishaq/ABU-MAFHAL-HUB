@@ -359,7 +359,14 @@ export default function DataScreen() {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         try {
             const mappedPlans = await api.data.getPlans(netId);
-            setPlans(mappedPlans);
+            // Sort data plans neatly in ascending order by volume (e.g. 500MB, 1GB, 2GB, 5GB...) and price
+            const sorted = [...mappedPlans].sort((a, b) => {
+                const volA = parseVolumeToGB(a.volume, a.originalName || a.name);
+                const volB = parseVolumeToGB(b.volume, b.originalName || b.name);
+                if (volA !== volB) return volA - volB;
+                return a.price - b.price;
+            });
+            setPlans(sorted);
         } catch (error) {
             console.error(error);
             Alert.alert("Error", "Failed to load data plans. Please try again.");
@@ -1486,9 +1493,9 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
   scrollContainer: {
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingBottom: 140,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1825,7 +1832,9 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   bottomButtonWrapper: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 90 : 75,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',

@@ -201,7 +201,7 @@ export default function AirtimeScreen() {
             <ScrollView 
                 style={isWeb ? { alignSelf: 'center', width: '100%', maxWidth: 450 } : { flex: 1 }}
                 contentContainerStyle={[
-                    { padding: 24, paddingBottom: 40, paddingTop: 100 },
+                    { padding: 16, paddingBottom: 130, paddingTop: 16 },
                     isWeb && { backgroundColor: '#ffffff', minHeight: '100%', shadowColor: '#0a1633', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }
                 ]}
             >
