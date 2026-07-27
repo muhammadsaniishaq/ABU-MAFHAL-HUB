@@ -93,7 +93,13 @@ export default function RootLayout() {
     };
 
     useEffect(() => {
+        // Safety timeout: Ensure app layout initializes within 1.5s even if network is slow/offline
+        const bootTimer = setTimeout(() => {
+            setInitialized(true);
+        }, 1500);
+
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+            clearTimeout(bootTimer);
             if (error) {
                 console.log("Session init error returned:", error.message);
                 if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Refresh token')) {
@@ -106,11 +112,12 @@ export default function RootLayout() {
                     // Restore role from local cache immediately
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
-                    await fetchUserRole(session.user.id, session.user.email);
+                    fetchUserRole(session.user.id, session.user.email);
                 }
             }
             setInitialized(true);
         }).catch(async (error) => {
+            clearTimeout(bootTimer);
             console.log("Session init error thrown:", error?.message || error);
             // If refresh token is invalid, clear session
             if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token') || error?.message?.includes('Refresh token')) {
@@ -131,12 +138,15 @@ export default function RootLayout() {
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            clearTimeout(bootTimer);
+            subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
         if (loaded && initialized) {
-            SplashScreen.hideAsync();
+            SplashScreen.hideAsync().catch(() => {});
         }
     }, [loaded, initialized]);
 
@@ -172,8 +182,7 @@ export default function RootLayout() {
         }
     }, [session, userRole, initialized, segments, loaded]);
 
-    if (!loaded || !initialized || settingsLoading) {
-        // Return nothing instead of a spinner, keep the native splash screen visible
+    if (!loaded || !initialized) {
         return null;
     }
 

@@ -81,6 +81,10 @@ export function useAppSettings() {
     useEffect(() => {
         let mounted = true;
 
+        const safetyTimer = setTimeout(() => {
+            if (mounted) setLoading(false);
+        }, 1000);
+
         const initFetch = async () => {
             if (!fetchPromise) {
                 isFetching = true;
@@ -101,7 +105,6 @@ export function useAppSettings() {
                             globalSettings = newSettings;
                         }
                     } catch (error: any) {
-                        // Suppress excessive logging, just warn once
                         console.warn('Could not fetch app settings from Supabase:', error?.message || error);
                     } finally {
                         isFetching = false;
@@ -112,6 +115,7 @@ export function useAppSettings() {
             await fetchPromise;
             
             if (mounted) {
+                clearTimeout(safetyTimer);
                 setSettings(globalSettings);
                 setLoading(false);
             }
@@ -121,6 +125,7 @@ export function useAppSettings() {
 
         return () => {
             mounted = false;
+            clearTimeout(safetyTimer);
         };
     }, []);
 
