@@ -1053,18 +1053,37 @@ export default function DataScreen() {
                                      paddingHorizontal: 20,
                                  }}>
                                      <Ionicons name="cellular-outline" size={28} color="#3b82f6" />
-                                     <Text style={{ color: '#3b82f6', marginTop: 8, fontWeight: '700', fontSize: 13 }}>
+                                        <Text style={{ color: '#3b82f6', marginTop: 8, fontWeight: '700', fontSize: 13 }}>
                                          Select a network to see plans
                                      </Text>
                                  </View>
                             ) : (
                                 <View style={s.plansListContainer}>
+                                    {/* Quick Features Hub Bar */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="filter-circle" size={14} color="#64748b" />
+                                            <Text style={{ fontSize: 12, color: '#64748b', marginLeft: 4, fontWeight: '600' }}>{filteredPlans.length} Plans Available</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#15803d', marginRight: 4 }} />
+                                                <Text style={{ fontSize: 10, color: '#475569' }}>Best Price/GB</Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#f97316', marginRight: 4 }} />
+                                                <Text style={{ fontSize: 10, color: '#475569' }}>Top Value</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
                                         const planInfo = parsePlanInfo(plan.volume, plan.originalName || plan.name, plan.validity);
                                         const isBestValue = (planInfo.validityCategory === 'Monthly' && plan.price < 1000);
                                         const isMega = plan.name.toLowerCase().includes('mega');
+                                        const costPerGB = planInfo.volumeInGB > 0 ? Math.round(plan.price / planInfo.volumeInGB) : null;
                                         
                                         return (
                                         <TouchableOpacity
@@ -1094,7 +1113,7 @@ export default function DataScreen() {
                                                 
                                                 {/* Middle: Details */}
                                                 <View style={s.planDetailsMid}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3, flexWrap: 'wrap', gap: 4 }}>
                                                         <Text style={[s.planListName, isSelected && s.planListNameSelected]} numberOfLines={2}>
                                                             {plan.name}
                                                         </Text>
@@ -1109,11 +1128,33 @@ export default function DataScreen() {
                                                             </View>
                                                         )}
                                                     </View>
-                                                    <View style={s.planListValidityContainer}>
-                                                        <Ionicons name="time-outline" size={10} color={isSelected ? '#fde047' : '#64748b'} style={{ marginRight: 3 }} />
-                                                        <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
-                                                            {planInfo.validity}
-                                                        </Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                                        <View style={s.planListValidityContainer}>
+                                                            <Ionicons name="time-outline" size={10} color={isSelected ? '#fde047' : '#64748b'} style={{ marginRight: 3 }} />
+                                                            <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
+                                                                {planInfo.validity}
+                                                            </Text>
+                                                        </View>
+
+                                                        {/* Live Cost Per GB Savings Badge */}
+                                                        {costPerGB !== null && (
+                                                            <View style={{
+                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#f0fdf4',
+                                                                borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#bbf7d0',
+                                                                borderWidth: 1,
+                                                                paddingHorizontal: 6,
+                                                                paddingVertical: 1,
+                                                                borderRadius: 8,
+                                                            }}>
+                                                                <Text style={{
+                                                                    fontSize: 9,
+                                                                    fontWeight: '700',
+                                                                    color: isSelected ? '#4ade80' : '#15803d',
+                                                                }}>
+                                                                    ₦{costPerGB}/GB
+                                                                </Text>
+                                                            </View>
+                                                        )}
                                                     </View>
                                                 </View>
 
@@ -1125,7 +1166,7 @@ export default function DataScreen() {
                                                     <TouchableOpacity onPress={() => toggleFavorite(plan.id)} style={{ padding: 4 }}>
                                                         <Ionicons 
                                                             name={isFav ? "heart" : "heart-outline"} 
-                                                            size={20} 
+                                                            size={18} 
                                                             color={isFav ? (isSelected ? "#f87171" : "#ef4444") : (isSelected ? "rgba(255,255,255,0.4)" : "#94a3b8")} 
                                                         />
                                                     </TouchableOpacity>
