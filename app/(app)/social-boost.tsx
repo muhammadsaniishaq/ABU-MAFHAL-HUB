@@ -44,6 +44,8 @@ export default function SocialBoostScreen() {
     
     // UI State
     const [serviceModal, setServiceModal] = useState(false);
+    const [confirmModal, setConfirmModal] = useState(false);
+    const [modalSearchQuery, setModalSearchQuery] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [walletBalance, setWalletBalance] = useState(0);
 
@@ -100,9 +102,16 @@ export default function SocialBoostScreen() {
     }, [services, platformFilter]);
 
     const filteredServices = useMemo(() => {
-        if (!selectedCategory) return [];
-        return services.filter(s => s.category.trim() === selectedCategory);
-    }, [services, selectedCategory]);
+        let list = services;
+        if (selectedCategory) {
+            list = list.filter(s => s.category.trim() === selectedCategory);
+        }
+        if (modalSearchQuery.trim()) {
+            const q = modalSearchQuery.toLowerCase().trim();
+            list = list.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q));
+        }
+        return list;
+    }, [services, selectedCategory, modalSearchQuery]);
 
     const calculatePrice = () => {
         if (!selectedService || !quantity) return 0;
@@ -127,7 +136,7 @@ export default function SocialBoostScreen() {
         return { platform: 'Web', icon: 'link-outline', color: '#64748b' };
     }, [link]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         if (!selectedService) {
             Platform.OS === 'web' ? alert("Please select a service") : Alert.alert("Error", "Please select a service");
             return;
@@ -150,21 +159,7 @@ export default function SocialBoostScreen() {
             return;
         }
 
-        if (Platform.OS === 'web') {
-            const confirmed = window.confirm(`Are you sure you want to place this order for ₦${totalPrice.toLocaleString()}?`);
-            if (confirmed) {
-                placeOrder();
-            }
-        } else {
-            Alert.alert(
-                "Confirm Order",
-                `Are you sure you want to place this order for ₦${totalPrice.toLocaleString()}?`,
-                [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Proceed", style: "default", onPress: placeOrder }
-                ]
-            );
-        }
+        setConfirmModal(true);
     };
 
     const placeOrder = async () => {
@@ -199,6 +194,7 @@ export default function SocialBoostScreen() {
             Platform.OS === 'web' ? alert(msg) : Alert.alert("Failed", msg);
         } finally {
             setIsSubmitting(false);
+            setConfirmModal(false);
         }
     };
 
@@ -461,16 +457,50 @@ export default function SocialBoostScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Compact Service Modal */}
+            {/* Decorated Service Selection Modal */}
             <Modal visible={serviceModal} animationType="slide" transparent={true}>
-                <View className="flex-1 bg-[#0F172A]/60 justify-end">
-                    <View className="bg-white rounded-t-3xl p-5 max-h-[75%]">
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-slate-800 text-sm font-black uppercase tracking-widest">Select Service</Text>
+                <View className="flex-1 bg-[#0F172A]/70 justify-end">
+                    <View className="bg-white rounded-t-[32px] p-6 max-h-[80%] border-t border-white/20">
+                        {/* Modal Drag Handle */}
+                        <View className="w-12 h-1 bg-slate-200 rounded-full self-center mb-4" />
+                        
+                        <View className="flex-row justify-between items-center mb-3">
+                            <View className="flex-row items-center">
+                                <View className="w-8 h-8 rounded-full bg-[#f5a623]/20 items-center justify-center mr-2">
+                                    <Ionicons name="sparkles" size={16} color="#f5a623" />
+                                </View>
+                                <Text className="text-slate-900 text-base font-black tracking-tight">Select Boost Service</Text>
+                            </View>
                             <TouchableOpacity onPress={() => setServiceModal(false)} className="w-8 h-8 bg-slate-100 rounded-full items-center justify-center">
                                 <Ionicons name="close" size={18} color="#64748b" />
                             </TouchableOpacity>
                         </View>
+
+                        {/* Search Input Bar */}
+                        <View className="bg-slate-100 flex-row items-center px-3.5 py-2.5 rounded-xl border border-slate-200 mb-4">
+                            <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
+                            <TextInput 
+                                className="flex-1 text-xs text-slate-800 font-medium"
+                                placeholder="Search services (e.g. Followers, Likes, Views)..."
+                                placeholderTextColor="#94a3b8"
+                                value={modalSearchQuery}
+                                onChangeText={setModalSearchQuery}
+                                autoCapitalize="none"
+                            />
+                            {modalSearchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setModalSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Category Badge Pill */}
+                        {selectedCategory && (
+                            <View className="flex-row items-center bg-slate-900 px-3 py-1.5 rounded-lg align-self-start mb-3 self-start">
+                                <Text className="text-[#f5a623] text-[10px] font-bold uppercase tracking-wider">{selectedCategory}</Text>
+                            </View>
+                        )}
+
                         <FlatList 
                             data={filteredServices}
                             keyExtractor={(item, index) => item.service.toString() + index.toString()}
@@ -478,20 +508,125 @@ export default function SocialBoostScreen() {
                             maxToRenderPerBatch={10}
                             windowSize={5}
                             showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 20 }}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity 
-                                    className="py-3 border-b border-slate-100 flex-row justify-between items-center"
-                                    onPress={() => {
-                                        setSelectedService(item);
-                                        setServiceModal(false);
-                                    }}
-                                >
-                                    <Text className="text-slate-600 text-xs font-medium flex-1 mr-3 leading-5">{item.name}</Text>
-                                    <Text className="text-[#0F172A] font-black text-xs">₦{parseFloat(item.rate).toLocaleString()}</Text>
-                                </TouchableOpacity>
+                            contentContainerStyle={{ paddingBottom: 24 }}
+                            ListEmptyComponent={() => (
+                                <View className="py-10 items-center justify-center">
+                                    <Ionicons name="search-outline" size={32} color="#cbd5e1" />
+                                    <Text className="text-slate-400 text-xs font-semibold mt-2">No matching services found</Text>
+                                </View>
                             )}
+                            renderItem={({ item }) => {
+                                const isSelected = selectedService?.service === item.service;
+                                return (
+                                    <TouchableOpacity 
+                                        activeOpacity={0.8}
+                                        className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${isSelected ? 'bg-slate-900 border-[#f5a623]' : 'bg-slate-50 border-slate-200/80'}`}
+                                        onPress={() => {
+                                            setSelectedService(item);
+                                            setServiceModal(false);
+                                        }}
+                                    >
+                                        <View className="flex-1 mr-3">
+                                            <Text className={`text-xs font-bold leading-5 ${isSelected ? 'text-white' : 'text-slate-800'}`}>{item.name}</Text>
+                                            <View className="flex-row items-center gap-2 mt-1.5">
+                                                <View className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                    <Text className="text-emerald-700 text-[9px] font-bold">⚡ Instant</Text>
+                                                </View>
+                                                <Text className={`text-[10px] font-semibold ${isSelected ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                    Min: {item.min} • Max: {item.max}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        
+                                        <View className="items-end">
+                                            <View className="bg-[#0F172A] px-2.5 py-1 rounded-lg border border-slate-700">
+                                                <Text className="text-[#f5a623] font-black text-xs">₦{parseFloat(item.rate).toLocaleString()}</Text>
+                                            </View>
+                                            <Text className={`text-[8px] uppercase font-bold mt-1 ${isSelected ? 'text-[#f5a623]' : 'text-slate-400'}`}>
+                                                {isSelected ? '✓ Selected' : 'per 1,000'}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            }}
                         />
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Ultra-Decorated Order Confirmation Modal */}
+            <Modal visible={confirmModal} animationType="fade" transparent={true}>
+                <View className="flex-1 bg-[#0F172A]/80 justify-center items-center px-5">
+                    <View className="bg-slate-900 w-full max-w-sm rounded-3xl p-6 border border-slate-800 shadow-2xl shadow-black">
+                        {/* Header Badge */}
+                        <View className="items-center mb-5">
+                            <View className="w-14 h-14 rounded-full bg-[#f5a623]/20 items-center justify-center mb-3 border border-[#f5a623]/40">
+                                <Ionicons name={linkDetector?.icon as any || "flash"} size={26} color="#f5a623" />
+                            </View>
+                            <Text className="text-white text-lg font-black tracking-tight">Confirm Social Boost</Text>
+                            <Text className="text-slate-400 text-xs font-medium text-center mt-1">Review your order details before launching</Text>
+                        </View>
+
+                        {/* Order Receipt Details */}
+                        <View className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 mb-5">
+                            <View className="mb-3 pb-3 border-b border-slate-800">
+                                <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Selected Service</Text>
+                                <Text className="text-white text-xs font-bold leading-5">{selectedService?.name}</Text>
+                            </View>
+
+                            <View className="flex-row justify-between items-center mb-2.5">
+                                <Text className="text-slate-400 text-xs font-medium">Target Link</Text>
+                                <Text className="text-slate-200 text-xs font-bold max-w-[160px]" numberOfLines={1}>{link}</Text>
+                            </View>
+
+                            <View className="flex-row justify-between items-center mb-2.5">
+                                <Text className="text-slate-400 text-xs font-medium">Quantity</Text>
+                                <Text className="text-slate-200 text-xs font-bold">{quantity}</Text>
+                            </View>
+
+                            <View className="flex-row justify-between items-center mb-2.5">
+                                <Text className="text-slate-400 text-xs font-medium">Delivery Speed</Text>
+                                <Text className="text-emerald-400 text-xs font-bold">⚡ 0 - 15 Mins</Text>
+                            </View>
+
+                            <View className="flex-row justify-between items-center pt-3 border-t border-slate-800">
+                                <Text className="text-white text-xs font-black uppercase">Total Payable</Text>
+                                <Text className="text-[#f5a623] text-xl font-black">₦{totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                            </View>
+                        </View>
+
+                        {/* Wallet Balance Check Pill */}
+                        <View className="bg-slate-800/80 px-3.5 py-2.5 rounded-xl border border-slate-700/80 flex-row items-center justify-between mb-5">
+                            <Text className="text-slate-300 text-xs font-semibold">Wallet After Order:</Text>
+                            <Text className="text-slate-100 text-xs font-bold">₦{(walletBalance - totalPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                        </View>
+
+                        {/* Modal Action Buttons */}
+                        <View className="flex-row gap-3">
+                            <TouchableOpacity 
+                                onPress={() => setConfirmModal(false)}
+                                disabled={isSubmitting}
+                                className="flex-1 py-3.5 rounded-xl bg-slate-800 items-center justify-center border border-slate-700"
+                            >
+                                <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider">Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={placeOrder}
+                                disabled={isSubmitting}
+                                activeOpacity={0.8}
+                                className="flex-[2] py-3.5 rounded-xl bg-[#f5a623] items-center justify-center flex-row"
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator size="small" color="#0F172A" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="rocket" size={16} color="#0F172A" style={{ marginRight: 6 }} />
+                                        <Text className="text-[#0F172A] text-xs font-black uppercase tracking-wider">Confirm & Launch</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
