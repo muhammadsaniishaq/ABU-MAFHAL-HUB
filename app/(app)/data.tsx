@@ -688,30 +688,35 @@ export default function DataScreen() {
                             </View>
 
                             {/* Quick Beneficiaries Chips */}
-                            {recentNumbers.length > 0 && (
+                            {beneficiaries.length > 0 && (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginTop: 2, marginBottom: 8 }}>
-                                    {recentNumbers.slice(0, 5).map((num, i) => (
-                                        <TouchableOpacity
-                                            key={i}
-                                            onPress={() => handlePhoneChange(num)}
-                                            style={{
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                backgroundColor: phoneNumber === num ? '#0d1b3e' : '#ffffff',
-                                                borderColor: phoneNumber === num ? '#0d1b3e' : '#e2e8f0',
-                                                borderWidth: 1,
-                                                paddingHorizontal: 9,
-                                                paddingVertical: 4,
-                                                borderRadius: 14,
-                                                marginRight: 6,
-                                            }}
-                                        >
-                                            <Ionicons name="person-circle-outline" size={12} color={phoneNumber === num ? '#f5a623' : '#64748b'} style={{ marginRight: 4 }} />
-                                            <Text style={{ fontSize: 10, fontWeight: '700', color: phoneNumber === num ? '#ffffff' : '#475569' }}>
-                                                {num}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    {beneficiaries.slice(0, 5).map((b: any, i: number) => {
+                                        const phone = b.phone_number || b.phone || b;
+                                        const label = b.name || phone;
+                                        const isSelected = phoneNumber === phone;
+                                        return (
+                                            <TouchableOpacity
+                                                key={i}
+                                                onPress={() => handlePhoneChange(phone)}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    backgroundColor: isSelected ? '#0d1b3e' : '#ffffff',
+                                                    borderColor: isSelected ? '#0d1b3e' : '#e2e8f0',
+                                                    borderWidth: 1,
+                                                    paddingHorizontal: 9,
+                                                    paddingVertical: 4,
+                                                    borderRadius: 14,
+                                                    marginRight: 6,
+                                                }}
+                                            >
+                                                <Ionicons name="person-circle-outline" size={12} color={isSelected ? '#f5a623' : '#64748b'} style={{ marginRight: 4 }} />
+                                                <Text style={{ fontSize: 10, fontWeight: '700', color: isSelected ? '#ffffff' : '#475569' }}>
+                                                    {label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </ScrollView>
                             )}
                         </View>
