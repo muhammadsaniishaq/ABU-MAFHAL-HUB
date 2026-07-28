@@ -647,7 +647,7 @@ export default function DataScreen() {
 
                     {/* Phone Number Input */}
                     {purchaseMode === 'others' && (
-                        <View>
+                        <View style={{ marginBottom: 12 }}>
                             <View style={s.sectionHeader}>
                                 <Ionicons name="phone-portrait-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
                                 <Text style={s.sectionTitle}>Phone Number</Text>
@@ -657,7 +657,7 @@ export default function DataScreen() {
                                     {network ? (
                                         <Image source={NETWORK_LOGOS[network]} style={s.inputBoxLogo as any} resizeMode="cover" />
                                     ) : (
-                                        <Ionicons name="call-outline" size={18} color="#94a3b8" />
+                                        <Ionicons name="call-outline" size={16} color="#94a3b8" />
                                     )}
                                 </View>
                                 <TextInput
@@ -677,15 +677,43 @@ export default function DataScreen() {
                                     style={s.beneficiaryBtn}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="people" size={18} color="#0056D2" />
+                                    <Ionicons name="people" size={16} color="#0056D2" />
                                 </TouchableOpacity>
 
                                 {phoneNumber.length > 0 && (
                                     <TouchableOpacity onPress={() => handlePhoneChange('')} style={s.clearBtn}>
-                                        <Ionicons name="close-circle" size={18} color="#D1D5DB" />
+                                        <Ionicons name="close-circle" size={16} color="#D1D5DB" />
                                     </TouchableOpacity>
                                 )}
                             </View>
+
+                            {/* Quick Beneficiaries Chips */}
+                            {recentNumbers.length > 0 && (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginTop: 2, marginBottom: 8 }}>
+                                    {recentNumbers.slice(0, 5).map((num, i) => (
+                                        <TouchableOpacity
+                                            key={i}
+                                            onPress={() => handlePhoneChange(num)}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                backgroundColor: phoneNumber === num ? '#0d1b3e' : '#ffffff',
+                                                borderColor: phoneNumber === num ? '#0d1b3e' : '#e2e8f0',
+                                                borderWidth: 1,
+                                                paddingHorizontal: 9,
+                                                paddingVertical: 4,
+                                                borderRadius: 14,
+                                                marginRight: 6,
+                                            }}
+                                        >
+                                            <Ionicons name="person-circle-outline" size={12} color={phoneNumber === num ? '#f5a623' : '#64748b'} style={{ marginRight: 4 }} />
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: phoneNumber === num ? '#ffffff' : '#475569' }}>
+                                                {num}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            )}
                         </View>
                     )}
 
@@ -1585,42 +1613,42 @@ const s = StyleSheet.create({
   networksRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
     width: '100%',
   },
   networkCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '22%',
-    paddingVertical: 10,
-    borderRadius: 14,
+    width: '23.5%',
+    paddingVertical: 7,
+    borderRadius: 12,
     backgroundColor: '#ffffff',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0a1633',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1.5,
     position: 'relative',
   },
   networkCardSelected: {
-    borderWidth: 2,
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
+    borderWidth: 1.5,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   networkLogoWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 1,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1631,9 +1659,9 @@ const s = StyleSheet.create({
     height: '80%',
   },
   networkName: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 2,
     color: '#64748b',
   },
   networkNameSelected: {
@@ -1642,39 +1670,39 @@ const s = StyleSheet.create({
   },
   checkBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    borderRadius: 8,
+    top: 3,
+    right: 3,
+    borderRadius: 6,
     padding: 1,
   },
   inputBoxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 50,
-    marginBottom: 16,
-    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0a1633',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1.5,
     width: '100%',
   },
   inputBoxFocused: {
     borderColor: '#0d1b3e',
   },
   inputBoxLogoWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#edf2f7',
@@ -1685,18 +1713,18 @@ const s = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#0d1b3e',
   },
   beneficiaryBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 6,
   },
   clearBtn: {
     padding: 4,
