@@ -1076,14 +1076,14 @@ export default function DataScreen() {
                                             </View>
                                         </View>
                                     </View>
-
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
                                         const planInfo = parsePlanInfo(plan.volume, plan.originalName || plan.name, plan.validity);
                                         const isBestValue = (planInfo.validityCategory === 'Monthly' && plan.price < 1000);
                                         const isMega = plan.name.toLowerCase().includes('mega');
-                                        const costPerGB = planInfo.volumeInGB > 0 ? Math.round(plan.price / planInfo.volumeInGB) : null;
+                                        const isGBPlan = planInfo.volumeInGB >= 1;
+                                        const costPerGB = isGBPlan ? Math.round(plan.price / planInfo.volumeInGB) : null;
                                         
                                         return (
                                         <TouchableOpacity
@@ -1136,8 +1136,8 @@ export default function DataScreen() {
                                                             </Text>
                                                         </View>
 
-                                                        {/* Live Cost Per GB Savings Badge */}
-                                                        {costPerGB !== null && (
+                                                        {/* Cost Badge for GB plans or Quick Pass for MB plans */}
+                                                        {costPerGB !== null ? (
                                                             <View style={{
                                                                 backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#f0fdf4',
                                                                 borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#bbf7d0',
@@ -1152,6 +1152,23 @@ export default function DataScreen() {
                                                                     color: isSelected ? '#4ade80' : '#15803d',
                                                                 }}>
                                                                     ₦{costPerGB}/GB
+                                                                </Text>
+                                                            </View>
+                                                        ) : (
+                                                            <View style={{
+                                                                backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#eff6ff',
+                                                                borderColor: isSelected ? 'rgba(255,255,255,0.2)' : '#bfdbfe',
+                                                                borderWidth: 1,
+                                                                paddingHorizontal: 6,
+                                                                paddingVertical: 1,
+                                                                borderRadius: 8,
+                                                            }}>
+                                                                <Text style={{
+                                                                    fontSize: 9,
+                                                                    fontWeight: '700',
+                                                                    color: isSelected ? '#93c5fd' : '#1d4ed8',
+                                                                }}>
+                                                                    ⚡ Quick Pass
                                                                 </Text>
                                                             </View>
                                                         )}
