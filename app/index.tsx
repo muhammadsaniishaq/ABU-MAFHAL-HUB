@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -97,18 +98,35 @@ export default function Splash() {
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.location.pathname === '/' && !ref) {
-        window.location.replace('/landing.html');
-        return;
-      }
-    }
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          const pinSaved = await AsyncStorage.getItem(`user_pin_${session.user.id}`);
+          if (pinSaved) {
+            router.replace('/(auth)/pin');
+          } else {
+            router.replace('/(app)/dashboard');
+          }
+          return;
+        }
+      } catch (e) {}
 
-    if (ref) {
-      router.replace(`/auth/login?ref=${ref}`);
-    } else {
-      setIsReady(true);
-    }
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (window.location.pathname === '/' && !ref) {
+          window.location.replace('/landing.html');
+          return;
+        }
+      }
+
+      if (ref) {
+        router.replace(`/auth/login?ref=${ref}`);
+      } else {
+        setIsReady(true);
+      }
+    };
+
+    checkSession();
   }, [ref]);
 
   const r1 = useReveal(200);

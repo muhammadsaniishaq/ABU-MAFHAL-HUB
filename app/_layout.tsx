@@ -163,7 +163,7 @@ export default function RootLayout() {
 
         if (session) {
             if (isAuthGroup) {
-                const allowedAuthScreens = ['otp', 'pin-setup'];
+                const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
                 if (userRole && !allowedAuthScreens.includes(currentScreen)) {
                     router.replace('/(app)/dashboard');
                 }
@@ -172,8 +172,15 @@ export default function RootLayout() {
                     router.replace('/(app)/dashboard');
                 }
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                // If on landing page (/) or onboarding and authenticated, go to dashboard immediately
-                router.replace('/(app)/dashboard');
+                AsyncStorage.getItem(`user_pin_${session.user.id}`).then((savedPin) => {
+                    if (savedPin) {
+                        router.replace('/(auth)/pin');
+                    } else {
+                        router.replace('/(app)/dashboard');
+                    }
+                }).catch(() => {
+                    router.replace('/(app)/dashboard');
+                });
             }
         } else {
             if (!isPublicScreen && !isAuthGroup) {
