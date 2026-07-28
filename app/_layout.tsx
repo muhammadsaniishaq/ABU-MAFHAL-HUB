@@ -48,6 +48,7 @@ export default function RootLayout() {
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [initialized, setInitialized] = useState(false);
+    const [authChecked, setAuthChecked] = useState(false);
     const router = useRouter();
     const segments = useSegments();
     const { settings, loading: settingsLoading } = useAppSettings();
@@ -95,6 +96,7 @@ export default function RootLayout() {
     useEffect(() => {
         // Safety timeout: Ensure app layout initializes within 1.5s even if network is slow/offline
         const bootTimer = setTimeout(() => {
+            setAuthChecked(true);
             setInitialized(true);
         }, 1500);
 
@@ -115,6 +117,7 @@ export default function RootLayout() {
                     fetchUserRole(session.user.id, session.user.email);
                 }
             }
+            setAuthChecked(true);
             setInitialized(true);
         }).catch(async (error) => {
             clearTimeout(bootTimer);
@@ -124,6 +127,7 @@ export default function RootLayout() {
                 await forceSignOut();
                 setSession(null);
             }
+            setAuthChecked(true);
             setInitialized(true);
         });
 
@@ -136,6 +140,7 @@ export default function RootLayout() {
             } else {
                 setUserRole(null);
             }
+            setAuthChecked(true);
         });
 
         return () => {
@@ -145,13 +150,13 @@ export default function RootLayout() {
     }, []);
 
     useEffect(() => {
-        if (loaded && initialized) {
+        if (loaded && initialized && authChecked) {
             SplashScreen.hideAsync().catch(() => {});
         }
-    }, [loaded, initialized]);
+    }, [loaded, initialized, authChecked]);
 
     useEffect(() => {
-        if (!initialized || !loaded) return;
+        if (!initialized || !loaded || !authChecked) return;
 
         const currentScreen = segments[segments.length - 1] || 'index';
         const isAuthGroup = segments.includes('(auth)');
@@ -187,7 +192,7 @@ export default function RootLayout() {
                 router.replace('/');
             }
         }
-    }, [session, userRole, initialized, segments, loaded]);
+    }, [session, userRole, initialized, segments, loaded, authChecked]);
 
     if (!loaded || !initialized) {
         return null;

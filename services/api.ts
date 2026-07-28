@@ -123,7 +123,7 @@ export const api = {
                     .from('data_plans')
                     .select('*')
                     .eq('network', netLower)
-                    .eq('is_active', true)
+                    .or('is_active.eq.true,is_active.is.null')
                     .order('cost_price', { ascending: true });
 
                 if (error) throw new Error(error.message);

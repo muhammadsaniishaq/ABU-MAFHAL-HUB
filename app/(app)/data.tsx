@@ -386,14 +386,14 @@ export default function DataScreen() {
         // Plan Type Filter (Dynamic)
         if (planTypeFilter !== 'All') {
             const nameUpper = (p.originalName || p.name).toUpperCase();
-            let pType = 'Standard';
-            if (nameUpper.includes('SME')) pType = 'SME';
-            else if (nameUpper.includes('CG') || nameUpper.includes('CORPORATE')) pType = 'CG';
-            else if (nameUpper.includes('DIRECT') || nameUpper.includes('GIFTING')) pType = 'Direct';
-            else if (nameUpper.includes('AWOOF')) pType = 'Awoof';
-            else if (nameUpper.includes('MEGA')) pType = 'Mega';
-            
-            if (pType !== planTypeFilter) return false;
+            const filterUpper = planTypeFilter.toUpperCase();
+            if (filterUpper === 'CG' && !nameUpper.includes('CG') && !nameUpper.includes('CORPORATE')) {
+                return false;
+            } else if (filterUpper === 'DIRECT' && !nameUpper.includes('DIRECT') && !nameUpper.includes('GIFTING')) {
+                return false;
+            } else if (filterUpper !== 'CG' && filterUpper !== 'DIRECT' && !nameUpper.includes(filterUpper)) {
+                return false;
+            }
         }
 
         // Duration Filter
