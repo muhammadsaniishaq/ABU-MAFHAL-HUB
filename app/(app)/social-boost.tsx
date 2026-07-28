@@ -375,9 +375,6 @@ export default function SocialBoostScreen() {
                                             autoCorrect={false}
                                         />
                                     </View>
-                                            autoCorrect={false}
-                                        />
-                                    </View>
 
                                     <View className="mb-5">
                                         <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1.5 tracking-wider ml-1">Quantity</Text>
