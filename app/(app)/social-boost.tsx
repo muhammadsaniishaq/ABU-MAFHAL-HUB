@@ -36,6 +36,7 @@ export default function SocialBoostScreen() {
     const [services, setServices] = useState<SMMService[]>([]);
     
     // Form State
+    const [platformFilter, setPlatformFilter] = useState<string>('All');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedService, setSelectedService] = useState<SMMService | null>(null);
     const [link, setLink] = useState('');
@@ -58,7 +59,7 @@ export default function SocialBoostScreen() {
             const cachedServices = await AsyncStorage.getItem('smm_services_cache');
             if (cachedServices) {
                 setServices(JSON.parse(cachedServices));
-                setLoading(false); // Make it fast immediately
+                setLoading(false);
             }
 
             const { data: { session } } = await supabase.auth.getSession();
@@ -83,7 +84,6 @@ export default function SocialBoostScreen() {
             }
         } catch (error: any) {
             console.error("Error fetching services:", error);
-            // Only show alert if we also don't have cached data
             if (services.length === 0) {
                 Alert.alert("Error", error.message || "Failed to load services");
             }
@@ -92,11 +92,12 @@ export default function SocialBoostScreen() {
         }
     };
 
-    // Group services by category
+    // Filter categories by selected platform filter tab
     const categories = useMemo(() => {
         const cats = Array.from(new Set(services.map(s => s.category.trim())));
-        return cats.sort();
-    }, [services]);
+        if (platformFilter === 'All') return cats.sort();
+        return cats.filter(c => c.toLowerCase().includes(platformFilter.toLowerCase())).sort();
+    }, [services, platformFilter]);
 
     const filteredServices = useMemo(() => {
         if (!selectedCategory) return [];
@@ -112,6 +113,19 @@ export default function SocialBoostScreen() {
     };
 
     const totalPrice = calculatePrice();
+
+    // Link Platform Detector
+    const linkDetector = useMemo(() => {
+        if (!link.trim()) return null;
+        const l = link.toLowerCase();
+        if (l.includes('instagram.com') || l.includes('instagr.am')) return { platform: 'Instagram', icon: 'logo-instagram', color: '#E1306C' };
+        if (l.includes('tiktok.com')) return { platform: 'TikTok', icon: 'logo-tiktok', color: '#000000' };
+        if (l.includes('youtube.com') || l.includes('youtu.be')) return { platform: 'YouTube', icon: 'logo-youtube', color: '#FF0000' };
+        if (l.includes('facebook.com') || l.includes('fb.watch')) return { platform: 'Facebook', icon: 'logo-facebook', color: '#1877F2' };
+        if (l.includes('twitter.com') || l.includes('x.com')) return { platform: 'Twitter/X', icon: 'logo-twitter', color: '#1DA1F2' };
+        if (l.includes('t.me') || l.includes('telegram.org')) return { platform: 'Telegram', icon: 'paper-plane', color: '#0088CC' };
+        return { platform: 'Web', icon: 'link-outline', color: '#64748b' };
+    }, [link]);
 
     const handleSubmit = async () => {
         if (!selectedService) {
@@ -251,7 +265,38 @@ export default function SocialBoostScreen() {
                     {/* Dynamic Banners */}
                     <DynamicBanners placement="social_boost" />
                     
-                    <Text className="text-slate-800 text-xs font-bold mb-3 ml-1 uppercase tracking-widest">Select Platform</Text>
+                    {/* Horizontal Platform Filter Tabs */}
+                    <Text className="text-slate-800 text-xs font-bold mb-2 ml-1 uppercase tracking-widest">Filter Platform</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mb-4">
+                        {[
+                            { id: 'All', name: 'All', icon: 'sparkles' },
+                            { id: 'instagram', name: 'Instagram', icon: 'logo-instagram' },
+                            { id: 'tiktok', name: 'TikTok', icon: 'logo-tiktok' },
+                            { id: 'youtube', name: 'YouTube', icon: 'logo-youtube' },
+                            { id: 'facebook', name: 'Facebook', icon: 'logo-facebook' },
+                            { id: 'twitter', name: 'Twitter / X', icon: 'logo-twitter' },
+                            { id: 'telegram', name: 'Telegram', icon: 'paper-plane' },
+                        ].map((tab) => {
+                            const isActive = platformFilter === tab.id;
+                            return (
+                                <TouchableOpacity
+                                    key={tab.id}
+                                    onPress={() => {
+                                        setPlatformFilter(tab.id);
+                                        setSelectedCategory(null);
+                                        setSelectedService(null);
+                                    }}
+                                    activeOpacity={0.8}
+                                    className={`flex-row items-center px-3.5 py-2 rounded-full mr-2 border ${isActive ? 'bg-[#0F172A] border-[#0F172A]' : 'bg-white border-slate-200'}`}
+                                >
+                                    <Ionicons name={tab.icon as any} size={13} color={isActive ? '#f5a623' : '#64748b'} style={{ marginRight: 6 }} />
+                                    <Text className={`text-xs font-bold ${isActive ? 'text-white' : 'text-slate-600'}`}>{tab.name}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+
+                    <Text className="text-slate-800 text-xs font-bold mb-3 ml-1 uppercase tracking-widest">Select Service Category</Text>
                     
                     {/* Compact Grid */}
                     <View className="flex-row flex-wrap justify-between gap-y-3 mb-6">
@@ -305,20 +350,31 @@ export default function SocialBoostScreen() {
                                             <Text className="text-blue-900 font-black text-sm">₦{parseFloat(selectedService.rate).toLocaleString()}</Text>
                                         </View>
                                         <View className="items-end">
-                                            <Text className="text-blue-600 text-[9px] font-bold mb-0.5">Limits</Text>
-                                            <Text className="text-blue-800 text-[10px] font-bold">{selectedService.min} - {selectedService.max}</Text>
+                                            <Text className="text-blue-600 text-[9px] font-bold mb-0.5">Limits & Speed</Text>
+                                            <Text className="text-blue-800 text-[10px] font-bold">{selectedService.min} - {selectedService.max} • ⚡ Instant</Text>
                                         </View>
                                     </View>
 
                                     <View className="mb-4">
-                                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1.5 tracking-wider ml-1">Target Link</Text>
+                                        <View className="flex-row items-center justify-between mb-1.5">
+                                            <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider ml-1">Target Link</Text>
+                                            {linkDetector && (
+                                                <View className="flex-row items-center bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                                    <Ionicons name={linkDetector.icon as any} size={10} color={linkDetector.color} style={{ marginRight: 4 }} />
+                                                    <Text className="text-emerald-800 text-[9px] font-bold">{linkDetector.platform} Detected</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                         <TextInput
                                             className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-800 font-medium border border-slate-200"
-                                            placeholder="Paste profile or post link here"
+                                            placeholder="Paste profile or post link here (e.g. https://...)"
                                             placeholderTextColor="#94a3b8"
                                             value={link}
                                             onChangeText={setLink}
                                             autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
                                             autoCorrect={false}
                                         />
                                     </View>

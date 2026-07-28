@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { api } from '../../services/api';
 
+import * as Clipboard from 'expo-clipboard';
+
 // Theme Configuration matching the rest of the app
 const T = {
     primary: '#ec4899', 
@@ -92,13 +94,13 @@ export default function SocialOrdersScreen() {
         }
     };
 
-    const getStatusStyle = (statusStr: string) => {
-        const s = statusStr?.toLowerCase() || '';
-        if (s === 'completed' || s === 'success' || s === 'successful') return { bg: '#dcfce7', txt: '#166534' };
-        if (s === 'pending') return { bg: '#fef3c7', txt: '#92400e' };
-        if (s === 'in progress' || s === 'processing') return { bg: '#dbeafe', txt: '#1e40af' };
-        if (s === 'canceled' || s === 'partial' || s === 'fail') return { bg: '#fee2e2', txt: '#991b1b' };
-        return { bg: '#f1f5f9', txt: '#475569' };
+    const getStatusStyle = (status: string) => {
+        const s = String(status || '').toLowerCase();
+        if (s.includes('completed') || s.includes('success')) return { bg: '#dcfce7', txt: '#15803d', label: 'Completed' };
+        if (s.includes('in progress') || s.includes('processing')) return { bg: '#dbeafe', txt: '#1d4ed8', label: 'Processing' };
+        if (s.includes('pending')) return { bg: '#fef3c7', txt: '#b45309', label: 'Pending' };
+        if (s.includes('cancel') || s.includes('partial') || s.includes('fail')) return { bg: '#fee2e2', txt: '#991b1b', label: 'Cancelled' };
+        return { bg: '#f1f5f9', txt: '#475569', label: status || 'Placed' };
     };
 
     return (
@@ -108,10 +110,12 @@ export default function SocialOrdersScreen() {
             <View style={[s.headerContainer, { paddingTop: insets.top + 8 }]}>
                 <View style={s.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={s.iconBtn}>
-                        <Ionicons name="arrow-back" size={22} color={T.white} />
+                        <Ionicons name="arrow-back" size={20} color={T.white} />
                     </TouchableOpacity>
                     <Text style={s.headerTitle}>Order History</Text>
-                    <View style={{ width: 40 }} />
+                    <TouchableOpacity onPress={fetchOrders} style={s.iconBtn}>
+                        <Ionicons name="refresh-outline" size={18} color={T.gold} />
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -132,28 +136,45 @@ export default function SocialOrdersScreen() {
                         const liveData = liveStatusMap[order.id];
                         const displayStatus = liveData ? liveData.status : "Placed";
                         const stStyle = getStatusStyle(displayStatus);
+                        const orderNum = order.reference.replace('SMM-', '');
 
                         return (
                             <View key={order.id} style={s.card}>
                                 <View style={s.cardHeader}>
-                                    <Text style={s.cardTitle} numberOfLines={2}>{order.description}</Text>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <Text style={s.cardTitle} numberOfLines={2}>{order.description}</Text>
+                                        <TouchableOpacity 
+                                            onPress={async () => {
+                                                await Clipboard.setStringAsync(orderNum);
+                                                Alert.alert("Copied", `Order ID ${orderNum} copied to clipboard!`);
+                                            }}
+                                            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}
+                                        >
+                                            <Text style={{ fontSize: 10, color: T.textLight, fontWeight: '700' }}>ID: #{orderNum}</Text>
+                                            <Ionicons name="copy-outline" size={11} color={T.textLight} style={{ marginLeft: 4 }} />
+                                        </TouchableOpacity>
+                                    </View>
                                     <Text style={s.cardAmount}>₦{order.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                                 </View>
                                 
                                 <View style={s.cardRow}>
                                     <View style={s.dateBox}>
-                                        <Ionicons name="calendar-outline" size={14} color={T.textLight} />
-                                        <Text style={s.dateTxt}>{new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString()}</Text>
+                                        <Ionicons name="calendar-outline" size={12} color={T.textLight} style={{ marginRight: 4 }} />
+                                        <Text style={s.dateTxt}>{new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                     </View>
                                     <View style={[s.badge, { backgroundColor: stStyle.bg }]}>
-                                        <Text style={[s.badgeTxt, { color: stStyle.txt }]}>{displayStatus}</Text>
+                                        <Text style={[s.badgeTxt, { color: stStyle.txt }]}>{stStyle.label}</Text>
                                     </View>
                                 </View>
 
                                 {liveData && liveData.remains !== undefined && (
-                                    <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-                                        <Text style={{ fontSize: 11, color: T.textLight, fontWeight: '600' }}>Remains: </Text>
-                                        <Text style={{ fontSize: 11, color: T.text, fontWeight: '700' }}>{liveData.remains}</Text>
+                                    <View style={{ backgroundColor: '#f8fafc', padding: 8, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 10, color: T.textLight, fontWeight: '700' }}>Remains: {liveData.remains}</Text>
+                                            <Text style={{ fontSize: 10, color: T.navy, fontWeight: '800' }}>
+                                                {liveData.start_count !== undefined ? `Start: ${liveData.start_count}` : ''}
+                                            </Text>
+                                        </View>
                                     </View>
                                 )}
 
@@ -166,7 +187,10 @@ export default function SocialOrdersScreen() {
                                     {checkingMap[order.id] ? (
                                         <ActivityIndicator size="small" color={T.navy} />
                                     ) : (
-                                        <Text style={s.checkBtnTxt}>Check Live Status</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="refresh" size={12} color={T.navy} style={{ marginRight: 4 }} />
+                                            <Text style={s.checkBtnTxt}>Check Live Status</Text>
+                                        </View>
                                     )}
                                 </TouchableOpacity>
                             </View>
