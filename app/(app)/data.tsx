@@ -81,7 +81,7 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     let volumeInGB = 0;
 
     // Check for TB
-    const tbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(tb|terabyte|terabytes)\b/i);
+    const tbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(tb|terabyte|terabytes)(?![a-z])/i);
     if (tbMatch) {
         const val = parseFloat(tbMatch[1]);
         volumeVal = String(val);
@@ -91,7 +91,7 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     }
 
     // Check for MB
-    const mbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)\b/i);
+    const mbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)(?![a-z])/i);
     if (mbMatch) {
         const val = parseFloat(mbMatch[1]);
         volumeVal = String(val);
@@ -101,7 +101,7 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     }
 
     // Check for GB
-    const gbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)\b/i);
+    const gbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)(?![a-z])/i);
     if (gbMatch) {
         const val = parseFloat(gbMatch[1]);
         volumeVal = String(val);
@@ -111,9 +111,9 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     }
 
     // Fallback numeric parsing
-    const numOnly = parseFloat(String(volume || '').replace(/[^0-9.]/g, ''));
+    const numOnly = parseFloat(String(volume || name || '').replace(/[^0-9.]/g, ''));
     if (!isNaN(numOnly) && numOnly > 0) {
-        if (numOnly >= 50) {
+        if (numOnly >= 100) {
             volumeVal = String(numOnly);
             volumeUnit = 'MB';
             volumeInGB = numOnly / 1024;
