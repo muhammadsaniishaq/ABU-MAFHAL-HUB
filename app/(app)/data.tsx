@@ -24,24 +24,23 @@ export interface ExtractedPlanInfo {
 }
 
 const parsePlanInfo = (volume: any, name: string, rawValidity?: string): ExtractedPlanInfo => {
-    const nameText = String(name || '').toLowerCase();
-    const rawValText = String(rawValidity || '').toLowerCase();
-    const combinedText = `${nameText} ${String(volume || '')} ${rawValText}`.trim();
+    const rawName = String(name || '').trim();
+    const rawVol = String(volume || '').trim();
+    const rawVal = String(rawValidity || '').trim();
 
-    // 1. Extract Validity Duration (Prioritize plan name over default "30 Days")
-    let validity = (rawValidity && rawValidity !== '30 Days') ? rawValidity.trim() : '';
+    // 1. Extract Validity Duration First
+    let validity = (rawVal && rawVal !== '30 Days') ? rawVal : '';
     let validityCategory: 'Daily' | 'Weekly' | 'Monthly' = 'Monthly';
 
-    // Check name first for days
-    const dayInNameMatch = nameText.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
-    const dayInRawMatch = rawValText.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
-    const dayMatch = dayInNameMatch || dayInRawMatch;
+    // Matches e.g. "30 Days", "1 Day", "7 Days", "24 Hrs"
+    const dayNameMatch = rawName.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
+    const dayValMatch = rawVal.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
 
-    const isDailyKeyword = combinedText.includes('daily') || combinedText.includes('1 day') || combinedText.includes('2 days') || combinedText.includes('24 hrs') || combinedText.includes('24hrs');
-    const isWeeklyKeyword = combinedText.includes('weekly') || combinedText.includes('7 days') || combinedText.includes('14 days') || combinedText.includes('7days') || combinedText.includes('14days');
+    const isDaily = /daily|1\s*day|2\s*days|3\s*days|24\s*hrs/i.test(`${rawName} ${rawVal}`);
+    const isWeekly = /weekly|7\s*days|14\s*days/i.test(`${rawName} ${rawVal}`);
 
-    if (dayInNameMatch) {
-        const numDays = parseInt(dayInNameMatch[1]);
+    if (dayNameMatch) {
+        const numDays = parseInt(dayNameMatch[1]);
         if (numDays <= 3) {
             validity = `${numDays} ${numDays === 1 ? 'Day' : 'Days'}`;
             validityCategory = 'Daily';
@@ -52,14 +51,14 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
             validity = `${numDays} Days`;
             validityCategory = 'Monthly';
         }
-    } else if (isDailyKeyword) {
+    } else if (isDaily) {
         validity = '1 Day';
         validityCategory = 'Daily';
-    } else if (isWeeklyKeyword) {
+    } else if (isWeekly) {
         validity = '7 Days';
         validityCategory = 'Weekly';
-    } else if (dayInRawMatch) {
-        const numDays = parseInt(dayInRawMatch[1]);
+    } else if (dayValMatch) {
+        const numDays = parseInt(dayValMatch[1]);
         if (numDays <= 3) {
             validity = `${numDays} ${numDays === 1 ? 'Day' : 'Days'}`;
             validityCategory = 'Daily';
@@ -75,13 +74,18 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
         validityCategory = 'Monthly';
     }
 
-    // 2. Extract Volume & Unit (TB, GB, MB)
+    // 2. Clean text for Volume Parsing (REMOVE validity numbers to avoid "5GB + 30 Days = 530MB" bug!)
+    const cleanText = `${rawVol} ${rawName}`
+        .replace(/(\d+)\s*(day|days|hrs|hours|hr|month|months|wk|wks|week|weeks)\b/gi, '')
+        .replace(/\(\s*\d+\s*(day|days|hrs|hours|hr)\s*\)/gi, '')
+        .trim();
+
     let volumeVal = '';
     let volumeUnit: 'MB' | 'GB' | 'TB' = 'GB';
     let volumeInGB = 0;
 
     // Check for TB
-    const tbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(tb|terabyte|terabytes)(?![a-z])/i);
+    const tbMatch = cleanText.match(/(\d+(\.\d+)?)\s*(tb|terabyte|terabytes)(?![a-z])/i);
     if (tbMatch) {
         const val = parseFloat(tbMatch[1]);
         volumeVal = String(val);
@@ -91,7 +95,7 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     }
 
     // Check for MB
-    const mbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)(?![a-z])/i);
+    const mbMatch = cleanText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)(?![a-z])/i);
     if (mbMatch) {
         const val = parseFloat(mbMatch[1]);
         volumeVal = String(val);
@@ -101,7 +105,7 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     }
 
     // Check for GB
-    const gbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)(?![a-z])/i);
+    const gbMatch = cleanText.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes|g)(?![a-z])/i);
     if (gbMatch) {
         const val = parseFloat(gbMatch[1]);
         volumeVal = String(val);
@@ -110,17 +114,20 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
         return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
     }
 
-    // Fallback numeric parsing
-    const numOnly = parseFloat(String(volume || name || '').replace(/[^0-9.]/g, ''));
-    if (!isNaN(numOnly) && numOnly > 0) {
-        if (numOnly >= 100) {
-            volumeVal = String(numOnly);
-            volumeUnit = 'MB';
-            volumeInGB = numOnly / 1024;
-        } else {
-            volumeVal = String(numOnly);
-            volumeUnit = 'GB';
-            volumeInGB = numOnly;
+    // Fallback: extract ONLY the first numeric token from cleanText
+    const firstNumMatch = cleanText.match(/(\d+(\.\d+)?)/);
+    if (firstNumMatch) {
+        const numVal = parseFloat(firstNumMatch[1]);
+        if (!isNaN(numVal) && numVal > 0) {
+            if (numVal >= 100) {
+                volumeVal = String(numVal);
+                volumeUnit = 'MB';
+                volumeInGB = numVal / 1024;
+            } else {
+                volumeVal = String(numVal);
+                volumeUnit = 'GB';
+                volumeInGB = numVal;
+            }
         }
     }
 
