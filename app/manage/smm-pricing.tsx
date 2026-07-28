@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
+import { api } from '../../services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,14 +37,9 @@ export default function SMMPricingManager() {
             }
 
             // Fetch Services from Edge Function (which includes original_rate)
-            const { data: srvData, error } = await supabase.functions.invoke('smm-api', {
-                body: { action: 'services' }
-            });
+            const srvData = await api.smm.invoke({ action: 'services' });
 
-            if (error) throw error;
-            if (srvData?.error) throw new Error(srvData.error);
-            
-            if (srvData?.services) {
+            if (srvData && srvData.services) {
                 setServices(srvData.services);
             }
         } catch (error: any) {

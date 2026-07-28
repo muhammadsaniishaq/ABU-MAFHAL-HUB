@@ -792,6 +792,51 @@ export const api = {
         }
     },
 
+    // --- SOCIAL BOOST / SMM SERVICES ---
+    smm: {
+        invoke: async (body: any) => {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
+
+            // 1. First try standard functions.invoke
+            try {
+                const res = await supabase.functions.invoke('smm-api', { body });
+                if (!res.error && res.data) {
+                    return res.data;
+                }
+                if (res.error && !res.error.message?.includes('Failed to send a request')) {
+                    throw res.error;
+                }
+            } catch (err: any) {
+                console.warn("Standard functions.invoke failed, attempting direct fetch...", err?.message || err);
+            }
+
+            // 2. Direct HTTP fetch fallback with explicit apikey & auth headers
+            try {
+                const url = `${supabaseUrl}/functions/v1/smm-api`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const json = await response.json();
+                if (!response.ok || json.error) {
+                    throw new Error(json.error || `HTTP ${response.status}: Server error`);
+                }
+                return json;
+            } catch (fetchErr: any) {
+                console.error("Direct fetch to smm-api failed:", fetchErr);
+                throw new Error(fetchErr.message || "Failed to communicate with Social Boost service. Please check network connection.");
+            }
+        }
+    },
+
     // Mock response for legacy components
     mock: (data: any, delay = 1000) => new Promise(resolve => setTimeout(() => resolve(data), delay)),
 };

@@ -4,6 +4,7 @@ import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
+import { api } from '../../services/api';
 
 // Theme Configuration matching the rest of the app
 const T = {
@@ -77,17 +78,7 @@ export default function SocialOrdersScreen() {
                 throw new Error("This order encountered a processing issue and has no valid ID.");
             }
 
-            const { data, error } = await supabase.functions.invoke('smm-api', {
-                body: { action: 'status', orderId }
-            });
-
-            if (error) throw error;
-            if (data?.error) {
-                if (data.error.toLowerCase().includes('invalid') || data.error.toLowerCase().includes('incorrect')) {
-                    throw new Error("Order not found on the server. It may have been cancelled or the API key changed.");
-                }
-                throw new Error(data.error);
-            }
+            const data = await api.smm.invoke({ action: 'status', orderId });
 
             setLiveStatusMap(prev => ({
                 ...prev,

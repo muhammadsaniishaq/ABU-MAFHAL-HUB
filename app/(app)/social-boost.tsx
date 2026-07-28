@@ -75,14 +75,9 @@ export default function SocialBoostScreen() {
             })();
 
             // Fetch Services from Edge Function in background to get latest prices
-            const { data, error } = await supabase.functions.invoke('smm-api', {
-                body: { action: 'services' }
-            });
+            const data = await api.smm.invoke({ action: 'services' });
 
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
-
-            if (data.services && data.services.length > 0) {
+            if (data && data.services && data.services.length > 0) {
                 setServices(data.services);
                 await AsyncStorage.setItem('smm_services_cache', JSON.stringify(data.services));
             }
@@ -161,18 +156,13 @@ export default function SocialBoostScreen() {
     const placeOrder = async () => {
         try {
             setIsSubmitting(true);
-            const { data, error } = await supabase.functions.invoke('smm-api', {
-                body: {
-                    action: 'place_order',
-                    serviceId: selectedService?.service,
-                    link: link.trim(),
-                    quantity: quantity,
-                    expectedPrice: totalPrice
-                }
+            const data = await api.smm.invoke({
+                action: 'place_order',
+                serviceId: selectedService?.service,
+                link: link.trim(),
+                quantity: quantity,
+                expectedPrice: totalPrice
             });
-
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
 
             const msg = `Your order has been placed successfully. Order ID: ${data.order}`;
             if (Platform.OS === 'web') {
