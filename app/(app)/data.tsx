@@ -98,9 +98,16 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     const mbMatch = cleanText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)(?![a-z])/i);
     if (mbMatch) {
         const val = parseFloat(mbMatch[1]);
-        volumeVal = String(val);
-        volumeUnit = 'MB';
-        volumeInGB = val / 1024;
+        if (val >= 1000) {
+            const gbVal = (val >= 1024 && val % 1024 === 0) ? val / 1024 : Math.round((val / 1000) * 100) / 100;
+            volumeVal = String(gbVal);
+            volumeUnit = 'GB';
+            volumeInGB = gbVal;
+        } else {
+            volumeVal = String(val);
+            volumeUnit = 'MB';
+            volumeInGB = val / 1024;
+        }
         return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
     }
 
@@ -119,7 +126,12 @@ const parsePlanInfo = (volume: any, name: string, rawValidity?: string): Extract
     if (firstNumMatch) {
         const numVal = parseFloat(firstNumMatch[1]);
         if (!isNaN(numVal) && numVal > 0) {
-            if (numVal >= 100) {
+            if (numVal >= 1000) {
+                const gbVal = (numVal >= 1024 && numVal % 1024 === 0) ? numVal / 1024 : Math.round((numVal / 1000) * 100) / 100;
+                volumeVal = String(gbVal);
+                volumeUnit = 'GB';
+                volumeInGB = gbVal;
+            } else if (numVal >= 100) {
                 volumeVal = String(numVal);
                 volumeUnit = 'MB';
                 volumeInGB = numVal / 1024;
