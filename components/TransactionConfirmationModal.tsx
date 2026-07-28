@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Modal, TouchableOpacity, Image, Animated, Easing, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Modal, TouchableOpacity, Image, Animated, Easing, Platform, ToastAndroid, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 
 interface TransactionDetail {
     label: string;
@@ -27,6 +28,13 @@ const NETWORK_LOGOS: Record<string, any> = {
     '9mobile': require('../assets/images/9mobile.png'),
 };
 
+const NETWORK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    mtn: { bg: '#fffbeb', text: '#d97706', border: '#fef3c7' },
+    glo: { bg: '#f0fdf4', text: '#16a34a', border: '#dcfce7' },
+    airtel: { bg: '#fef2f2', text: '#dc2626', border: '#fee2e2' },
+    '9mobile': { bg: '#f0f9ff', text: '#0284c7', border: '#e0f2fe' },
+};
+
 export default function TransactionConfirmationModal({ 
     visible, 
     onClose, 
@@ -37,9 +45,11 @@ export default function TransactionConfirmationModal({
 }: TransactionConfirmationModalProps) {
     const scaleAnim = useRef(new Animated.Value(0.85)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         if (visible) {
+            setCopied(false);
             Animated.parallel([
                 Animated.spring(scaleAnim, {
                     toValue: 1,
@@ -61,7 +71,18 @@ export default function TransactionConfirmationModal({
     }, [visible]);
 
     const totalItem = details.find(d => d.isTotal) || details.find(d => d.isAmount);
-    
+    const netKey = (network || '').toLowerCase();
+    const netTheme = NETWORK_COLORS[netKey] || { bg: '#f8fafc', text: '#0d1b3e', border: '#e2e8f0' };
+
+    const handleCopyDetails = async () => {
+        try {
+            const summary = details.map(d => `${d.label}: ${d.value}`).join('\n');
+            await Clipboard.setStringAsync(summary);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (e) {}
+    };
+
     return (
         <Modal
             animationType="fade"
@@ -88,13 +109,16 @@ export default function TransactionConfirmationModal({
                         </TouchableOpacity>
                     </View>
 
-                    {/* Network & Amount Mini Hero Card */}
-                    <View className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex-row items-center justify-between mb-3 shadow-xs">
+                    {/* Network & Amount Hero Card */}
+                    <View 
+                        style={{ backgroundColor: netTheme.bg, borderColor: netTheme.border }} 
+                        className="border p-3 rounded-2xl flex-row items-center justify-between mb-3 shadow-xs"
+                    >
                         <View className="flex-row items-center gap-2.5">
                             <View style={{ width: 34, height: 34, borderRadius: 17 }} className="bg-white items-center justify-center border border-slate-200 shadow-xs overflow-hidden">
-                                {network && NETWORK_LOGOS[network.toLowerCase()] ? (
+                                {network && NETWORK_LOGOS[netKey] ? (
                                     <Image 
-                                        source={NETWORK_LOGOS[network.toLowerCase()]} 
+                                        source={NETWORK_LOGOS[netKey]} 
                                         style={{ width: 22, height: 22, borderRadius: 11 }} 
                                         resizeMode="contain" 
                                     />
@@ -103,8 +127,13 @@ export default function TransactionConfirmationModal({
                                 )}
                             </View>
                             <View>
-                                <Text className="text-[#0d1b3e] font-extrabold text-[13px] capitalize">{network || 'Data Bundle'}</Text>
-                                <Text className="text-slate-400 text-[9.5px] font-bold uppercase tracking-wider">Instant Topup</Text>
+                                <Text style={{ color: netTheme.text }} className="font-extrabold text-[13px] capitalize">
+                                    {network || 'Data Bundle'}
+                                </Text>
+                                <View className="flex-row items-center gap-1">
+                                    <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    <Text className="text-slate-500 text-[9.5px] font-bold uppercase tracking-wider">Instant Delivery</Text>
+                                </View>
                             </View>
                         </View>
                         
@@ -114,10 +143,21 @@ export default function TransactionConfirmationModal({
                         </View>
                     </View>
 
-                    {/* Decorative Security Badge */}
-                    <View className="flex-row items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-100/80 px-2.5 py-1 rounded-full mb-3 self-center">
-                        <Ionicons name="shield-checkmark" size={11} color="#059669" />
-                        <Text className="text-emerald-700 text-[9.5px] font-black uppercase tracking-wider">256-Bit Encrypted Checkout</Text>
+                    {/* Decorative Badges Row */}
+                    <View className="flex-row items-center justify-center gap-2 mb-3">
+                        <View className="flex-row items-center gap-1 bg-emerald-50 border border-emerald-100/80 px-2.5 py-1 rounded-full">
+                            <Ionicons name="shield-checkmark" size={10} color="#059669" />
+                            <Text className="text-emerald-700 text-[9px] font-black uppercase tracking-wider">256-Bit Encrypted</Text>
+                        </View>
+                        <TouchableOpacity 
+                            onPress={handleCopyDetails}
+                            className="flex-row items-center gap-1 bg-slate-100 border border-slate-200/70 px-2.5 py-1 rounded-full"
+                        >
+                            <Ionicons name={copied ? "checkmark" : "copy-outline"} size={10} color={copied ? "#16a34a" : "#475569"} />
+                            <Text className={`text-[9px] font-black uppercase tracking-wider ${copied ? 'text-green-700' : 'text-slate-600'}`}>
+                                {copied ? 'Copied!' : 'Copy Summary'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Compact Details List */}
@@ -141,7 +181,7 @@ export default function TransactionConfirmationModal({
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={['#0d1b3e', '#142258']}
+                                colors={['#0d1b3e', '#142258', '#1e293b']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 className="h-11 rounded-xl items-center justify-center shadow-xs flex-row gap-1.5"
@@ -163,6 +203,7 @@ export default function TransactionConfirmationModal({
         </Modal>
     );
 }
+
 
 
 
