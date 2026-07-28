@@ -261,7 +261,7 @@ export default function SocialBoostScreen() {
             </LinearGradient>
 
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
-                <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+                <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 180, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
                     {/* Dynamic Banners */}
                     <DynamicBanners placement="social_boost" />
                     
@@ -388,23 +388,69 @@ export default function SocialBoostScreen() {
                                         />
                                     </View>
 
-                                    <View className="flex-row justify-between items-center bg-amber-50/50 p-4 rounded-xl border border-amber-100 mb-5">
-                                        <Text className="text-amber-800 text-[10px] font-bold uppercase tracking-widest">Total Charge</Text>
-                                        <Text className="text-amber-900 font-black text-xl">₦{totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                    {/* CAC-Style Premium Summary Breakdown */}
+                                    <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-5 shadow-lg shadow-slate-950/20">
+                                        <View className="flex-row items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
+                                            <View className="flex-row items-center">
+                                                <Ionicons name="receipt-outline" size={14} color="#f5a623" style={{ marginRight: 6 }} />
+                                                <Text className="text-slate-300 text-[10px] uppercase font-bold tracking-widest">Order Summary</Text>
+                                            </View>
+                                            <View className="bg-[#f5a623]/10 px-2.5 py-0.5 rounded-full border border-[#f5a623]/30">
+                                                <Text className="text-[#f5a623] text-[9px] font-extrabold uppercase">Instant Delivery</Text>
+                                            </View>
+                                        </View>
+
+                                        <View className="flex-row justify-between items-center mb-2">
+                                            <Text className="text-slate-400 text-xs font-medium">Service Rate (per 1k)</Text>
+                                            <Text className="text-slate-200 text-xs font-bold">₦{parseFloat(selectedService.rate).toLocaleString()}</Text>
+                                        </View>
+
+                                        <View className="flex-row justify-between items-center mb-2">
+                                            <Text className="text-slate-400 text-xs font-medium">Target Quantity</Text>
+                                            <Text className="text-slate-200 text-xs font-bold">{quantity || '0'}</Text>
+                                        </View>
+
+                                        <View className="flex-row justify-between items-center pt-3 border-t border-slate-800">
+                                            <Text className="text-white text-xs font-black uppercase tracking-wider">Total Charge</Text>
+                                            <Text className="text-[#f5a623] font-black text-xl">₦{totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                        </View>
                                     </View>
 
+                                    {/* CAC-Style Glowing Submit Button */}
                                     <TouchableOpacity 
                                         onPress={handleSubmit}
                                         disabled={isSubmitting}
-                                        className={`w-full py-4 rounded-xl items-center justify-center flex-row gap-2 ${isSubmitting ? 'bg-[#0F172A]/70' : 'bg-[#0F172A]'}`}
-                                        style={{ shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+                                        activeOpacity={0.85}
+                                        className={`w-full py-4 px-5 rounded-2xl items-center justify-between flex-row ${isSubmitting ? 'bg-slate-800' : 'bg-[#0F172A]'}`}
+                                        style={{ 
+                                            borderWidth: 1, 
+                                            borderColor: '#f5a623',
+                                            shadowColor: '#f5a623', 
+                                            shadowOffset: { width: 0, height: 4 }, 
+                                            shadowOpacity: 0.25, 
+                                            shadowRadius: 10, 
+                                            elevation: 6 
+                                        }}
                                     >
                                         {isSubmitting ? (
-                                            <ActivityIndicator size="small" color="#ffffff" />
+                                            <View className="w-full flex-row items-center justify-center py-0.5">
+                                                <ActivityIndicator size="small" color="#f5a623" />
+                                                <Text className="text-[#f5a623] text-sm font-bold ml-2 uppercase tracking-wider">Processing Order...</Text>
+                                            </View>
                                         ) : (
                                             <>
-                                                <Ionicons name="flash" size={16} color="#f5a623" />
-                                                <Text className="text-white text-sm font-bold">Place Order</Text>
+                                                <View className="flex-row items-center">
+                                                    <View className="w-8 h-8 rounded-full bg-[#f5a623]/20 items-center justify-center mr-3 border border-[#f5a623]/40">
+                                                        <Ionicons name="flash" size={16} color="#f5a623" />
+                                                    </View>
+                                                    <View>
+                                                        <Text className="text-white text-sm font-black uppercase tracking-wider">Submit Order Now</Text>
+                                                        <Text className="text-slate-400 text-[9px] font-semibold">Instant Execution • Safe & Secure</Text>
+                                                    </View>
+                                                </View>
+                                                <View className="bg-[#f5a623] px-3 py-1.5 rounded-xl">
+                                                    <Text className="text-[#0F172A] text-xs font-extrabold">₦{totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                                                </View>
                                             </>
                                         )}
                                     </TouchableOpacity>
