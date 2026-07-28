@@ -15,28 +15,120 @@ import SecurityModal from '../../components/SecurityModal';
 import TransactionConfirmationModal from '../../components/TransactionConfirmationModal';
 import DynamicBanners from '../../components/DynamicBanners';
 
-const parseVolumeToGB = (volume: any, name: string): number => {
-    const text = (String(volume || '') + ' ' + String(name || '')).toLowerCase();
-    
-    // Check for MB first to avoid false GB matches from words starting with G (e.g. gifting, glo)
-    const mbMatch = text.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)\b/i);
+export interface ExtractedPlanInfo {
+    volumeVal: string;
+    volumeUnit: 'MB' | 'GB' | 'TB';
+    volumeInGB: number;
+    validity: string;
+    validityCategory: 'Daily' | 'Weekly' | 'Monthly';
+}
+
+const parsePlanInfo = (volume: any, name: string, rawValidity?: string): ExtractedPlanInfo => {
+    const nameText = String(name || '').toLowerCase();
+    const rawValText = String(rawValidity || '').toLowerCase();
+    const combinedText = `${nameText} ${String(volume || '')} ${rawValText}`.trim();
+
+    // 1. Extract Validity Duration (Prioritize plan name over default "30 Days")
+    let validity = (rawValidity && rawValidity !== '30 Days') ? rawValidity.trim() : '';
+    let validityCategory: 'Daily' | 'Weekly' | 'Monthly' = 'Monthly';
+
+    // Check name first for days
+    const dayInNameMatch = nameText.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
+    const dayInRawMatch = rawValText.match(/(\d+)\s*(day|days|hrs|hours|hr)\b/i);
+    const dayMatch = dayInNameMatch || dayInRawMatch;
+
+    const isDailyKeyword = combinedText.includes('daily') || combinedText.includes('1 day') || combinedText.includes('2 days') || combinedText.includes('24 hrs') || combinedText.includes('24hrs');
+    const isWeeklyKeyword = combinedText.includes('weekly') || combinedText.includes('7 days') || combinedText.includes('14 days') || combinedText.includes('7days') || combinedText.includes('14days');
+
+    if (dayInNameMatch) {
+        const numDays = parseInt(dayInNameMatch[1]);
+        if (numDays <= 3) {
+            validity = `${numDays} ${numDays === 1 ? 'Day' : 'Days'}`;
+            validityCategory = 'Daily';
+        } else if (numDays <= 14) {
+            validity = `${numDays} Days`;
+            validityCategory = 'Weekly';
+        } else {
+            validity = `${numDays} Days`;
+            validityCategory = 'Monthly';
+        }
+    } else if (isDailyKeyword) {
+        validity = '1 Day';
+        validityCategory = 'Daily';
+    } else if (isWeeklyKeyword) {
+        validity = '7 Days';
+        validityCategory = 'Weekly';
+    } else if (dayInRawMatch) {
+        const numDays = parseInt(dayInRawMatch[1]);
+        if (numDays <= 3) {
+            validity = `${numDays} ${numDays === 1 ? 'Day' : 'Days'}`;
+            validityCategory = 'Daily';
+        } else if (numDays <= 14) {
+            validity = `${numDays} Days`;
+            validityCategory = 'Weekly';
+        } else {
+            validity = `${numDays} Days`;
+            validityCategory = 'Monthly';
+        }
+    } else {
+        validity = validity || '30 Days';
+        validityCategory = 'Monthly';
+    }
+
+    // 2. Extract Volume & Unit (TB, GB, MB)
+    let volumeVal = '';
+    let volumeUnit: 'MB' | 'GB' | 'TB' = 'GB';
+    let volumeInGB = 0;
+
+    // Check for TB
+    const tbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(tb|terabyte|terabytes)\b/i);
+    if (tbMatch) {
+        const val = parseFloat(tbMatch[1]);
+        volumeVal = String(val);
+        volumeUnit = 'TB';
+        volumeInGB = val * 1024;
+        return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
+    }
+
+    // Check for MB
+    const mbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(mb|meg|megs|megabyte|megabytes)\b/i);
     if (mbMatch) {
-        return parseFloat(mbMatch[1]) / 1024;
+        const val = parseFloat(mbMatch[1]);
+        volumeVal = String(val);
+        volumeUnit = 'MB';
+        volumeInGB = val / 1024;
+        return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
     }
 
-    // Check for GB with strict word boundary
-    const gbMatch = text.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)\b/i);
+    // Check for GB
+    const gbMatch = combinedText.match(/(\d+(\.\d+)?)\s*(gb|gig|gigs|gigabyte|gigabytes)\b/i);
     if (gbMatch) {
-        return parseFloat(gbMatch[1]);
-    }
-    
-    // Fallback if numeric string
-    const numOnly = parseFloat(String(volume).replace(/[^0-9.]/g, ''));
-    if (!isNaN(numOnly) && numOnly > 0) {
-        return numOnly > 50 ? numOnly / 1024 : numOnly;
+        const val = parseFloat(gbMatch[1]);
+        volumeVal = String(val);
+        volumeUnit = 'GB';
+        volumeInGB = val;
+        return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
     }
 
-    return 0;
+    // Fallback numeric parsing
+    const numOnly = parseFloat(String(volume || '').replace(/[^0-9.]/g, ''));
+    if (!isNaN(numOnly) && numOnly > 0) {
+        if (numOnly >= 50) {
+            volumeVal = String(numOnly);
+            volumeUnit = 'MB';
+            volumeInGB = numOnly / 1024;
+        } else {
+            volumeVal = String(numOnly);
+            volumeUnit = 'GB';
+            volumeInGB = numOnly;
+        }
+    }
+
+    return { volumeVal, volumeUnit, volumeInGB, validity, validityCategory };
+};
+
+const parseVolumeToGB = (volume: any, name: string): number => {
+    return parsePlanInfo(volume, name).volumeInGB;
 };
 
 // Network Logos
@@ -301,38 +393,10 @@ export default function DataScreen() {
         if (planFilter === 'All') return true;
         if (planFilter === 'Favorites') return favorites.includes(p.id);
         
-        const rawVal = (p.validity || '').toLowerCase();
-        const nameVal = (p.originalName || p.name).toLowerCase();
-        let days = parseInt(p.validity) || 0;
-
-        const combinedText = rawVal + ' ' + nameVal;
-        const durationMatch = combinedText.match(/(\d+)\s*(day|week|month|hr|hour)/i);
-        
-        if (durationMatch) {
-            const num = parseInt(durationMatch[1]);
-            const unit = durationMatch[2].toLowerCase();
-            
-            if (unit.startsWith('hr') || unit.startsWith('hour')) days = 1;
-            else if (unit.startsWith('day')) days = num;
-            else if (unit.startsWith('week')) days = num * 7;
-            else if (unit.startsWith('month')) days = num * 30;
-        }
-
-        if (days === 0 || days === 30) {
-            if (combinedText.includes('daily') || combinedText.includes('24hr')) days = 1;
-            else if (combinedText.includes('weekly')) days = 7;
-            else if (combinedText.includes('monthly') || combinedText.includes('30 days')) days = 30;
-        }
-
-        if (planFilter === 'Daily') {
-             return (days > 0 && days < 7);
-        }
-        if (planFilter === 'Weekly') {
-             return (days >= 7 && days < 28);
-        }
-        if (planFilter === 'Monthly') {
-             return (days >= 28);
-        }
+        const planInfo = parsePlanInfo(p.volume, p.originalName || p.name, p.validity);
+        if (planFilter === 'Daily') return planInfo.validityCategory === 'Daily';
+        if (planFilter === 'Weekly') return planInfo.validityCategory === 'Weekly';
+        if (planFilter === 'Monthly') return planInfo.validityCategory === 'Monthly';
         return true;
     });
 
@@ -958,12 +1022,9 @@ export default function DataScreen() {
                                     {filteredPlans.map((plan) => {
                                         const isSelected = selectedPlan?.id === plan.id;
                                         const isFav = favorites.includes(plan.id);
-                                        const isBestValue = (plan.validity.toLowerCase().includes('30') && plan.price < 1000);
+                                        const planInfo = parsePlanInfo(plan.volume, plan.originalName || plan.name, plan.validity);
+                                        const isBestValue = (planInfo.validityCategory === 'Monthly' && plan.price < 1000);
                                         const isMega = plan.name.toLowerCase().includes('mega');
-                                        
-                                        // Extract Data Volume for beautiful display
-                                        const gbVol = parseVolumeToGB(plan.volume, plan.originalName || plan.name);
-                                        let displayVol = gbVol > 0 ? (gbVol >= 1 ? `${gbVol}GB` : `${gbVol * 1024}MB`) : '';
                                         
                                         return (
                                         <TouchableOpacity
@@ -983,18 +1044,12 @@ export default function DataScreen() {
                                             >
                                                 {/* Left: Volume Badge */}
                                                 <View style={[s.planVolumeBadge, isSelected && s.planVolumeBadgeSelected]}>
-                                                    {displayVol ? (
-                                                        <>
-                                                            <Text style={[s.planVolumeValue, isSelected && { color: '#ffffff' }]}>
-                                                                {displayVol.replace(/[a-zA-Z]+/g, '')}
-                                                            </Text>
-                                                            <Text style={[s.planVolumeUnit, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>
-                                                                {displayVol.replace(/[0-9.]+/g, '')}
-                                                            </Text>
-                                                        </>
-                                                    ) : (
-                                                        <Ionicons name="wifi" size={24} color={isSelected ? '#ffffff' : '#0d1b3e'} />
-                                                    )}
+                                                    <Text style={[s.planVolumeValue, isSelected && { color: '#ffffff' }]}>
+                                                        {planInfo.volumeVal || 'Data'}
+                                                    </Text>
+                                                    <Text style={[s.planVolumeUnit, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>
+                                                        {planInfo.volumeUnit}
+                                                    </Text>
                                                 </View>
                                                 
                                                 {/* Middle: Details */}
@@ -1017,7 +1072,7 @@ export default function DataScreen() {
                                                     <View style={s.planListValidityContainer}>
                                                         <Ionicons name="time-outline" size={10} color={isSelected ? '#fde047' : '#64748b'} style={{ marginRight: 3 }} />
                                                         <Text style={[s.planListValidity, isSelected && s.planListValiditySelected]}>
-                                                            {plan.validity}
+                                                            {planInfo.validity}
                                                         </Text>
                                                     </View>
                                                 </View>
