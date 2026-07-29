@@ -428,6 +428,7 @@ export default function Dashboard() {
     { icon: 'school-outline', label: 'Education', color: '#06b6d4', route: '/education' },
     { icon: 'briefcase-outline', label: 'CAC Reg', color: '#8b5cf6', route: '/cac-services' },
     { icon: 'rocket-outline', label: 'Social Boost', color: '#ec4899', route: '/social-boost' },
+    { icon: 'star-outline', label: 'Reviews', color: '#f5a623', route: '/reviews' },
     // Remaining actions shown when expanded
     { icon: 'card-outline', label: 'Cards', color: '#8B5CF6', route: '/virtual-cards' },
     { icon: 'wallet-outline', label: 'Savings', color: '#107C10', route: '/savings' },
@@ -745,6 +746,38 @@ export default function Dashboard() {
               />
             </View>
           </LinearGradient>
+        </View>
+
+        {/* ─── Customer Reviews Banner ─── */}
+        <View style={[s.promoContainer, { marginTop: -6 }]}>
+          <TouchableOpacity onPress={() => router.push('/reviews')} activeOpacity={0.85}>
+            <LinearGradient 
+              colors={['#0d1b3e', '#142258']} 
+              style={[s.promoCard, { borderWidth: 1, borderColor: 'rgba(245,166,35,0.4)' }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={s.promoLeft}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                  <Text style={[s.promoTitle, { fontSize: 13 }]}>Customer Reviews</Text>
+                  <View style={{ flexDirection: 'row', marginLeft: 6, gap: 2 }}>
+                    {[1, 2, 3, 4, 5].map(st => (
+                      <Ionicons key={st} name="star" size={10} color="#f5a623" />
+                    ))}
+                  </View>
+                </View>
+                <Text style={s.promoDesc}>See what 1,400+ satisfied users say or leave your rating!</Text>
+                <View style={[s.promoBtn, { backgroundColor: '#f5a623', marginTop: 6 }]}>
+                  <Text style={[s.promoBtnTxt, { color: '#0d1b3e', fontWeight: 'bold' }]}>Explore Reviews</Text>
+                  <Ionicons name="arrow-forward" size={12} color="#0d1b3e" style={{ marginLeft: 4 }} />
+                </View>
+              </View>
+
+              <View style={s.promoRight}>
+                <Ionicons name="chatbubbles" size={44} color="rgba(245, 166, 35, 0.4)" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         {/* ─── Recent Transactions ─── */}

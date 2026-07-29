@@ -60,13 +60,32 @@ const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select
 };
 
 const CustomDatePicker = ({ label, value, onChange }: any) => {
-  const [show, setShow] = useState(false);
-  const dateObj = value ? new Date(value) : new Date();
-  
-  const handleConfirm = (event: any, selectedDate?: Date) => {
-    setShow(Platform.OS === 'ios');
+  const [showNative, setShowNative] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [manualText, setManualText] = useState(value || '');
+
+  useEffect(() => {
+    setManualText(value || '');
+  }, [value]);
+
+  const handleTextChange = (text: string) => {
+    setManualText(text);
+    onChange(text);
+  };
+
+  const openPicker = () => {
+    if (Platform.OS === 'web') {
+      setShowModal(true);
+    } else {
+      setShowNative(true);
+    }
+  };
+
+  const handleNativeConfirm = (event: any, selectedDate?: Date) => {
+    setShowNative(Platform.OS === 'ios');
     if (selectedDate) {
       const formatted = selectedDate.toISOString().split('T')[0];
+      setManualText(formatted);
       onChange(formatted);
     }
   };
@@ -74,19 +93,75 @@ const CustomDatePicker = ({ label, value, onChange }: any) => {
   return (
     <View style={s.inputContainer}>
       <Text style={s.label}>{label}</Text>
-      <TouchableOpacity style={[s.input, { justifyContent: 'center' }]} onPress={() => setShow(true)}>
-        <Text style={{ color: value ? COLORS.navy : COLORS.textSub }}>{value || "Select Date"}</Text>
-        <Ionicons name="calendar-outline" size={16} color={COLORS.textSub} style={{ position: 'absolute', right: 12, top: 12 }} />
-      </TouchableOpacity>
-      {show && (
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <TextInput
+          style={[s.input, { flex: 1, paddingRight: 36 }]}
+          placeholder="YYYY-MM-DD"
+          value={manualText}
+          onChangeText={handleTextChange}
+        />
+        <TouchableOpacity 
+          onPress={openPicker} 
+          style={{ position: 'absolute', right: 8, top: 8, padding: 4 }}
+        >
+          <Ionicons name="calendar-outline" size={18} color={COLORS.navy} />
+        </TouchableOpacity>
+      </View>
+
+      {showNative && Platform.OS !== 'web' && (
         <DateTimePicker
-          value={dateObj}
+          value={manualText && !isNaN(Date.parse(manualText)) ? new Date(manualText) : new Date(2000, 0, 1)}
           mode="date"
           display="default"
-          onChange={handleConfirm}
+          onChange={handleNativeConfirm}
           maximumDate={new Date()}
         />
       )}
+
+      {/* Web & Native Quick Date Selection Modal */}
+      <Modal visible={showModal} transparent animationType="fade" onRequestClose={() => setShowModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(13,27,62,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, width: '100%', maxWidth: 360, shadowColor: '#000', shadowRadius: 10, shadowOpacity: 0.15, elevation: 5 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.navy }}>Select Date of Birth</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <Ionicons name="close" size={22} color={COLORS.navy} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: COLORS.textSub, marginBottom: 12 }}>Enter date in YYYY-MM-DD format or pick year below:</Text>
+            
+            <TextInput
+              style={[s.input, { marginBottom: 16, fontSize: 16, fontWeight: 'bold', textAlign: 'center' }]}
+              placeholder="YYYY-MM-DD"
+              value={manualText}
+              onChangeText={handleTextChange}
+            />
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+              {['1985', '1990', '1995', '1998', '2000', '2002', '2005'].map((yr) => (
+                <TouchableOpacity 
+                  key={yr} 
+                  onPress={() => {
+                    const currentMonthDay = manualText.split('-').slice(1).join('-') || '01-01';
+                    handleTextChange(`${yr}-${currentMonthDay}`);
+                  }}
+                  style={{ backgroundColor: manualText.startsWith(yr) ? COLORS.navy : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: manualText.startsWith(yr) ? '#fff' : COLORS.navy }}>{yr}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setShowModal(false)} 
+              style={{ backgroundColor: COLORS.navy, paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Set Date</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

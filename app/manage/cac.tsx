@@ -66,7 +66,19 @@ export default function ManageCAC() {
         if (data) setRequests(data);
       } else {
         const { data } = await supabase.from('cac_pricing').select('*').order('price', { ascending: true });
-        if (data) setPricings(data);
+        let allPricings: any[] = data ? [...data] : [];
+
+        const hasRetrieval = allPricings.some(p => p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('certificate search'));
+        if (!hasRetrieval) {
+          allPricings.push({
+            id: 'cac-certificate-retrieval-default',
+            name: 'CAC Certificate Retrieval / Document Search',
+            price: 7500,
+            active: true
+          });
+        }
+
+        setPricings(allPricings);
         
         // Fetch TIN Fee from app_settings
         try {
@@ -437,7 +449,7 @@ export default function ManageCAC() {
     );
   };
 
-  const savePrice = async (id: string) => {
+  const savePrice = async (id: string, name?: string) => {
     const draft = priceDrafts[id];
     if (!draft) return;
     const p = parseFloat(draft);
@@ -445,8 +457,17 @@ export default function ManageCAC() {
     
     try {
       setLoading(true);
-      const { error } = await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
-      if (error) throw error;
+      if (id.startsWith('cac-certificate-retrieval-default')) {
+        const { error } = await supabase.from('cac_pricing').upsert([{
+          name: name || 'CAC Certificate Retrieval / Document Search',
+          price: p,
+          active: true
+        }]);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('cac_pricing').update({ price: p }).eq('id', id);
+        if (error) throw error;
+      }
       Alert.alert('Success', 'Price updated successfully');
       fetchData();
     } catch (e: any) {
