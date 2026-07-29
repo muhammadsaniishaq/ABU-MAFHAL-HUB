@@ -59,106 +59,150 @@ const CustomDropdown = ({ label, value, options, onSelect, placeholder = "Select
   );
 };
 
+const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MONTHS = [
+  { name: 'January', value: '01' }, { name: 'February', value: '02' }, { name: 'March', value: '03' },
+  { name: 'April', value: '04' }, { name: 'May', value: '05' }, { name: 'June', value: '06' },
+  { name: 'July', value: '07' }, { name: 'August', value: '08' }, { name: 'September', value: '09' },
+  { name: 'October', value: '10' }, { name: 'November', value: '11' }, { name: 'December', value: '12' }
+];
+const YEARS = Array.from({ length: 70 }, (_, i) => String(2008 - i));
+
 const CustomDatePicker = ({ label, value, onChange }: any) => {
-  const [showNative, setShowNative] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [manualText, setManualText] = useState(value || '');
+  
+  // Parse initial values
+  const parts = (value || '').split('-');
+  const [selYear, setSelYear] = useState(parts[0] || '1998');
+  const [selMonth, setSelMonth] = useState(parts[1] || '05');
+  const [selDay, setSelDay] = useState(parts[2] || '14');
 
   useEffect(() => {
-    setManualText(value || '');
+    if (value && value.includes('-')) {
+      const p = value.split('-');
+      if (p.length === 3) {
+        setSelYear(p[0]);
+        setSelMonth(p[1]);
+        setSelDay(p[2]);
+      }
+    }
   }, [value]);
 
-  const handleTextChange = (text: string) => {
-    setManualText(text);
-    onChange(text);
+  const handleConfirm = () => {
+    const formattedDate = `${selYear}-${selMonth}-${selDay}`;
+    onChange(formattedDate);
+    setShowModal(false);
   };
 
-  const openPicker = () => {
-    if (Platform.OS === 'web') {
-      setShowModal(true);
-    } else {
-      setShowNative(true);
-    }
+  const getMonthName = (mCode: string) => {
+    const mObj = MONTHS.find(m => m.value === mCode);
+    return mObj ? mObj.name : mCode;
   };
 
-  const handleNativeConfirm = (event: any, selectedDate?: Date) => {
-    setShowNative(Platform.OS === 'ios');
-    if (selectedDate) {
-      const formatted = selectedDate.toISOString().split('T')[0];
-      setManualText(formatted);
-      onChange(formatted);
-    }
-  };
+  const formattedDisplay = value 
+    ? `${selDay} ${getMonthName(selMonth)} ${selYear}` 
+    : 'Select Date of Birth';
 
   return (
     <View style={s.inputContainer}>
       <Text style={s.label}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <TextInput
-          style={[s.input, { flex: 1, paddingRight: 36 }]}
-          placeholder="YYYY-MM-DD"
-          value={manualText}
-          onChangeText={handleTextChange}
-        />
-        <TouchableOpacity 
-          onPress={openPicker} 
-          style={{ position: 'absolute', right: 8, top: 8, padding: 4 }}
-        >
-          <Ionicons name="calendar-outline" size={18} color={COLORS.navy} />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity 
+        style={[s.input, { justifyContent: 'center', backgroundColor: '#f8fafc' }]} 
+        onPress={() => setShowModal(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={{ fontSize: 13, color: value ? COLORS.navy : COLORS.textSub, fontWeight: value ? '700' : '400' }}>
+          {formattedDisplay}
+        </Text>
+        <Ionicons name="calendar-outline" size={18} color={COLORS.navy} style={{ position: 'absolute', right: 12, top: 11 }} />
+      </TouchableOpacity>
 
-      {showNative && Platform.OS !== 'web' && (
-        <DateTimePicker
-          value={manualText && !isNaN(Date.parse(manualText)) ? new Date(manualText) : new Date(2000, 0, 1)}
-          mode="date"
-          display="default"
-          onChange={handleNativeConfirm}
-          maximumDate={new Date()}
-        />
-      )}
-
-      {/* Web & Native Quick Date Selection Modal */}
+      {/* Styled Interactive Modal Date Picker */}
       <Modal visible={showModal} transparent animationType="fade" onRequestClose={() => setShowModal(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(13,27,62,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, width: '100%', maxWidth: 360, shadowColor: '#000', shadowRadius: 10, shadowOpacity: 0.15, elevation: 5 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.navy }}>Select Date of Birth</Text>
+        <View style={{ flex: 1, backgroundColor: 'rgba(13,27,62,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 20, width: '100%', maxWidth: 380, shadowColor: '#000', shadowRadius: 16, shadowOpacity: 0.2, elevation: 8 }}>
+            
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(245,166,35,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Ionicons name="calendar" size={18} color={COLORS.goldDk} />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.navy }}>Select Date of Birth</Text>
+              </View>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={22} color={COLORS.navy} />
+                <Ionicons name="close-circle" size={24} color={COLORS.textSub} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 12, color: COLORS.textSub, marginBottom: 12 }}>Enter date in YYYY-MM-DD format or pick year below:</Text>
-            
-            <TextInput
-              style={[s.input, { marginBottom: 16, fontSize: 16, fontWeight: 'bold', textAlign: 'center' }]}
-              placeholder="YYYY-MM-DD"
-              value={manualText}
-              onChangeText={handleTextChange}
-            />
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
-              {['1985', '1990', '1995', '1998', '2000', '2002', '2005'].map((yr) => (
-                <TouchableOpacity 
-                  key={yr} 
-                  onPress={() => {
-                    const currentMonthDay = manualText.split('-').slice(1).join('-') || '01-01';
-                    handleTextChange(`${yr}-${currentMonthDay}`);
-                  }}
-                  style={{ backgroundColor: manualText.startsWith(yr) ? COLORS.navy : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
-                >
-                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: manualText.startsWith(yr) ? '#fff' : COLORS.navy }}>{yr}</Text>
-                </TouchableOpacity>
-              ))}
+            {/* Live Selected Date Display Badge */}
+            <View style={{ backgroundColor: '#0d1b3e', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, color: COLORS.gold, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>Selected Date</Text>
+              <Text style={{ fontSize: 18, color: '#fff', fontWeight: '900', marginTop: 2 }}>{selDay} {getMonthName(selMonth)} {selYear}</Text>
             </View>
 
+            {/* 3 Wheel Selector Columns */}
+            <View style={{ flexDirection: 'row', gap: 8, height: 180, marginBottom: 16 }}>
+              
+              {/* Day Selector */}
+              <View style={{ flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>DAY</Text>
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {DAYS.map(d => (
+                    <TouchableOpacity 
+                      key={d} 
+                      onPress={() => setSelDay(d)}
+                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selDay === d ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: selDay === d ? 'bold' : '500', color: selDay === d ? '#fff' : COLORS.textMain }}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Month Selector */}
+              <View style={{ flex: 1.3, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>MONTH</Text>
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {MONTHS.map(m => (
+                    <TouchableOpacity 
+                      key={m.value} 
+                      onPress={() => setSelMonth(m.value)}
+                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selMonth === m.value ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: selMonth === m.value ? 'bold' : '500', color: selMonth === m.value ? '#fff' : COLORS.textMain }} numberOfLines={1}>{m.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Year Selector */}
+              <View style={{ flex: 1.2, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', padding: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: COLORS.textSub, textAlign: 'center', marginVertical: 4 }}>YEAR</Text>
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {YEARS.map(y => (
+                    <TouchableOpacity 
+                      key={y} 
+                      onPress={() => setSelYear(y)}
+                      style={{ paddingVertical: 8, borderRadius: 8, backgroundColor: selYear === y ? COLORS.navy : 'transparent', alignItems: 'center', marginVertical: 1 }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: selYear === y ? 'bold' : '500', color: selYear === y ? '#fff' : COLORS.textMain }}>{y}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+            </View>
+
+            {/* Confirm Button */}
             <TouchableOpacity 
-              onPress={() => setShowModal(false)} 
-              style={{ backgroundColor: COLORS.navy, paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+              onPress={handleConfirm}
+              style={{ backgroundColor: COLORS.gold, paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}
             >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Set Date</Text>
+              <Ionicons name="checkmark-circle" size={18} color={COLORS.navy} style={{ marginRight: 6 }} />
+              <Text style={{ color: COLORS.navy, fontWeight: 'bold', fontSize: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>Confirm Date</Text>
             </TouchableOpacity>
+
           </View>
         </View>
       </Modal>
