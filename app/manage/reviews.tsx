@@ -15,6 +15,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_KEY = '@abu_mafhal_reviews_v1';
+const DELETED_KEY = '@abu_mafhal_deleted_reviews_v1';
 
 const COLORS = {
   navy: '#0d1b3e',
@@ -66,20 +70,40 @@ export default function AdminReviewsManagement() {
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      if (error && error.code !== '42P01') {
-        console.error('Error fetching reviews:', error);
+      // Read deleted IDs
+      let deletedIds: string[] = [];
+      try {
+        const delStr = await AsyncStorage.getItem(DELETED_KEY);
+        if (delStr) deletedIds = JSON.parse(delStr);
+      } catch (err) {}
+
+      // Read local stored reviews
+      let localReviews: Review[] = [];
+      try {
+        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+        if (localStr) localReviews = JSON.parse(localStr);
+      } catch (err) {}
+
+      // Fetch remote reviews from DB
+      let remoteReviews: Review[] = [];
+      try {
+        const { data } = await supabase
+          .from('reviews')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (data && data.length > 0) remoteReviews = data;
+      } catch (e) {
+        console.log('Remote reviews error:', e);
       }
-      
-      if (data && data.length > 0) {
-        setReviews(data);
-      } else {
-        // Fallback default sample data if table is empty
-        setReviews([
+
+      const map = new Map<string, Review>();
+      remoteReviews.forEach(r => map.set(r.id, r));
+      localReviews.forEach(r => map.set(r.id, r));
+
+      let finalArr = Array.from(map.values()).filter(r => !deletedIds.includes(r.id));
+      if (finalArr.length === 0) {
+        finalArr = [
           {
             id: 'rev-1',
             user_name: 'Usman Garba',
@@ -101,20 +125,12 @@ export default function AdminReviewsManagement() {
             is_hidden: false,
             is_featured: false,
             created_at: new Date(Date.now() - 3600000 * 48).toISOString()
-          },
-          {
-            id: 'rev-3',
-            user_name: 'Ibrahim Sani',
-            avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-            rating: 5,
-            category: 'Data Bundles',
-            comment: 'Sauri da aminci wajen siyan Data koda a cikin tsakiyar dare. Instant delivery ne wlh!',
-            is_hidden: false,
-            is_featured: true,
-            created_at: new Date(Date.now() - 3600000 * 72).toISOString()
           }
-        ]);
+        ];
       }
+
+      finalArr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setReviews(finalArr);
     } catch (e) {
       console.error(e);
     } finally {
@@ -132,11 +148,24 @@ export default function AdminReviewsManagement() {
           text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
+            setReviews(prev => prev.filter(r => r.id !== id));
             try {
-              setReviews(prev => prev.filter(r => r.id !== id));
-              const { error } = await supabase.from('reviews').delete().eq('id', id);
-              if (error && error.code !== '42P01') throw error;
-              Alert.alert('Success', 'Review deleted successfully.');
+              // Store deleted ID locally
+              const delStr = await AsyncStorage.getItem(DELETED_KEY);
+              const deletedList = delStr ? JSON.parse(delStr) : [];
+              if (!deletedList.includes(id)) {
+                deletedList.push(id);
+                await AsyncStorage.setItem(DELETED_KEY, JSON.stringify(deletedList));
+              }
+
+              const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+              if (localStr) {
+                const existing = JSON.parse(localStr);
+                const filtered = existing.filter((r: any) => r.id !== id);
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+              }
+
+              await supabase.from('reviews').delete().eq('id', id);
             } catch (e: any) {
               console.log('Delete error:', e.message);
             }
@@ -197,8 +226,18 @@ export default function AdminReviewsManagement() {
         created_at: new Date().toISOString()
       };
 
+      // 1. Save locally to AsyncStorage
+      try {
+        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+        const existing = localStr ? JSON.parse(localStr) : [];
+        const updatedLocal = [newRev, ...existing];
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocal));
+      } catch (err) {}
+
+      // 2. Insert into DB
       try {
         await supabase.from('reviews').insert([{
+          id: newRev.id,
           user_name: newRev.user_name,
           avatar_url: newRev.avatar_url,
           rating: newRev.rating,
@@ -207,7 +246,7 @@ export default function AdminReviewsManagement() {
           is_featured: true
         }]);
       } catch (dbErr) {
-        console.log('Database insert error:', dbErr);
+        console.log('Database insert error (saved locally):', dbErr);
       }
 
       setReviews(prev => [newRev, ...prev]);
@@ -215,7 +254,7 @@ export default function AdminReviewsManagement() {
       setNameInput('');
       setAvatarInput('');
       setCommentInput('');
-      Alert.alert('Success', 'Custom review created successfully!');
+      Alert.alert('Success', 'Custom review created and saved successfully!');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {

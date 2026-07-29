@@ -16,6 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const STORAGE_KEY = '@abu_mafhal_reviews_v1';
+const DELETED_KEY = '@abu_mafhal_deleted_reviews_v1';
 
 const COLORS = {
   navy: '#0d1b3e',
@@ -153,16 +157,55 @@ export default function ReviewsScreen() {
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .order('created_at', { ascending: false });
+      
+      // 1. Read locally deleted review IDs
+      let deletedIds: string[] = [];
+      try {
+        const delStr = await AsyncStorage.getItem(DELETED_KEY);
+        if (delStr) deletedIds = JSON.parse(delStr);
+      } catch (err) {}
 
-      if (data && data.length > 0) {
-        setReviews(data);
+      // 2. Read local stored user reviews
+      let localReviews: ReviewItem[] = [];
+      try {
+        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+        if (localStr) localReviews = JSON.parse(localStr);
+      } catch (err) {}
+
+      // 3. Fetch remote reviews from Supabase DB
+      let remoteReviews: ReviewItem[] = [];
+      try {
+        const { data } = await supabase
+          .from('reviews')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (data && data.length > 0) remoteReviews = data;
+      } catch (e) {
+        console.log('Error fetching remote reviews, using local cache:', e);
       }
+
+      // 4. Combine all sources: remote + local user reviews + defaults
+      const map = new Map<string, ReviewItem>();
+      
+      // Add defaults first
+      INITIAL_REVIEWS.forEach(r => map.set(r.id, r));
+
+      // Add remote DB reviews
+      remoteReviews.forEach(r => map.set(r.id, r));
+
+      // Add local user submitted reviews
+      localReviews.forEach(r => map.set(r.id, r));
+
+      // Filter out locally deleted items
+      let combined = Array.from(map.values()).filter(r => !deletedIds.includes(r.id));
+      
+      // Sort descending by date
+      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setReviews(combined);
     } catch (e) {
-      console.log('Error fetching reviews from database, using defaults:', e);
+      console.log('Error in fetchReviews:', e);
     } finally {
       setLoading(false);
     }
@@ -199,6 +242,7 @@ export default function ReviewsScreen() {
       const newReviewItem: ReviewItem = {
         id: `rev-${Date.now()}`,
         user_name: userName || 'Anonymous User',
+        avatar_url: userAvatar || undefined,
         rating: newRating,
         category: newCategory,
         comment: newComment.trim(),
@@ -207,19 +251,31 @@ export default function ReviewsScreen() {
         verified: true
       };
 
-      // Attempt DB insert
+      // 1. Save to local AsyncStorage immediately so it NEVER gets lost
+      try {
+        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+        const existing = localStr ? JSON.parse(localStr) : [];
+        const updatedLocal = [newReviewItem, ...existing];
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocal));
+      } catch (err) {
+        console.log('Failed to save review to AsyncStorage:', err);
+      }
+
+      // 2. Insert into Supabase DB
       if (user) {
         try {
           await supabase.from('reviews').insert([{
+            id: newReviewItem.id,
             user_id: user.id,
             user_name: newReviewItem.user_name,
+            avatar_url: newReviewItem.avatar_url,
             rating: newReviewItem.rating,
             category: newReviewItem.category,
             comment: newReviewItem.comment,
             created_at: newReviewItem.created_at
           }]);
         } catch (dbErr) {
-          console.log('DB insert error (falling back to local UI state):', dbErr);
+          console.log('DB insert error (review preserved locally):', dbErr);
         }
       }
 
@@ -228,7 +284,7 @@ export default function ReviewsScreen() {
       setNewComment('');
       setNewRating(5);
 
-      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully.');
+      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully and saved.');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to submit review');
     } finally {
@@ -263,10 +319,29 @@ export default function ReviewsScreen() {
           style: 'destructive',
           onPress: async () => {
             setReviews(prev => prev.filter(r => r.id !== id));
+            
+            // Save deleted ID locally so it stays deleted
+            try {
+              const delStr = await AsyncStorage.getItem(DELETED_KEY);
+              const deletedList = delStr ? JSON.parse(delStr) : [];
+              if (!deletedList.includes(id)) {
+                deletedList.push(id);
+                await AsyncStorage.setItem(DELETED_KEY, JSON.stringify(deletedList));
+              }
+
+              // Remove from stored user reviews
+              const localStr = await AsyncStorage.getItem(STORAGE_KEY);
+              if (localStr) {
+                const existing = JSON.parse(localStr);
+                const filtered = existing.filter((r: any) => r.id !== id);
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+              }
+            } catch (err) {}
+
             try {
               await supabase.from('reviews').delete().eq('id', id);
             } catch (e) {
-              console.log('Error deleting review:', e);
+              console.log('Error deleting review from DB:', e);
             }
           }
         }
