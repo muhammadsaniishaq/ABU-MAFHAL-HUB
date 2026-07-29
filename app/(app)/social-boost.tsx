@@ -666,6 +666,8 @@ export default function SocialBoostScreen() {
                         </View>
                     </View>
                 </View>
+            </Modal>
+
             {/* Custom Decorated Alert Modal (Replacing Native Alerts) */}
             <Modal visible={alertModal.visible} animationType="fade" transparent={true}>
                 <View className="flex-1 bg-[#0F172A]/80 justify-center items-center px-6">
