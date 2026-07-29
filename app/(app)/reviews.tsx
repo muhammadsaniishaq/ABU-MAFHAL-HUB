@@ -175,12 +175,14 @@ export default function ReviewsScreen() {
       // 3. Fetch remote reviews from Supabase DB
       let remoteReviews: ReviewItem[] = [];
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('reviews')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (data && data.length > 0) remoteReviews = data;
+        if (!error && data && data.length > 0) {
+          remoteReviews = data;
+        }
       } catch (e) {
         console.log('Error fetching remote reviews, using local cache:', e);
       }
@@ -211,16 +213,19 @@ export default function ReviewsScreen() {
     }
   };
 
-  const handleLike = (id: string) => {
+  const handleLike = async (id: string) => {
     setLikedReviews(prev => {
       const isAlreadyLiked = prev[id];
       const newStatus = !isAlreadyLiked;
       
       setReviews(current => current.map(item => {
         if (item.id === id) {
+          const newLikes = (item.likes_count || 0) + (newStatus ? 1 : -1);
+          // Async sync likes count to Supabase
+          supabase.from('reviews').update({ likes_count: newLikes }).eq('id', id).then(() => {}, () => {});
           return {
             ...item,
-            likes_count: (item.likes_count || 0) + (newStatus ? 1 : -1)
+            likes_count: newLikes
           };
         }
         return item;
@@ -251,7 +256,7 @@ export default function ReviewsScreen() {
         verified: true
       };
 
-      // 1. Save to local AsyncStorage immediately so it NEVER gets lost
+      // 1. Save to local AsyncStorage immediately as backup
       try {
         const localStr = await AsyncStorage.getItem(STORAGE_KEY);
         const existing = localStr ? JSON.parse(localStr) : [];
@@ -261,22 +266,25 @@ export default function ReviewsScreen() {
         console.log('Failed to save review to AsyncStorage:', err);
       }
 
-      // 2. Insert into Supabase DB
-      if (user) {
-        try {
-          await supabase.from('reviews').insert([{
-            id: newReviewItem.id,
-            user_id: user.id,
-            user_name: newReviewItem.user_name,
-            avatar_url: newReviewItem.avatar_url,
-            rating: newReviewItem.rating,
-            category: newReviewItem.category,
-            comment: newReviewItem.comment,
-            created_at: newReviewItem.created_at
-          }]);
-        } catch (dbErr) {
-          console.log('DB insert error (review preserved locally):', dbErr);
+      // 2. Insert into Supabase DB (online for all users across devices)
+      try {
+        const { error: dbErr } = await supabase.from('reviews').insert([{
+          id: newReviewItem.id,
+          user_id: user?.id || null,
+          user_name: newReviewItem.user_name,
+          avatar_url: newReviewItem.avatar_url || null,
+          rating: newReviewItem.rating,
+          category: newReviewItem.category,
+          comment: newReviewItem.comment,
+          likes_count: 0,
+          verified: true,
+          created_at: newReviewItem.created_at
+        }]);
+        if (dbErr) {
+          console.log('Supabase insert review result/error:', dbErr);
         }
+      } catch (dbErr) {
+        console.log('DB insert error (review preserved locally):', dbErr);
       }
 
       setReviews(prev => [newReviewItem, ...prev]);
@@ -284,7 +292,7 @@ export default function ReviewsScreen() {
       setNewComment('');
       setNewRating(5);
 
-      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully and saved.');
+      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully and posted!');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to submit review');
     } finally {
