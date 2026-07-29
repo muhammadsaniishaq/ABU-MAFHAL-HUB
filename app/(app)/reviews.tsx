@@ -9,7 +9,8 @@ import {
   Alert, 
   Modal, 
   Platform, 
-  StyleSheet 
+  StyleSheet,
+  Image 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -42,18 +43,21 @@ const CATEGORIES = [
 type ReviewItem = {
   id: string;
   user_name: string;
+  avatar_url?: string;
   rating: number;
   category: string;
   comment: string;
   created_at: string;
   likes_count?: number;
   verified?: boolean;
+  is_hidden?: boolean;
 };
 
 const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 'rev-1',
     user_name: 'Usman Garba',
+    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     rating: 5,
     category: 'CAC Services',
     comment: 'Masha Allah! CAC Business Name registration yayi saurin fitowa a kasa da kwana 3! Nagode sosai Abu Mafhal Sub.',
@@ -64,6 +68,7 @@ const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 'rev-2',
     user_name: 'Amina Bello',
+    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
     rating: 5,
     category: 'Social Boost',
     comment: 'Social boost din ku yana aiki 100%! Instagram followers da likes sun shigo cikin minti 5 kacal.',
@@ -74,6 +79,7 @@ const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 'rev-3',
     user_name: 'Ibrahim Sani',
+    avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
     rating: 5,
     category: 'Data Bundles',
     comment: 'Sauri da aminci wajen siyan Data koda a cikin tsakiyar dare. Instant delivery ne wlh!',
@@ -84,6 +90,7 @@ const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 'rev-4',
     user_name: 'Fatima Zubairu',
+    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
     rating: 5,
     category: 'CAC Services',
     comment: 'Nayi rajistar Limited Liability Company tare da TIN. An tura min official certificate dita lafiya lau.',
@@ -94,6 +101,7 @@ const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 'rev-5',
     user_name: 'Kabiru Lawal',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
     rating: 4,
     category: 'Airtime & Cable',
     comment: 'Cable TV subscription (DSTV/GOTV) dina ya dawo nan take. Wanta yayi kyau sosai.',
@@ -116,6 +124,8 @@ export default function ReviewsScreen() {
   const [newCategory, setNewCategory] = useState('General Support');
   const [newComment, setNewComment] = useState('');
   const [userName, setUserName] = useState('');
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [likedReviews, setLikedReviews] = useState<Record<string, boolean>>({});
 
@@ -128,9 +138,11 @@ export default function ReviewsScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-        if (profile?.full_name) {
-          setUserName(profile.full_name);
+        const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url, role').eq('id', user.id).single();
+        if (profile) {
+          if (profile.full_name) setUserName(profile.full_name);
+          if (profile.avatar_url) setUserAvatar(profile.avatar_url);
+          if (profile.role === 'admin' || profile.role === 'super_admin') setIsAdmin(true);
         }
       }
     } catch (e) {
@@ -240,9 +252,31 @@ export default function ReviewsScreen() {
   const fiveStarCount = reviews.filter(r => r.rating === 5).length;
   const fourStarCount = reviews.filter(r => r.rating === 4).length;
 
+  const handleDeleteReview = (id: string) => {
+    Alert.alert(
+      'Delete Review',
+      'Are you sure you want to delete this review?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            setReviews(prev => prev.filter(r => r.id !== id));
+            try {
+              await supabase.from('reviews').delete().eq('id', id);
+            } catch (e) {
+              console.log('Error deleting review:', e);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={s.container}>
-      {/* Header */}
+        {/* Header */}
       <LinearGradient colors={[COLORS.navy, COLORS.navyMid]} style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
@@ -251,6 +285,14 @@ export default function ReviewsScreen() {
           <Text style={s.headerTitle}>Customer Reviews & Ratings</Text>
           <Text style={s.headerSubTitle}>See what our users say about Abu Mafhal Sub</Text>
         </View>
+
+        {isAdmin && (
+          <TouchableOpacity style={[s.writeBtnHeader, { backgroundColor: '#f1f5f9', marginRight: 8 }]} onPress={() => router.push('/manage/reviews')}>
+            <Ionicons name="settings-outline" size={15} color={COLORS.navy} />
+            <Text style={[s.writeBtnHeaderTxt, { color: COLORS.navy }]}>Admin</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={s.writeBtnHeader} onPress={() => setModalVisible(true)}>
           <Ionicons name="create-outline" size={16} color={COLORS.navy} />
           <Text style={s.writeBtnHeaderTxt}>Review</Text>
@@ -358,9 +400,13 @@ export default function ReviewsScreen() {
           filteredReviews.map((item) => (
             <View key={item.id} style={s.reviewCard}>
               <View style={s.cardHeader}>
-                <View style={s.avatarBox}>
-                  <Text style={s.avatarTxt}>{item.user_name ? item.user_name.charAt(0).toUpperCase() : 'U'}</Text>
-                </View>
+                {item.avatar_url ? (
+                  <Image source={{ uri: item.avatar_url }} style={s.avatarImg} />
+                ) : (
+                  <View style={s.avatarBox}>
+                    <Text style={s.avatarTxt}>{item.user_name ? item.user_name.charAt(0).toUpperCase() : 'U'}</Text>
+                  </View>
+                )}
                 
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -388,7 +434,14 @@ export default function ReviewsScreen() {
                   </View>
                 </View>
 
-                <Text style={s.dateTxt}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={s.dateTxt}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                  {isAdmin && (
+                    <TouchableOpacity onPress={() => handleDeleteReview(item.id)} style={{ marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#fef2f2', borderRadius: 4 }}>
+                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: COLORS.error }}>🗑️ Delete</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               <Text style={s.commentTxt}>{item.comment}</Text>
@@ -545,6 +598,7 @@ const s = StyleSheet.create({
 
   reviewCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  avatarImg: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e2e8f0' },
   avatarBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.navy, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { fontSize: 14, fontWeight: 'bold', color: COLORS.gold },
   userName: { fontSize: 13, fontWeight: 'bold', color: COLORS.navy },

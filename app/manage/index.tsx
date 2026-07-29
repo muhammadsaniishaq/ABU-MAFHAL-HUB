@@ -37,6 +37,7 @@ const modules = {
         { title: 'Airtime', icon: 'call-outline', route: '/manage/airtime', color: '#10B981' },
         { title: 'Localization', icon: 'language-outline', route: '/manage/localization', color: '#8B5CF6' },
         { title: 'Bulk SMS', icon: 'chatbubbles-outline', route: '/manage/bulk-sms', color: '#3B82F6' },
+        { title: 'Reviews Control', icon: 'star-outline', route: '/manage/reviews', color: '#F59E0B' },
     ],
     banking: [
         { title: 'Cards', icon: 'card-outline', route: '/manage/cards', color: '#EC4899' },
