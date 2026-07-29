@@ -100,6 +100,12 @@ export default function CACServices() {
   const [regType, setRegType] = useState<Pricing | null>(null);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
+  // TIN & Retrieval Add-on State
+  const [includeTin, setIncludeTin] = useState(false);
+  const [tinFee, setTinFee] = useState(3000);
+  const [rcNumber, setRcNumber] = useState('');
+  const [registrationYear, setRegistrationYear] = useState('');
+
   // Form State
   const [proposedName1, setProposedName1] = useState('');
   const [proposedName2, setProposedName2] = useState('');
@@ -135,17 +141,41 @@ export default function CACServices() {
   const fetchPricing = async () => {
     try {
       setLoading(true);
+      
+      // Fetch TIN Add-on Fee from settings
+      try {
+        const { data: tinSetting } = await supabase.from('app_settings').select('value').eq('key', 'cac_tin_fee').maybeSingle();
+        if (tinSetting && tinSetting.value) {
+          const parsed = parseFloat(tinSetting.value);
+          if (!isNaN(parsed) && parsed >= 0) setTinFee(parsed);
+        }
+      } catch (err) {
+        console.log("Failed to fetch tin setting:", err);
+      }
+
       const { data, error } = await supabase.from('cac_pricing').select('*').eq('active', true).order('price', { ascending: true });
       if (error && error.code !== '42P01') {
         console.error('Error fetching CAC pricing:', error);
       }
-      if (data) {
-        setPricings(data);
-        if (editId) {
-          await loadEditData(editId as string, data);
-        } else if (data.length > 0) {
-          setRegType(data[data.length - 1]); // Default
-        }
+
+      let allPricings: Pricing[] = data ? [...data] : [];
+      
+      // Ensure "CAC Certificate Retrieval" option is available
+      const hasRetrieval = allPricings.some(p => p.name.toLowerCase().includes('retrieval') || p.name.toLowerCase().includes('certificate search'));
+      if (!hasRetrieval) {
+        allPricings.push({
+          id: 'cac-certificate-retrieval-default',
+          name: 'CAC Certificate Retrieval / Document Search',
+          price: 7500
+        });
+      }
+
+      setPricings(allPricings);
+
+      if (editId) {
+        await loadEditData(editId as string, allPricings);
+      } else if (allPricings.length > 0) {
+        setRegType(allPricings[0]); // Default first pricing
       }
     } catch (e) {
       console.error(e);
@@ -172,6 +202,11 @@ export default function CACServices() {
           setOfficeNumber(data.business_info.officeNumber || '');
           setOfficeAddress(data.business_info.officeAddress || '');
           setTenure(data.business_info.tenure || '');
+          setRcNumber(data.business_info.rcNumber || '');
+          setRegistrationYear(data.business_info.registrationYear || '');
+          if (data.business_info.apply_with_tin !== undefined) {
+            setIncludeTin(Boolean(data.business_info.apply_with_tin));
+          }
         }
 
         if (data.proprietors && data.proprietors.length > 0) setProprietors(data.proprietors);
@@ -195,6 +230,7 @@ export default function CACServices() {
   const isNgo = regType?.name?.toLowerCase().includes('ngo');
   const isPartnership = regType?.name?.toLowerCase().includes('partnership');
   const isLimitedLiability = regType?.name?.toLowerCase().includes('limited liability') || regType?.name?.toLowerCase().includes('ltd') || regType?.name?.toLowerCase().includes('share');
+  const isRetrieval = regType?.name?.toLowerCase().includes('retrieval') || regType?.name?.toLowerCase().includes('certificate');
 
   const pickImage = async (setter: Function, field: string) => {
     try {
@@ -355,8 +391,16 @@ export default function CACServices() {
   };
 
   const handleSubmit = async () => {
-    if (!regType) return Alert.alert('Error', 'Please select a registration type');
-    if (!proposedName1 || !proposedName2) return Alert.alert('Error', 'Please enter proposed names');
+    if (!regType) return Alert.alert('Error', 'Please select a service type');
+    
+    if (isRetrieval) {
+      if (!proposedName1.trim()) return Alert.alert('Error', 'Please enter your Registered Business / Company Name');
+      if (!rcNumber.trim()) return Alert.alert('Error', 'Please enter your CAC RC or BN Number');
+    } else {
+      if (!proposedName1.trim() || (!isNgo && !proposedName2.trim())) {
+        return Alert.alert('Error', 'Please enter your proposed business names');
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -364,10 +408,12 @@ export default function CACServices() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const totalCost = regType.price + (includeTin ? tinFee : 0);
+
       // Check balance first before heavy uploads
       const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-      if (!profile || profile.balance < regType.price) {
-        throw new Error(`Insufficient wallet balance. You need ₦${regType.price.toLocaleString()} for this service.`);
+      if (!profile || profile.balance < totalCost) {
+        throw new Error(`Insufficient wallet balance. You need ₦${totalCost.toLocaleString()} for this service.`);
       }
 
       // Process and upload files
@@ -391,12 +437,19 @@ export default function CACServices() {
       }
 
       const businessInfo = {
-        email, phone, natureOfBusiness, state, lga, officeNumber, officeAddress, tenure
+        email, phone, natureOfBusiness, state, lga, officeNumber, officeAddress, tenure,
+        rcNumber: isRetrieval ? rcNumber.trim() : undefined,
+        registrationYear: isRetrieval ? registrationYear.trim() : undefined,
+        apply_with_tin: includeTin,
+        tin_fee: includeTin ? tinFee : 0,
+        base_price: regType.price,
+        total_cost: totalCost,
+        is_retrieval: isRetrieval
       };
 
       const proposedNames = {
         name1: proposedName1,
-        name2: proposedName2,
+        name2: isRetrieval ? proposedName1 : proposedName2,
         name3: proposedName3
       };
 
@@ -412,7 +465,7 @@ export default function CACServices() {
           secretary: uploadedSecretary,
           trustees: uploadedTrustees,
           aims_and_objectives: aims,
-          status: 'pending' // Send back to pending for review
+          status: 'pending'
         }).eq('id', editId);
 
         if (updateError) throw updateError;
@@ -424,7 +477,7 @@ export default function CACServices() {
         return;
       }
 
-      // Call RPC for new requests (charges wallet)
+      // Call RPC for new requests (charges wallet total cost including TIN)
       const { data: rpcData, error: rpcError } = await supabase.rpc('submit_cac_request', {
         p_pricing_id: regType.id,
         p_registration_type: regType.name,
@@ -435,19 +488,19 @@ export default function CACServices() {
         p_secretary: uploadedSecretary,
         p_trustees: uploadedTrustees,
         p_aims_and_objectives: aims,
-        p_cost: regType.price
+        p_cost: totalCost
       });
 
       if (rpcError) throw rpcError;
 
-      Alert.alert('Success', 'CAC Registration submitted successfully!', [
+      Alert.alert('Success', isRetrieval ? 'Certificate Retrieval Request submitted successfully!' : 'CAC Registration submitted successfully!', [
         { text: 'View History', onPress: () => router.push('/cac-history') },
         { text: 'OK', onPress: () => router.back() }
       ]);
       
     } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', e.message || 'Failed to submit registration');
+      Alert.alert('Error', e.message || 'Failed to submit request');
     } finally {
       setSubmitting(false);
     }
@@ -483,16 +536,30 @@ export default function CACServices() {
         </View>
 
         {!editId && (
-          <View style={s.chargeRow}>
-             <Text style={s.chargeRowLabel}>Service Charge:</Text>
-             <Text style={s.chargeRowAmt}>₦{regType?.price ? regType.price.toLocaleString() : '0.00'}</Text>
+          <View style={s.chargeCard}>
+             <View style={s.chargeRow}>
+                <Text style={s.chargeRowLabel}>Base Service Fee:</Text>
+                <Text style={s.chargeRowAmt}>₦{regType?.price ? regType.price.toLocaleString() : '0.00'}</Text>
+             </View>
+             {includeTin && (
+               <View style={[s.chargeRow, { marginTop: 4 }]}>
+                  <Text style={[s.chargeRowLabel, { color: COLORS.goldDk }]}>TIN Processing Add-on:</Text>
+                  <Text style={[s.chargeRowAmt, { color: COLORS.goldDk }]}>+₦{tinFee.toLocaleString()}</Text>
+               </View>
+             )}
+             <View style={[s.chargeRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: '#e2e8f0' }]}>
+                <Text style={[s.chargeRowLabel, { fontWeight: 'bold', color: COLORS.navy }]}>Total Amount Payable:</Text>
+                <Text style={[s.chargeRowAmt, { fontSize: 18, color: COLORS.navy }]}>
+                  ₦{((regType?.price || 0) + (includeTin ? tinFee : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </Text>
+             </View>
           </View>
         )}
 
         <View style={s.formCard}>
           
           <View style={s.inputGroup}>
-            <Text style={s.labelReq}>Registration Type *</Text>
+            <Text style={s.labelReq}>Service / Registration Type *</Text>
             <TouchableOpacity 
               style={[s.dropdownBtn, editId ? { backgroundColor: '#f1f5f9' } : {}]} 
               onPress={() => !editId && setShowTypeDropdown(!showTypeDropdown)}
@@ -519,18 +586,97 @@ export default function CACServices() {
             )}
           </View>
 
-          <View style={s.row}>
-            <View style={s.inputContainer}>
-              <Text style={s.labelReq}>Proposed Name 1 *</Text>
-              <TextInput style={s.input} placeholder="First choice name" value={proposedName1} onChangeText={setProposedName1} />
+          {/* Apply with TIN Checkbox Feature */}
+          <TouchableOpacity 
+            style={[s.tinCard, includeTin && s.tinCardActive]} 
+            onPress={() => setIncludeTin(!includeTin)}
+            activeOpacity={0.8}
+          >
+            <View style={[s.tinCheckbox, includeTin && s.tinCheckboxActive]}>
+              {includeTin && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
             </View>
-            <View style={s.inputContainer}>
-              <Text style={s.labelReq}>Proposed Name 2 *</Text>
-              <TextInput style={s.input} placeholder="Alternative name" value={proposedName2} onChangeText={setProposedName2} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={s.tinTitle}>Apply with TIN (Tax Identification Number)</Text>
+                <View style={s.tinBadge}>
+                  <Text style={s.tinBadgeTxt}>RECOMMENDED</Text>
+                </View>
+              </View>
+              <Text style={s.tinSub}>Process official JTB Tax Identification Number alongside your CAC (+₦{tinFee.toLocaleString()})</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <Text style={s.sectionHeader}>BUSINESS INFORMATION</Text>
+          {isRetrieval ? (
+            /* CAC Certificate Retrieval Specific Form */
+            <>
+              <Text style={s.sectionHeader}>CAC CERTIFICATE RETRIEVAL DETAILS</Text>
+              <View style={s.inputContainer}>
+                <Text style={s.labelReq}>Registered Business / Company Name *</Text>
+                <TextInput 
+                  style={s.input} 
+                  placeholder="e.g. Abu Mafhal Enterprises LTD" 
+                  value={proposedName1} 
+                  onChangeText={setProposedName1} 
+                />
+              </View>
+
+              <View style={s.row}>
+                <View style={s.inputContainer}>
+                  <Text style={s.labelReq}>CAC RC or BN Number *</Text>
+                  <TextInput 
+                    style={s.input} 
+                    placeholder="e.g. BN-1234567 or RC-987654" 
+                    value={rcNumber} 
+                    onChangeText={setRcNumber} 
+                  />
+                </View>
+
+                <View style={s.inputContainer}>
+                  <Text style={s.label}>Registration Year / Date</Text>
+                  <TextInput 
+                    style={s.input} 
+                    placeholder="e.g. 2021 or 15/04/2021" 
+                    value={registrationYear} 
+                    onChangeText={setRegistrationYear} 
+                  />
+                </View>
+              </View>
+
+              <View style={s.row}>
+                <View style={s.inputContainer}>
+                  <Text style={s.label}>Contact Email Address</Text>
+                  <TextInput style={s.input} keyboardType="email-address" value={email} onChangeText={setEmail} />
+                </View>
+                <View style={s.inputContainer}>
+                  <Text style={s.label}>Contact Phone Number</Text>
+                  <TextInput style={s.input} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                </View>
+              </View>
+
+              <Text style={s.sectionHeader}>APPLICANT / BUSINESS OWNER DETAILS</Text>
+              {proprietors.map((_, i) => renderPersonForm(
+                proprietors, 
+                'Business Owner / Applicant', 
+                setProprietors, 
+                true, 
+                i
+              ))}
+            </>
+          ) : (
+            /* Standard CAC Registration Form */
+            <>
+              <View style={s.row}>
+                <View style={s.inputContainer}>
+                  <Text style={s.labelReq}>Proposed Name 1 *</Text>
+                  <TextInput style={s.input} placeholder="First choice name" value={proposedName1} onChangeText={setProposedName1} />
+                </View>
+                <View style={s.inputContainer}>
+                  <Text style={s.labelReq}>Proposed Name 2 *</Text>
+                  <TextInput style={s.input} placeholder="Alternative name" value={proposedName2} onChangeText={setProposedName2} />
+                </View>
+              </View>
+
+              <Text style={s.sectionHeader}>BUSINESS INFORMATION</Text>
 
           {isNgo && (
             <View style={s.row}>
@@ -765,10 +911,20 @@ const s = StyleSheet.create({
   headerSubTitle: { fontSize: 12, color: COLORS.gold, marginTop: 2 },
   historyBtnTop: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245,166,35,0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.gold, gap: 4 },
   historyBtnTxt: { fontSize: 12, fontWeight: 'bold', color: COLORS.gold },
-  chargeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, padding: 14, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  chargeCard: { backgroundColor: COLORS.white, padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  chargeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chargeRowLabel: { fontSize: 13, fontWeight: '700', color: COLORS.navy },
-  chargeRowAmt: { fontSize: 16, fontWeight: '800', color: COLORS.success },
+  chargeRowAmt: { fontSize: 15, fontWeight: '800', color: COLORS.success },
   content: { flex: 1 },
+
+  tinCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 16 },
+  tinCardActive: { backgroundColor: '#fffbeb', borderColor: COLORS.goldDk },
+  tinCheckbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: COLORS.textSub, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
+  tinCheckboxActive: { backgroundColor: COLORS.goldDk, borderColor: COLORS.goldDk },
+  tinTitle: { fontSize: 12, fontWeight: 'bold', color: COLORS.navy },
+  tinSub: { fontSize: 10, color: COLORS.textSub, marginTop: 2, lineHeight: 14 },
+  tinBadge: { backgroundColor: 'rgba(245,166,35,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 },
+  tinBadgeTxt: { fontSize: 8, fontWeight: '900', color: COLORS.goldDk },
   
   infoBanner: { flexDirection: 'row', backgroundColor: '#e0e7ff', padding: 12, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: '#c7d2fe', alignItems: 'center' },
   infoBannerTitle: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginBottom: 2 },

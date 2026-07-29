@@ -42,6 +42,7 @@ export default function ManageCAC() {
   // Pricing state
   const [pricings, setPricings] = useState<any[]>([]);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [tinFeeDraft, setTinFeeDraft] = useState('3000');
 
   // Computed Stats
   const totalRequests = requests.length;
@@ -66,9 +67,39 @@ export default function ManageCAC() {
       } else {
         const { data } = await supabase.from('cac_pricing').select('*').order('price', { ascending: true });
         if (data) setPricings(data);
+        
+        // Fetch TIN Fee from app_settings
+        try {
+          const { data: tinSetting } = await supabase.from('app_settings').select('value').eq('key', 'cac_tin_fee').maybeSingle();
+          if (tinSetting && tinSetting.value) setTinFeeDraft(tinSetting.value);
+        } catch (e) {
+          console.log("Failed to fetch tin fee setting:", e);
+        }
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveTinFee = async () => {
+    const val = parseFloat(tinFeeDraft);
+    if (isNaN(val) || val < 0) return Alert.alert('Error', 'Please enter a valid TIN fee');
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('app_settings').upsert({
+        key: 'cac_tin_fee',
+        value: String(val),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+
+      if (error) throw error;
+      Alert.alert('Success', 'TIN Add-on Fee updated successfully!');
+      fetchData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
     }
@@ -514,7 +545,27 @@ export default function ManageCAC() {
               <Ionicons name="pricetag" size={20} color={COLORS.navy} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={s.infoBannerTitle}>Pricing Management</Text>
-                <Text style={s.infoBannerText}>Set the costs for your CAC services. Enter the new amount and tap Save.</Text>
+                <Text style={s.infoBannerText}>Set the costs for your CAC services and TIN Processing Add-on. Enter the new amount and tap Save.</Text>
+              </View>
+            </View>
+
+            {/* TIN Add-on Fee Configuration Card */}
+            <View style={[s.priceCard, { backgroundColor: '#fffbeb', borderColor: COLORS.gold }]}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[s.priceName, { color: COLORS.navy }]}>TIN Processing Add-on Fee</Text>
+                <Text style={{ fontSize: 10, color: COLORS.textSub, marginTop: 2 }}>Fee charged when users check "Apply with TIN"</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ color: COLORS.textSub, fontWeight: '600' }}>₦</Text>
+                <TextInput 
+                  style={s.priceInput} 
+                  value={tinFeeDraft} 
+                  keyboardType="numeric"
+                  onChangeText={setTinFeeDraft}
+                />
+                <TouchableOpacity style={[s.savePriceBtn, { backgroundColor: COLORS.gold }]} onPress={saveTinFee}>
+                  <Text style={[s.savePriceBtnTxt, { color: COLORS.navy }]}>Save</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -567,11 +618,15 @@ export default function ManageCAC() {
                   <Text style={s.infoLabel}>Choice 1</Text>
                   <Text style={s.infoValue}>{selectedReq.proposed_names?.name1}</Text>
                 </View>
-                <View style={s.infoDivider} />
-                <View style={s.infoRow}>
-                  <Text style={s.infoLabel}>Choice 2</Text>
-                  <Text style={s.infoValue}>{selectedReq.proposed_names?.name2}</Text>
-                </View>
+                {selectedReq.proposed_names?.name2 && selectedReq.proposed_names?.name2 !== selectedReq.proposed_names?.name1 && (
+                  <>
+                    <View style={s.infoDivider} />
+                    <View style={s.infoRow}>
+                      <Text style={s.infoLabel}>Choice 2</Text>
+                      <Text style={s.infoValue}>{selectedReq.proposed_names?.name2}</Text>
+                    </View>
+                  </>
+                )}
                 {selectedReq.proposed_names?.name3 && (
                   <>
                     <View style={s.infoDivider} />
@@ -581,6 +636,33 @@ export default function ManageCAC() {
                     </View>
                   </>
                 )}
+
+                {/* TIN Processing Add-on Indicator */}
+                {selectedReq.business_info?.apply_with_tin && (
+                  <>
+                    <View style={s.infoDivider} />
+                    <View style={s.infoRow}>
+                      <Text style={s.infoLabel}>TIN Processing</Text>
+                      <Text style={[s.infoValue, { color: COLORS.gold, fontWeight: '900' }]}>
+                        YES (+₦{selectedReq.business_info?.tin_fee?.toLocaleString() || '3,000'})
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                {/* RC / BN Number for Certificate Retrieval */}
+                {selectedReq.business_info?.rcNumber && (
+                  <>
+                    <View style={s.infoDivider} />
+                    <View style={s.infoRow}>
+                      <Text style={s.infoLabel}>RC / BN Number</Text>
+                      <Text style={[s.infoValue, { color: COLORS.navy, fontWeight: '900' }]}>
+                        {selectedReq.business_info.rcNumber}
+                      </Text>
+                    </View>
+                  </>
+                )}
+
                 <View style={s.infoDivider} />
                 <View style={s.infoRow}>
                   <Text style={s.infoLabel}>Amount Paid</Text>
