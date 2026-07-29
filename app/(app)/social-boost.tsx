@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicBanners from '../../components/DynamicBanners';
 import { api } from '../../services/api';
 
+import * as Clipboard from 'expo-clipboard';
+
 // Theme Configuration matching the rest of the app
 const T = {
     primary: '#ec4899', 
@@ -48,6 +50,37 @@ export default function SocialBoostScreen() {
     const [modalSearchQuery, setModalSearchQuery] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [walletBalance, setWalletBalance] = useState(0);
+
+    // Custom Decorated Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        visible: boolean;
+        type: 'success' | 'error' | 'info';
+        title: string;
+        message: string;
+        orderId?: string;
+    }>({
+        visible: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info', orderId?: string) => {
+        setAlertModal({ visible: true, type, title, message, orderId });
+    };
+
+    const pasteFromClipboard = async () => {
+        try {
+            const text = await Clipboard.getStringAsync();
+            if (text && text.trim()) {
+                setLink(text.trim());
+            } else {
+                showAlert("Clipboard Empty", "No text link found in your clipboard.", "info");
+            }
+        } catch (err) {
+            console.error("Paste error:", err);
+        }
+    };
 
     const insets = useSafeAreaInsets();
 
@@ -138,24 +171,22 @@ export default function SocialBoostScreen() {
 
     const handleSubmit = () => {
         if (!selectedService) {
-            Platform.OS === 'web' ? alert("Please select a service") : Alert.alert("Error", "Please select a service");
+            showAlert("Service Required", "Please select a boost service type before proceeding.", "info");
             return;
         }
         if (!link.trim()) {
-            Platform.OS === 'web' ? alert("Please enter a valid link") : Alert.alert("Error", "Please enter a valid link");
+            showAlert("Target Link Required", "Please enter or paste a valid post or profile link.", "info");
             return;
         }
         
         const q = parseInt(quantity);
         if (isNaN(q) || q < parseInt(String(selectedService.min)) || q > parseInt(String(selectedService.max))) {
-            const msg = `Quantity must be between ${selectedService.min} and ${selectedService.max}`;
-            Platform.OS === 'web' ? alert(msg) : Alert.alert("Error", msg);
+            showAlert("Invalid Quantity", `Quantity must be between ${selectedService.min} and ${selectedService.max}`, "info");
             return;
         }
 
         if (walletBalance < totalPrice) {
-            const msg = "Please fund your wallet to place this order.";
-            Platform.OS === 'web' ? alert(msg) : Alert.alert("Insufficient Balance", msg);
+            showAlert("Insufficient Wallet Balance", "Please fund your wallet balance to launch this boost order.", "error");
             return;
         }
 
@@ -173,17 +204,7 @@ export default function SocialBoostScreen() {
                 expectedPrice: totalPrice
             });
 
-            const msg = `Your order has been placed successfully. Order ID: ${data.order}`;
-            if (Platform.OS === 'web') {
-                alert(msg);
-                router.push('/social-orders');
-            } else {
-                Alert.alert(
-                    "Success!",
-                    msg,
-                    [{ text: "OK", onPress: () => router.push('/social-orders') }]
-                );
-            }
+            showAlert("Boost Order Launched!", "Your social boost order has been submitted successfully.", "success", String(data.order || ''));
             
             setLink('');
             setQuantity('');
@@ -191,7 +212,7 @@ export default function SocialBoostScreen() {
             setWalletBalance(prev => prev - totalPrice);
         } catch (error: any) {
             const msg = error.message || "Could not place order";
-            Platform.OS === 'web' ? alert(msg) : Alert.alert("Failed", msg);
+            showAlert("Order Failed", msg, "error");
         } finally {
             setIsSubmitting(false);
             setConfirmModal(false);
@@ -224,35 +245,27 @@ export default function SocialBoostScreen() {
         <View className="flex-1 bg-slate-50">
             <Stack.Screen options={{ headerShown: false }} />
             
-            {/* Premium Header */}
+            {/* Compact Ultra-Sleek Header */}
             <LinearGradient 
                 colors={['#0F172A', '#1E293B', '#334155']} 
-                style={{ paddingTop: insets.top + 10, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
+                style={{ paddingTop: insets.top + 6, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <View className="flex-row items-center justify-between mb-6">
-                    <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/5">
-                        <Ionicons name="chevron-back" size={20} color="#f5a623" />
+                <View className="flex-row items-center justify-between">
+                    <TouchableOpacity onPress={() => router.back()} className="w-9 h-9 rounded-full bg-white/10 items-center justify-center border border-white/5">
+                        <Ionicons name="chevron-back" size={18} color="#f5a623" />
                     </TouchableOpacity>
-                    <Text className="text-white font-bold text-lg">Social Boost</Text>
-                    <TouchableOpacity onPress={() => router.push('/social-orders')} className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/5">
-                        <Ionicons name="receipt-outline" size={18} color="#f5a623" />
+                    <View className="items-center">
+                        <Text className="text-white font-bold text-base">Social Boost</Text>
+                        <View className="flex-row items-center bg-white/10 px-2.5 py-0.5 rounded-full mt-0.5 border border-white/10">
+                            <Ionicons name="wallet-outline" size={10} color="#f5a623" style={{ marginRight: 4 }} />
+                            <Text className="text-[#f5a623] text-[10px] font-extrabold">₦{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity onPress={() => router.push('/social-orders')} className="w-9 h-9 rounded-full bg-white/10 items-center justify-center border border-white/5">
+                        <Ionicons name="receipt-outline" size={16} color="#f5a623" />
                     </TouchableOpacity>
-                </View>
-                
-                {/* Wallet Balance (Compact) */}
-                <View className="bg-white/10 rounded-2xl p-3 border border-white/10 flex-row items-center">
-                    <View className="w-10 h-10 rounded-full bg-[#f5a623]/20 items-center justify-center mr-3">
-                        <Ionicons name="wallet" size={20} color="#f5a623" />
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-slate-300 text-[10px] uppercase font-bold tracking-widest mb-0.5">Available Balance</Text>
-                        <Text className="text-white text-lg font-black tracking-tight">₦{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-                    </View>
-                    <View className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
-                        <Text className="text-[#f5a623] text-[9px] font-bold">FUND</Text>
-                    </View>
                 </View>
             </LinearGradient>
 
@@ -361,15 +374,25 @@ export default function SocialBoostScreen() {
                                                 </View>
                                             )}
                                         </View>
-                                        <TextInput
-                                            className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-800 font-medium border border-slate-200"
-                                            placeholder="Paste profile or post link here (e.g. https://...)"
-                                            placeholderTextColor="#94a3b8"
-                                            value={link}
-                                            onChangeText={setLink}
-                                            autoCapitalize="none"
-                                            autoCorrect={false}
-                                        />
+                                        <View className="flex-row items-center bg-slate-50 rounded-xl px-3 py-1 border border-slate-200">
+                                            <TextInput
+                                                className="flex-1 py-2 text-xs text-slate-800 font-medium"
+                                                placeholder="Paste profile or post link here (e.g. https://...)"
+                                                placeholderTextColor="#94a3b8"
+                                                value={link}
+                                                onChangeText={setLink}
+                                                autoCapitalize="none"
+                                                autoCorrect={false}
+                                            />
+                                            <TouchableOpacity 
+                                                onPress={pasteFromClipboard}
+                                                activeOpacity={0.7}
+                                                className="bg-[#0F172A] px-2.5 py-1.5 rounded-lg border border-slate-700 flex-row items-center"
+                                            >
+                                                <Ionicons name="clipboard-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                                                <Text className="text-[#f5a623] text-[10px] font-bold uppercase">Paste</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
 
                                     <View className="mb-5">
@@ -382,6 +405,20 @@ export default function SocialBoostScreen() {
                                             onChangeText={setQuantity}
                                             keyboardType="numeric"
                                         />
+                                        
+                                        {/* Quick Quantity Selector Chips */}
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row mt-2">
+                                            {['100', '500', '1000', '5000', '10000'].map((val) => (
+                                                <TouchableOpacity
+                                                    key={val}
+                                                    onPress={() => setQuantity(val)}
+                                                    activeOpacity={0.7}
+                                                    className="bg-slate-100 px-3 py-1.5 rounded-lg mr-2 border border-slate-200"
+                                                >
+                                                    <Text className="text-slate-700 text-[10px] font-bold">+{parseInt(val).toLocaleString()}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
                                     </View>
 
                                     {/* CAC-Style Premium Summary Breakdown */}
@@ -626,6 +663,82 @@ export default function SocialBoostScreen() {
                                     </>
                                 )}
                             </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            {/* Custom Decorated Alert Modal (Replacing Native Alerts) */}
+            <Modal visible={alertModal.visible} animationType="fade" transparent={true}>
+                <View className="flex-1 bg-[#0F172A]/80 justify-center items-center px-6">
+                    <View className="bg-slate-900 w-full max-w-sm rounded-3xl p-6 border border-slate-800 shadow-2xl items-center">
+                        <View className={`w-14 h-14 rounded-full items-center justify-center mb-4 border ${
+                            alertModal.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/40' :
+                            alertModal.type === 'error' ? 'bg-rose-500/20 border-rose-500/40' : 'bg-amber-500/20 border-amber-500/40'
+                        }`}>
+                            <Ionicons 
+                                name={
+                                    alertModal.type === 'success' ? 'checkmark-circle' :
+                                    alertModal.type === 'error' ? 'alert-circle' : 'information-circle'
+                                } 
+                                size={32} 
+                                color={
+                                    alertModal.type === 'success' ? '#10b981' :
+                                    alertModal.type === 'error' ? '#f43f5e' : '#f5a623'
+                                } 
+                            />
+                        </View>
+
+                        <Text className="text-white text-lg font-black text-center mb-1.5 tracking-tight">{alertModal.title}</Text>
+                        <Text className="text-slate-300 text-xs font-medium text-center mb-4 leading-5">{alertModal.message}</Text>
+
+                        {alertModal.orderId && (
+                            <View className="bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 flex-row items-center justify-between w-full mb-5">
+                                <Text className="text-slate-400 text-xs font-semibold">Order ID: #{alertModal.orderId}</Text>
+                                <TouchableOpacity 
+                                    onPress={async () => {
+                                        if (alertModal.orderId) {
+                                            await Clipboard.setStringAsync(alertModal.orderId);
+                                            showAlert("Copied!", "Order ID copied to clipboard.", "success");
+                                        }
+                                    }}
+                                    className="flex-row items-center bg-white/10 px-2 py-1 rounded"
+                                >
+                                    <Ionicons name="copy-outline" size={12} color="#f5a623" style={{ marginRight: 3 }} />
+                                    <Text className="text-[#f5a623] text-[9px] font-bold">Copy</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        <View className="flex-row gap-3 w-full">
+                            {alertModal.type === 'success' ? (
+                                <>
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setAlertModal(prev => ({ ...prev, visible: false }));
+                                        }}
+                                        className="flex-1 py-3 rounded-xl bg-slate-800 items-center justify-center border border-slate-700"
+                                    >
+                                        <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider">Close</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setAlertModal(prev => ({ ...prev, visible: false }));
+                                            router.push('/social-orders');
+                                        }}
+                                        className="flex-[1.5] py-3 rounded-xl bg-[#f5a623] items-center justify-center flex-row"
+                                    >
+                                        <Ionicons name="receipt" size={14} color="#0F172A" style={{ marginRight: 4 }} />
+                                        <Text className="text-[#0F172A] text-xs font-black uppercase tracking-wider">View Orders</Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
+                                <TouchableOpacity 
+                                    onPress={() => setAlertModal(prev => ({ ...prev, visible: false }))}
+                                    className="w-full py-3.5 rounded-xl bg-[#0F172A] border border-[#f5a623] items-center justify-center"
+                                >
+                                    <Text className="text-[#f5a623] text-xs font-black uppercase tracking-wider">OK, Got It</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 </View>
