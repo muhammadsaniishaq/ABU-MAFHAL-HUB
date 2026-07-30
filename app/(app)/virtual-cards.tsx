@@ -307,7 +307,7 @@ export default function VirtualCardsScreen() {
                     onPress: async () => {
                         try {
                             setActionLoading(true);
-                            await payvesselCardService.terminateCard(selectedCard.id, selectedCard.user_id);
+                            await payvesselCardService.terminateCard(selectedCard.id, selectedCard.user_id, selectedCard.currency);
                             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             showAlert('Card Terminated 🗑️', 'Card terminated and remaining balance refunded to your main wallet.');
                             loadData();

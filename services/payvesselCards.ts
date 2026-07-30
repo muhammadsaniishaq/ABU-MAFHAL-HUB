@@ -357,13 +357,13 @@ export const payvesselCardService = {
     /**
      * Terminate Card & Refund Balance to Wallet
      */
-    terminateCard: async (cardDbId: string, userId: string, currency: 'USD' | 'NGN') => {
-        const { data: card } = await supabase.from('user_virtual_cards').select('balance').eq('id', cardDbId).single();
+    terminateCard: async (cardDbId: string, userId: string, currency: 'USD' | 'NGN' = 'USD') => {
+        const { data: card } = await supabase.from('user_virtual_cards').select('balance').eq('id', cardDbId).maybeSingle();
         const remainingCardBalance = Number(card?.balance) || 0;
 
         if (remainingCardBalance > 0) {
             const refundNGN = currency === 'USD' ? remainingCardBalance * 1600 : remainingCardBalance;
-            const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
+            const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).maybeSingle();
             const currentWallet = Number(userProfile?.balance) || 0;
 
             await supabase.from('profiles').update({ balance: currentWallet + refundNGN }).eq('id', userId);
