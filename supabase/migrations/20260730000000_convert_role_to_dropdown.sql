@@ -1,5 +1,5 @@
 -- SQL Migration: Convert 'role' column in public.profiles to ENUM Dropdown
--- Dynamically drops all dependent RLS policies across all tables to avoid dependency errors!
+-- Handles all schemas (public, storage, etc.) to safely drop policy dependencies!
 
 DO $$ 
 DECLARE
@@ -10,15 +10,14 @@ BEGIN
         CREATE TYPE public.user_role AS ENUM ('user', 'admin', 'super_admin');
     END IF;
 
-    -- 2. Dynamically find and drop ALL policies on any table that reference 'role'
+    -- 2. Dynamically drop ALL policies across ALL schemas (public, storage) that reference 'role' or 'profiles'
     FOR pol IN 
-        SELECT policyname, tablename 
+        SELECT policyname, tablename, schemaname 
         FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND (qual LIKE '%role%' OR with_check LIKE '%role%')
+        WHERE qual LIKE '%role%' OR with_check LIKE '%role%' OR qual LIKE '%profiles%' OR with_check LIKE '%profiles%'
     LOOP
         BEGIN
-            EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+            EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', pol.policyname, pol.schemaname, pol.tablename);
         EXCEPTION WHEN OTHERS THEN
             NULL;
         END;
@@ -37,14 +36,19 @@ ALTER TABLE public.profiles
   ),
   ALTER COLUMN role SET DEFAULT 'user'::public.user_role;
 
--- 4. Re-create the standard policies
+-- 4. Re-create default policies for public and storage schemas
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cac_pricing') THEN
         EXECUTE 'CREATE POLICY "Admin full access for cac_pricing" ON public.cac_pricing FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role::text IN (''admin'', ''super_admin'')))';
     END IF;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cac_requests') THEN
         EXECUTE 'CREATE POLICY "Admin full access for cac_requests" ON public.cac_requests FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role::text IN (''admin'', ''super_admin'')))';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
+        EXECUTE 'CREATE POLICY "Admin Delete Access for cac_documents" ON storage.objects FOR DELETE USING (bucket_id = ''cac_documents'' AND EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role::text IN (''admin'', ''super_admin'')))';
     END IF;
 END $$;
 
