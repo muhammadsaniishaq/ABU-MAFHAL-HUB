@@ -437,58 +437,58 @@ export default function AdminBento() {
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
                             <TouchableOpacity 
-                                style={[s.quickActionBtn, { backgroundColor: '#78350f', borderColor: '#f5a623' }]}
+                                style={s.superControlCard}
                                 onPress={() => router.push('/manage/super-admin' as any)}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(245, 166, 35, 0.2)' }]}>
-                                    <Ionicons name="ribbon-outline" size={20} color="#f5a623" />
+                                <View style={[s.superIconBox, { backgroundColor: '#fffbeb', borderColor: '#fde68a' }]}>
+                                    <Ionicons name="ribbon" size={22} color="#d97706" />
                                 </View>
-                                <Text style={[s.quickActionLabel, { color: '#ffffff', fontWeight: 'bold' }]}>Master Hub</Text>
+                                <Text style={s.superCardLabel}>Master Hub</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity 
-                                style={[s.quickActionBtn, { backgroundColor: '#1e1b4b', borderColor: '#6366f1' }]}
+                                style={s.superControlCard}
                                 onPress={() => router.push('/manage/staff')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-                                    <Ionicons name="people-outline" size={20} color="#818cf8" />
+                                <View style={[s.superIconBox, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+                                    <Ionicons name="people" size={22} color="#2563eb" />
                                 </View>
-                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Staff & Roles</Text>
+                                <Text style={s.superCardLabel}>Staff & Roles</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity 
-                                style={[s.quickActionBtn, { backgroundColor: '#431407', borderColor: '#f97316' }]}
+                                style={s.superControlCard}
                                 onPress={() => router.push('/manage/features')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(249, 115, 22, 0.2)' }]}>
-                                    <Ionicons name="toggle-outline" size={20} color="#fb923c" />
+                                <View style={[s.superIconBox, { backgroundColor: '#fff7ed', borderColor: '#ffedd5' }]}>
+                                    <Ionicons name="toggle" size={22} color="#ea580c" />
                                 </View>
-                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Feature Flags</Text>
+                                <Text style={s.superCardLabel}>Feature Flags</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity 
-                                style={[s.quickActionBtn, { backgroundColor: '#450a0a', borderColor: '#ef4444' }]}
+                                style={s.superControlCard}
                                 onPress={() => router.push('/manage/security')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
-                                    <Ionicons name="shield-checkmark-outline" size={20} color="#f87171" />
+                                <View style={[s.superIconBox, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+                                    <Ionicons name="shield-checkmark" size={22} color="#16a34a" />
                                 </View>
-                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Security Hub</Text>
+                                <Text style={s.superCardLabel}>Security Hub</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity 
-                                style={[s.quickActionBtn, { backgroundColor: '#78350f', borderColor: '#f5a623' }]}
+                                style={s.superControlCard}
                                 onPress={() => router.push('/manage/panic')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(245, 166, 35, 0.2)' }]}>
-                                    <Ionicons name="warning-outline" size={20} color="#fbbf24" />
+                                <View style={[s.superIconBox, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
+                                    <Ionicons name="warning" size={22} color="#dc2626" />
                                 </View>
-                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Panic Room</Text>
+                                <Text style={s.superCardLabel}>Panic Room</Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
@@ -880,8 +880,37 @@ const s = StyleSheet.create({
     },
     quickActionsScroll: {
         paddingRight: 16,
-        gap: 12,
+        gap: 10,
         marginTop: 8,
+    },
+    superControlCard: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ffffff',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.2)',
+        shadowColor: T.navy,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    superIconBox: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        marginBottom: 6,
+    },
+    superCardLabel: {
+        color: T.navy,
+        fontSize: 10,
+        fontWeight: '800',
     },
     quickActionBtn: {
         alignItems: 'center',
