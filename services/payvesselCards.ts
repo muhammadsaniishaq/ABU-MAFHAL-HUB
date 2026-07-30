@@ -53,7 +53,7 @@ export const payvesselCardService = {
             const apiKey = typeof apiKeyData?.value === 'string' ? apiKeyData.value : apiKeyData?.value?.key || '';
             const secretKey = typeof secretKeyData?.value === 'string' ? secretKeyData.value : secretKeyData?.value?.key || '';
             const businessId = typeof businessIdData?.value === 'string' ? businessIdData.value : businessIdData?.value?.id || '';
-            const cardFee = Number(cardFeeData?.value) || 3.0; // Retail creation fee ($3.00)
+            const cardFee = Number(cardFeeData?.value) || 2.0; // Retail creation fee ($2.00)
 
             return {
                 apiKey,

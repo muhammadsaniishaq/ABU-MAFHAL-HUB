@@ -130,7 +130,7 @@ export default function VirtualCardsScreen() {
 
     // Calculate Wallet Charge Accurately
     const calcCreationWalletCharge = () => {
-        const creationFeeUSD = 3.0;
+        const creationFeeUSD = 2.0; // $2.00 Creation Fee
         const creationFeeNGN = creationFeeUSD * usdRate;
         const initialFund = Number(initialFundAmount) || 0;
 
@@ -141,11 +141,15 @@ export default function VirtualCardsScreen() {
             fundChargeNGN = initialFund;
         }
 
+        const totalNGN = creationFeeNGN + fundChargeNGN;
+        const totalUSD = totalNGN / usdRate;
+
         return {
             creationFeeUSD,
             creationFeeNGN,
             fundChargeNGN,
-            totalNGN: creationFeeNGN + fundChargeNGN
+            totalNGN,
+            totalUSD
         };
     };
 
@@ -761,7 +765,7 @@ export default function VirtualCardsScreen() {
                         style={{ width: '100%', backgroundColor: '#0f172a', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4, flexDirection: 'row', gap: 6 }}
                     >
                         <Ionicons name="card" size={18} color="#ffffff" />
-                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Issue Virtual Card ($3 Fee)</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Issue Virtual Card ($2 Fee)</Text>
                     </TouchableOpacity>
 
                 </ScrollView>
@@ -899,7 +903,7 @@ export default function VirtualCardsScreen() {
                         {/* Initial Funding Chips */}
                         <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Initial Funding Amount ({cardCurrency})</Text>
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                            {['10', '25', '50', '100'].map(val => (
+                            {(cardCurrency === 'USD' ? ['10', '25', '50', '100'] : ['5000', '10000', '25000', '50000']).map(val => (
                                 <TouchableOpacity
                                     key={val}
                                     onPress={() => setInitialFundAmount(val)}
@@ -914,7 +918,7 @@ export default function VirtualCardsScreen() {
                                     }}
                                 >
                                     <Text style={{ color: initialFundAmount === val ? '#d97706' : '#0f172a', fontWeight: '900', fontSize: 12 }}>
-                                        {cardCurrency === 'USD' ? '$' : '₦'}{val}
+                                        {cardCurrency === 'USD' ? `$${val}` : `₦${Number(val).toLocaleString()}`}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -922,7 +926,7 @@ export default function VirtualCardsScreen() {
 
                         <TextInput
                             style={{ backgroundColor: '#f8fafc', color: '#0f172a', padding: 14, borderRadius: 16, fontSize: 16, fontWeight: 'bold', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}
-                            placeholder="Or enter custom amount"
+                            placeholder={`Or enter custom amount in ${cardCurrency}`}
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             value={initialFundAmount}
@@ -932,13 +936,13 @@ export default function VirtualCardsScreen() {
                         {/* ACCURATE TRANSPARENT FEE BREAKDOWN */}
                         <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee ($3.00 USD)</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee ($2.00 USD)</Text>
                                 <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>₦{creationCharges.creationFeeNGN.toLocaleString()}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                                 <Text style={{ color: '#64748b', fontSize: 11 }}>
-                                    Initial Card Funding ({cardCurrency === 'USD' ? `$${initialFundAmount || 0}` : `₦${initialFundAmount || 0}`})
+                                    Initial Card Funding ({cardCurrency === 'USD' ? `$${initialFundAmount || 0}` : `₦${Number(initialFundAmount || 0).toLocaleString()}`})
                                 </Text>
                                 <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>
                                     ₦{creationCharges.fundChargeNGN.toLocaleString()}
@@ -948,10 +952,15 @@ export default function VirtualCardsScreen() {
                             <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 6 }} />
                             
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '900' }}>Total Wallet Charge</Text>
-                                <Text style={{ color: '#d97706', fontSize: 15, fontWeight: '900' }}>
-                                    ₦{creationCharges.totalNGN.toLocaleString()}
-                                </Text>
+                                <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '900' }}>Total Wallet Charge</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={{ color: '#d97706', fontSize: 15, fontWeight: '900' }}>
+                                        ₦{creationCharges.totalNGN.toLocaleString()}
+                                    </Text>
+                                    <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '700', marginTop: 1 }}>
+                                        (~${creationCharges.totalUSD.toFixed(2)} USD)
+                                    </Text>
+                                </View>
                             </View>
                         </View>
 
