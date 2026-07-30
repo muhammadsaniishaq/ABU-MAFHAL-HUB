@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
@@ -50,6 +50,9 @@ export default function VirtualCardsScreen() {
     const [selectedCard, setSelectedCard] = useState<VirtualCard | null>(null);
     const [showFullDetails, setShowFullDetails] = useState(false);
     const [walletBalance, setWalletBalance] = useState(0);
+
+    // Dynamic Exchange Rate
+    const usdRate = Number(settings?.usd_exchange_rate) || 1600;
 
     // Selected Card Skin
     const [activeSkin, setActiveSkin] = useState<'obsidian' | 'sapphire' | 'rose_gold' | 'emerald'>('obsidian');
@@ -105,6 +108,27 @@ export default function VirtualCardsScreen() {
         }
     };
 
+    // Calculate Wallet Charge Accurately
+    const calcCreationWalletCharge = () => {
+        const creationFeeUSD = 3.0; // $3.00 Creation Fee
+        const creationFeeNGN = creationFeeUSD * usdRate;
+        const initialFund = Number(initialFundAmount) || 0;
+
+        let fundChargeNGN = 0;
+        if (cardCurrency === 'USD') {
+            fundChargeNGN = initialFund * usdRate;
+        } else {
+            fundChargeNGN = initialFund; // Already in NGN
+        }
+
+        return {
+            creationFeeUSD,
+            creationFeeNGN,
+            fundChargeNGN,
+            totalNGN: creationFeeNGN + fundChargeNGN
+        };
+    };
+
     const handleCreateCard = async () => {
         const fundNum = Number(initialFundAmount) || 0;
         if (fundNum < 5 && cardCurrency === 'USD') {
@@ -124,7 +148,7 @@ export default function VirtualCardsScreen() {
             });
 
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Virtual Card Created 🎉', `Your Payvessel ${cardCurrency} Virtual Card is now active and ready for international online payments!`);
+            Alert.alert('Virtual Card Created 🎉', `Your Payvessel ${cardCurrency} Virtual Card is now active and ready for online payments!`);
             
             setShowCreateModal(false);
             loadData();
@@ -241,11 +265,12 @@ export default function VirtualCardsScreen() {
     };
 
     const skinTheme = CARD_SKINS[activeSkin];
+    const creationCharges = calcCreationWalletCharge();
 
     return (
         <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
             <Stack.Screen options={{ 
-                title: 'Payvessel Virtual Cards', 
+                title: 'Virtual Cards Studio', 
                 headerTintColor: '#0f172a', 
                 headerStyle: { backgroundColor: '#ffffff' }, 
                 headerTitleStyle: { color: '#0f172a', fontWeight: '900', fontSize: 18 } 
@@ -255,25 +280,75 @@ export default function VirtualCardsScreen() {
             {loading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <ActivityIndicator size="large" color="#d97706" />
-                    <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Virtual Cards...</Text>
+                    <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Virtual Cards Studio...</Text>
                 </View>
             ) : cards.length > 0 && selectedCard ? (
                 <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
                     
-                    {/* Top Wallet Bar */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-                        <View>
-                            <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
-                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
+                    {/* LUXURY ELEGANT TOP HEADER DASHBOARD BAR */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                        
+                        {/* Live Exchange Rate & Active Card Counter Pill */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                            <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 11 }}>🇺🇸</Text>
+                                <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '900' }}>1 USD = ₦{usdRate.toLocaleString()}</Text>
+                            </View>
+
+                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' }} />
+                                <Text style={{ color: '#047857', fontSize: 10, fontWeight: '900' }}>{cards.length} Active Card{cards.length > 1 ? 's' : ''}</Text>
+                            </View>
                         </View>
-                        <TouchableOpacity 
-                            onPress={() => setShowCreateModal(true)}
-                            style={{ backgroundColor: '#0f172a', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
-                        >
-                            <Ionicons name="add-circle" size={18} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>+ New Card</Text>
-                        </TouchableOpacity>
+
+                        {/* Main Wallet Balance Row */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View>
+                                <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 22, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
+                            </View>
+                            <TouchableOpacity 
+                                onPress={() => setShowCreateModal(true)}
+                                style={{ backgroundColor: '#0f172a', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+                            >
+                                <Ionicons name="add-circle" size={18} color="#ffffff" />
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>+ New Card</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
+
+                    {/* Multiple Cards Switcher Tabs */}
+                    {cards.length > 1 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {cards.map((c, i) => (
+                                    <TouchableOpacity
+                                        key={c.id}
+                                        onPress={() => {
+                                            setSelectedCard(c);
+                                            setShowFullDetails(false);
+                                        }}
+                                        style={{
+                                            paddingHorizontal: 14,
+                                            paddingVertical: 8,
+                                            borderRadius: 16,
+                                            backgroundColor: selectedCard.id === c.id ? '#0f172a' : '#ffffff',
+                                            borderWidth: 1,
+                                            borderColor: selectedCard.id === c.id ? '#0f172a' : '#e2e8f0',
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            gap: 6
+                                        }}
+                                    >
+                                        <Ionicons name="card" size={14} color={selectedCard.id === c.id ? '#ffffff' : '#0f172a'} />
+                                        <Text style={{ color: selectedCard.id === c.id ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 11 }}>
+                                            Card #{i + 1} ({c.currency})
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+                    )}
 
                     {/* CARD SKIN CUSTOMIZER SELECTOR */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -499,7 +574,7 @@ export default function VirtualCardsScreen() {
                 </View>
             )}
 
-            {/* MODAL: LIMITS & CONTROLS (GLOBAL FINTECH APP FEATURE) */}
+            {/* MODAL: LIMITS & CONTROLS */}
             <Modal visible={showControlsModal} animationType="slide" transparent presentationStyle="overFullScreen">
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
                     <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
@@ -518,7 +593,6 @@ export default function VirtualCardsScreen() {
                             keyboardType="numeric"
                         />
 
-                        {/* Toggle Switches */}
                         <View style={{ gap: 12, marginBottom: 24 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
                                 <View>
@@ -662,21 +736,28 @@ export default function VirtualCardsScreen() {
                             onChangeText={setInitialFundAmount}
                         />
 
-                        {/* Fee Breakdown */}
+                        {/* ACCURATE TRANSPARENT FEE BREAKDOWN */}
                         <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee</Text>
-                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>$3.00 (₦4,800)</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee ($3.00 USD)</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>₦{creationCharges.creationFeeNGN.toLocaleString()}</Text>
                             </View>
+
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#64748b', fontSize: 11 }}>Initial Card Funding</Text>
-                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>{cardCurrency === 'USD' ? '$' : '₦'}{initialFundAmount || 0}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>
+                                    Initial Card Funding ({cardCurrency === 'USD' ? `$${initialFundAmount || 0}` : `₦${initialFundAmount || 0}`})
+                                </Text>
+                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>
+                                    ₦{creationCharges.fundChargeNGN.toLocaleString()}
+                                </Text>
                             </View>
+
                             <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 6 }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '900' }}>Total Wallet Charge</Text>
-                                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '900' }}>
-                                    ₦{((3 + (Number(initialFundAmount) || 0)) * 1600).toLocaleString()}
+                                <Text style={{ color: '#d97706', fontSize: 15, fontWeight: '900' }}>
+                                    ₦{creationCharges.totalNGN.toLocaleString()}
                                 </Text>
                             </View>
                         </View>
@@ -738,7 +819,7 @@ export default function VirtualCardsScreen() {
 
                         {selectedCard && (
                             <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '900', marginBottom: 20 }}>
-                                Equivalent Wallet Charge: ₦{((Number(fundAmountInput) || 0) * (selectedCard.currency === 'USD' ? 1600 : 1)).toLocaleString()}
+                                Total Wallet Deduction: ₦{((Number(fundAmountInput) || 0) * (selectedCard.currency === 'USD' ? usdRate : 1)).toLocaleString()}
                             </Text>
                         )}
 
