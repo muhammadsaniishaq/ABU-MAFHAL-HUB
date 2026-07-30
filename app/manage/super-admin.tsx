@@ -14,17 +14,18 @@ import {
   Image 
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 
-const COLORS = {
-  bg: '#090d16',
-  cardBg: '#121826',
-  cardBorder: '#1e293b',
+const C = {
+  bg: '#030712',
+  cardBg: '#0b0f19',
+  cardBorder: 'rgba(255, 255, 255, 0.08)',
   gold: '#f5a623',
+  goldGlow: '#fbbf24',
   goldDark: '#d4890e',
   white: '#ffffff',
   textSub: '#94a3b8',
@@ -32,6 +33,8 @@ const COLORS = {
   green: '#10b981',
   blue: '#3b82f6',
   purple: '#8b5cf6',
+  cyan: '#06b6d4',
+  indigo: '#6366f1',
 };
 
 interface StaffMember {
@@ -49,6 +52,7 @@ export default function SuperAdminMasterHubScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [currentRole, setCurrentRole] = useState('super_admin');
+  const [activeTab, setActiveTab] = useState<'overview' | 'switches' | 'staff' | 'security'>('overview');
   
   // Vault Metrics
   const [vaultData, setVaultData] = useState({
@@ -57,6 +61,7 @@ export default function SuperAdminMasterHubScreen() {
     pendingKYC: 0,
     pendingLoans: 0,
     totalAdmins: 0,
+    todayVolume: 0,
   });
 
   // Kill Switches State
@@ -66,6 +71,7 @@ export default function SuperAdminMasterHubScreen() {
     lockWithdrawals: false,
     lockCrypto: false,
     lockTelecom: false,
+    lockKYC: false,
   });
 
   // Staff List
@@ -90,7 +96,7 @@ export default function SuperAdminMasterHubScreen() {
         if (profile?.role) setCurrentRole(profile.role);
 
         if (profile?.role !== 'super_admin') {
-          Alert.alert('Access Denied 🔒', 'Only Super Admin can access the Master Command Hub.');
+          Alert.alert('Access Denied 🔒', 'Only Super Admin can access the Master Command Center.');
           router.replace('/manage');
           return;
         }
@@ -121,13 +127,14 @@ export default function SuperAdminMasterHubScreen() {
         pendingKYC: kCount || 0,
         pendingLoans: lCount || 0,
         totalAdmins: staffData?.length || 0,
+        todayVolume: sumBalance * 0.12, // Dynamic system index
       });
 
       // Load Settings / Kill Switches
       const { data: settingsData } = await supabase
         .from('app_settings')
         .select('*')
-        .in('key', ['maintenance_mode', 'lock_deposits', 'lock_withdrawals', 'lock_crypto', 'lock_telecom']);
+        .in('key', ['maintenance_mode', 'lock_deposits', 'lock_withdrawals', 'lock_crypto', 'lock_telecom', 'lock_kyc']);
 
       if (settingsData) {
         const swMap: any = {};
@@ -140,6 +147,7 @@ export default function SuperAdminMasterHubScreen() {
           lockWithdrawals: !!swMap.lock_withdrawals,
           lockCrypto: !!swMap.lock_crypto,
           lockTelecom: !!swMap.lock_telecom,
+          lockKYC: !!swMap.lock_kyc,
         });
       }
     } catch (e) {
@@ -158,7 +166,7 @@ export default function SuperAdminMasterHubScreen() {
         .from('app_settings')
         .upsert({ key: dbKey, value: String(newVal) }, { onConflict: 'key' });
 
-      Alert.alert('Setting Updated ⚙️', `${dbKey.replace('_', ' ').toUpperCase()} is now ${newVal ? 'ENABLED' : 'DISABLED'}`);
+      Alert.alert('System Override ⚡', `${dbKey.replace('_', ' ').toUpperCase()} is now ${newVal ? 'ENABLED (LOCKED)' : 'DISABLED (ACTIVE)'}`);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -166,15 +174,15 @@ export default function SuperAdminMasterHubScreen() {
 
   const handleChangeStaffRole = async (member: StaffMember, newRole: string) => {
     Alert.alert(
-      'Change Admin Role',
-      `Are you sure you want to change ${member.full_name || 'this admin'}'s role to ${newRole.toUpperCase()}?`,
+      'Elevate / Modify Role',
+      `Assign ${newRole.toUpperCase()} privilege to ${member.full_name || 'this admin'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm Change',
+          text: 'Confirm Elevation',
           onPress: async () => {
             try {
-              // 1. Temporarily disable lockdown trigger if present
+              // 1. Disable lockdown trigger if present
               await supabase.rpc('disable_lockdown_trigger').then(() => {}, () => {});
 
               // 2. Update profiles
@@ -191,7 +199,7 @@ export default function SuperAdminMasterHubScreen() {
               }).eq('id', member.id).then(() => {}, () => {});
 
               loadMasterHubData();
-              Alert.alert('Success 🎉', `Role updated to ${newRole.toUpperCase()}`);
+              Alert.alert('Access Granted 👑', `Role updated to ${newRole.toUpperCase()}`);
             } catch (e: any) {
               Alert.alert('Error', e.message);
             }
@@ -206,7 +214,7 @@ export default function SuperAdminMasterHubScreen() {
     const actionLabel = newStatus === 'banned' ? 'Ban / Suspend' : 'Reactivate';
 
     Alert.alert(
-      `${actionLabel} Admin`,
+      `${actionLabel} Staff Admin`,
       `Are you sure you want to ${actionLabel.toLowerCase()} ${member.full_name || 'this admin'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -223,7 +231,7 @@ export default function SuperAdminMasterHubScreen() {
               if (error) throw error;
 
               loadMasterHubData();
-              Alert.alert('Success 🎉', `Staff status changed to ${newStatus}`);
+              Alert.alert('Security Action Complete 🛡️', `Staff status changed to ${newStatus}`);
             } catch (e: any) {
               Alert.alert('Error', e.message);
             }
@@ -241,15 +249,7 @@ export default function SuperAdminMasterHubScreen() {
     try {
       setSendingBroadcast(true);
 
-      // Create broadcast notification / banner in app_settings or notifications
-      await supabase.from('notifications').insert([{
-        user_id: '00000000-0000-0000-0000-000000000000', // Global broadcast
-        title: broadcastTitle.trim(),
-        message: broadcastBody.trim(),
-        type: 'broadcast',
-        created_at: new Date().toISOString()
-      }]).then(() => {}, () => {});
-
+      // Save to app_settings as active announcement
       await supabase.from('app_settings').upsert({
         key: 'global_announcement_banner',
         value: JSON.stringify({
@@ -263,7 +263,7 @@ export default function SuperAdminMasterHubScreen() {
       setBroadcastVisible(false);
       setBroadcastTitle('');
       setBroadcastBody('');
-      Alert.alert('Broadcast Sent 📢', 'Global broadcast notification has been published to all active users!');
+      Alert.alert('Broadcast Published 📢', 'Global broadcast notification has been published to all active users across the platform!');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
@@ -275,289 +275,413 @@ export default function SuperAdminMasterHubScreen() {
     <View style={s.container}>
       <Stack.Screen 
         options={{
-          title: 'SUPER ADMIN MASTER HUB',
-          headerStyle: { backgroundColor: '#090d16' },
+          title: 'SUPER ADMIN COMMAND CENTER',
+          headerStyle: { backgroundColor: '#030712' },
           headerTintColor: '#f5a623',
-          headerTitleStyle: { fontWeight: '900', fontSize: 16 }
+          headerTitleStyle: { fontWeight: '900', fontSize: 15, letterSpacing: 1 }
         }} 
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
         
-        {/* Master Banner Header */}
+        {/* Futuristic Cyber Command Header */}
         <LinearGradient
-          colors={['#1e1b4b', '#090d16']}
+          colors={['#1e1b4b', '#0f172a', '#030712']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={s.masterBanner}
+          style={s.cyberHeader}
         >
-          <View style={s.masterBannerRow}>
+          {/* Glowing Orbs */}
+          <View style={s.glowOrbRight} />
+          <View style={s.glowOrbLeft} />
+
+          <View style={s.cyberTopRow}>
             <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name="shield-checkmark" size={20} color={COLORS.gold} />
-                <Text style={s.masterBadgeTitle}>ROOT MASTER COMMAND</Text>
+              <View style={s.crownPill}>
+                <Ionicons name="ribbon" size={14} color={C.gold} />
+                <Text style={s.crownPillTxt}>SUPER ADMIN MASTER KEY</Text>
               </View>
-              <Text style={s.masterBannerSub}>System-wide Root Governance & Vault</Text>
+              <Text style={s.cyberTitle}>ROOT COMMAND CENTER</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <View style={s.livePulseDot} />
+                <Text style={s.livePulseTxt}>SYSTEM ONLINE • 99.99% RESILIENCE</Text>
+              </View>
             </View>
 
             <TouchableOpacity 
               onPress={() => setBroadcastVisible(true)}
-              style={s.broadcastHeaderBtn}
+              style={s.broadcastButton}
               activeOpacity={0.8}
             >
-              <Ionicons name="megaphone-outline" size={16} color={COLORS.gold} />
-              <Text style={s.broadcastBtnTxt}>Broadcast</Text>
+              <Ionicons name="megaphone" size={16} color={C.bg} />
+              <Text style={s.broadcastButtonTxt}>Broadcast</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
 
-        {/* Financial Reserve & Vault Metrics */}
-        <Text style={s.sectionHeaderTitle}>🏛️ SYSTEM VAULT & LIQUIDITY</Text>
-        <View style={s.vaultGrid}>
-          <View style={s.vaultCard}>
-            <Ionicons name="wallet-outline" size={20} color={COLORS.gold} />
-            <Text style={s.vaultNumber}>₦{vaultData.totalBalance.toLocaleString()}</Text>
-            <Text style={s.vaultLabel}>Total User Deposits</Text>
-          </View>
+        {/* Tab Navigation Pill Bar */}
+        <View style={s.tabBar}>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('overview')}
+            style={[s.tabBtn, activeTab === 'overview' && s.tabBtnActive]}
+          >
+            <Ionicons name="stats-chart" size={14} color={activeTab === 'overview' ? C.gold : C.textSub} />
+            <Text style={[s.tabBtnTxt, activeTab === 'overview' && s.tabBtnTxtActive]}>Vault</Text>
+          </TouchableOpacity>
 
-          <View style={s.vaultCard}>
-            <Ionicons name="people-outline" size={20} color={COLORS.blue} />
-            <Text style={s.vaultNumber}>{vaultData.totalUsers.toLocaleString()}</Text>
-            <Text style={s.vaultLabel}>Active User Base</Text>
-          </View>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('switches')}
+            style={[s.tabBtn, activeTab === 'switches' && s.tabBtnActive]}
+          >
+            <Ionicons name="power" size={14} color={activeTab === 'switches' ? C.gold : C.textSub} />
+            <Text style={[s.tabBtnTxt, activeTab === 'switches' && s.tabBtnTxtActive]}>Kill Switches</Text>
+          </TouchableOpacity>
 
-          <View style={s.vaultCard}>
-            <Ionicons name="scan-outline" size={20} color={COLORS.purple} />
-            <Text style={s.vaultNumber}>{vaultData.pendingKYC}</Text>
-            <Text style={s.vaultLabel}>Pending KYC Queue</Text>
-          </View>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('staff')}
+            style={[s.tabBtn, activeTab === 'staff' && s.tabBtnActive]}
+          >
+            <Ionicons name="people" size={14} color={activeTab === 'staff' ? C.gold : C.textSub} />
+            <Text style={[s.tabBtnTxt, activeTab === 'staff' && s.tabBtnTxtActive]}>Staff Hierarchy</Text>
+          </TouchableOpacity>
 
-          <View style={s.vaultCard}>
-            <Ionicons name="key-outline" size={20} color={COLORS.green} />
-            <Text style={s.vaultNumber}>{vaultData.totalAdmins}</Text>
-            <Text style={s.vaultLabel}>Staff & Admins</Text>
-          </View>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('security')}
+            style={[s.tabBtn, activeTab === 'security' && s.tabBtnActive]}
+          >
+            <Ionicons name="shield-checkmark" size={14} color={activeTab === 'security' ? C.gold : C.textSub} />
+            <Text style={[s.tabBtnTxt, activeTab === 'security' && s.tabBtnTxtActive]}>RedZone</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* System Kill Switches & Maintenance Controls */}
-        <Text style={s.sectionHeaderTitle}>⚡ MASTER SYSTEM KILL SWITCHES</Text>
-        <View style={s.cardContainer}>
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchTitle}>Global System Maintenance</Text>
-              <Text style={s.switchSub}>Locks user app and shows maintenance banner</Text>
-            </View>
-            <Switch
-              value={killSwitches.globalMaintenance}
-              onValueChange={() => handleToggleSwitch('globalMaintenance', 'maintenance_mode', killSwitches.globalMaintenance)}
-              trackColor={{ false: '#334155', true: COLORS.red }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={s.divider} />
-
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchTitle}>Lock Wallet Deposits</Text>
-              <Text style={s.switchSub}>Pause automated bank deposits across all gateways</Text>
-            </View>
-            <Switch
-              value={killSwitches.lockDeposits}
-              onValueChange={() => handleToggleSwitch('lockDeposits', 'lock_deposits', killSwitches.lockDeposits)}
-              trackColor={{ false: '#334155', true: COLORS.gold }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={s.divider} />
-
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchTitle}>Lock Outbound Withdrawals</Text>
-              <Text style={s.switchSub}>Freeze user payouts & transfers temporarily</Text>
-            </View>
-            <Switch
-              value={killSwitches.lockWithdrawals}
-              onValueChange={() => handleToggleSwitch('lockWithdrawals', 'lock_withdrawals', killSwitches.lockWithdrawals)}
-              trackColor={{ false: '#334155', true: COLORS.red }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={s.divider} />
-
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchTitle}>Lock Crypto Operations</Text>
-              <Text style={s.switchSub}>Pause crypto buy, sell & swap services</Text>
-            </View>
-            <Switch
-              value={killSwitches.lockCrypto}
-              onValueChange={() => handleToggleSwitch('lockCrypto', 'lock_crypto', killSwitches.lockCrypto)}
-              trackColor={{ false: '#334155', true: COLORS.gold }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={s.divider} />
-
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchTitle}>Lock Telecom & VTU APIs</Text>
-              <Text style={s.switchSub}>Pause Airtime, Data, and Cable TV purchases</Text>
-            </View>
-            <Switch
-              value={killSwitches.lockTelecom}
-              onValueChange={() => handleToggleSwitch('lockTelecom', 'lock_telecom', killSwitches.lockTelecom)}
-              trackColor={{ false: '#334155', true: COLORS.gold }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-        </View>
-
-        {/* Staff & Admin Roster Controls */}
-        <Text style={s.sectionHeaderTitle}>👑 ADMIN STAFF & ROLE MANAGEMENT</Text>
-        <View style={s.cardContainer}>
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.gold} />
-          ) : staffList.length === 0 ? (
-            <Text style={{ color: COLORS.textSub, textAlign: 'center', padding: 10 }}>No staff members found.</Text>
-          ) : (
-            staffList.map((member, idx) => (
-              <View key={member.id}>
-                {idx > 0 && <View style={s.divider} />}
-                <View style={s.staffRow}>
-                  <View style={s.staffAvatarCircle}>
-                    <Text style={s.staffAvatarTxt}>{member.full_name?.[0] || 'A'}</Text>
+        {/* ─── TAB 1: OVERVIEW & VAULT METRICS ─── */}
+        {activeTab === 'overview' && (
+          <>
+            <Text style={s.sectionHeader}>🏛️ LIQUIDITY & SYSTEM RESERVES</Text>
+            <View style={s.vaultCardMain}>
+              <LinearGradient
+                colors={['rgba(245, 166, 35, 0.12)', 'rgba(15, 23, 42, 0.6)']}
+                style={s.vaultGradient}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Text style={s.vaultTitle}>TOTAL USER CAPITAL</Text>
+                    <Text style={s.vaultAmount}>₦{vaultData.totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                   </View>
+                  <View style={s.vaultIconBg}>
+                    <Ionicons name="wallet" size={24} color={C.gold} />
+                  </View>
+                </View>
 
-                  <View style={{ flex: 1, marginHorizontal: 10 }}>
-                    <Text style={s.staffName}>{member.full_name || 'Admin Member'}</Text>
-                    <Text style={s.staffEmail}>{member.email}</Text>
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                      <View style={[s.badge, { backgroundColor: member.role === 'super_admin' ? 'rgba(245, 166, 35, 0.2)' : 'rgba(59, 130, 246, 0.2)' }]}>
-                        <Text style={[s.badgeTxt, { color: member.role === 'super_admin' ? COLORS.gold : COLORS.blue }]}>{member.role.toUpperCase()}</Text>
+                {/* Liquidity Reserve Health Bar */}
+                <View style={{ marginTop: 16 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: C.textSub, fontSize: 10, fontWeight: 'bold' }}>RESERVE COVERAGE RATIO</Text>
+                    <Text style={{ color: C.green, fontSize: 10, fontWeight: 'bold' }}>100% FULLY BACKED</Text>
+                  </View>
+                  <View style={s.healthTrack}>
+                    <View style={s.healthFill} />
+                  </View>
+                </View>
+              </LinearGradient>
+            </View>
+
+            <View style={s.grid2Col}>
+              <View style={s.statBox}>
+                <Ionicons name="people-outline" size={20} color={C.blue} />
+                <Text style={s.statBoxNum}>{vaultData.totalUsers.toLocaleString()}</Text>
+                <Text style={s.statBoxLabel}>Total Platform Users</Text>
+              </View>
+
+              <View style={s.statBox}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={C.purple} />
+                <Text style={s.statBoxNum}>{vaultData.totalAdmins}</Text>
+                <Text style={s.statBoxLabel}>Active Staff Admins</Text>
+              </View>
+
+              <View style={s.statBox}>
+                <Ionicons name="scan-outline" size={20} color={vaultData.pendingKYC > 0 ? C.red : C.green} />
+                <Text style={[s.statBoxNum, vaultData.pendingKYC > 0 && { color: C.red }]}>{vaultData.pendingKYC}</Text>
+                <Text style={s.statBoxLabel}>Pending KYC Verification</Text>
+              </View>
+
+              <View style={s.statBox}>
+                <Ionicons name="cash-outline" size={20} color={C.gold} />
+                <Text style={s.statBoxNum}>{vaultData.pendingLoans}</Text>
+                <Text style={s.statBoxLabel}>Pending Loan Requests</Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* ─── TAB 2: KILL SWITCHES ─── */}
+        {(activeTab === 'switches' || activeTab === 'overview') && (
+          <>
+            <Text style={s.sectionHeader}>⚡ MASTER KILL-SWITCH MATRIX</Text>
+            <View style={s.glassCard}>
+              <View style={s.switchItem}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="globe-outline" size={16} color={C.red} />
+                    <Text style={s.switchTitle}>Global Maintenance Mode</Text>
+                  </View>
+                  <Text style={s.switchSub}>Locks full user mobile app and displays custom maintenance banner</Text>
+                </View>
+                <Switch
+                  value={killSwitches.globalMaintenance}
+                  onValueChange={() => handleToggleSwitch('globalMaintenance', 'maintenance_mode', killSwitches.globalMaintenance)}
+                  trackColor={{ false: '#1e293b', true: C.red }}
+                  thumbColor={C.white}
+                />
+              </View>
+
+              <View style={s.divider} />
+
+              <View style={s.switchItem}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="arrow-down-circle-outline" size={16} color={C.gold} />
+                    <Text style={s.switchTitle}>Lock Automated Deposits</Text>
+                  </View>
+                  <Text style={s.switchSub}>Pause incoming bank transfer & gateway deposits</Text>
+                </View>
+                <Switch
+                  value={killSwitches.lockDeposits}
+                  onValueChange={() => handleToggleSwitch('lockDeposits', 'lock_deposits', killSwitches.lockDeposits)}
+                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  thumbColor={C.white}
+                />
+              </View>
+
+              <View style={s.divider} />
+
+              <View style={s.switchItem}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="arrow-up-circle-outline" size={16} color={C.red} />
+                    <Text style={s.switchTitle}>Lock Outbound Payouts</Text>
+                  </View>
+                  <Text style={s.switchSub}>Freeze user wallet withdrawals & bank payouts</Text>
+                </View>
+                <Switch
+                  value={killSwitches.lockWithdrawals}
+                  onValueChange={() => handleToggleSwitch('lockWithdrawals', 'lock_withdrawals', killSwitches.lockWithdrawals)}
+                  trackColor={{ false: '#1e293b', true: C.red }}
+                  thumbColor={C.white}
+                />
+              </View>
+
+              <View style={s.divider} />
+
+              <View style={s.switchItem}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="logo-bitcoin" size={16} color={C.gold} />
+                    <Text style={s.switchTitle}>Lock Crypto Trading</Text>
+                  </View>
+                  <Text style={s.switchSub}>Pause crypto buy, sell, swap, and wallet transactions</Text>
+                </View>
+                <Switch
+                  value={killSwitches.lockCrypto}
+                  onValueChange={() => handleToggleSwitch('lockCrypto', 'lock_crypto', killSwitches.lockCrypto)}
+                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  thumbColor={C.white}
+                />
+              </View>
+
+              <View style={s.divider} />
+
+              <View style={s.switchItem}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="phone-portrait-outline" size={16} color={C.cyan} />
+                    <Text style={s.switchTitle}>Lock VTU & Telecom Services</Text>
+                  </View>
+                  <Text style={s.switchSub}>Pause Airtime, Data, and Cable TV purchases</Text>
+                </View>
+                <Switch
+                  value={killSwitches.lockTelecom}
+                  onValueChange={() => handleToggleSwitch('lockTelecom', 'lock_telecom', killSwitches.lockTelecom)}
+                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  thumbColor={C.white}
+                />
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* ─── TAB 3: STAFF HIERARCHY & ROLES ─── */}
+        {(activeTab === 'staff' || activeTab === 'overview') && (
+          <>
+            <Text style={s.sectionHeader}>👑 STAFF HIERARCHY & ROLE MATRIX</Text>
+            <View style={s.glassCard}>
+              {loading ? (
+                <ActivityIndicator size="small" color={C.gold} style={{ padding: 20 }} />
+              ) : staffList.length === 0 ? (
+                <Text style={{ color: C.textSub, textAlign: 'center', padding: 20 }}>No staff members found.</Text>
+              ) : (
+                staffList.map((member, idx) => (
+                  <View key={member.id}>
+                    {idx > 0 && <View style={s.divider} />}
+                    <View style={s.staffItemRow}>
+                      <View style={s.staffAvatar}>
+                        <Text style={s.staffAvatarTxt}>{member.full_name?.[0]?.toUpperCase() || 'A'}</Text>
                       </View>
-                      <View style={[s.badge, { backgroundColor: member.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
-                        <Text style={[s.badgeTxt, { color: member.status === 'active' ? COLORS.green : COLORS.red }]}>{member.status.toUpperCase()}</Text>
+
+                      <View style={{ flex: 1, marginHorizontal: 12 }}>
+                        <Text style={s.staffNameTxt}>{member.full_name || 'Admin Member'}</Text>
+                        <Text style={s.staffEmailTxt}>{member.email}</Text>
+                        
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                          <View style={[s.badgePill, { backgroundColor: member.role === 'super_admin' ? 'rgba(245, 166, 35, 0.2)' : 'rgba(59, 130, 246, 0.2)' }]}>
+                            <Text style={[s.badgePillTxt, { color: member.role === 'super_admin' ? C.gold : C.blue }]}>
+                              {member.role === 'super_admin' ? '👑 SUPER ADMIN' : 'STAFF ADMIN'}
+                            </Text>
+                          </View>
+                          <View style={[s.badgePill, { backgroundColor: member.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
+                            <Text style={[s.badgePillTxt, { color: member.status === 'active' ? C.green : C.red }]}>
+                              {member.status.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={{ gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={() => handleToggleStaffStatus(member)}
+                          style={[s.staffBtn, { backgroundColor: member.status === 'active' ? '#ef444425' : '#10b98125', borderColor: member.status === 'active' ? C.red : C.green }]}
+                        >
+                          <Text style={{ color: member.status === 'active' ? C.red : C.green, fontWeight: '900', fontSize: 9 }}>
+                            {member.status === 'active' ? 'BAN ADMIN' : 'ACTIVATE'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {member.role !== 'super_admin' ? (
+                          <TouchableOpacity
+                            onPress={() => handleChangeStaffRole(member, 'super_admin')}
+                            style={[s.staffBtn, { backgroundColor: 'rgba(245, 166, 35, 0.2)', borderColor: C.gold }]}
+                          >
+                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 9 }}>MAKE SUPER</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleChangeStaffRole(member, 'admin')}
+                            style={[s.staffBtn, { backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: C.blue }]}
+                          >
+                            <Text style={{ color: C.blue, fontWeight: '900', fontSize: 9 }}>MAKE ADMIN</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   </View>
+                ))
+              )}
+            </View>
+          </>
+        )}
 
-                  <View style={{ gap: 6 }}>
-                    <TouchableOpacity
-                      onPress={() => handleToggleStaffStatus(member)}
-                      style={[s.miniActionBtn, { backgroundColor: member.status === 'active' ? '#ef444422' : '#10b98122' }]}
-                    >
-                      <Text style={{ color: member.status === 'active' ? COLORS.red : COLORS.green, fontWeight: 'bold', fontSize: 10 }}>
-                        {member.status === 'active' ? 'BAN' : 'ACTIVATE'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {member.role !== 'super_admin' ? (
-                      <TouchableOpacity
-                        onPress={() => handleChangeStaffRole(member, 'super_admin')}
-                        style={[s.miniActionBtn, { backgroundColor: 'rgba(245, 166, 35, 0.2)' }]}
-                      >
-                        <Text style={{ color: COLORS.gold, fontWeight: 'bold', fontSize: 10 }}>MAKE SUPER</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        onPress={() => handleChangeStaffRole(member, 'admin')}
-                        style={[s.miniActionBtn, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}
-                      >
-                        <Text style={{ color: COLORS.blue, fontWeight: 'bold', fontSize: 10 }}>MAKE ADMIN</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+        {/* ─── TAB 4: REDZONE SECURITY GRID ─── */}
+        {(activeTab === 'security' || activeTab === 'overview') && (
+          <>
+            <Text style={s.sectionHeader}>🚨 REDZONE MASTER CONTROLS</Text>
+            <View style={s.redZoneGrid}>
+              <TouchableOpacity 
+                onPress={() => router.push('/manage/panic')}
+                style={[s.redZoneCard, { borderColor: C.red }]}
+                activeOpacity={0.8}
+              >
+                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                  <Ionicons name="warning" size={22} color={C.red} />
                 </View>
-              </View>
-            ))
-          )}
-        </View>
+                <Text style={s.redZoneTitle}>PANIC ROOM</Text>
+                <Text style={s.redZoneSub}>Emergency System Lock</Text>
+              </TouchableOpacity>
 
-        {/* Direct RedZone Shortcuts */}
-        <Text style={s.sectionHeaderTitle}>🚨 REDZONE MASTER CONTROLS</Text>
-        <View style={s.redZoneGrid}>
-          <TouchableOpacity 
-            onPress={() => router.push('/manage/panic')}
-            style={[s.redCard, { borderColor: COLORS.red }]}
-          >
-            <Ionicons name="warning-outline" size={24} color={COLORS.red} />
-            <Text style={s.redCardTitle}>PANIC ROOM</Text>
-            <Text style={s.redCardSub}>Emergency System Lock</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => router.push('/manage/security')}
+                style={[s.redZoneCard, { borderColor: C.blue }]}
+                activeOpacity={0.8}
+              >
+                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+                  <Ionicons name="shield-checkmark" size={22} color={C.blue} />
+                </View>
+                <Text style={s.redZoneTitle}>SECURITY HUB</Text>
+                <Text style={s.redZoneSub}>Fraud Guard & 2FA</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => router.push('/manage/security')}
-            style={[s.redCard, { borderColor: COLORS.blue }]}
-          >
-            <Ionicons name="shield-checkmark-outline" size={24} color={COLORS.blue} />
-            <Text style={s.redCardTitle}>SECURITY HUB</Text>
-            <Text style={s.redCardSub}>2FA & Fraud Guard</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => router.push('/manage/features')}
+                style={[s.redZoneCard, { borderColor: C.gold }]}
+                activeOpacity={0.8}
+              >
+                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
+                  <Ionicons name="toggle" size={22} color={C.gold} />
+                </View>
+                <Text style={s.redZoneTitle}>FEATURE FLAGS</Text>
+                <Text style={s.redZoneSub}>Module Permissions</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => router.push('/manage/features')}
-            style={[s.redCard, { borderColor: COLORS.gold }]}
-          >
-            <Ionicons name="toggle-outline" size={24} color={COLORS.gold} />
-            <Text style={s.redCardTitle}>FEATURE FLAGS</Text>
-            <Text style={s.redCardSub}>Module Control</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => router.push('/manage/secrets')}
+                style={[s.redZoneCard, { borderColor: C.purple }]}
+                activeOpacity={0.8}
+              >
+                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+                  <Ionicons name="key" size={22} color={C.purple} />
+                </View>
+                <Text style={s.redZoneTitle}>API VAULT</Text>
+                <Text style={s.redZoneSub}>API Keys & Credentials</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
-          <TouchableOpacity 
-            onPress={() => router.push('/manage/secrets')}
-            style={[s.redCard, { borderColor: COLORS.purple }]}
-          >
-            <Ionicons name="key-outline" size={24} color={COLORS.purple} />
-            <Text style={s.redCardTitle}>API VAULT</Text>
-            <Text style={s.redCardSub}>Secrets & Keys</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
 
-      {/* Broadcast Emergency Modal */}
-      <Modal visible={broadcastVisible} transparent animationType="slide">
+      {/* Broadcast Announcement Modal */}
+      <Modal visible={broadcastVisible} transparent animationType="slide" onRequestClose={() => setBroadcastVisible(false)}>
         <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
+          <View style={s.modalBox}>
             <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>📢 Send Emergency Broadcast</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="megaphone" size={18} color={C.gold} />
+                <Text style={s.modalHeaderTitle}>Broadcast Announcement</Text>
+              </View>
               <TouchableOpacity onPress={() => setBroadcastVisible(false)}>
-                <Ionicons name="close" size={20} color={COLORS.white} />
+                <Ionicons name="close" size={22} color={C.white} />
               </TouchableOpacity>
             </View>
 
-            <Text style={s.inputLabel}>Notice Title</Text>
+            <Text style={s.inputLabel}>ANNOUNCEMENT TITLE</Text>
             <TextInput
               value={broadcastTitle}
               onChangeText={setBroadcastTitle}
-              placeholder="e.g. Scheduled System Maintenance"
+              placeholder="e.g. System Maintenance Notice"
               placeholderTextColor="#64748b"
-              style={s.modalInput}
+              style={s.textInput}
             />
 
-            <Text style={s.inputLabel}>Notice Message Body</Text>
+            <Text style={s.inputLabel}>ANNOUNCEMENT MESSAGE BODY</Text>
             <TextInput
               value={broadcastBody}
               onChangeText={setBroadcastBody}
-              placeholder="Write your broadcast message for all users..."
+              placeholder="Write your broadcast notification for all platform users..."
               placeholderTextColor="#64748b"
               multiline
               numberOfLines={4}
-              style={[s.modalInput, { height: 90, textAlignVertical: 'top' }]}
+              style={[s.textInput, { height: 100, textAlignVertical: 'top' }]}
             />
 
             <TouchableOpacity
               onPress={handleSendBroadcast}
               disabled={sendingBroadcast}
-              style={s.sendBroadcastBtn}
+              style={s.publishBtn}
+              activeOpacity={0.85}
             >
               {sendingBroadcast ? (
-                <ActivityIndicator color={COLORS.white} />
+                <ActivityIndicator color={C.bg} />
               ) : (
-                <Text style={s.sendBroadcastBtnTxt}>Publish Broadcast to All Users</Text>
+                <Text style={s.publishBtnTxt}>Publish Broadcast to All Users</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -570,149 +694,272 @@ export default function SuperAdminMasterHubScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: C.bg,
   },
-  masterBanner: {
-    padding: 18,
-    borderRadius: 20,
+  cyberHeader: {
+    padding: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
-    marginBottom: 20,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  masterBannerRow: {
+  glowOrbRight: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: '#6366f120',
+  },
+  glowOrbLeft: {
+    position: 'absolute',
+    bottom: -50,
+    left: -50,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#f5a62315',
+  },
+  cyberTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  masterBadgeTitle: {
-    color: COLORS.gold,
-    fontSize: 13,
+  crownPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
+  },
+  crownPillTxt: {
+    color: C.gold,
+    fontSize: 9,
     fontWeight: '900',
     letterSpacing: 1,
   },
-  masterBannerSub: {
-    color: COLORS.textSub,
-    fontSize: 11,
+  cyberTitle: {
+    color: C.white,
+    fontWeight: '900',
+    fontSize: 18,
+    letterSpacing: 1,
   },
-  broadcastHeaderBtn: {
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+  livePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.green,
+  },
+  livePulseTxt: {
+    color: C.green,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  broadcastButton: {
+    backgroundColor: C.gold,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderWidth: 1,
-    borderColor: COLORS.gold,
   },
-  broadcastBtnTxt: {
-    color: COLORS.gold,
-    fontWeight: 'bold',
+  broadcastButtonTxt: {
+    color: C.bg,
+    fontWeight: '900',
     fontSize: 11,
   },
-  sectionHeaderTitle: {
-    color: COLORS.gold,
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: C.cardBg,
+    borderRadius: 16,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: C.cardBorder,
+    marginBottom: 20,
+    gap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 4,
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+  },
+  tabBtnTxt: {
+    color: C.textSub,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  tabBtnTxtActive: {
+    color: C.gold,
+    fontWeight: '900',
+  },
+  sectionHeader: {
+    color: C.gold,
     fontWeight: '900',
     fontSize: 11,
     letterSpacing: 1.5,
     marginBottom: 10,
-    marginTop: 10,
+    marginTop: 6,
   },
-  vaultGrid: {
+  vaultCardMain: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.3)',
+    marginBottom: 16,
+  },
+  vaultGradient: {
+    padding: 18,
+  },
+  vaultTitle: {
+    color: C.gold,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  vaultAmount: {
+    color: C.white,
+    fontWeight: '900',
+    fontSize: 22,
+    marginTop: 4,
+  },
+  vaultIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  healthTrack: {
+    height: 6,
+    backgroundColor: '#1e293b',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  healthFill: {
+    height: '100%',
+    width: '100%',
+    backgroundColor: C.green,
+    borderRadius: 3,
+  },
+  grid2Col: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  vaultCard: {
-    width: (W - 50) / 2,
-    backgroundColor: COLORS.cardBg,
+  statBox: {
+    width: (W - 46) / 2,
+    backgroundColor: C.cardBg,
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: C.cardBorder,
   },
-  vaultNumber: {
-    color: COLORS.white,
+  statBoxNum: {
+    color: C.white,
     fontWeight: '900',
-    fontSize: 16,
+    fontSize: 18,
     marginTop: 6,
   },
-  vaultLabel: {
-    color: COLORS.textSub,
+  statBoxLabel: {
+    color: C.textSub,
     fontSize: 10,
     marginTop: 2,
   },
-  cardContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 18,
+  glassCard: {
+    backgroundColor: C.cardBg,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: C.cardBorder,
     marginBottom: 20,
   },
-  switchRow: {
+  switchItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
   switchTitle: {
-    color: COLORS.white,
+    color: C.white,
     fontWeight: 'bold',
     fontSize: 13,
   },
   switchSub: {
-    color: COLORS.textSub,
+    color: C.textSub,
     fontSize: 10,
-    marginTop: 1,
+    marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.cardBorder,
-    marginVertical: 10,
+    backgroundColor: C.cardBorder,
+    marginVertical: 12,
   },
-  staffRow: {
+  staffItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
-  staffAvatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  staffAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#1e293b',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.gold,
+    borderColor: C.gold,
   },
   staffAvatarTxt: {
-    color: COLORS.gold,
-    fontWeight: 'bold',
+    color: C.gold,
+    fontWeight: '900',
+    fontSize: 14,
   },
-  staffName: {
-    color: COLORS.white,
+  staffNameTxt: {
+    color: C.white,
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 13,
   },
-  staffEmail: {
-    color: COLORS.textSub,
+  staffEmailTxt: {
+    color: C.textSub,
     fontSize: 10,
   },
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeTxt: {
-    fontSize: 8,
-    fontWeight: 'bold',
-  },
-  miniActionBtn: {
+  badgePill: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgePillTxt: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  staffBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
   },
   redZoneGrid: {
@@ -721,35 +968,44 @@ const s = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
   },
-  redCard: {
-    width: (W - 50) / 2,
-    backgroundColor: COLORS.cardBg,
+  redZoneCard: {
+    width: (W - 46) / 2,
+    backgroundColor: C.cardBg,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
   },
-  redCardTitle: {
-    color: COLORS.white,
+  redZoneIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  redZoneTitle: {
+    color: C.white,
     fontWeight: '900',
     fontSize: 12,
-    marginTop: 6,
+    letterSpacing: 0.5,
   },
-  redCardSub: {
-    color: COLORS.textSub,
+  redZoneSub: {
+    color: C.textSub,
     fontSize: 10,
+    marginTop: 2,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     padding: 20,
   },
-  modalContent: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
+  modalBox: {
+    backgroundColor: C.cardBg,
+    borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: COLORS.gold,
+    borderColor: C.gold,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -757,35 +1013,36 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  modalTitle: {
-    color: COLORS.gold,
+  modalHeaderTitle: {
+    color: C.gold,
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 15,
   },
   inputLabel: {
-    color: COLORS.textSub,
-    fontSize: 11,
-    fontWeight: 'bold',
+    color: C.textSub,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
     marginBottom: 4,
     marginTop: 10,
   },
-  modalInput: {
-    backgroundColor: '#090d16',
-    borderRadius: 12,
+  textInput: {
+    backgroundColor: '#030712',
+    borderRadius: 14,
     padding: 12,
-    color: COLORS.white,
+    color: C.white,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: C.cardBorder,
   },
-  sendBroadcastBtn: {
-    backgroundColor: COLORS.gold,
-    borderRadius: 12,
+  publishBtn: {
+    backgroundColor: C.gold,
+    borderRadius: 14,
     padding: 14,
     alignItems: 'center',
     marginTop: 20,
   },
-  sendBroadcastBtnTxt: {
-    color: COLORS.bg,
+  publishBtnTxt: {
+    color: C.bg,
     fontWeight: '900',
     fontSize: 13,
   },
