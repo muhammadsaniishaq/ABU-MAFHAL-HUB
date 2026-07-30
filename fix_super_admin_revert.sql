@@ -1,6 +1,6 @@
--- Promote muhammadsaniisyaku3@gmail.com to Super Admin & sync with Auth metadata
+-- Direct Force Update for muhammadsaniisyaku3@gmail.com
 
--- 1. Create automatic trigger so role changes in Table Editor NEVER revert back
+-- 1. Attach automatic sync trigger
 CREATE OR REPLACE FUNCTION public.sync_user_role_to_auth()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -24,15 +24,21 @@ CREATE TRIGGER trigger_sync_user_role
     FOR EACH ROW
     EXECUTE FUNCTION public.sync_user_role_to_auth();
 
--- 2. Promote muhammadsaniisyaku3@gmail.com to super_admin in BOTH tables
+-- 2. Force Update role in profiles (Case-insensitive email match)
 UPDATE public.profiles 
-SET role = 'super_admin' 
-WHERE email = 'muhammadsaniisyaku3@gmail.com';
+SET role = 'super_admin'
+WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
 
+-- 3. Force Update role in auth.users
 UPDATE auth.users 
 SET raw_app_meta_data = jsonb_set(
     coalesce(raw_app_meta_data, '{}'::jsonb), 
     '{role}', 
     '"super_admin"'
 )
-WHERE email = 'muhammadsaniisyaku3@gmail.com';
+WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
+
+-- 4. Display result in SQL Editor so you can verify immediately!
+SELECT id, email, full_name, role 
+FROM public.profiles 
+WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
