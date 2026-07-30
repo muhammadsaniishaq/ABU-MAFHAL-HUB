@@ -1,4 +1,4 @@
--- SQL Script to convert 'role' column to ENUM Dropdown in Supabase Table Editor
+-- Complete SQL Script with policy cleanup to enable ENUM Dropdown in Supabase
 
 -- Step 1: Drop the existing default on 'role' column first
 ALTER TABLE public.profiles ALTER COLUMN role DROP DEFAULT;
@@ -10,6 +10,11 @@ BEGIN
         CREATE TYPE user_role AS ENUM ('user', 'admin', 'super_admin');
     END IF;
 END $$;
+
+-- Step 2.5: Drop policies blocking the column type change
+DROP POLICY IF EXISTS "Admin Delete Access for cac_documents" ON storage.objects;
+DROP POLICY IF EXISTS "Admin full access for cac_pricing" ON public.cac_pricing;
+DROP POLICY IF EXISTS "Admin full access for cac_requests" ON public.cac_requests;
 
 -- Step 3: Alter column type to user_role
 ALTER TABLE public.profiles 
