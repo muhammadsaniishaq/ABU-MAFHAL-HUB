@@ -432,7 +432,18 @@ export default function VirtualCardsScreen() {
                                     </Text>
                                 </View>
                             </View>
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic' }}>{selectedCard.card_type}</Text>
+                            {selectedCard.card_type === 'VISA' ? (
+                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 }}>
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic', letterSpacing: 2.5, fontFamily: Platform.OS === 'ios' ? 'HelveticaNeue-BoldItalic' : 'sans-serif-condensed' }}>
+                                        VISA
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: -6 }}>
+                                    <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#eb001b', opacity: 0.9 }} />
+                                    <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#f79e1b', opacity: 0.9 }} />
+                                </View>
+                            )}
                         </View>
 
                         {/* Metallic Chip & Contactless Symbol */}
@@ -651,7 +662,11 @@ export default function VirtualCardsScreen() {
                                     <Text style={{ color: '#4ade80', fontSize: 8, fontWeight: '900' }}>ACTIVE</Text>
                                 </View>
                             </View>
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic' }}>VISA</Text>
+                            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 }}>
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic', letterSpacing: 2.5, fontFamily: Platform.OS === 'ios' ? 'HelveticaNeue-BoldItalic' : 'sans-serif-condensed' }}>
+                                    VISA
+                                </Text>
+                            </View>
                         </View>
 
                         {/* Metallic Chip & Contactless Symbol */}
