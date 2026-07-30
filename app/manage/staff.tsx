@@ -1,8 +1,26 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, Modal, FlatList, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
+
+const ADMIN_LOCKABLE_MODULES = [
+    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline' },
+    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline' },
+    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline' },
+    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline' },
+    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline' },
+    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline' },
+    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline' },
+    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline' },
+    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline' },
+    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline' },
+    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline' },
+    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin' },
+    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline' },
+    { key: 'panic', label: 'Panic Room Lockdown', icon: 'warning-outline' },
+    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'people-outline' },
+];
 
 export default function StaffManager() {
     const [staff, setStaff] = useState<any[]>([]);
@@ -129,11 +147,28 @@ export default function StaffManager() {
         );
     };
 
+    const [individualHiddenModules, setIndividualHiddenModules] = useState<string[]>([]);
+
     const openAdminProfile = async (admin: any) => {
         setSelectedAdmin(admin);
         setShowAdminModal(true);
         setLoadingLogs(true);
+        setIndividualHiddenModules([]);
         
+        // Fetch per-admin custom hidden modules
+        try {
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', `admin_hidden_modules_${admin.id}`)
+                .single();
+
+            if (data?.value) {
+                const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                if (Array.isArray(parsed)) setIndividualHiddenModules(parsed);
+            }
+        } catch (e) {}
+
         const { data, error } = await supabase
             .from('audit_logs')
             .select('*')
@@ -143,6 +178,33 @@ export default function StaffManager() {
             
         if (!error) setAdminLogs(data || []);
         setLoadingLogs(false);
+    };
+
+    const toggleIndividualModule = async (adminId: string, moduleKey: string) => {
+        if (currentUserRole !== 'super_admin') {
+            return Alert.alert('Access Restricted 🔒', 'Only Super Admin can change feature permissions for individual staff admins.');
+        }
+
+        try {
+            let updatedList: string[];
+            if (individualHiddenModules.includes(moduleKey)) {
+                updatedList = individualHiddenModules.filter(k => k !== moduleKey);
+            } else {
+                updatedList = [...individualHiddenModules, moduleKey];
+            }
+
+            setIndividualHiddenModules(updatedList);
+
+            await supabase.from('app_settings').upsert({
+                key: `admin_hidden_modules_${adminId}`,
+                value: JSON.stringify(updatedList)
+            }, { onConflict: 'key' });
+
+            const statusLabel = updatedList.includes(moduleKey) ? 'HIDDEN 🙈' : 'ENABLED 👁️';
+            Alert.alert('Individual Permission Updated 🔒', `Feature "${moduleKey.toUpperCase()}" is now ${statusLabel} for ${selectedAdmin?.full_name || 'this admin'}`);
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
     };
 
     return (
@@ -284,51 +346,81 @@ export default function StaffManager() {
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                            </View>
+                             <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+                                {/* 👑 Super Admin Per-Admin Custom Feature Hiding Controls */}
+                                {currentUserRole === 'super_admin' && (
+                                    <View style={{ backgroundColor: '#fffbeb', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fde68a', marginBottom: 20 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <Ionicons name="shield-checkmark" size={16} color="#d97706" />
+                                            <Text style={{ fontWeight: '900', fontSize: 12, color: '#d97706' }}>PER-ADMIN FEATURE ACCESS PERMISSIONS</Text>
+                                        </View>
+                                        <Text style={{ color: '#475569', fontSize: 10, marginBottom: 12, lineHeight: 14 }}>
+                                            Toggle switches below to HIDE or SHOW specific modules for {selectedAdmin.full_name || 'this admin'} ALONE. Only features enabled here will be visible to this admin.
+                                        </Text>
 
-                            {/* Activity Timeline */}
-                            <View className="flex-1 px-6 pt-6">
+                                        {ADMIN_LOCKABLE_MODULES.map(mod => {
+                                            const isHidden = individualHiddenModules.includes(mod.key);
+                                            return (
+                                                <View key={mod.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: 'rgba(217, 119, 6, 0.1)' }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                        <Ionicons name={mod.icon as any} size={16} color={isHidden ? '#ef4444' : '#0f172a'} />
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={{ fontWeight: 'bold', fontSize: 11, color: isHidden ? '#ef4444' : '#0f172a' }}>{mod.label}</Text>
+                                                            <Text style={{ fontSize: 9, fontWeight: '700', color: isHidden ? '#ef4444' : '#10b981' }}>
+                                                                {isHidden ? 'HIDDEN FOR THIS ADMIN 🙈' : 'VISIBLE TO THIS ADMIN 👁️'}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Switch
+                                                        trackColor={{ false: "#22c55e", true: "#ef4444" }}
+                                                        thumbColor="#fff"
+                                                        style={{ transform: [{ scaleX: 0.65 }, { scaleY: 0.65 }] }}
+                                                        onValueChange={() => toggleIndividualModule(selectedAdmin.id, mod.key)}
+                                                        value={isHidden}
+                                                    />
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+
+                                {/* Activity Timeline */}
                                 <Text className="text-slate-800 font-black text-sm uppercase tracking-wider mb-4">Activity Timeline (Logs)</Text>
                                 
                                 {loadingLogs ? (
                                     <ActivityIndicator size="large" color="#0F172A" className="mt-10" />
                                 ) : adminLogs.length === 0 ? (
-                                    <View className="items-center justify-center mt-10">
-                                        <Ionicons name="document-text-outline" size={40} color="#cbd5e1" />
-                                        <Text className="text-slate-400 mt-2 font-medium">No recent actions recorded</Text>
+                                    <View className="items-center justify-center my-6">
+                                        <Ionicons name="document-text-outline" size={32} color="#cbd5e1" />
+                                        <Text className="text-slate-400 mt-2 font-medium text-xs">No recent actions recorded</Text>
                                     </View>
                                 ) : (
-                                    <FlatList 
-                                        data={adminLogs}
-                                        keyExtractor={item => item.id}
-                                        showsVerticalScrollIndicator={false}
-                                        renderItem={({ item }) => (
-                                            <View className="flex-row mb-4">
-                                                <View className="items-center mr-3">
-                                                    <View className="w-2 h-2 rounded-full bg-blue-500 z-10" />
-                                                    <View className="w-0.5 flex-1 bg-slate-200 -my-1" />
-                                                </View>
-                                                <View className="flex-1 bg-white p-4 rounded-xl border border-slate-100 shadow-sm shadow-slate-100">
-                                                    <View className="flex-row justify-between items-center mb-1">
-                                                        <Text className="font-bold text-slate-800 text-[13px]">{item.action}</Text>
-                                                        <Text className="text-[10px] font-bold text-slate-400">
-                                                            {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                        </Text>
-                                                    </View>
-                                                    <Text className="text-slate-500 text-[11px] leading-4">
-                                                        {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
-                                                    </Text>
-                                                    {item.target_resource && (
-                                                        <View className="mt-2 self-start bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
-                                                            <Text className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{item.target_resource}</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
+                                    adminLogs.map(item => (
+                                        <View key={item.id} className="flex-row mb-4">
+                                            <View className="items-center mr-3">
+                                                <View className="w-2 h-2 rounded-full bg-blue-500 z-10" />
+                                                <View className="w-0.5 flex-1 bg-slate-200 -my-1" />
                                             </View>
-                                        )}
-                                    />
+                                            <View className="flex-1 bg-white p-4 rounded-xl border border-slate-100 shadow-sm shadow-slate-100">
+                                                <View className="flex-row justify-between items-center mb-1">
+                                                    <Text className="font-bold text-slate-800 text-[13px]">{item.action}</Text>
+                                                    <Text className="text-[10px] font-bold text-slate-400">
+                                                        {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                    </Text>
+                                                </View>
+                                                <Text className="text-slate-500 text-[11px] leading-4">
+                                                    {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
+                                                </Text>
+                                                {item.target_resource && (
+                                                    <View className="mt-2 self-start bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
+                                                        <Text className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{item.target_resource}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                    ))
                                 )}
-                            </View>
+                            </ScrollView>
                         </>
                     )}
                 </View>

@@ -138,6 +138,25 @@ export default function AdminBento() {
 
     const fetchHiddenAdminModules = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                // 1. Check if there are individual per-admin hidden modules for THIS user
+                const { data: customData } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', `admin_hidden_modules_${user.id}`)
+                    .single();
+
+                if (customData?.value) {
+                    const parsedCustom = typeof customData.value === 'string' ? JSON.parse(customData.value) : customData.value;
+                    if (Array.isArray(parsedCustom)) {
+                        setHiddenAdminModules(parsedCustom);
+                        return; // Individual override active!
+                    }
+                }
+            }
+
+            // 2. Global fallback hidden modules for staff admins
             const { data } = await supabase
                 .from('app_settings')
                 .select('value')
