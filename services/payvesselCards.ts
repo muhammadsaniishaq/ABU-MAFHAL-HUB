@@ -142,14 +142,18 @@ export const payvesselCardService = {
     }) => {
         const { userId, cardHolderName, currency, initialFundingAmount } = params;
 
-        // 1. Fetch User Balance & Verify Funds
-        const { data: userProfile, error: profileErr } = await supabase
-            .from('profiles')
-            .select('balance, email, phone_number, full_name')
-            .eq('id', userId)
-            .single();
+        // 1. Fetch User Auth & Profile Balance safely
+        const { data: { user } } = await supabase.auth.getUser();
+        const userEmail = user?.email || `${userId.substring(0, 8)}@abumafhal.com`;
 
-        if (profileErr || !userProfile) throw new Error('User profile not found.');
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('balance, full_name')
+            .eq('id', userId)
+            .maybeSingle();
+
+        const currentBalance = Number(userProfile?.balance) || 0;
+        const finalCardHolderName = (cardHolderName.trim() || userProfile?.full_name || user?.user_metadata?.full_name || 'ABU MAFHAL USER').toUpperCase();
 
         const config = await payvesselCardService.getConfig();
         const creationFeeUSD = currency === 'USD' ? config.cardFeeUSD : config.cardFeeNGN / 1600;
@@ -158,7 +162,6 @@ export const payvesselCardService = {
         const initialFundNGN = currency === 'USD' ? initialFundingAmount * 1600 : initialFundingAmount;
         const totalFeeInNGN = creationFeeNGN + initialFundNGN;
 
-        const currentBalance = Number(userProfile.balance) || 0;
         if (currentBalance < totalFeeInNGN) {
             throw new Error(`Insufficient wallet balance. Required: ₦${totalFeeInNGN.toLocaleString()} (Creation Fee + Initial Funding). Current Balance: ₦${currentBalance.toLocaleString()}`);
         }
@@ -177,8 +180,8 @@ export const payvesselCardService = {
                     body: JSON.stringify({
                         currency: currency,
                         amount: initialFundingAmount,
-                        name: cardHolderName || userProfile.full_name,
-                        email: userProfile.email,
+                        name: finalCardHolderName,
+                        email: userEmail,
                         business_id: config.businessId,
                     }),
                 });
@@ -209,7 +212,7 @@ export const payvesselCardService = {
         await supabase.from('transactions').insert({
             user_id: userId,
             title: `Virtual ${currency} Card Created`,
-            description: `Card Creation Fee ($${creationFeeUSD}) + Initial Fund ($${initialFundingAmount})`,
+            description: `Card Creation Fee (${currency === 'USD' ? '$' + creationFeeUSD : '₦' + creationFeeNGN}) + Initial Fund (${currency === 'USD' ? '$' + initialFundingAmount : '₦' + initialFundingAmount})`,
             amount: -totalFeeInNGN,
             status: 'completed',
             category: 'card_creation',
@@ -226,7 +229,7 @@ export const payvesselCardService = {
             cvv: cvv,
             expiry_month: expMonth,
             expiry_year: expYear,
-            card_holder_name: (cardHolderName || userProfile.full_name || 'ABU MAFHAL USER').toUpperCase(),
+            card_holder_name: finalCardHolderName,
             currency: currency,
             card_type: currency === 'USD' ? 'VISA' : 'MASTERCARD',
             balance: initialFundingAmount,
@@ -268,7 +271,7 @@ export const payvesselCardService = {
         const { cardDbId, userId, amount, currency } = params;
 
         // Verify user wallet balance
-        const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
+        const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).maybeSingle();
         const currentWalletBalance = Number(userProfile?.balance) || 0;
         const requiredNGN = currency === 'USD' ? amount * 1600 : amount;
 
@@ -277,7 +280,7 @@ export const payvesselCardService = {
         }
 
         // Fetch card
-        const { data: card } = await supabase.from('user_virtual_cards').select('balance, card_id').eq('id', cardDbId).single();
+        const { data: card } = await supabase.from('user_virtual_cards').select('balance, card_id').eq('id', cardDbId).maybeSingle();
         const currentCardBalance = Number(card?.balance) || 0;
         const newCardBalance = currentCardBalance + amount;
         const newWalletBalance = currentWalletBalance - requiredNGN;
@@ -311,14 +314,14 @@ export const payvesselCardService = {
     }) => {
         const { cardDbId, userId, amount, currency } = params;
 
-        const { data: card } = await supabase.from('user_virtual_cards').select('balance, card_id').eq('id', cardDbId).single();
+        const { data: card } = await supabase.from('user_virtual_cards').select('balance, card_id').eq('id', cardDbId).maybeSingle();
         const currentCardBalance = Number(card?.balance) || 0;
 
         if (currentCardBalance < amount) {
             throw new Error(`Insufficient card balance. Available: ${currency === 'USD' ? '$' : '₦'}${currentCardBalance}`);
         }
 
-        const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).single();
+        const { data: userProfile } = await supabase.from('profiles').select('balance').eq('id', userId).maybeSingle();
         const currentWalletBalance = Number(userProfile?.balance) || 0;
         const refundNGN = currency === 'USD' ? amount * 1600 : amount;
 
