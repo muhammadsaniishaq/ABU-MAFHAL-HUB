@@ -11,10 +11,12 @@ BEGIN
     END IF;
 END $$;
 
--- Step 2.5: Drop policies blocking the column type change
+-- Step 2.5: Drop policies blocking or conflicting with the column type change
 DROP POLICY IF EXISTS "Admin Delete Access for cac_documents" ON storage.objects;
 DROP POLICY IF EXISTS "Admin full access for cac_pricing" ON public.cac_pricing;
 DROP POLICY IF EXISTS "Admin full access for cac_requests" ON public.cac_requests;
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update profiles" ON public.profiles;
 
 -- Step 3: Alter column type to user_role
 ALTER TABLE public.profiles 
