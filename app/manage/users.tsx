@@ -36,6 +36,8 @@ interface UserProfile {
     next_of_kin_phone?: string;
     avatar_url?: string;
     credit_balance?: number;
+    crypto_enabled?: boolean;
+    virtual_cards_enabled?: boolean;
 }
 
 interface Transaction {
@@ -71,7 +73,7 @@ export default function UserManagement() {
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const [showSecurity, setShowSecurity] = useState(false);
-    const [pendingAction, setPendingAction] = useState<{ type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device', amount?: number, role?: string, payload?: any } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards', amount?: number, role?: string, payload?: any } | null>(null);
     
     // Fund/Debit Input
     const [fundAmount, setFundAmount] = useState('');
@@ -333,34 +335,63 @@ export default function UserManagement() {
         try {
             if (pendingAction.type === 'fund' || pendingAction.type === 'debit') {
                 const amount = pendingAction.type === 'fund' ? Number(pendingAction.amount) : -Number(pendingAction.amount);
-                const currentBalance = Number(selectedUser.credit_balance) || 0;
+                const currentBalance = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
                 const newBalance = currentBalance + amount;
                 
-                const { error } = await supabase.from('profiles').update({ credit_balance: newBalance }).eq('id', selectedUser.id);
+                // Update BOTH balance and credit_balance so main user wallet is credited immediately!
+                const { error } = await supabase.from('profiles').update({ 
+                    balance: newBalance,
+                    credit_balance: newBalance 
+                }).eq('id', selectedUser.id);
+
                 if (error) throw error;
                 
                 await supabase.from('transactions').insert({
                     user_id: selectedUser.id,
                     type: pendingAction.type === 'fund' ? 'topup' : 'withdrawal',
+                    title: `Admin Wallet ${pendingAction.type === 'fund' ? 'Credit' : 'Debit'}`,
                     amount: Math.abs(amount),
-                    status: 'success',
-                    description: `Admin ${pendingAction.type === 'fund' ? 'Funding' : 'Debit'}`,
+                    status: 'completed',
+                    description: `Admin Wallet ${pendingAction.type === 'fund' ? 'Funding' : 'Debit'}`,
                     reference: `admin_${pendingAction.type}_${Date.now()}`
                 });
                 
-                Alert.alert("Success", amount > 0 ? `Funded ₦${amount.toLocaleString()}` : `Debited ₦${Math.abs(amount).toLocaleString()}`);
+                Alert.alert("Wallet Updated 🎉", amount > 0 ? `Funded ₦${amount.toLocaleString()} to user wallet!` : `Debited ₦${Math.abs(amount).toLocaleString()} from user wallet!`);
+                setSelectedUser({ ...selectedUser, balance: newBalance, credit_balance: newBalance });
+                setFundAmount('');
+                fetchUsers();
             }
             else if (pendingAction.type === 'block') {
                 const newStatus = selectedUser.status === 'active' ? 'suspended' : 'active';
                 const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', selectedUser.id);
                 if (error) throw error;
                 Alert.alert("Updated", `User is now ${newStatus.toUpperCase()}`);
+                setSelectedUser({ ...selectedUser, status: newStatus });
+                fetchUsers();
             }
             else if (pendingAction.type === 'promote') {
-                const newRole = selectedUser.role === 'admin' ? 'user' : 'admin';
-                const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', selectedUser.id);
+                const targetRole = pendingAction.role || (selectedUser.role === 'super_admin' ? 'admin' : selectedUser.role === 'admin' ? 'user' : 'admin');
+                const { error } = await supabase.from('profiles').update({ role: targetRole }).eq('id', selectedUser.id);
                 if (error) throw error;
-                Alert.alert("Role Changed", `User is now ${newRole.toUpperCase()}`);
+                Alert.alert("Role Changed 👑", `User role is now ${targetRole.toUpperCase()}`);
+                setSelectedUser({ ...selectedUser, role: targetRole });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'toggle_crypto') {
+                const newStatus = !(selectedUser.crypto_enabled ?? true);
+                const { error } = await supabase.from('profiles').update({ crypto_enabled: newStatus }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("Crypto Feature 🪙", `Crypto Trading is now ${newStatus ? 'ENABLED' : 'DISABLED'} for this user`);
+                setSelectedUser({ ...selectedUser, crypto_enabled: newStatus });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'toggle_cards') {
+                const newStatus = !(selectedUser.virtual_cards_enabled ?? true);
+                const { error } = await supabase.from('profiles').update({ virtual_cards_enabled: newStatus }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("Virtual Cards 💳", `Virtual Cards are now ${newStatus ? 'ENABLED' : 'DISABLED'} for this user`);
+                setSelectedUser({ ...selectedUser, virtual_cards_enabled: newStatus });
+                fetchUsers();
             }
             else if (pendingAction.type === 'reset_pin') {
                  if (selectedUser.email) {
@@ -836,31 +867,49 @@ Metadata:
                                     )}
                                 </View>
 
-                                {/* Admin Financial Control (Navy & Gold styling) */}
-                                <View className="bg-white p-3 rounded-[20px] border border-slate-200 mb-4 flex-row items-center justify-between shadow-sm">
-                                    <View className="flex-row items-center gap-2">
-                                        <Switch 
-                                            value={isDebit} 
-                                            onValueChange={setIsDebit}
-                                            trackColor={{ false: "#34D399", true: "#FB7185" }}
-                                            thumbColor={"#fff"}
-                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                                        />
-                                        <Text className={`text-[10px] font-black uppercase tracking-widest ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>{isDebit ? 'Debit' : 'Fund'}</Text>
+                                {/* Admin Financial Control (Navy & Gold styling with Presets) */}
+                                <View className="bg-white p-4 rounded-[20px] border border-slate-200 mb-4 shadow-sm">
+                                    <View className="flex-row items-center justify-between mb-3">
+                                        <View className="flex-row items-center gap-2">
+                                            <Switch 
+                                                value={isDebit} 
+                                                onValueChange={setIsDebit}
+                                                trackColor={{ false: "#34D399", true: "#FB7185" }}
+                                                thumbColor={"#fff"}
+                                                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                            />
+                                            <Text className={`text-[10px] font-black uppercase tracking-widest ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>{isDebit ? 'Debit Wallet' : 'Fund Wallet'}</Text>
+                                        </View>
+                                        <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden w-36 h-9">
+                                            <Text className="text-[#0A1128] font-black pl-2 text-xs">₦</Text>
+                                            <TextInput 
+                                                placeholder="Custom Amt" 
+                                                keyboardType="numeric"
+                                                className="flex-1 text-[#0A1128] font-bold text-xs px-1 text-center"
+                                                value={fundAmount}
+                                                onChangeText={setFundAmount}
+                                            />
+                                        </View>
+                                        <TouchableOpacity onPress={initiateFundOrDebit} className={`w-9 h-9 rounded-xl items-center justify-center ${isDebit ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                                            <Ionicons name="checkmark-done" size={16} color="white" />
+                                        </TouchableOpacity>
                                     </View>
-                                    <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden w-32 h-9">
-                                        <Text className="text-[#0A1128] font-black pl-2 text-xs">₦</Text>
-                                        <TextInput 
-                                            placeholder="Amount" 
-                                            keyboardType="numeric"
-                                            className="flex-1 text-[#0A1128] font-bold text-xs px-1 text-center"
-                                            value={fundAmount}
-                                            onChangeText={setFundAmount}
-                                        />
+
+                                    {/* Quick Funding Presets */}
+                                    <View className="flex-row gap-1.5 justify-between">
+                                        {['5000', '10000', '25000', '50000', '100000'].map(val => (
+                                            <TouchableOpacity
+                                                key={val}
+                                                onPress={() => {
+                                                    setFundAmount(val);
+                                                    setIsDebit(false);
+                                                }}
+                                                className={`px-2 py-1.5 rounded-lg border items-center justify-center ${fundAmount === val ? 'bg-[#0A1128] border-[#0A1128]' : 'bg-slate-50 border-slate-200'}`}
+                                            >
+                                                <Text className={`font-bold text-[9px] ${fundAmount === val ? 'text-[#D4AF37]' : 'text-slate-700'}`}>+₦{Number(val)/1000}k</Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
-                                    <TouchableOpacity onPress={initiateFundOrDebit} className={`w-9 h-9 rounded-xl items-center justify-center ${isDebit ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                                        <Ionicons name="checkmark-done" size={16} color="white" />
-                                    </TouchableOpacity>
                                 </View>
 
                                 {/* Limits & Notes Grid */}
@@ -903,16 +952,54 @@ Metadata:
                                 </View>
 
                                 {/* Quick Actions Grid */}
-                                <Text className="text-[#0A1128] font-black text-xs tracking-widest uppercase mb-2 ml-1">Quick Actions</Text>
+                                <Text className="text-[#0A1128] font-black text-xs tracking-widest uppercase mb-2 ml-1">Admin & Feature Controls</Text>
                                 <View className="flex-row flex-wrap gap-2 mb-6">
                                     <TouchableOpacity onPress={initiateBlock} className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${selectedUser?.status === 'active' ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
                                         <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={14} color={selectedUser?.status === 'active' ? "#E11D48" : "#10B981"} />
                                         <Text className={`font-black text-[10px] uppercase tracking-widest ${selectedUser?.status === 'active' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiatePromote} className="w-[48%] bg-amber-50 border border-amber-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="shield-half" size={14} color="#D97706" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-amber-700">{selectedUser?.role === 'admin' ? 'Demote' : 'Make Admin'}</Text>
+                                    {/* Super Admin / Admin Role Switcher */}
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            const newRole = selectedUser?.role === 'super_admin' ? 'admin' : selectedUser?.role === 'admin' ? 'user' : 'super_admin';
+                                            setPendingAction({ type: 'promote', role: newRole });
+                                            setShowSecurity(true);
+                                        }} 
+                                        className="w-[48%] bg-amber-50 border border-amber-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm"
+                                    >
+                                        <Ionicons name="crown-outline" size={14} color="#D97706" />
+                                        <Text className="font-black text-[10px] uppercase tracking-widest text-amber-700">
+                                            {selectedUser?.role === 'super_admin' ? 'Super Admin 👑' : selectedUser?.role === 'admin' ? 'Admin 🛡️' : 'Make Admin 👑'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Crypto Feature Control */}
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setPendingAction({ type: 'toggle_crypto' });
+                                            executeAction();
+                                        }} 
+                                        className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.crypto_enabled ?? true) ? 'bg-amber-50 border-amber-300' : 'bg-slate-100 border-slate-300'}`}
+                                    >
+                                        <Ionicons name="logo-bitcoin" size={14} color={(selectedUser?.crypto_enabled ?? true) ? "#D97706" : "#64748B"} />
+                                        <Text className={`font-black text-[10px] uppercase tracking-widest ${(selectedUser?.crypto_enabled ?? true) ? 'text-amber-800' : 'text-slate-600'}`}>
+                                            Crypto: {(selectedUser?.crypto_enabled ?? true) ? 'ON 🪙' : 'OFF 🚫'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Virtual Cards Feature Control */}
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setPendingAction({ type: 'toggle_cards' });
+                                            executeAction();
+                                        }} 
+                                        className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.virtual_cards_enabled ?? true) ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-100 border-slate-300'}`}
+                                    >
+                                        <Ionicons name="card-outline" size={14} color={(selectedUser?.virtual_cards_enabled ?? true) ? "#4F46E5" : "#64748B"} />
+                                        <Text className={`font-black text-[10px] uppercase tracking-widest ${(selectedUser?.virtual_cards_enabled ?? true) ? 'text-indigo-800' : 'text-slate-600'}`}>
+                                            Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON 💳' : 'OFF 🚫'}
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateResetPin} className="w-[48%] bg-white border border-slate-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
