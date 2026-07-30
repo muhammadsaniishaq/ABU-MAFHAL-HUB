@@ -77,6 +77,9 @@ export default function VirtualCardsScreen() {
     const [contactlessEnabled, setContactlessEnabled] = useState(true);
     const [internationalEnabled, setInternationalEnabled] = useState(true);
 
+    // Payvessel Config & Rates State
+    const [pvConfig, setPvConfig] = useState<any>(null);
+
     // Creation Form State
     const [cardCurrency, setCardCurrency] = useState<'USD' | 'NGN'>('USD');
     const [cardHolderName, setCardHolderName] = useState('');
@@ -107,6 +110,9 @@ export default function VirtualCardsScreen() {
     const loadData = async () => {
         setLoading(true);
         try {
+            const config = await payvesselCardService.getConfig();
+            setPvConfig(config);
+
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data: profile } = await supabase.from('profiles').select('balance, full_name').eq('id', user.id).single();
@@ -128,10 +134,10 @@ export default function VirtualCardsScreen() {
         }
     };
 
-    // Calculate Wallet Charge Accurately
+    // Calculate Wallet Charge Accurately (API Wholesale Rate + Admin Profit Margin)
     const calcCreationWalletCharge = () => {
-        const usdCardFee = Number(settings?.virtual_card_creation_fee_usd) || 3.0; // $3.00 USD for USD card
-        const ngnCardFee = Number(settings?.virtual_card_creation_fee_ngn) || 1000; // ₦1,000 NGN for NGN card
+        const usdCardFee = pvConfig?.cardFeeUSD || Number(settings?.virtual_card_creation_fee_usd) || 3.0; // API Wholesale ($1.50) + Profit ($1.50)
+        const ngnCardFee = pvConfig?.cardFeeNGN || Number(settings?.virtual_card_creation_fee_ngn) || 1000; // API Wholesale (₦500) + Profit (₦500)
 
         const initialFund = Number(initialFundAmount) || 0;
 

@@ -41,28 +41,58 @@ export interface CardTransaction {
  */
 export const payvesselCardService = {
     /**
-     * Get Payvessel Config from app_settings
+     * Get Payvessel Config & Wholesale API Rates + Admin Profit Margins
      */
     getConfig: async () => {
         try {
             const { data: apiKeyData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_api_key').single();
             const { data: secretKeyData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_secret_key').single();
             const { data: businessIdData } = await supabase.from('app_settings').select('value').eq('key', 'payvessel_business_id').single();
-            const { data: cardFeeData } = await supabase.from('app_settings').select('value').eq('key', 'virtual_card_creation_fee_usd').single();
+            
+            // Profit Margins from app_settings
+            const { data: profitUsdData } = await supabase.from('app_settings').select('value').eq('key', 'virtual_card_profit_margin_usd').single();
+            const { data: profitNgnData } = await supabase.from('app_settings').select('value').eq('key', 'virtual_card_profit_margin_ngn').single();
 
             const apiKey = typeof apiKeyData?.value === 'string' ? apiKeyData.value : apiKeyData?.value?.key || '';
             const secretKey = typeof secretKeyData?.value === 'string' ? secretKeyData.value : secretKeyData?.value?.key || '';
             const businessId = typeof businessIdData?.value === 'string' ? businessIdData.value : businessIdData?.value?.id || '';
-            const cardFee = Number(cardFeeData?.value) || 2.0; // Retail creation fee ($2.00)
+
+            // Payvessel Wholesale API Rates
+            let wholesaleUsd = 1.50; // $1.50 USD Payvessel API Base Fee
+            let wholesaleNgn = 500;  // ₦500 NGN Payvessel API Base Fee
+
+            // Try to fetch live wholesale fees from Payvessel API if keys exist
+            if (apiKey && secretKey) {
+                try {
+                    const res = await fetch('https://api.payvessel.com/pms/api/v1/cards/rates', {
+                        headers: { 'api-key': apiKey, 'api-secret': secretKey }
+                    });
+                    const rateData = await res.json();
+                    if (rateData?.data?.wholesale_usd) wholesaleUsd = Number(rateData.data.wholesale_usd);
+                    if (rateData?.data?.wholesale_ngn) wholesaleNgn = Number(rateData.data.wholesale_ngn);
+                } catch (e) {
+                    console.warn('Using standard Payvessel wholesale rates');
+                }
+            }
+
+            // Profit Margin Addition
+            const adminProfitUSD = Number(profitUsdData?.value) || 1.50; // $1.50 Profit
+            const adminProfitNGN = Number(profitNgnData?.value) || 500;  // ₦500 Profit
+
+            // Total Retail Fee = API Wholesale Rate + Admin Profit Margin
+            const retailFeeUSD = wholesaleUsd + adminProfitUSD; // $3.00 USD
+            const retailFeeNGN = wholesaleNgn + adminProfitNGN; // ₦1,000 NGN
 
             return {
                 apiKey,
                 secretKey,
                 businessId,
-                cardFee,
-                wholesaleCardIssuanceFeeUSD: 1.50, // Payvessel Commercial Proposal Rate for ABU MAFHAL LTD
-                wholesaleContactlessCardFeeUSD: 2.50, // Contactless Card (Apple Pay & Google Pay)
-                individualCardFundingFee: 0, // $0 fee for funding individual card
+                wholesaleUsd,
+                wholesaleNgn,
+                adminProfitUSD,
+                adminProfitNGN,
+                cardFeeUSD: retailFeeUSD,
+                cardFeeNGN: retailFeeNGN,
                 baseUrl: 'https://api.payvessel.com'
             };
         } catch (e) {
@@ -70,10 +100,12 @@ export const payvesselCardService = {
                 apiKey: '',
                 secretKey: '',
                 businessId: '',
-                cardFee: 3.0,
-                wholesaleCardIssuanceFeeUSD: 1.50,
-                wholesaleContactlessCardFeeUSD: 2.50,
-                individualCardFundingFee: 0,
+                wholesaleUsd: 1.50,
+                wholesaleNgn: 500,
+                adminProfitUSD: 1.50,
+                adminProfitNGN: 500,
+                cardFeeUSD: 3.00,
+                cardFeeNGN: 1000,
                 baseUrl: 'https://api.payvessel.com'
             };
         }
@@ -120,11 +152,11 @@ export const payvesselCardService = {
         if (profileErr || !userProfile) throw new Error('User profile not found.');
 
         const config = await payvesselCardService.getConfig();
-        const creationFeeUSD = config.cardFee;
-        const creationFeeNGN = creationFeeUSD * 1600; // Exchange rate conversion
-        const totalFeeInNGN = currency === 'USD' 
-            ? (creationFeeUSD + initialFundingAmount) * 1600 
-            : creationFeeNGN + initialFundingAmount;
+        const creationFeeUSD = currency === 'USD' ? config.cardFeeUSD : config.cardFeeNGN / 1600;
+        const creationFeeNGN = currency === 'USD' ? creationFeeUSD * 1600 : config.cardFeeNGN;
+        
+        const initialFundNGN = currency === 'USD' ? initialFundingAmount * 1600 : initialFundingAmount;
+        const totalFeeInNGN = creationFeeNGN + initialFundNGN;
 
         const currentBalance = Number(userProfile.balance) || 0;
         if (currentBalance < totalFeeInNGN) {
