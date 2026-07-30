@@ -16,7 +16,7 @@ import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { payvesselCardService, VirtualCard } from '../../services/payvesselCards';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,6 +31,8 @@ const SUPPORTED_MERCHANTS = [
     { name: 'Google Play', icon: 'logo-google', color: '#4285F4' },
     { name: 'ChatGPT AI', icon: 'sparkles', color: '#10A37F' },
     { name: 'Spotify', icon: 'musical-notes', color: '#1DB954' },
+    { name: 'Facebook Ads', icon: 'logo-facebook', color: '#1877F2' },
+    { name: 'AliExpress', icon: 'cart', color: '#FF4747' },
 ];
 
 const CARD_SKINS = {
@@ -56,6 +58,10 @@ export default function VirtualCardsScreen() {
 
     // Selected Card Skin
     const [activeSkin, setActiveSkin] = useState<'obsidian' | 'sapphire' | 'rose_gold' | 'emerald'>('obsidian');
+
+    // Auto-Scroll Marquee Ref
+    const marqueeRef = useRef<ScrollView>(null);
+    const marqueePos = useRef(0);
 
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -84,6 +90,20 @@ export default function VirtualCardsScreen() {
         loadData();
     }, []);
 
+    // Continuous Auto-Scroll Marquee Timer for Supported Platforms
+    useEffect(() => {
+        const timer = setInterval(() => {
+            if (marqueeRef.current) {
+                marqueePos.current += 1.2;
+                if (marqueePos.current > 500) {
+                    marqueePos.current = 0;
+                }
+                marqueeRef.current.scrollTo({ x: marqueePos.current, animated: false });
+            }
+        }, 30);
+        return () => clearInterval(timer);
+    }, []);
+
     const loadData = async () => {
         setLoading(true);
         try {
@@ -110,7 +130,7 @@ export default function VirtualCardsScreen() {
 
     // Calculate Wallet Charge Accurately
     const calcCreationWalletCharge = () => {
-        const creationFeeUSD = 3.0; // $3.00 Creation Fee
+        const creationFeeUSD = 3.0;
         const creationFeeNGN = creationFeeUSD * usdRate;
         const initialFund = Number(initialFundAmount) || 0;
 
@@ -118,7 +138,7 @@ export default function VirtualCardsScreen() {
         if (cardCurrency === 'USD') {
             fundChargeNGN = initialFund * usdRate;
         } else {
-            fundChargeNGN = initialFund; // Already in NGN
+            fundChargeNGN = initialFund;
         }
 
         return {
@@ -273,7 +293,7 @@ export default function VirtualCardsScreen() {
                 title: 'Virtual Cards Studio', 
                 headerTintColor: '#0f172a', 
                 headerStyle: { backgroundColor: '#ffffff' }, 
-                headerTitleStyle: { color: '#0f172a', fontWeight: '900', fontSize: 18 } 
+                headerTitleStyle: { color: '#0f172a', fontWeight: '900', fontSize: 17 } 
             }} />
             <StatusBar style="dark" />
 
@@ -283,44 +303,44 @@ export default function VirtualCardsScreen() {
                     <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Virtual Cards Studio...</Text>
                 </View>
             ) : cards.length > 0 && selectedCard ? (
-                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                     
-                    {/* LUXURY ELEGANT TOP HEADER DASHBOARD BAR */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    {/* ELEGANT COMPACT TOP DASHBOARD BAR */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
                         
                         {/* Live Exchange Rate & Active Card Counter Pill */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                            <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ fontSize: 11 }}>🇺🇸</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Text style={{ fontSize: 10 }}>🇺🇸</Text>
                                 <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '900' }}>1 USD = ₦{usdRate.toLocaleString()}</Text>
                             </View>
 
-                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' }} />
-                                <Text style={{ color: '#047857', fontSize: 10, fontWeight: '900' }}>{cards.length} Active Card{cards.length > 1 ? 's' : ''}</Text>
+                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#a7f3d0', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#10b981' }} />
+                                <Text style={{ color: '#047857', fontSize: 9, fontWeight: '900' }}>{cards.length} Active Card{cards.length > 1 ? 's' : ''}</Text>
                             </View>
                         </View>
 
                         {/* Main Wallet Balance Row */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View>
-                                <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
-                                <Text style={{ color: '#0f172a', fontSize: 22, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>Main Wallet</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 19, fontWeight: '900', marginTop: 1 }}>₦{walletBalance.toLocaleString()}</Text>
                             </View>
                             <TouchableOpacity 
                                 onPress={() => setShowCreateModal(true)}
-                                style={{ backgroundColor: '#0f172a', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
+                                style={{ backgroundColor: '#0f172a', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 5 }}
                             >
-                                <Ionicons name="add-circle" size={18} color="#ffffff" />
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>+ New Card</Text>
+                                <Ionicons name="add-circle" size={16} color="#ffffff" />
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 11 }}>+ New Card</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Multiple Cards Switcher Tabs */}
                     {cards.length > 1 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
                                 {cards.map((c, i) => (
                                     <TouchableOpacity
                                         key={c.id}
@@ -329,9 +349,9 @@ export default function VirtualCardsScreen() {
                                             setShowFullDetails(false);
                                         }}
                                         style={{
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 8,
-                                            borderRadius: 16,
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 6,
+                                            borderRadius: 14,
                                             backgroundColor: selectedCard.id === c.id ? '#0f172a' : '#ffffff',
                                             borderWidth: 1,
                                             borderColor: selectedCard.id === c.id ? '#0f172a' : '#e2e8f0',
@@ -340,8 +360,8 @@ export default function VirtualCardsScreen() {
                                             gap: 6
                                         }}
                                     >
-                                        <Ionicons name="card" size={14} color={selectedCard.id === c.id ? '#ffffff' : '#0f172a'} />
-                                        <Text style={{ color: selectedCard.id === c.id ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 11 }}>
+                                        <Ionicons name="card" size={12} color={selectedCard.id === c.id ? '#ffffff' : '#0f172a'} />
+                                        <Text style={{ color: selectedCard.id === c.id ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 10 }}>
                                             Card #{i + 1} ({c.currency})
                                         </Text>
                                     </TouchableOpacity>
@@ -350,10 +370,10 @@ export default function VirtualCardsScreen() {
                         </ScrollView>
                     )}
 
-                    {/* CARD SKIN CUSTOMIZER SELECTOR */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Choose Card Skin</Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {/* CARD SKIN SELECTOR */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8 }}>Choose Card Skin</Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
                             {(Object.keys(CARD_SKINS) as Array<keyof typeof CARD_SKINS>).map(skinKey => (
                                 <TouchableOpacity
                                     key={skinKey}
@@ -362,9 +382,9 @@ export default function VirtualCardsScreen() {
                                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                     }}
                                     style={{
-                                        width: 22,
-                                        height: 22,
-                                        borderRadius: 11,
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: 10,
                                         backgroundColor: CARD_SKINS[skinKey].colors[0],
                                         borderWidth: activeSkin === skinKey ? 2 : 0,
                                         borderColor: '#d97706'
@@ -374,7 +394,7 @@ export default function VirtualCardsScreen() {
                         </View>
                     </View>
 
-                    {/* ULTRA-LUXURY 3D VIRTUAL CARD VISUAL */}
+                    {/* ULTRA-LUXURY COMPACT 3D VIRTUAL CARD VISUAL */}
                     <LinearGradient
                         colors={skinTheme.colors as any}
                         start={{ x: 0, y: 0 }}
@@ -382,52 +402,51 @@ export default function VirtualCardsScreen() {
                         style={{
                             width: '100%',
                             aspectRatio: 1.586,
-                            borderRadius: 24,
-                            padding: 24,
+                            borderRadius: 20,
+                            padding: 20,
                             justifyContent: 'space-between',
-                            marginBottom: 20,
+                            marginBottom: 16,
                             borderWidth: 1.5,
                             borderColor: selectedCard.status === 'frozen' ? '#ef4444' : skinTheme.accent,
                             position: 'relative',
                             overflow: 'hidden',
                             shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 12 },
-                            shadowOpacity: 0.25,
-                            shadowRadius: 18,
-                            elevation: 10
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 12,
+                            elevation: 8
                         }}
                     >
-                        {/* Metallic Watermark */}
-                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
+                        <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
 
                         {/* Top Row: Brand & Status Badge */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
-                                    <Text style={{ color: skinTheme.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>PAYVESSEL SECURE</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
+                                    <Text style={{ color: skinTheme.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL SECURE</Text>
                                 </View>
-                                <View style={{ backgroundColor: selectedCard.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444' }} />
-                                    <Text style={{ color: selectedCard.status === 'active' ? '#4ade80' : '#f87171', fontSize: 9, fontWeight: '900' }}>
+                                <View style={{ backgroundColor: selectedCard.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444' }} />
+                                    <Text style={{ color: selectedCard.status === 'active' ? '#4ade80' : '#f87171', fontSize: 8, fontWeight: '900' }}>
                                         {selectedCard.status.toUpperCase()}
                                     </Text>
                                 </View>
                             </View>
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 24, fontStyle: 'italic', letterSpacing: 1 }}>{selectedCard.card_type}</Text>
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic' }}>{selectedCard.card_type}</Text>
                         </View>
 
                         {/* Metallic Chip & Contactless Symbol */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, zIndex: 10 }}>
-                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: skinTheme.accent, borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
-                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 3 }} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 }}>
+                            <View style={{ width: 38, height: 28, borderRadius: 6, backgroundColor: skinTheme.accent, borderWidth: 1, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 5 }}>
+                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 2 }} />
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
                             </View>
-                            <Ionicons name="wifi-outline" size={24} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
+                            <Ionicons name="wifi-outline" size={20} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
                         </View>
 
                         {/* 16-Digit Card Number */}
                         <View style={{ zIndex: 10 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 21, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2.5, fontWeight: 'bold' }}>
+                            <Text style={{ color: '#ffffff', fontSize: 18, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, fontWeight: 'bold' }}>
                                 {showFullDetails ? (selectedCard.card_number_full || selectedCard.card_number_masked) : selectedCard.card_number_masked}
                             </Text>
                         </View>
@@ -435,17 +454,17 @@ export default function VirtualCardsScreen() {
                         {/* Bottom Info: Holder Name, Expiry & CVV */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 10 }}>
                             <View>
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Card Holder</Text>
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15, marginTop: 2, letterSpacing: 0.5 }}>{selectedCard.card_holder_name}</Text>
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>Card Holder</Text>
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 1 }}>{selectedCard.card_holder_name}</Text>
                             </View>
-                            <View style={{ flexDirection: 'row', gap: 18 }}>
+                            <View style={{ flexDirection: 'row', gap: 14 }}>
                                 <View>
-                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Text>
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginTop: 2 }}>{selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>Expires</Text>
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12, marginTop: 1 }}>{selectedCard.expiry_month}/{selectedCard.expiry_year}</Text>
                                 </View>
                                 <View>
-                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>CVV</Text>
-                                    <Text style={{ color: skinTheme.accent, fontWeight: '900', fontSize: 14, marginTop: 2 }}>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>CVV</Text>
+                                    <Text style={{ color: skinTheme.accent, fontWeight: '900', fontSize: 12, marginTop: 1 }}>
                                         {showFullDetails ? (selectedCard.cvv || '882') : '•••'}
                                     </Text>
                                 </View>
@@ -454,10 +473,10 @@ export default function VirtualCardsScreen() {
                     </LinearGradient>
 
                     {/* Card Balance Display Header */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 22, padding: 20, marginBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 18, padding: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}>
                         <View>
-                            <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Available Card Balance</Text>
-                            <Text style={{ color: '#0f172a', fontSize: 32, fontWeight: '900', marginTop: 2 }}>
+                            <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' }}>Available Card Balance</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 26, fontWeight: '900', marginTop: 1 }}>
                                 {selectedCard.currency === 'USD' ? '$' : '₦'}{selectedCard.balance.toFixed(2)}
                             </Text>
                         </View>
@@ -466,79 +485,79 @@ export default function VirtualCardsScreen() {
                                 setShowFullDetails(!showFullDetails);
                                 if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
-                            style={{ backgroundColor: '#fffbeb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                            style={{ backgroundColor: '#fffbeb', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 5 }}
                         >
-                            <Ionicons name={showFullDetails ? "eye-off-outline" : "eye-outline"} size={18} color="#d97706" />
-                            <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 12 }}>
+                            <Ionicons name={showFullDetails ? "eye-off-outline" : "eye-outline"} size={16} color="#d97706" />
+                            <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 11 }}>
                                 {showFullDetails ? 'Mask Details' : 'Reveal Details'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    {/* BIG GLOBAL FINTECH APPS CONTROL GRID */}
-                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Global App Card Controls</Text>
+                    {/* CONTROL GRID */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>Card Controls & Security</Text>
                     
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
                         <TouchableOpacity 
                             onPress={() => setShowFundModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#10b981', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#10b981', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                         >
-                            <Ionicons name="card-outline" size={20} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>+ Fund Card</Text>
+                            <Ionicons name="card-outline" size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>+ Fund Card</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={() => setShowWithdrawModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#3b82f6', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#3b82f6', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                         >
-                            <Ionicons name="wallet-outline" size={20} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>💸 Withdraw</Text>
+                            <Ionicons name="wallet-outline" size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>💸 Withdraw</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={() => setShowControlsModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#0f172a', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#0f172a', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                         >
-                            <Ionicons name="options-outline" size={20} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>Limits & Controls</Text>
+                            <Ionicons name="options-outline" size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>Limits & Controls</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={handleToggleFreeze}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                         >
-                            <Ionicons name={selectedCard.status === 'active' ? "lock-closed-outline" : "lock-open-outline"} size={20} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>
+                            <Ionicons name={selectedCard.status === 'active' ? "lock-closed-outline" : "lock-open-outline"} size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>
                                 {selectedCard.status === 'active' ? 'Freeze Card ❄️' : 'Unfreeze Card 🔓'}
                             </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={() => setShowAddressModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#e2e8f0' }}
                         >
-                            <Ionicons name="location-outline" size={20} color="#0f172a" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>US Address</Text>
+                            <Ionicons name="location-outline" size={18} color="#0f172a" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>US Address</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={() => setShowStatementModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#e2e8f0' }}
                         >
-                            <Ionicons name="document-text-outline" size={20} color="#0f172a" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Statement Logs</Text>
+                            <Ionicons name="document-text-outline" size={18} color="#0f172a" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>Statement Logs</Text>
                         </TouchableOpacity>
                     </View>
 
-                    {/* SUPPORTED MERCHANTS SHOWCASE */}
-                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Supported Merchants</Text>
+                    {/* CONTINUOUS AUTO-SCROLLING MARQUEE OF BRAND LOGOS */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>Supported Merchants</Text>
                     
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                            {SUPPORTED_MERCHANTS.map((m, i) => (
-                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                                    <Ionicons name={m.icon as any} size={18} color={m.color} />
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
+                    <ScrollView ref={marqueeRef} horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {SUPPORTED_MERCHANTS.concat(SUPPORTED_MERCHANTS).map((m, i) => (
+                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                    <Ionicons name={m.icon as any} size={16} color={m.color} />
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 11 }}>{m.name}</Text>
                                 </View>
                             ))}
                         </View>
@@ -547,32 +566,32 @@ export default function VirtualCardsScreen() {
                     {/* Terminate Card Danger Zone */}
                     <TouchableOpacity
                         onPress={handleTerminateCard}
-                        style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                        style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', padding: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                     >
-                        <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                        <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 13 }}>Terminate Card & Refund Balance</Text>
+                        <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                        <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 12 }}>Terminate Card & Refund Balance</Text>
                     </TouchableOpacity>
 
                 </ScrollView>
             ) : (
-                /* ULTRA-MODERN FINTECH WELCOME LANDING SHOWCASE */
-                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
+                /* ULTRA-MODERN COMPACT WELCOME LANDING SHOWCASE */
+                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                     
                     {/* Welcome Header Badge */}
-                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                        <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                            <Text style={{ fontSize: 12 }}>✨</Text>
-                            <Text style={{ color: '#d97706', fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL VIRTUAL CARDS</Text>
+                    <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                        <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                            <Text style={{ fontSize: 11 }}>✨</Text>
+                            <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL VIRTUAL CARDS</Text>
                         </View>
-                        <Text style={{ color: '#0f172a', fontSize: 26, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 }}>
+                        <Text style={{ color: '#0f172a', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 }}>
                             Unlock Global Payments
                         </Text>
-                        <Text style={{ color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 6, maxWidth: 320, lineHeight: 20 }}>
+                        <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center', marginTop: 4, maxWidth: 300, lineHeight: 18 }}>
                             Issue instant Virtual Dollar & Naira cards for international subscriptions, online shopping, and ad bills.
                         </Text>
                     </View>
 
-                    {/* INTERACTIVE 3D DEMO SHOWCASE CARD VISUAL */}
+                    {/* ULTRA-PREMIUM SAMPLE PREVIEW CARD VISUAL */}
                     <LinearGradient
                         colors={['#0f172a', '#1e293b', '#0f172a']}
                         start={{ x: 0, y: 0 }}
@@ -580,115 +599,115 @@ export default function VirtualCardsScreen() {
                         style={{
                             width: '100%',
                             aspectRatio: 1.586,
-                            borderRadius: 24,
-                            padding: 24,
+                            borderRadius: 20,
+                            padding: 20,
                             justifyContent: 'space-between',
-                            marginBottom: 24,
+                            marginBottom: 18,
                             borderWidth: 1.5,
                             borderColor: '#f5a623',
                             position: 'relative',
                             overflow: 'hidden',
                             shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 12 },
-                            shadowOpacity: 0.25,
-                            shadowRadius: 18,
-                            elevation: 10
+                            shadowOffset: { width: 0, height: 10 },
+                            shadowOpacity: 0.22,
+                            shadowRadius: 14,
+                            elevation: 8
                         }}
                     >
-                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(245, 166, 35, 0.15)' }} />
+                        <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(245, 166, 35, 0.15)' }} />
 
                         {/* Card Header Row */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
-                                    <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>PAYVESSEL SECURE</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
+                                    <Text style={{ color: '#f5a623', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL SECURE</Text>
                                 </View>
-                                <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#22c55e', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' }} />
-                                    <Text style={{ color: '#4ade80', fontSize: 9, fontWeight: '900' }}>SAMPLE PREVIEW</Text>
+                                <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: '#22c55e', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22c55e' }} />
+                                    <Text style={{ color: '#4ade80', fontSize: 8, fontWeight: '900' }}>SAMPLE PREVIEW</Text>
                                 </View>
                             </View>
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 22, fontStyle: 'italic' }}>VISA</Text>
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic' }}>VISA</Text>
                         </View>
 
                         {/* Metallic Chip & Contactless */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, zIndex: 10 }}>
-                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: '#f5a623', borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
-                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 3 }} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 }}>
+                            <View style={{ width: 38, height: 28, borderRadius: 6, backgroundColor: '#f5a623', borderWidth: 1, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 5 }}>
+                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 2 }} />
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
                             </View>
-                            <Ionicons name="wifi-outline" size={24} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
+                            <Ionicons name="wifi-outline" size={20} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
                         </View>
 
                         {/* Card Number */}
                         <View style={{ zIndex: 10 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 20, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2.5, fontWeight: 'bold' }}>
-                                5532 •••• •••• 8829
+                            <Text style={{ color: '#ffffff', fontSize: 18, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, fontWeight: 'bold' }}>
+                                4111 •••• •••• 8829
                             </Text>
                         </View>
 
                         {/* Card Footer */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 10 }}>
                             <View>
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Card Holder</Text>
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginTop: 2 }}>ABU MAFHAL USER</Text>
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>Card Holder</Text>
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 1 }}>ABU MAFHAL USER</Text>
                             </View>
-                            <View style={{ flexDirection: 'row', gap: 16 }}>
+                            <View style={{ flexDirection: 'row', gap: 14 }}>
                                 <View>
-                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Expires</Text>
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 2 }}>12/28</Text>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>Expires</Text>
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12, marginTop: 1 }}>12/28</Text>
                                 </View>
                                 <View>
-                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>CVV</Text>
-                                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13, marginTop: 2 }}>•••</Text>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>CVV</Text>
+                                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12, marginTop: 1 }}>•••</Text>
                                 </View>
                             </View>
                         </View>
                     </LinearGradient>
 
                     {/* WHY GET A VIRTUAL CARD BENEFITS GRID */}
-                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 14, letterSpacing: 1.5 }}>Why Get A Virtual Card?</Text>
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>Why Get A Virtual Card?</Text>
                     
-                    <View style={{ gap: 12, marginBottom: 24 }}>
-                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
-                                <Ionicons name="globe-outline" size={22} color="#3b82f6" />
+                    <View style={{ gap: 8, marginBottom: 18 }}>
+                        <View style={{ backgroundColor: '#ffffff', padding: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="globe-outline" size={18} color="#3b82f6" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Global Merchant Acceptance</Text>
-                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>Pay seamlessly on Netflix, Amazon, Apple, ChatGPT AI, Spotify & 100k+ global stores.</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Global Merchant Acceptance</Text>
+                                <Text style={{ color: '#64748b', fontSize: 10, marginTop: 1, lineHeight: 14 }}>Pay seamlessly on Netflix, Amazon, Apple, ChatGPT AI & Spotify.</Text>
                             </View>
                         </View>
 
-                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center' }}>
-                                <Ionicons name="flash-outline" size={22} color="#10b981" />
+                        <View style={{ backgroundColor: '#ffffff', padding: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="flash-outline" size={18} color="#10b981" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Instant 5-Second Issuance</Text>
-                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>No paper documentation or bank branch visits. Card activates instantly.</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Instant 5-Second Issuance</Text>
+                                <Text style={{ color: '#64748b', fontSize: 10, marginTop: 1, lineHeight: 14 }}>No paperwork delay. Card activates instantly upon issuance.</Text>
                             </View>
                         </View>
 
-                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center' }}>
-                                <Ionicons name="shield-checkmark-outline" size={22} color="#d97706" />
+                        <View style={{ backgroundColor: '#ffffff', padding: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="shield-checkmark-outline" size={18} color="#d97706" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Bank-Grade Security Controls</Text>
-                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>1-Tap Freeze, custom monthly spending limits, and US Billing Address included.</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Bank-Grade Security Controls</Text>
+                                <Text style={{ color: '#64748b', fontSize: 10, marginTop: 1, lineHeight: 14 }}>1-Tap Freeze, custom monthly limits & US billing address.</Text>
                             </View>
                         </View>
                     </View>
 
-                    {/* SUPPORTED MERCHANTS BAR */}
-                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Supported Platforms</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                            {SUPPORTED_MERCHANTS.map((m, i) => (
-                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                                    <Ionicons name={m.icon as any} size={18} color={m.color} />
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
+                    {/* CONTINUOUS AUTO-SCROLLING MARQUEE OF BRAND LOGOS */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>Supported Platforms</Text>
+                    <ScrollView ref={marqueeRef} horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {SUPPORTED_MERCHANTS.concat(SUPPORTED_MERCHANTS).map((m, i) => (
+                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                    <Ionicons name={m.icon as any} size={16} color={m.color} />
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 11 }}>{m.name}</Text>
                                 </View>
                             ))}
                         </View>
@@ -700,10 +719,10 @@ export default function VirtualCardsScreen() {
                             setShowCreateModal(true);
                             if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         }}
-                        style={{ width: '100%', backgroundColor: '#0f172a', height: 56, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6, flexDirection: 'row', gap: 8 }}
+                        style={{ width: '100%', backgroundColor: '#0f172a', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4, flexDirection: 'row', gap: 6 }}
                     >
-                        <Ionicons name="card" size={20} color="#ffffff" />
-                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Issue Virtual Card ($3 Fee)</Text>
+                        <Ionicons name="card" size={18} color="#ffffff" />
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Issue Virtual Card ($3 Fee)</Text>
                     </TouchableOpacity>
 
                 </ScrollView>
