@@ -48,21 +48,64 @@ interface FeatureFlag {
 }
 
 const ADMIN_LOCKABLE_MODULES = [
-    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline', route: '/manage/nin-pricing' },
-    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline', route: '/manage/smm-pricing' },
-    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline', route: '/manage/bills-pricing' },
-    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline', route: '/manage/cac' },
-    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline', route: '/manage/tickets' },
-    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline', route: '/manage/communications' },
-    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline', route: '/manage/api' },
-    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline', route: '/manage/features' },
-    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline', route: '/manage/cards' },
-    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline', route: '/manage/lending' },
-    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline', route: '/manage/reports' },
-    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin', route: '/manage/crypto' },
-    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline', route: '/manage/security' },
-    { key: 'panic', label: 'Panic Room Lockdown', icon: 'warning-outline', route: '/manage/panic' },
-    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'people-outline', route: '/manage/staff' },
+    // Operations & Core
+    { key: 'users', label: 'Users Management', icon: 'people-outline', cat: 'Operations' },
+    { key: 'transactions', label: 'Transactions & Receipts', icon: 'receipt-outline', cat: 'Operations' },
+    { key: 'kyc', label: 'KYC Queue & Upgrades', icon: 'scan-outline', cat: 'Operations' },
+    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline', cat: 'Operations' },
+    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline', cat: 'Operations' },
+    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline', cat: 'Operations' },
+    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline', cat: 'Operations' },
+    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline', cat: 'Operations' },
+    { key: 'cms', label: 'Content & CMS', icon: 'images-outline', cat: 'Operations' },
+    { key: 'data_plans', label: 'Data Bundles & Plans', icon: 'wifi-outline', cat: 'Operations' },
+    { key: 'airtime', label: 'Airtime Top-up', icon: 'call-outline', cat: 'Operations' },
+    { key: 'localization', label: 'Localization & Languages', icon: 'language-outline', cat: 'Operations' },
+    { key: 'bulk_sms', label: 'Bulk SMS Messaging', icon: 'chatbubbles-outline', cat: 'Operations' },
+    { key: 'reviews', label: 'Customer Reviews Control', icon: 'star-outline', cat: 'Operations' },
+
+    // Banking & Assets
+    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline', cat: 'Banking' },
+    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline', cat: 'Banking' },
+    { key: 'wealth', label: 'Wealth & Investments', icon: 'briefcase-outline', cat: 'Banking' },
+    { key: 'liquidity', label: 'Liquidity Vault', icon: 'water-outline', cat: 'Banking' },
+    { key: 'rates', label: 'Exchange Rates', icon: 'trending-up-outline', cat: 'Banking' },
+
+    // Markets & Analytics
+    { key: 'risk', label: 'Risk Assessment', icon: 'alert-circle-outline', cat: 'Finance' },
+    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline', cat: 'Finance' },
+    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline', cat: 'Finance' },
+    { key: 'ai', label: 'Cortex AI Console', icon: 'sparkles-outline', cat: 'Finance' },
+    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin', cat: 'Finance' },
+
+    // Technical Infrastructure
+    { key: 'infrastructure', label: 'Server Infrastructure', icon: 'server-outline', cat: 'Technical' },
+    { key: 'db', label: 'Database Console', icon: 'server', cat: 'Technical' },
+    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline', cat: 'Technical' },
+    { key: 'cinema', label: 'Media & Cinema Stream', icon: 'videocam-outline', cat: 'Technical' },
+    { key: 'terminal', label: 'CLI System Terminal', icon: 'terminal-outline', cat: 'Technical' },
+    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline', cat: 'Technical' },
+    { key: 'stores', label: 'App Store Deployments', icon: 'logo-apple', cat: 'Technical' },
+    { key: 'files', label: 'Files & Cloud Storage', icon: 'folder-open-outline', cat: 'Technical' },
+
+    // Internal Affairs
+    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'briefcase-outline', cat: 'Internal' },
+    { key: 'voice', label: 'Voice OS Assistant', icon: 'mic-outline', cat: 'Internal' },
+    { key: 'legal', label: 'Legal & Compliance', icon: 'document-text-outline', cat: 'Internal' },
+    { key: 'team', label: 'Team Internal Chat', icon: 'people-circle-outline', cat: 'Internal' },
+    { key: 'academy', label: 'Academy & Training', icon: 'school-outline', cat: 'Internal' },
+    { key: 'appearance', label: 'Theme & Appearance', icon: 'color-palette-outline', cat: 'Internal' },
+    { key: 'automation', label: 'Workflow Automation', icon: 'flash-outline', cat: 'Internal' },
+    { key: 'kanban', label: 'Kanban Task Board', icon: 'grid-outline', cat: 'Internal' },
+
+    // Security & RedZone
+    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline', cat: 'RedZone' },
+    { key: 'forensics', label: 'Digital Forensics', icon: 'finger-print-outline', cat: 'RedZone' },
+    { key: 'secrets', label: 'API Secrets Vault', icon: 'key-outline', cat: 'RedZone' },
+    { key: 'logs', label: 'System Audit Logs', icon: 'list-outline', cat: 'RedZone' },
+    { key: 'map', label: 'User Geography Map', icon: 'earth-outline', cat: 'RedZone' },
+    { key: 'settings', label: 'App System Settings', icon: 'settings-outline', cat: 'RedZone' },
+    { key: 'panic', label: 'PANIC ROOM Emergency Lock', icon: 'warning-outline', cat: 'RedZone' },
 ];
 
 export default function ManageFeaturesScreen() {

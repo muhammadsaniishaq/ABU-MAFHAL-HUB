@@ -239,25 +239,19 @@ export default function AdminBento() {
     const isModuleHiddenForStaff = (itemRoute: string) => {
         if (adminProfile?.role === 'super_admin') return false; // Super Admin sees ALL features
         
-        const routeMap: Record<string, string> = {
+        // Extract module key from route (e.g. '/manage/nin-pricing' -> 'nin_pricing')
+        const routeParts = itemRoute.split('/');
+        const rawKey = routeParts[routeParts.length - 1]?.replace(/-/g, '_');
+
+        const customRouteMap: Record<string, string> = {
             '/manage/nin-pricing': 'nin_pricing',
             '/manage/smm-pricing': 'smm_pricing',
             '/manage/bills-pricing': 'bills_pricing',
-            '/manage/cac': 'cac',
-            '/manage/tickets': 'tickets',
-            '/manage/communications': 'communications',
-            '/manage/api': 'api',
-            '/manage/features': 'features',
-            '/manage/cards': 'cards',
-            '/manage/lending': 'lending',
-            '/manage/reports': 'reports',
-            '/manage/crypto': 'crypto',
-            '/manage/security': 'security',
-            '/manage/panic': 'panic',
-            '/manage/staff': 'staff',
+            '/manage/data-plans': 'data_plans',
+            '/manage/bulk-sms': 'bulk_sms',
         };
 
-        const moduleKey = routeMap[itemRoute];
+        const moduleKey = customRouteMap[itemRoute] || rawKey;
         return !!(moduleKey && hiddenAdminModules.includes(moduleKey));
     };
 

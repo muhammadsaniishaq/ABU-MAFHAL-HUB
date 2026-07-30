@@ -1,25 +1,68 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, Modal, FlatList, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, Modal, FlatList, Switch, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 
-const ADMIN_LOCKABLE_MODULES = [
-    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline' },
-    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline' },
-    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline' },
-    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline' },
-    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline' },
-    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline' },
-    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline' },
-    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline' },
-    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline' },
-    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline' },
-    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline' },
-    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin' },
-    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline' },
-    { key: 'panic', label: 'Panic Room Lockdown', icon: 'warning-outline' },
-    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'people-outline' },
+const ALL_ADMIN_MODULES = [
+    // Operations & Core
+    { key: 'users', label: 'Users Management', icon: 'people-outline', cat: 'Operations' },
+    { key: 'transactions', label: 'Transactions & Receipts', icon: 'receipt-outline', cat: 'Operations' },
+    { key: 'kyc', label: 'KYC Queue & Upgrades', icon: 'scan-outline', cat: 'Operations' },
+    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline', cat: 'Operations' },
+    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline', cat: 'Operations' },
+    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline', cat: 'Operations' },
+    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline', cat: 'Operations' },
+    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline', cat: 'Operations' },
+    { key: 'cms', label: 'Content & CMS', icon: 'images-outline', cat: 'Operations' },
+    { key: 'data_plans', label: 'Data Bundles & Plans', icon: 'wifi-outline', cat: 'Operations' },
+    { key: 'airtime', label: 'Airtime Top-up', icon: 'call-outline', cat: 'Operations' },
+    { key: 'localization', label: 'Localization & Languages', icon: 'language-outline', cat: 'Operations' },
+    { key: 'bulk_sms', label: 'Bulk SMS Messaging', icon: 'chatbubbles-outline', cat: 'Operations' },
+    { key: 'reviews', label: 'Customer Reviews Control', icon: 'star-outline', cat: 'Operations' },
+
+    // Banking & Assets
+    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline', cat: 'Banking' },
+    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline', cat: 'Banking' },
+    { key: 'wealth', label: 'Wealth & Investments', icon: 'briefcase-outline', cat: 'Banking' },
+    { key: 'liquidity', label: 'Liquidity Vault', icon: 'water-outline', cat: 'Banking' },
+    { key: 'rates', label: 'Exchange Rates', icon: 'trending-up-outline', cat: 'Banking' },
+
+    // Markets & Analytics
+    { key: 'risk', label: 'Risk Assessment', icon: 'alert-circle-outline', cat: 'Finance' },
+    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline', cat: 'Finance' },
+    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline', cat: 'Finance' },
+    { key: 'ai', label: 'Cortex AI Console', icon: 'sparkles-outline', cat: 'Finance' },
+    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin', cat: 'Finance' },
+
+    // Technical Infrastructure
+    { key: 'infrastructure', label: 'Server Infrastructure', icon: 'server-outline', cat: 'Technical' },
+    { key: 'db', label: 'Database Console', icon: 'server', cat: 'Technical' },
+    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline', cat: 'Technical' },
+    { key: 'cinema', label: 'Media & Cinema Stream', icon: 'videocam-outline', cat: 'Technical' },
+    { key: 'terminal', label: 'CLI System Terminal', icon: 'terminal-outline', cat: 'Technical' },
+    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline', cat: 'Technical' },
+    { key: 'stores', label: 'App Store Deployments', icon: 'logo-apple', cat: 'Technical' },
+    { key: 'files', label: 'Files & Cloud Storage', icon: 'folder-open-outline', cat: 'Technical' },
+
+    // Internal Affairs
+    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'briefcase-outline', cat: 'Internal' },
+    { key: 'voice', label: 'Voice OS Assistant', icon: 'mic-outline', cat: 'Internal' },
+    { key: 'legal', label: 'Legal & Compliance', icon: 'document-text-outline', cat: 'Internal' },
+    { key: 'team', label: 'Team Internal Chat', icon: 'people-circle-outline', cat: 'Internal' },
+    { key: 'academy', label: 'Academy & Training', icon: 'school-outline', cat: 'Internal' },
+    { key: 'appearance', label: 'Theme & Appearance', icon: 'color-palette-outline', cat: 'Internal' },
+    { key: 'automation', label: 'Workflow Automation', icon: 'flash-outline', cat: 'Internal' },
+    { key: 'kanban', label: 'Kanban Task Board', icon: 'grid-outline', cat: 'Internal' },
+
+    // Security & RedZone
+    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline', cat: 'RedZone' },
+    { key: 'forensics', label: 'Digital Forensics', icon: 'finger-print-outline', cat: 'RedZone' },
+    { key: 'secrets', label: 'API Secrets Vault', icon: 'key-outline', cat: 'RedZone' },
+    { key: 'logs', label: 'System Audit Logs', icon: 'list-outline', cat: 'RedZone' },
+    { key: 'map', label: 'User Geography Map', icon: 'earth-outline', cat: 'RedZone' },
+    { key: 'settings', label: 'App System Settings', icon: 'settings-outline', cat: 'RedZone' },
+    { key: 'panic', label: 'PANIC ROOM Emergency Lock', icon: 'warning-outline', cat: 'RedZone' },
 ];
 
 export default function StaffManager() {
@@ -31,6 +74,34 @@ export default function StaffManager() {
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('admin');
     const [actionLoading, setActionLoading] = useState(false);
+
+    // Module hiding search & category filter state
+    const [moduleSearch, setModuleSearch] = useState('');
+    const [activeCategory, setActiveCategory] = useState('All');
+
+    const applyQuickPreset = async (adminId: string, type: 'hide_redzone' | 'enable_all' | 'hide_all') => {
+        let newList: string[] = [];
+        if (type === 'hide_redzone') {
+            const redZoneKeys = ALL_ADMIN_MODULES.filter(m => m.cat === 'RedZone').map(m => m.key);
+            newList = Array.from(new Set([...individualHiddenModules, ...redZoneKeys]));
+        } else if (type === 'hide_all') {
+            newList = ALL_ADMIN_MODULES.map(m => m.key);
+        } else if (type === 'enable_all') {
+            newList = [];
+        }
+
+        setIndividualHiddenModules(newList);
+        try {
+            await supabase.from('app_settings').upsert({
+                key: `admin_hidden_modules_${adminId}`,
+                value: JSON.stringify(newList)
+            }, { onConflict: 'key' });
+
+            Alert.alert('Preset Applied 🪄', `Permissions updated successfully!`);
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
+    };
 
     useEffect(() => {
         fetchStaff();
@@ -348,40 +419,147 @@ export default function StaffManager() {
                                 )}
                             </View>
                             <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
-                                {/* 👑 Super Admin Per-Admin Custom Feature Hiding Controls */}
+                                {/* 👑 Super Admin Per-Admin Custom Feature Hiding Studio */}
                                 {currentUserRole === 'super_admin' && (
-                                    <View style={{ backgroundColor: '#fffbeb', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fde68a', marginBottom: 20 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                            <Ionicons name="shield-checkmark" size={16} color="#d97706" />
-                                            <Text style={{ fontWeight: '900', fontSize: 12, color: '#d97706' }}>PER-ADMIN FEATURE ACCESS PERMISSIONS</Text>
+                                    <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Ionicons name="shield-checkmark" size={16} color="#d97706" />
+                                                </View>
+                                                <Text style={{ fontWeight: '900', fontSize: 13, color: '#0f172a' }}>PER-ADMIN MODULE PERMISSIONS</Text>
+                                            </View>
+                                            <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a' }}>
+                                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#d97706' }}>
+                                                    {ALL_ADMIN_MODULES.length - individualHiddenModules.length}/{ALL_ADMIN_MODULES.length} ENABLED
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <Text style={{ color: '#475569', fontSize: 10, marginBottom: 12, lineHeight: 14 }}>
-                                            Toggle switches below to HIDE or SHOW specific modules for {selectedAdmin.full_name || 'this admin'} ALONE. Only features enabled here will be visible to this admin.
+
+                                        <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 12, lineHeight: 15 }}>
+                                            Custom permissions for <Text style={{ fontWeight: 'bold', color: '#0f172a' }}>{selectedAdmin.full_name || 'this admin'}</Text>. Disabled modules will be hidden completely from their admin dashboard.
                                         </Text>
 
-                                        {ADMIN_LOCKABLE_MODULES.map(mod => {
-                                            const isHidden = individualHiddenModules.includes(mod.key);
-                                            return (
-                                                <View key={mod.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: 'rgba(217, 119, 6, 0.1)' }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                                                        <Ionicons name={mod.icon as any} size={16} color={isHidden ? '#ef4444' : '#0f172a'} />
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text style={{ fontWeight: 'bold', fontSize: 11, color: isHidden ? '#ef4444' : '#0f172a' }}>{mod.label}</Text>
-                                                            <Text style={{ fontSize: 9, fontWeight: '700', color: isHidden ? '#ef4444' : '#10b981' }}>
-                                                                {isHidden ? 'HIDDEN FOR THIS ADMIN 🙈' : 'VISIBLE TO THIS ADMIN 👁️'}
+                                        {/* Search Input */}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12, height: 38 }}>
+                                            <Ionicons name="search-outline" size={16} color="#94a3b8" />
+                                            <TextInput
+                                                style={{ flex: 1, marginLeft: 8, fontSize: 12, color: '#0f172a' }}
+                                                placeholder="Search 48+ modules by name..."
+                                                placeholderTextColor="#94a3b8"
+                                                value={moduleSearch}
+                                                onChangeText={setModuleSearch}
+                                            />
+                                            {moduleSearch.length > 0 && (
+                                                <TouchableOpacity onPress={() => setModuleSearch('')}>
+                                                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+
+                                        {/* Category Chips */}
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                                {['All', 'Operations', 'Banking', 'Finance', 'Technical', 'Internal', 'RedZone'].map(cat => {
+                                                    const isActive = activeCategory === cat;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={cat}
+                                                            onPress={() => setActiveCategory(cat)}
+                                                            style={{
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 6,
+                                                                borderRadius: 20,
+                                                                backgroundColor: isActive ? (cat === 'RedZone' ? '#ef4444' : '#0f172a') : '#f1f5f9',
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 10, fontWeight: '800', color: isActive ? '#ffffff' : '#64748b' }}>
+                                                                {cat === 'RedZone' ? '🚨 RedZone' : cat}
                                                             </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        </ScrollView>
+
+                                        {/* 1-Tap Presets Bar */}
+                                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                                            <TouchableOpacity
+                                                onPress={() => applyQuickPreset(selectedAdmin.id, 'hide_redzone')}
+                                                style={{ flex: 1, backgroundColor: '#fef2f2', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}
+                                            >
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#ef4444' }}>🚨 Hide RedZone</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={() => applyQuickPreset(selectedAdmin.id, 'enable_all')}
+                                                style={{ flex: 1, backgroundColor: '#ecfdf5', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#a7f3d0' }}
+                                            >
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#10b981' }}>👁️ Enable All</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={() => applyQuickPreset(selectedAdmin.id, 'hide_all')}
+                                                style={{ flex: 1, backgroundColor: '#f8fafc', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
+                                            >
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748b' }}>🙈 Lock All</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Module Cards List */}
+                                        {ALL_ADMIN_MODULES
+                                            .filter(m => (activeCategory === 'All' || m.cat === activeCategory) && m.label.toLowerCase().includes(moduleSearch.toLowerCase()))
+                                            .map(mod => {
+                                                const isHidden = individualHiddenModules.includes(mod.key);
+                                                return (
+                                                    <View
+                                                        key={mod.key}
+                                                        style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            justify: 'space-between',
+                                                            padding: 10,
+                                                            borderRadius: 14,
+                                                            backgroundColor: isHidden ? '#fef2f2' : '#f8fafc',
+                                                            borderWidth: 1,
+                                                            borderColor: isHidden ? '#fecaca' : '#e2e8f0',
+                                                            marginBottom: 8,
+                                                        }}
+                                                    >
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                                            <View style={{
+                                                                width: 32, height: 32, borderRadius: 10,
+                                                                backgroundColor: isHidden ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 166, 35, 0.15)',
+                                                                alignItems: 'center', justifyContent: 'center'
+                                                            }}>
+                                                                <Ionicons name={mod.icon as any} size={16} color={isHidden ? '#ef4444' : '#d97706'} />
+                                                            </View>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={{ fontWeight: 'bold', fontSize: 11, color: isHidden ? '#ef4444' : '#0f172a' }}>{mod.label}</Text>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                                                    <View style={{
+                                                                        paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6,
+                                                                        backgroundColor: isHidden ? '#fef2f2' : '#ecfdf5',
+                                                                        borderWidth: 1, borderColor: isHidden ? '#fecaca' : '#a7f3d0'
+                                                                    }}>
+                                                                        <Text style={{ fontSize: 8, fontWeight: '800', color: isHidden ? '#ef4444' : '#10b981' }}>
+                                                                            {isHidden ? 'HIDDEN 🙈' : 'ENABLED 👁️'}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <Text style={{ fontSize: 8, fontWeight: '700', color: '#94a3b8' }}>• {mod.cat}</Text>
+                                                                </View>
+                                                            </View>
                                                         </View>
+                                                        <Switch
+                                                            trackColor={{ false: "#22c55e", true: "#ef4444" }}
+                                                            thumbColor="#fff"
+                                                            style={{ transform: [{ scaleX: 0.65 }, { scaleY: 0.65 }] }}
+                                                            onValueChange={() => toggleIndividualModule(selectedAdmin.id, mod.key)}
+                                                            value={isHidden}
+                                                        />
                                                     </View>
-                                                    <Switch
-                                                        trackColor={{ false: "#22c55e", true: "#ef4444" }}
-                                                        thumbColor="#fff"
-                                                        style={{ transform: [{ scaleX: 0.65 }, { scaleY: 0.65 }] }}
-                                                        onValueChange={() => toggleIndividualModule(selectedAdmin.id, mod.key)}
-                                                        value={isHidden}
-                                                    />
-                                                </View>
-                                            );
-                                        })}
+                                                );
+                                            })}
                                     </View>
                                 )}
 
