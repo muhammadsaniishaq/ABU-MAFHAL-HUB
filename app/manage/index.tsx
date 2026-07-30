@@ -437,6 +437,17 @@ export default function AdminBento() {
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
                             <TouchableOpacity 
+                                style={[s.quickActionBtn, { backgroundColor: '#78350f', borderColor: '#f5a623' }]}
+                                onPress={() => router.push('/manage/super-admin' as any)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(245, 166, 35, 0.2)' }]}>
+                                    <Ionicons name="ribbon-outline" size={20} color="#f5a623" />
+                                </View>
+                                <Text style={[s.quickActionLabel, { color: '#ffffff', fontWeight: 'bold' }]}>Master Hub</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
                                 style={[s.quickActionBtn, { backgroundColor: '#1e1b4b', borderColor: '#6366f1' }]}
                                 onPress={() => router.push('/manage/staff')}
                                 activeOpacity={0.8}
