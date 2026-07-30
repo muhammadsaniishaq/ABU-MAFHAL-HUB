@@ -128,10 +128,30 @@ export default function AdminBento() {
         redZone: false,
     });
 
+    const [hiddenAdminModules, setHiddenAdminModules] = useState<string[]>([]);
+
     useEffect(() => {
         fetchCounts();
         fetchLogoIcon();
+        fetchHiddenAdminModules();
     }, []);
+
+    const fetchHiddenAdminModules = async () => {
+        try {
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'hidden_admin_modules')
+                .single();
+
+            if (data?.value) {
+                const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                if (Array.isArray(parsed)) setHiddenAdminModules(parsed);
+            }
+        } catch (e) {
+            console.error('Error fetching hidden admin modules:', e);
+        }
+    };
 
     const fetchLogoIcon = async () => {
         try {
@@ -197,9 +217,41 @@ export default function AdminBento() {
         }));
     };
 
+    const isModuleHiddenForStaff = (itemRoute: string) => {
+        if (adminProfile?.role === 'super_admin') return false; // Super Admin sees ALL features
+        
+        const routeMap: Record<string, string> = {
+            '/manage/nin-pricing': 'nin_pricing',
+            '/manage/smm-pricing': 'smm_pricing',
+            '/manage/bills-pricing': 'bills_pricing',
+            '/manage/cac': 'cac',
+            '/manage/tickets': 'tickets',
+            '/manage/communications': 'communications',
+            '/manage/api': 'api',
+            '/manage/features': 'features',
+            '/manage/cards': 'cards',
+            '/manage/lending': 'lending',
+            '/manage/reports': 'reports',
+            '/manage/crypto': 'crypto',
+            '/manage/security': 'security',
+            '/manage/panic': 'panic',
+            '/manage/staff': 'staff',
+        };
+
+        const moduleKey = routeMap[itemRoute];
+        return !!(moduleKey && hiddenAdminModules.includes(moduleKey));
+    };
+
     const renderSectionAccordion = (key: keyof typeof modules) => {
         const meta = categoryMeta[key];
-        const items = modules[key];
+        const allItems = modules[key];
+        const visibleItems = allItems.filter(item => !isModuleHiddenForStaff(item.route));
+        
+        if (visibleItems.length === 0 && adminProfile?.role !== 'super_admin') {
+            return null; // Don't render empty section if all items are hidden for staff
+        }
+
+        const items = adminProfile?.role === 'super_admin' ? allItems : visibleItems;
         const isExpanded = expandedSections[key];
         
         return (

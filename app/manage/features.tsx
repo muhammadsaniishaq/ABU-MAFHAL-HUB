@@ -47,17 +47,89 @@ interface FeatureFlag {
     maintenance_message: string;
 }
 
+const ADMIN_LOCKABLE_MODULES = [
+    { key: 'nin_pricing', label: 'NIN & Services Pricing', icon: 'pricetag-outline', route: '/manage/nin-pricing' },
+    { key: 'smm_pricing', label: 'SMM Services Pricing', icon: 'thumbs-up-outline', route: '/manage/smm-pricing' },
+    { key: 'bills_pricing', label: 'Bills & Utilities Pricing', icon: 'flash-outline', route: '/manage/bills-pricing' },
+    { key: 'cac', label: 'CAC Business Management', icon: 'briefcase-outline', route: '/manage/cac' },
+    { key: 'tickets', label: 'Help Desk & Support Tickets', icon: 'chatbubbles-outline', route: '/manage/tickets' },
+    { key: 'communications', label: 'Broadcast Communications', icon: 'megaphone-outline', route: '/manage/communications' },
+    { key: 'api', label: 'API Integrations & Keys', icon: 'code-working-outline', route: '/manage/api' },
+    { key: 'features', label: 'System Feature Flags', icon: 'toggle-outline', route: '/manage/features' },
+    { key: 'cards', label: 'Virtual Cards Management', icon: 'card-outline', route: '/manage/cards' },
+    { key: 'lending', label: 'Loans & Lending', icon: 'cash-outline', route: '/manage/lending' },
+    { key: 'reports', label: 'Analytics & Financial Reports', icon: 'bar-chart-outline', route: '/manage/reports' },
+    { key: 'crypto', label: 'Crypto Assets Management', icon: 'logo-bitcoin', route: '/manage/crypto' },
+    { key: 'security', label: 'Security & 2FA Hub', icon: 'shield-checkmark-outline', route: '/manage/security' },
+    { key: 'panic', label: 'Panic Room Lockdown', icon: 'warning-outline', route: '/manage/panic' },
+    { key: 'staff', label: 'Staff HR & Team Roles', icon: 'people-outline', route: '/manage/staff' },
+];
+
 export default function ManageFeaturesScreen() {
     const [features, setFeatures] = useState<FeatureFlag[]>([]);
+    const [hiddenModules, setHiddenModules] = useState<string[]>([]);
+    const [userRole, setUserRole] = useState<string>('admin');
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState<string | null>(null);
     const [editMessage, setEditMessage] = useState<string | null>(null);
     const [messageInput, setMessageInput] = useState('');
+    const [activeTab, setActiveTab] = useState<'app_features' | 'admin_locks'>('admin_locks');
     const router = useRouter();
 
     useEffect(() => {
         fetchFeatures();
+        fetchHiddenAdminModules();
     }, []);
+
+    const fetchHiddenAdminModules = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                if (profile?.role) setUserRole(profile.role);
+            }
+
+            const { data } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'hidden_admin_modules')
+                .single();
+
+            if (data?.value) {
+                const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                if (Array.isArray(parsed)) setHiddenModules(parsed);
+            }
+        } catch (e) {
+            console.log('Error fetching hidden modules:', e);
+        }
+    };
+
+    const toggleHideModule = async (moduleKey: string) => {
+        if (userRole !== 'super_admin') {
+            return Alert.alert('Access Restricted 🔒', 'Only Super Admin can hide or show feature modules for staff admins.');
+        }
+
+        try {
+            let updatedList: string[];
+            if (hiddenModules.includes(moduleKey)) {
+                updatedList = hiddenModules.filter(k => k !== moduleKey);
+            } else {
+                updatedList = [...hiddenModules, moduleKey];
+            }
+
+            setHiddenModules(updatedList);
+
+            await supabase.from('app_settings').upsert({
+                key: 'hidden_admin_modules',
+                value: JSON.stringify(updatedList)
+            }, { onConflict: 'key' });
+
+            const actionLabel = updatedList.includes(moduleKey) ? 'HIDDEN from Staff Admins 🙈' : 'MADE VISIBLE to Staff Admins 👁️';
+            Alert.alert('Module Access Updated 👑', `Module "${moduleKey.toUpperCase()}" is now ${actionLabel}`);
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
+    };
 
     const fetchFeatures = async () => {
         setLoading(true);
@@ -161,22 +233,87 @@ export default function ManageFeaturesScreen() {
             </LinearGradient>
             
             <ScrollView style={s.scrollView} contentContainerStyle={{ paddingBottom: 40 }}>
-                {/* Intro Banner */}
-                <View style={s.introBanner}>
-                    <Ionicons name="construct" size={24} color="#0d1b3e" style={{ marginBottom: 4 }} />
-                    <Text style={s.introTitle}>System Maintenance</Text>
-                    <Text style={s.introDesc}>
-                        Toggle features ON/OFF to restrict user access. When a feature is OFF, users will see the maintenance message.
-                    </Text>
+                {/* Tab Selector */}
+                <View style={{ flexDirection: 'row', backgroundColor: '#ffffff', padding: 4, borderRadius: 16, marginBottom: 16, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                    <TouchableOpacity 
+                        onPress={() => setActiveTab('admin_locks')}
+                        style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12, backgroundColor: activeTab === 'admin_locks' ? '#fffbeb' : 'transparent', borderWidth: activeTab === 'admin_locks' ? 1 : 0, borderColor: '#fde68a' }}
+                    >
+                        <Text style={{ fontWeight: '900', fontSize: 11, color: activeTab === 'admin_locks' ? '#d97706' : '#64748b' }}>👑 ADMIN MODULE LOCKS</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        onPress={() => setActiveTab('app_features')}
+                        style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12, backgroundColor: activeTab === 'app_features' ? '#eff6ff' : 'transparent', borderWidth: activeTab === 'app_features' ? 1 : 0, borderColor: '#bfdbfe' }}
+                    >
+                        <Text style={{ fontWeight: '900', fontSize: 11, color: activeTab === 'app_features' ? '#2563eb' : '#64748b' }}>⚙️ USER APP FEATURES</Text>
+                    </TouchableOpacity>
                 </View>
 
-                {loading ? (
-                    <View style={{ marginTop: 40 }}>
-                        <ActivityIndicator size="large" color="#0d1b3e" />
+                {/* 👑 TAB 1: ADMIN MODULE HIDING MATRIX */}
+                {activeTab === 'admin_locks' && (
+                    <View style={{ marginBottom: 20 }}>
+                        <View style={{ backgroundColor: '#fffbeb', padding: 14, borderRadius: 16, borderHeight: 1, borderColor: '#fde68a', marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <Ionicons name="eye-off-outline" size={18} color="#d97706" />
+                                <Text style={{ fontWeight: '900', fontSize: 12, color: '#d97706' }}>SUPER ADMIN MODULE HIDING CONTROL</Text>
+                            </View>
+                            <Text style={{ color: '#475569', fontSize: 11, lineHeight: 16 }}>
+                                Toggle switches below to HIDE or SHOW specific modules from normal Staff Admins. When a module is HIDDEN, normal staff admins will NOT see or have access to it on their dashboard. Super Admin always retains master key access.
+                            </Text>
+                        </View>
+
+                        <View style={s.listContainer}>
+                            {ADMIN_LOCKABLE_MODULES.map((mod) => {
+                                const isHidden = hiddenModules.includes(mod.key);
+                                return (
+                                    <View key={mod.key} style={[s.card, isHidden && { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
+                                        <View style={s.cardHeader}>
+                                            <View style={s.cardHeaderTop}>
+                                                <View style={[s.cardIconBox, isHidden && { backgroundColor: '#fee2e2' }]}>
+                                                    <Ionicons name={mod.icon as any} size={16} color={isHidden ? '#ef4444' : '#0d1b3e'} />
+                                                </View>
+                                                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                                                    <Text style={[s.cardTitle, isHidden && { color: '#ef4444' }]}>{mod.label}</Text>
+                                                    <Text style={{ fontSize: 10, fontWeight: '700', color: isHidden ? '#ef4444' : '#10b981', marginTop: 2 }}>
+                                                        {isHidden ? 'HIDDEN FROM STAFF ADMINS 🙈' : 'VISIBLE TO STAFF ADMINS 👁️'}
+                                                    </Text>
+                                                </View>
+                                                <Switch
+                                                    trackColor={{ false: "#22c55e", true: "#ef4444" }}
+                                                    thumbColor="#fff"
+                                                    ios_backgroundColor="#22c55e"
+                                                    style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+                                                    onValueChange={() => toggleHideModule(mod.key)}
+                                                    value={isHidden}
+                                                />
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
                     </View>
-                ) : (
-                    <View style={s.listContainer}>
-                        {features.map((feature) => (
+                )}
+
+                {/* TAB 2: USER APP SYSTEM FEATURES */}
+                {activeTab === 'app_features' && (
+                    <>
+                        <View style={s.introBanner}>
+                            <Ionicons name="construct" size={24} color="#0d1b3e" style={{ marginBottom: 4 }} />
+                            <Text style={s.introTitle}>User App Feature Flags</Text>
+                            <Text style={s.introDesc}>
+                                Toggle features ON/OFF to restrict mobile app users. When a feature is OFF, users will see the maintenance message.
+                            </Text>
+                        </View>
+
+                        {loading ? (
+                            <View style={{ marginTop: 40 }}>
+                                <ActivityIndicator size="large" color="#0d1b3e" />
+                            </View>
+                        ) : (
+                            <View style={s.listContainer}>
+                                {features.map((feature) => (
                             <View key={feature.feature_key} style={s.card}>
                                 <View style={s.cardHeader}>
                                     <View style={s.cardHeaderTop}>
