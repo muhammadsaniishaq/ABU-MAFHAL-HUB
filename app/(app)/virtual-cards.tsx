@@ -167,21 +167,26 @@ export default function VirtualCardsScreen() {
         };
     };
 
-    // Cross-platform Alert Helper for Web & Mobile
+    // Custom Modern In-App Alert Modal State
+    const [customAlert, setCustomAlert] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        buttons: Array<{ text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void }>;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        buttons: []
+    });
+
     const showAlert = (title: string, message?: string, buttons?: any[]) => {
-        if (Platform.OS === 'web') {
-            if (buttons && buttons.length > 1) {
-                const confirmed = window.confirm(`${title}\n\n${message || ''}`);
-                if (confirmed) {
-                    const confirmBtn = buttons.find(b => b.style !== 'cancel' && b.onPress);
-                    if (confirmBtn && confirmBtn.onPress) confirmBtn.onPress();
-                }
-            } else {
-                window.alert(`${title}\n\n${message || ''}`);
-            }
-        } else {
-            Alert.alert(title, message, buttons);
-        }
+        setCustomAlert({
+            visible: true,
+            title,
+            message: message || '',
+            buttons: buttons && buttons.length > 0 ? buttons : [{ text: 'OK', style: 'default' }]
+        });
     };
 
     const handleCreateCard = async () => {
@@ -1147,6 +1152,77 @@ export default function VirtualCardsScreen() {
                         >
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Close</Text>
                         </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ULTRA-MODERN CUSTOM IN-APP ALERT MODAL */}
+            <Modal visible={customAlert.visible} animationType="fade" transparent presentationStyle="overFullScreen">
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, width: '100%', maxWidth: 360, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 10 }}>
+                        
+                        {/* Dynamic Header Icon Badge */}
+                        <View style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 28,
+                            backgroundColor: customAlert.title.includes('Failed') || customAlert.title.includes('Error') || customAlert.title.includes('Terminate') ? '#fef2f2' : '#ecfdf5',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginBottom: 14,
+                            borderWidth: 1,
+                            borderColor: customAlert.title.includes('Failed') || customAlert.title.includes('Error') || customAlert.title.includes('Terminate') ? '#fecaca' : '#a7f3d0'
+                        }}>
+                            <Ionicons
+                                name={
+                                    customAlert.title.includes('Failed') || customAlert.title.includes('Error') ? 'close-circle' :
+                                    customAlert.title.includes('Terminate') ? 'alert-circle' : 'checkmark-circle'
+                                }
+                                size={32}
+                                color={
+                                    customAlert.title.includes('Failed') || customAlert.title.includes('Error') || customAlert.title.includes('Terminate') ? '#ef4444' : '#10b981'
+                                }
+                            />
+                        </View>
+
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textAlign: 'center', marginBottom: 6 }}>
+                            {customAlert.title}
+                        </Text>
+                        
+                        <Text style={{ color: '#64748b', fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 20 }}>
+                            {customAlert.message}
+                        </Text>
+
+                        {/* Action Buttons Row */}
+                        <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+                            {customAlert.buttons.map((btn, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    onPress={() => {
+                                        setCustomAlert(prev => ({ ...prev, visible: false }));
+                                        if (btn.onPress) btn.onPress();
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        height: 46,
+                                        borderRadius: 14,
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        backgroundColor: btn.style === 'destructive' ? '#ef4444' : btn.style === 'cancel' ? '#f1f5f9' : '#0f172a',
+                                        borderWidth: btn.style === 'cancel' ? 1 : 0,
+                                        borderColor: '#cbd5e1'
+                                    }}
+                                >
+                                    <Text style={{
+                                        color: btn.style === 'cancel' ? '#475569' : '#ffffff',
+                                        fontWeight: '900',
+                                        fontSize: 14
+                                    }}>
+                                        {btn.text}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
                 </View>
             </Modal>
