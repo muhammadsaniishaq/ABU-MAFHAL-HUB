@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput, ActivityIndicator, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput, ActivityIndicator, StyleSheet, Platform, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -429,7 +429,7 @@ export default function AdminBento() {
                 {/* Dynamic Quick Actions / Master Control Panel */}
                 {adminProfile?.role === 'super_admin' ? (
                     <View style={s.quickActionsSection}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'between', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                             <Text style={s.sectionHeader}>👑 Super Admin Master Controls</Text>
                             <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
                                 <Text style={{ color: T.gold, fontSize: 10, fontWeight: 'bold' }}>ROOT PERMISSIONS</Text>
