@@ -9,11 +9,12 @@ import {
     Modal, 
     TextInput, 
     Dimensions,
-    Platform 
+    Platform,
+    Switch 
 } from 'react-native';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
@@ -32,6 +33,13 @@ const SUPPORTED_MERCHANTS = [
     { name: 'Spotify', icon: 'musical-notes', color: '#1DB954' },
 ];
 
+const CARD_SKINS = {
+    obsidian: { name: 'Midnight Obsidian 👑', colors: ['#0f172a', '#1e293b', '#0f172a'], text: '#ffffff', accent: '#f5a623' },
+    sapphire: { name: 'Royal Sapphire 💎', colors: ['#1e1b4b', '#312e81', '#1e1b4b'], text: '#ffffff', accent: '#60a5fa' },
+    rose_gold: { name: 'Rose Gold Pearl 🌸', colors: ['#881337', '#be123c', '#4c0519'], text: '#ffffff', accent: '#f472b6' },
+    emerald: { name: 'Emerald Cyber ⚡', colors: ['#064e3b', '#047857', '#022c22'], text: '#ffffff', accent: '#34d399' },
+};
+
 export default function VirtualCardsScreen() {
     const { settings } = useAppSettings();
     const router = useRouter();
@@ -43,11 +51,22 @@ export default function VirtualCardsScreen() {
     const [showFullDetails, setShowFullDetails] = useState(false);
     const [walletBalance, setWalletBalance] = useState(0);
 
+    // Selected Card Skin
+    const [activeSkin, setActiveSkin] = useState<'obsidian' | 'sapphire' | 'rose_gold' | 'emerald'>('obsidian');
+
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showFundModal, setShowFundModal] = useState(false);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
+    const [showControlsModal, setShowControlsModal] = useState(false);
+    const [showStatementModal, setShowStatementModal] = useState(false);
+
+    // Card Controls & Limits State
+    const [monthlySpendingLimit, setMonthlySpendingLimit] = useState('1000');
+    const [onlineShoppingEnabled, setOnlineShoppingEnabled] = useState(true);
+    const [contactlessEnabled, setContactlessEnabled] = useState(true);
+    const [internationalEnabled, setInternationalEnabled] = useState(true);
 
     // Creation Form State
     const [cardCurrency, setCardCurrency] = useState<'USD' | 'NGN'>('USD');
@@ -221,6 +240,8 @@ export default function VirtualCardsScreen() {
         );
     };
 
+    const skinTheme = CARD_SKINS[activeSkin];
+
     return (
         <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
             <Stack.Screen options={{ 
@@ -234,13 +255,13 @@ export default function VirtualCardsScreen() {
             {loading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <ActivityIndicator size="large" color="#d97706" />
-                    <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Payvessel Cards...</Text>
+                    <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Virtual Cards...</Text>
                 </View>
             ) : cards.length > 0 && selectedCard ? (
                 <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
                     
-                    {/* Header Top Bar: Main Wallet & New Card Button */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+                    {/* Top Wallet Bar */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
                         <View>
                             <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
                             <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
@@ -254,44 +275,33 @@ export default function VirtualCardsScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Multiple Cards Switcher Tabs */}
-                    {cards.length > 1 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                                {cards.map((c, i) => (
-                                    <TouchableOpacity
-                                        key={c.id}
-                                        onPress={() => {
-                                            setSelectedCard(c);
-                                            setShowFullDetails(false);
-                                        }}
-                                        style={{
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 8,
-                                            borderRadius: 16,
-                                            backgroundColor: selectedCard.id === c.id ? '#0f172a' : '#ffffff',
-                                            borderWidth: 1,
-                                            borderColor: selectedCard.id === c.id ? '#0f172a' : '#e2e8f0',
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            gap: 6
-                                        }}
-                                    >
-                                        <Ionicons name="card" size={14} color={selectedCard.id === c.id ? '#ffffff' : '#0f172a'} />
-                                        <Text style={{ color: selectedCard.id === c.id ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 11 }}>
-                                            Card #{i + 1} ({c.currency})
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </ScrollView>
-                    )}
+                    {/* CARD SKIN CUSTOMIZER SELECTOR */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Choose Card Skin</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {(Object.keys(CARD_SKINS) as Array<keyof typeof CARD_SKINS>).map(skinKey => (
+                                <TouchableOpacity
+                                    key={skinKey}
+                                    onPress={() => {
+                                        setActiveSkin(skinKey);
+                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    }}
+                                    style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: 11,
+                                        backgroundColor: CARD_SKINS[skinKey].colors[0],
+                                        borderWidth: activeSkin === skinKey ? 2 : 0,
+                                        borderColor: '#d97706'
+                                    }}
+                                />
+                            ))}
+                        </View>
+                    </View>
 
-                    {/* ULTRA-LUXURY ROYAL 3D VIRTUAL CARD VISUAL */}
+                    {/* ULTRA-LUXURY 3D VIRTUAL CARD VISUAL */}
                     <LinearGradient
-                        colors={selectedCard.currency === 'USD' 
-                            ? ['#0f172a', '#1e293b', '#0f172a'] 
-                            : ['#451a03', '#7c2d12', '#0f172a']}
+                        colors={skinTheme.colors as any}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={{
@@ -302,7 +312,7 @@ export default function VirtualCardsScreen() {
                             justifyContent: 'space-between',
                             marginBottom: 20,
                             borderWidth: 1.5,
-                            borderColor: selectedCard.status === 'frozen' ? '#ef4444' : '#d97706',
+                            borderColor: selectedCard.status === 'frozen' ? '#ef4444' : skinTheme.accent,
                             position: 'relative',
                             overflow: 'hidden',
                             shadowColor: '#000',
@@ -313,13 +323,13 @@ export default function VirtualCardsScreen() {
                         }}
                     >
                         {/* Metallic Watermark */}
-                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(217, 119, 6, 0.15)' }} />
+                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
 
-                        {/* Top Row: Payvessel Badge & Live Status Pulse */}
+                        {/* Top Row: Brand & Status Badge */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
-                                    <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>PAYVESSEL SECURE</Text>
+                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
+                                    <Text style={{ color: skinTheme.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>PAYVESSEL SECURE</Text>
                                 </View>
                                 <View style={{ backgroundColor: selectedCard.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                     <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: selectedCard.status === 'active' ? '#22c55e' : '#ef4444' }} />
@@ -333,7 +343,7 @@ export default function VirtualCardsScreen() {
 
                         {/* Metallic Chip & Contactless Symbol */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, zIndex: 10 }}>
-                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: '#f5a623', borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
+                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: skinTheme.accent, borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 3 }} />
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
                             </View>
@@ -360,7 +370,7 @@ export default function VirtualCardsScreen() {
                                 </View>
                                 <View>
                                     <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>CVV</Text>
-                                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 14, marginTop: 2 }}>
+                                    <Text style={{ color: skinTheme.accent, fontWeight: '900', fontSize: 14, marginTop: 2 }}>
                                         {showFullDetails ? (selectedCard.cvv || '882') : '•••'}
                                     </Text>
                                 </View>
@@ -390,8 +400,8 @@ export default function VirtualCardsScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* MODERN QUICK ACTIONS GRID */}
-                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Card Controls & Security</Text>
+                    {/* BIG GLOBAL FINTECH APPS CONTROL GRID */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Global App Card Controls</Text>
                     
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
                         <TouchableOpacity 
@@ -411,8 +421,16 @@ export default function VirtualCardsScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity 
+                            onPress={() => setShowControlsModal(true)}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#0f172a', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                        >
+                            <Ionicons name="options-outline" size={20} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>Limits & Controls</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
                             onPress={handleToggleFreeze}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                         >
                             <Ionicons name={selectedCard.status === 'active' ? "lock-closed-outline" : "lock-open-outline"} size={20} color="#ffffff" />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>
@@ -422,10 +440,18 @@ export default function VirtualCardsScreen() {
 
                         <TouchableOpacity 
                             onPress={() => setShowAddressModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
                         >
                             <Ionicons name="location-outline" size={20} color="#0f172a" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Billing Address</Text>
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>US Address</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={() => setShowStatementModal(true)}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
+                        >
+                            <Ionicons name="document-text-outline" size={20} color="#0f172a" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Statement Logs</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -435,7 +461,7 @@ export default function VirtualCardsScreen() {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             {SUPPORTED_MERCHANTS.map((m, i) => (
-                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 }}>
+                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
                                     <Ionicons name={m.icon as any} size={18} color={m.color} />
                                     <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
                                 </View>
@@ -472,6 +498,105 @@ export default function VirtualCardsScreen() {
                     </TouchableOpacity>
                 </View>
             )}
+
+            {/* MODAL: LIMITS & CONTROLS (GLOBAL FINTECH APP FEATURE) */}
+            <Modal visible={showControlsModal} animationType="slide" transparent presentationStyle="overFullScreen">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>Card Limits & Security Switches</Text>
+                            <TouchableOpacity onPress={() => setShowControlsModal(false)}>
+                                <Ionicons name="close-circle" size={26} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 6, textTransform: 'uppercase' }}>Monthly Spending Limit ($ USD)</Text>
+                        <TextInput
+                            style={{ backgroundColor: '#f8fafc', color: '#0f172a', padding: 14, borderRadius: 16, fontSize: 16, fontWeight: 'bold', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 }}
+                            value={monthlySpendingLimit}
+                            onChangeText={setMonthlySpendingLimit}
+                            keyboardType="numeric"
+                        />
+
+                        {/* Toggle Switches */}
+                        <View style={{ gap: 12, marginBottom: 24 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                <View>
+                                    <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#0f172a' }}>Online Shopping</Text>
+                                    <Text style={{ fontSize: 10, color: '#64748b' }}>Allow web & app transactions</Text>
+                                </View>
+                                <Switch value={onlineShoppingEnabled} onValueChange={setOnlineShoppingEnabled} trackColor={{ false: '#cbd5e1', true: '#10b981' }} />
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                <View>
+                                    <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#0f172a' }}>Contactless (Apple/Google Pay)</Text>
+                                    <Text style={{ fontSize: 10, color: '#64748b' }}>NFC & Mobile wallet tap to pay</Text>
+                                </View>
+                                <Switch value={contactlessEnabled} onValueChange={setContactlessEnabled} trackColor={{ false: '#cbd5e1', true: '#10b981' }} />
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                <View>
+                                    <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#0f172a' }}>Cross-Border Payments</Text>
+                                    <Text style={{ fontSize: 10, color: '#64748b' }}>International merchant processing</Text>
+                                </View>
+                                <Switch value={internationalEnabled} onValueChange={setInternationalEnabled} trackColor={{ false: '#cbd5e1', true: '#10b981' }} />
+                            </View>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                setShowControlsModal(false);
+                                Alert.alert('Security Settings Saved 🛡️', 'Your Virtual Card limits and security controls have been updated.');
+                            }}
+                            style={{ backgroundColor: '#0f172a', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}
+                        >
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Save Controls 💾</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODAL: STATEMENT LOGS */}
+            <Modal visible={showStatementModal} animationType="slide" transparent presentationStyle="overFullScreen">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, maxHeight: '80%', borderWidth: 1, borderColor: '#e2e8f0' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>Card Statement Logs</Text>
+                            <TouchableOpacity onPress={() => setShowStatementModal(false)}>
+                                <Ionicons name="close-circle" size={26} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {[
+                                { merchant: 'Netflix Subscription', date: 'Just Now', amount: '-$15.99', status: 'SETTLED', icon: 'logo-netflix', color: '#E50914' },
+                                { merchant: 'Amazon Web Services', date: 'Yesterday', amount: '-$45.00', status: 'SETTLED', icon: 'logo-amazon', color: '#FF9900' },
+                                { merchant: 'ChatGPT Plus Subscription', date: '2 days ago', amount: '-$20.00', status: 'SETTLED', icon: 'sparkles', color: '#10A37F' },
+                                { merchant: 'Card Wallet Funding', date: '3 days ago', amount: '+$100.00', status: 'CREDIT', icon: 'add-circle', color: '#10b981' },
+                            ].map((tx, i) => (
+                                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', padding: 14, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                            <Ionicons name={tx.icon as any} size={18} color={tx.color} />
+                                        </View>
+                                        <View>
+                                            <Text style={{ fontWeight: 'bold', fontSize: 13, color: '#0f172a' }}>{tx.merchant}</Text>
+                                            <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{tx.date}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text style={{ fontWeight: '900', fontSize: 14, color: tx.amount.startsWith('+') ? '#10b981' : '#0f172a' }}>{tx.amount}</Text>
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#10b981', marginTop: 2 }}>{tx.status}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* MODAL 1: CREATE VIRTUAL CARD */}
             <Modal visible={showCreateModal} animationType="slide" transparent presentationStyle="overFullScreen">
