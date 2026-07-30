@@ -797,43 +797,49 @@ export const api = {
         invoke: async (body: any) => {
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
+            const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://uagcxrtdqttayulvgpwg.supabase.co';
+
+            let resData: any = null;
 
             // 1. First try standard functions.invoke
             try {
                 const res = await supabase.functions.invoke('smm-api', { body });
-                if (!res.error && res.data) {
-                    return res.data;
-                }
-                if (res.error && !res.error.message?.includes('Failed to send a request')) {
-                    throw res.error;
+                if (res.data) {
+                    resData = res.data;
+                } else if (res.error) {
+                    console.warn("Edge function invoke error, attempting direct fetch fallback:", res.error);
                 }
             } catch (err: any) {
                 console.warn("Standard functions.invoke failed, attempting direct fetch...", err?.message || err);
             }
 
             // 2. Direct HTTP fetch fallback with explicit apikey & auth headers
-            try {
-                const url = `${supabaseUrl}/functions/v1/smm-api`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
-                    },
-                    body: JSON.stringify(body)
-                });
+            if (!resData) {
+                try {
+                    const url = `${supabaseUrl}/functions/v1/smm-api`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                            'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
+                        },
+                        body: JSON.stringify(body)
+                    });
 
-                const json = await response.json();
-                if (!response.ok || json.error) {
-                    throw new Error(json.error || `HTTP ${response.status}: Server error`);
+                    resData = await response.json();
+                } catch (fetchErr: any) {
+                    console.error("Direct fetch to smm-api failed:", fetchErr);
+                    throw new Error(fetchErr.message || "Failed to communicate with Social Boost service. Please check network connection.");
                 }
-                return json;
-            } catch (fetchErr: any) {
-                console.error("Direct fetch to smm-api failed:", fetchErr);
-                throw new Error(fetchErr.message || "Failed to communicate with Social Boost service. Please check network connection.");
             }
+
+            // 3. Throw Error if SMM Edge Function returned an error message
+            if (resData && resData.error) {
+                throw new Error(resData.error);
+            }
+
+            return resData;
         }
     },
 

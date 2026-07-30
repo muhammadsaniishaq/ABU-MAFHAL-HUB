@@ -204,7 +204,11 @@ export default function SocialBoostScreen() {
                 expectedPrice: totalPrice
             });
 
-            showAlert("Boost Order Launched!", "Your social boost order has been submitted successfully.", "success", String(data.order || ''));
+            if (data && data.error) {
+                throw new Error(data.error);
+            }
+
+            showAlert("Boost Order Launched! 🚀", `Order #${data.order || 'SUCCESS'} has been placed successfully.`, "success", String(data.order || ''));
             
             setLink('');
             setQuantity('');
@@ -212,7 +216,7 @@ export default function SocialBoostScreen() {
             setWalletBalance(prev => prev - totalPrice);
         } catch (error: any) {
             const msg = error.message || "Could not place order";
-            showAlert("Order Failed", msg, "error");
+            showAlert("Order Failed ❌", msg, "error");
         } finally {
             setIsSubmitting(false);
             setConfirmModal(false);

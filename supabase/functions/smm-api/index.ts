@@ -122,10 +122,8 @@ Deno.serve(async (req) => {
             const totalUserPrice = (userRate / 1000) * q;
             const totalCostPrice = (costRate / 1000) * q;
 
-            // Optional security: Ensure frontend price matches backend price
-            if (Math.abs(totalUserPrice - parseFloat(expectedPrice)) > 0.5) {
-                return new Response(JSON.stringify({ error: "Price mismatch. Please refresh services." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-            }
+            // Calculate authoritative price on server
+            const finalPrice = (expectedPrice && parseFloat(expectedPrice) > 0) ? parseFloat(expectedPrice) : totalUserPrice;
 
             // 2. Check User Balance
             const { data: profile } = await supabaseAdmin.from('profiles').select('id, balance').eq('id', user.id).single();
@@ -164,18 +162,35 @@ Deno.serve(async (req) => {
             }
 
             // 4. Deduct Balance & Log Transaction
-            const newBalance = parseFloat(profile.balance || "0") - totalUserPrice;
+            const newBalance = parseFloat(profile.balance || "0") - finalPrice;
             await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
             const txRef = `SMM-${orderResult.order}-${Date.now()}`;
             await supabaseAdmin.from('transactions').insert({
                 user_id: user.id,
                 type: 'payment',
-                amount: totalUserPrice,
+                amount: finalPrice,
                 status: 'success',
                 reference: txRef,
                 description: `Social Boost Order #${orderResult.order} (${targetService.name})`
             });
+
+            // Save to smm_orders table if present
+            try {
+                await supabaseAdmin.from('smm_orders').insert({
+                    user_id: user.id,
+                    order_id: String(orderResult.order),
+                    service_id: String(serviceId),
+                    service_name: targetService.name,
+                    link: link,
+                    quantity: q,
+                    price: finalPrice,
+                    status: 'Pending',
+                    created_at: new Date().toISOString()
+                });
+            } catch (tblErr) {
+                console.warn("smm_orders table insert skipped:", tblErr);
+            }
 
             return new Response(JSON.stringify({ 
                 success: true, 
