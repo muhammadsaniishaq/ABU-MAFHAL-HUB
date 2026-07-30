@@ -250,29 +250,43 @@ export default function AdminBento() {
                 {isExpanded && (
                     <View style={s.accordionBody}>
                         <View style={s.gridContainer}>
-                            {items.map((item, i) => (
-                                <TouchableOpacity
-                                    key={i}
-                                    onPress={() => router.push(item.route as any)}
-                                    style={s.gridCard}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={s.gridCardHeader}>
-                                        <View style={[s.iconBg, { backgroundColor: item.color + '12' }]}>
-                                            <Ionicons name={item.icon as any} size={14} color={item.color} />
-                                        </View>
-                                        {(item as any).badge > 0 && (
-                                            <View style={s.badgeContainer}>
-                                                <Text style={s.badgeText}>{(item as any).badge}</Text>
+                            {items.map((item, i) => {
+                                const isRedZoneModule = key === 'redZone' || item.route === '/manage/staff' || item.route === '/manage/features';
+                                const isLockedForAdmin = isRedZoneModule && adminProfile?.role !== 'super_admin';
+
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        onPress={() => {
+                                            if (isLockedForAdmin) {
+                                                Alert.alert(
+                                                    'Access Restricted 🔒',
+                                                    'Only Super Admin (Master Key) has permission to access Security RedZone, Panic Room, or Staff HR.'
+                                                );
+                                                return;
+                                            }
+                                            router.push(item.route as any);
+                                        }}
+                                        style={[s.gridCard, isLockedForAdmin && { opacity: 0.6 }]}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={s.gridCardHeader}>
+                                            <View style={[s.iconBg, { backgroundColor: isLockedForAdmin ? '#ef444415' : item.color + '12' }]}>
+                                                <Ionicons name={isLockedForAdmin ? "lock-closed" : (item.icon as any)} size={14} color={isLockedForAdmin ? "#ef4444" : item.color} />
                                             </View>
-                                        )}
-                                    </View>
-                                    <View style={s.gridCardFooter}>
-                                        {(item as any).stat && <Text style={s.statText}>{(item as any).stat}</Text>}
-                                        <Text style={s.gridCardTitle} numberOfLines={1}>{item.title}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
+                                            {(item as any).badge > 0 && (
+                                                <View style={s.badgeContainer}>
+                                                    <Text style={s.badgeText}>{(item as any).badge}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <View style={s.gridCardFooter}>
+                                            {(item as any).stat && <Text style={s.statText}>{(item as any).stat}</Text>}
+                                            <Text style={s.gridCardTitle} numberOfLines={1}>{item.title}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </View>
                 )}
@@ -353,9 +367,11 @@ export default function AdminBento() {
                             <View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                                     <Text style={s.welcomeText}>Welcome back, {adminProfile?.full_name?.split(' ')[0] || 'Admin'} 👋</Text>
-                                    <View style={s.adminBadgePill}>
-                                        <Text style={s.adminBadgeText}>SUPER ADMIN</Text>
-                                    </View>
+                                     <View style={[s.adminBadgePill, adminProfile?.role === 'super_admin' && { backgroundColor: 'rgba(245, 166, 35, 0.25)', borderColor: '#f5a623' }]}>
+                                         <Text style={[s.adminBadgeText, adminProfile?.role === 'super_admin' && { color: '#f5a623', fontWeight: '900' }]}>
+                                             {adminProfile?.role === 'super_admin' ? '👑 SUPER ADMIN (MASTER KEY)' : 'STAFF ADMIN'}
+                                         </Text>
+                                     </View>
                                 </View>
                                 <View style={s.liveRow}>
                                     <View style={s.statusDot} />

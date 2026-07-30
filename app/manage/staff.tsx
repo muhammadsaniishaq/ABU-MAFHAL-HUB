@@ -11,10 +11,23 @@ export default function StaffManager() {
     const [adminLogs, setAdminLogs] = useState<any[]>([]);
     const [showAdminModal, setShowAdminModal] = useState(false);
     const [loadingLogs, setLoadingLogs] = useState(false);
+    const [currentUserRole, setCurrentUserRole] = useState<string>('admin');
+    const [actionLoading, setActionLoading] = useState(false);
 
     useEffect(() => {
         fetchStaff();
+        checkCurrentRole();
     }, []);
+
+    const checkCurrentRole = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                if (profile?.role) setCurrentUserRole(profile.role);
+            }
+        } catch (e) {}
+    };
 
     const fetchStaff = async () => {
         setLoading(true);
@@ -32,6 +45,88 @@ export default function StaffManager() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleToggleAdminStatus = async (admin: any) => {
+        if (currentUserRole !== 'super_admin') {
+            return Alert.alert('Access Denied 🔒', 'Only Super Admin can change staff status or ban admins.');
+        }
+
+        const newStatus = admin.status === 'active' ? 'banned' : 'active';
+        const actionLabel = newStatus === 'banned' ? 'Ban / Suspend' : 'Reactivate';
+
+        Alert.alert(
+            `${actionLabel} Admin`,
+            `Are you sure you want to ${actionLabel.toLowerCase()} ${admin.full_name || 'this admin'}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: actionLabel,
+                    style: newStatus === 'banned' ? 'destructive' : 'default',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            const { error } = await supabase
+                                .from('profiles')
+                                .update({ status: newStatus })
+                                .eq('id', admin.id);
+
+                            if (error) throw error;
+
+                            setSelectedAdmin((prev: any) => prev ? { ...prev, status: newStatus } : null);
+                            fetchStaff();
+                            Alert.alert('Success 🎉', `Admin status changed to ${newStatus}`);
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message);
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleChangeAdminRole = async (admin: any, newRole: string) => {
+        if (currentUserRole !== 'super_admin') {
+            return Alert.alert('Access Denied 🔒', 'Only Super Admin can change admin roles.');
+        }
+
+        Alert.alert(
+            'Change Role',
+            `Change ${admin.full_name || 'this admin'}'s role to ${newRole.toUpperCase()}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm Change',
+                    onPress: async () => {
+                        try {
+                            setActionLoading(true);
+                            // Disable lockdown trigger temporarily if needed, then update
+                            const { error } = await supabase
+                                .from('profiles')
+                                .update({ role: newRole })
+                                .eq('id', admin.id);
+
+                            if (error) throw error;
+
+                            // Also sync auth metadata
+                            await supabase.from('auth.users' as any).update({
+                                raw_app_meta_data: { role: newRole }
+                            }).eq('id', admin.id).catch(() => {});
+
+                            setSelectedAdmin((prev: any) => prev ? { ...prev, role: newRole } : null);
+                            fetchStaff();
+                            Alert.alert('Success 🎉', `Role updated to ${newRole.toUpperCase()}`);
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message);
+                        } finally {
+                            setActionLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const openAdminProfile = async (admin: any) => {
@@ -139,14 +234,56 @@ export default function StaffManager() {
                                 <Text className="text-white font-black text-xl mb-1">{selectedAdmin.full_name || 'Unknown Admin'}</Text>
                                 <Text className="text-slate-400 text-xs mb-3">{selectedAdmin.email}</Text>
                                 
-                                <View className="flex-row gap-2">
+                                <View className="flex-row gap-2 mb-3">
                                     <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
                                         <Text className="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">{selectedAdmin.role}</Text>
                                     </View>
-                                    <View className="bg-blue-500/20 px-3 py-1 rounded-full border border-blue-500/30">
-                                        <Text className="text-blue-400 font-bold text-[10px] uppercase tracking-wider">{selectedAdmin.status}</Text>
+                                    <View className={`px-3 py-1 rounded-full border ${selectedAdmin.status === 'active' ? 'bg-blue-500/20 border-blue-500/30' : 'bg-red-500/20 border-red-500/30'}`}>
+                                        <Text className={`${selectedAdmin.status === 'active' ? 'text-blue-400' : 'text-red-400'} font-bold text-[10px] uppercase tracking-wider`}>{selectedAdmin.status}</Text>
                                     </View>
                                 </View>
+
+                                {/* 👑 Super Admin Master Action Controls */}
+                                {currentUserRole === 'super_admin' && (
+                                    <View className="w-full mt-2 pt-3 border-t border-white/10 flex-row flex-wrap justify-center gap-2">
+                                        <TouchableOpacity 
+                                            onPress={() => handleToggleAdminStatus(selectedAdmin)}
+                                            style={{ backgroundColor: selectedAdmin.status === 'active' ? '#ef4444' : '#10b981' }}
+                                            className="px-3 py-1.5 rounded-lg flex-row items-center gap-1 shadow-sm"
+                                        >
+                                            <Ionicons name={selectedAdmin.status === 'active' ? "ban-outline" : "checkmark-circle-outline"} size={14} color="white" />
+                                            <Text className="text-white font-bold text-xs">{selectedAdmin.status === 'active' ? 'Ban Admin' : 'Activate Admin'}</Text>
+                                        </TouchableOpacity>
+
+                                        {selectedAdmin.role !== 'super_admin' && (
+                                            <TouchableOpacity 
+                                                onPress={() => handleChangeAdminRole(selectedAdmin, 'super_admin')}
+                                                className="bg-amber-500 px-3 py-1.5 rounded-lg flex-row items-center gap-1 shadow-sm"
+                                            >
+                                                <Ionicons name="ribbon-outline" size={14} color="white" />
+                                                <Text className="text-white font-bold text-xs">Make Super Admin</Text>
+                                            </TouchableOpacity>
+                                        )}
+
+                                        {selectedAdmin.role !== 'admin' && (
+                                            <TouchableOpacity 
+                                                onPress={() => handleChangeAdminRole(selectedAdmin, 'admin')}
+                                                className="bg-blue-600 px-3 py-1.5 rounded-lg flex-row items-center gap-1 shadow-sm"
+                                            >
+                                                <Ionicons name="person-outline" size={14} color="white" />
+                                                <Text className="text-white font-bold text-xs">Make Staff Admin</Text>
+                                            </TouchableOpacity>
+                                        )}
+
+                                        <TouchableOpacity 
+                                            onPress={() => handleChangeAdminRole(selectedAdmin, 'user')}
+                                            className="bg-slate-700 px-3 py-1.5 rounded-lg flex-row items-center gap-1 shadow-sm"
+                                        >
+                                            <Ionicons name="arrow-down-circle-outline" size={14} color="white" />
+                                            <Text className="text-white font-bold text-xs">Demote User</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Activity Timeline */}
