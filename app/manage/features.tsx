@@ -381,6 +381,7 @@ export default function ManageFeaturesScreen() {
                                             <Text style={s.messageText}>
                                                 {feature.maintenance_message || 'This feature is currently under maintenance.'}
                                             </Text>
+                                        )}
                                     </View>
                                 )}
                             </View>
