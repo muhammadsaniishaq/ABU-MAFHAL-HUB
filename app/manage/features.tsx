@@ -253,7 +253,7 @@ export default function ManageFeaturesScreen() {
                 {/* 👑 TAB 1: ADMIN MODULE HIDING MATRIX */}
                 {activeTab === 'admin_locks' && (
                     <View style={{ marginBottom: 20 }}>
-                        <View style={{ backgroundColor: '#fffbeb', padding: 14, borderRadius: 16, borderHeight: 1, borderColor: '#fde68a', marginBottom: 16 }}>
+                        <View style={{ backgroundColor: '#fffbeb', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#fde68a', marginBottom: 16 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                 <Ionicons name="eye-off-outline" size={18} color="#d97706" />
                                 <Text style={{ fontWeight: '900', fontSize: 12, color: '#d97706' }}>SUPER ADMIN MODULE HIDING CONTROL</Text>
@@ -381,13 +381,14 @@ export default function ManageFeaturesScreen() {
                                             <Text style={s.messageText}>
                                                 {feature.maintenance_message || 'This feature is currently under maintenance.'}
                                             </Text>
-                                        )}
                                     </View>
                                 )}
                             </View>
                         ))}
                     </View>
                 )}
+            </>
+        )}
             </ScrollView>
         </View>
     );
