@@ -130,14 +130,22 @@ export default function VirtualCardsScreen() {
 
     // Calculate Wallet Charge Accurately
     const calcCreationWalletCharge = () => {
-        const creationFeeUSD = 2.0; // $2.00 Creation Fee
-        const creationFeeNGN = creationFeeUSD * usdRate;
+        const usdCardFee = Number(settings?.virtual_card_creation_fee_usd) || 3.0; // $3.00 USD for USD card
+        const ngnCardFee = Number(settings?.virtual_card_creation_fee_ngn) || 1000; // ₦1,000 NGN for NGN card
+
         const initialFund = Number(initialFundAmount) || 0;
 
+        let creationFeeNGN = 0;
+        let creationFeeUSD = 0;
         let fundChargeNGN = 0;
+
         if (cardCurrency === 'USD') {
+            creationFeeUSD = usdCardFee;
+            creationFeeNGN = creationFeeUSD * usdRate;
             fundChargeNGN = initialFund * usdRate;
         } else {
+            creationFeeNGN = ngnCardFee;
+            creationFeeUSD = creationFeeNGN / usdRate;
             fundChargeNGN = initialFund;
         }
 
@@ -765,7 +773,7 @@ export default function VirtualCardsScreen() {
                         style={{ width: '100%', backgroundColor: '#0f172a', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4, flexDirection: 'row', gap: 6 }}
                     >
                         <Ionicons name="card" size={18} color="#ffffff" />
-                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Issue Virtual Card ($2 Fee)</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Issue Virtual Card</Text>
                     </TouchableOpacity>
 
                 </ScrollView>
@@ -884,19 +892,25 @@ export default function VirtualCardsScreen() {
                         <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Select Card Currency</Text>
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                             <TouchableOpacity
-                                onPress={() => setCardCurrency('USD')}
+                                onPress={() => {
+                                    setCardCurrency('USD');
+                                    setInitialFundAmount('10');
+                                }}
                                 style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'USD' ? '#0f172a' : '#f8fafc', alignItems: 'center', borderWidth: 1, borderColor: cardCurrency === 'USD' ? '#0f172a' : '#e2e8f0' }}
                             >
                                 <Text style={{ color: cardCurrency === 'USD' ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 14 }}>🇺🇸 USD Dollar Card</Text>
-                                <Text style={{ color: cardCurrency === 'USD' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For International Bills</Text>
+                                <Text style={{ color: cardCurrency === 'USD' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>$3.00 Creation Fee</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => setCardCurrency('NGN')}
+                                onPress={() => {
+                                    setCardCurrency('NGN');
+                                    setInitialFundAmount('5000');
+                                }}
                                 style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'NGN' ? '#0f172a' : '#f8fafc', alignItems: 'center', borderWidth: 1, borderColor: cardCurrency === 'NGN' ? '#0f172a' : '#e2e8f0' }}
                             >
                                 <Text style={{ color: cardCurrency === 'NGN' ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 14 }}>🇳🇬 NGN Naira Card</Text>
-                                <Text style={{ color: cardCurrency === 'NGN' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For Local Merchant Bills</Text>
+                                <Text style={{ color: cardCurrency === 'NGN' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>₦1,000 Creation Fee</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -936,7 +950,9 @@ export default function VirtualCardsScreen() {
                         {/* ACCURATE TRANSPARENT FEE BREAKDOWN */}
                         <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee ($2.00 USD)</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>
+                                    Card Creation Fee ({cardCurrency === 'USD' ? `$${creationCharges.creationFeeUSD.toFixed(2)} USD` : `₦${creationCharges.creationFeeNGN.toLocaleString()} NGN`})
+                                </Text>
                                 <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>₦{creationCharges.creationFeeNGN.toLocaleString()}</Text>
                             </View>
 
