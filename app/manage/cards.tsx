@@ -342,13 +342,34 @@ export default function CardManager() {
 
                         <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>Virtual Card Creation Fee (USD $)</Text>
                         <TextInput
-                            style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 20, borderWidth: 1, borderColor: '#334155' }}
+                            style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 14, borderWidth: 1, borderColor: '#334155' }}
                             placeholder="3.00"
                             placeholderTextColor="#64748b"
                             keyboardType="numeric"
                             value={cardCreationFeeUSD}
                             onChangeText={setCardCreationFeeUSD}
                         />
+
+                        {/* Commercial Rates Summary Banner */}
+                        <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#334155' }}>
+                            <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '900', marginBottom: 6 }}>📜 Payvessel Rates (ABU MAFHAL LTD Proposal):</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Card Issuance Wholesale Cost:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>$1.50 / card</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Apple/Google Pay Contactless:</Text>
+                                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold' }}>$2.50 / card</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Monthly & API Access Fees:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>WAIVED ($0)</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Individual Card Funding Fee:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>NO FEE ($0)</Text>
+                            </View>
+                        </View>
 
                         <TouchableOpacity
                             onPress={handleSaveConfig}

@@ -53,13 +53,16 @@ export const payvesselCardService = {
             const apiKey = typeof apiKeyData?.value === 'string' ? apiKeyData.value : apiKeyData?.value?.key || '';
             const secretKey = typeof secretKeyData?.value === 'string' ? secretKeyData.value : secretKeyData?.value?.key || '';
             const businessId = typeof businessIdData?.value === 'string' ? businessIdData.value : businessIdData?.value?.id || '';
-            const cardFee = Number(cardFeeData?.value) || 3.0; // Default $3 creation fee
+            const cardFee = Number(cardFeeData?.value) || 3.0; // Retail creation fee ($3.00)
 
             return {
                 apiKey,
                 secretKey,
                 businessId,
                 cardFee,
+                wholesaleCardIssuanceFeeUSD: 1.50, // Payvessel Commercial Proposal Rate for ABU MAFHAL LTD
+                wholesaleContactlessCardFeeUSD: 2.50, // Contactless Card (Apple Pay & Google Pay)
+                individualCardFundingFee: 0, // $0 fee for funding individual card
                 baseUrl: 'https://api.payvessel.com'
             };
         } catch (e) {
@@ -68,6 +71,9 @@ export const payvesselCardService = {
                 secretKey: '',
                 businessId: '',
                 cardFee: 3.0,
+                wholesaleCardIssuanceFeeUSD: 1.50,
+                wholesaleContactlessCardFeeUSD: 2.50,
+                individualCardFundingFee: 0,
                 baseUrl: 'https://api.payvessel.com'
             };
         }
