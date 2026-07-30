@@ -131,7 +131,7 @@ export default function StaffManager() {
                             // Also sync auth metadata
                             await supabase.from('auth.users' as any).update({
                                 raw_app_meta_data: { role: newRole }
-                            }).eq('id', admin.id).catch(() => {});
+                            }).eq('id', admin.id).then(() => {}, () => {});
 
                             setSelectedAdmin((prev: any) => prev ? { ...prev, role: newRole } : null);
                             fetchStaff();
@@ -346,7 +346,8 @@ export default function StaffManager() {
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                             <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+                            </View>
+                            <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
                                 {/* 👑 Super Admin Per-Admin Custom Feature Hiding Controls */}
                                 {currentUserRole === 'super_admin' && (
                                     <View style={{ backgroundColor: '#fffbeb', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fde68a', marginBottom: 20 }}>
