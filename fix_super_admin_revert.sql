@@ -1,6 +1,6 @@
--- Direct Force Update for muhammadsaniisyaku3@gmail.com
+-- Direct Update by User UUID: 46720c42-ab0e-47bb-98bf-7839548b715e
 
--- 1. Attach automatic sync trigger
+-- 1. Create automatic sync trigger so role changes NEVER revert back
 CREATE OR REPLACE FUNCTION public.sync_user_role_to_auth()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -24,21 +24,20 @@ CREATE TRIGGER trigger_sync_user_role
     FOR EACH ROW
     EXECUTE FUNCTION public.sync_user_role_to_auth();
 
--- 2. Force Update role in profiles (Case-insensitive email match)
+-- 2. Update role to super_admin by exact User ID (UUID)
 UPDATE public.profiles 
-SET role = 'super_admin'
-WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
+SET role = 'super_admin' 
+WHERE id = '46720c42-ab0e-47bb-98bf-7839548b715e';
 
--- 3. Force Update role in auth.users
 UPDATE auth.users 
 SET raw_app_meta_data = jsonb_set(
     coalesce(raw_app_meta_data, '{}'::jsonb), 
     '{role}', 
     '"super_admin"'
 )
-WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
+WHERE id = '46720c42-ab0e-47bb-98bf-7839548b715e';
 
--- 4. Display result in SQL Editor so you can verify immediately!
+-- 3. Show updated result immediately in SQL Editor
 SELECT id, email, full_name, role 
 FROM public.profiles 
-WHERE LOWER(TRIM(email)) LIKE '%muhammadsaniisyaku3%';
+WHERE id = '46720c42-ab0e-47bb-98bf-7839548b715e';
