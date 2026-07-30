@@ -1,6 +1,6 @@
--- SQL Script: Fix Role Reverting Issue & Enable Automatic Auth Metadata Sync
+-- Promote muhammadsaniisyaku3@gmail.com to Super Admin & sync with Auth metadata
 
--- 1. Create an automatic trigger so changing role in Table Editor NEVER reverts back!
+-- 1. Create automatic trigger so role changes in Table Editor NEVER revert back
 CREATE OR REPLACE FUNCTION public.sync_user_role_to_auth()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -24,24 +24,15 @@ CREATE TRIGGER trigger_sync_user_role
     FOR EACH ROW
     EXECUTE FUNCTION public.sync_user_role_to_auth();
 
+-- 2. Promote muhammadsaniisyaku3@gmail.com to super_admin in BOTH tables
+UPDATE public.profiles 
+SET role = 'super_admin' 
+WHERE email = 'muhammadsaniisyaku3@gmail.com';
 
--- 2. Promote target user to super_admin in BOTH tables (profiles + auth.users)
--- Replace 'admin@abumafhal.com' with the actual email address you want to promote!
-DO $$
-DECLARE
-    target_email TEXT := 'admin@abumafhal.com'; -- <--- SAKA EMAIL DIN A NAN
-BEGIN
-    -- Update public.profiles
-    UPDATE public.profiles 
-    SET role = 'super_admin' 
-    WHERE email = target_email;
-
-    -- Update auth.users metadata
-    UPDATE auth.users 
-    SET raw_app_meta_data = jsonb_set(
-        coalesce(raw_app_meta_data, '{}'::jsonb), 
-        '{role}', 
-        '"super_admin"'
-    )
-    WHERE email = target_email;
-END $$;
+UPDATE auth.users 
+SET raw_app_meta_data = jsonb_set(
+    coalesce(raw_app_meta_data, '{}'::jsonb), 
+    '{role}', 
+    '"super_admin"'
+)
+WHERE email = 'muhammadsaniisyaku3@gmail.com';
