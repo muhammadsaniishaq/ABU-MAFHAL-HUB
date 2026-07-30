@@ -303,7 +303,7 @@ export default function VirtualCardsScreen() {
                     <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Virtual Cards Studio...</Text>
                 </View>
             ) : cards.length > 0 && selectedCard ? (
-                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                     
                     {/* ELEGANT COMPACT TOP DASHBOARD BAR */}
                     <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
@@ -575,7 +575,7 @@ export default function VirtualCardsScreen() {
                 </ScrollView>
             ) : (
                 /* ULTRA-MODERN COMPACT WELCOME LANDING SHOWCASE */
-                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                     
                     {/* Welcome Header Badge */}
                     <View style={{ alignItems: 'center', marginBottom: 14 }}>
