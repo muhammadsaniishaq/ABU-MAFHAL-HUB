@@ -555,23 +555,158 @@ export default function VirtualCardsScreen() {
 
                 </ScrollView>
             ) : (
-                /* NO VIRTUAL CARD EMPTY STATE WITH LIGHT THEME */
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-                    <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 1.5, borderColor: '#fde68a' }}>
-                        <Ionicons name="card" size={46} color="#d97706" />
+                /* ULTRA-MODERN FINTECH WELCOME LANDING SHOWCASE */
+                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
+                    
+                    {/* Welcome Header Badge */}
+                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                        <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                            <Text style={{ fontSize: 12 }}>✨</Text>
+                            <Text style={{ color: '#d97706', fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL VIRTUAL CARDS</Text>
+                        </View>
+                        <Text style={{ color: '#0f172a', fontSize: 26, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 }}>
+                            Unlock Global Payments
+                        </Text>
+                        <Text style={{ color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 6, maxWidth: 320, lineHeight: 20 }}>
+                            Issue instant Virtual Dollar & Naira cards for international subscriptions, online shopping, and ad bills.
+                        </Text>
                     </View>
-                    <Text style={{ color: '#0f172a', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>Get Your Virtual Card</Text>
-                    <Text style={{ color: '#64748b', textAlign: 'center', fontSize: 13, lineHeight: 20, marginBottom: 30, maxWidth: 330 }}>
-                        Create an instant Payvessel Virtual Card for seamless international online payments. Works anywhere VISA and Mastercard are accepted.
-                    </Text>
 
-                    <TouchableOpacity
-                        onPress={() => setShowCreateModal(true)}
-                        style={{ width: '100%', backgroundColor: '#0f172a', height: 54, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 }}
+                    {/* INTERACTIVE 3D DEMO SHOWCASE CARD VISUAL */}
+                    <LinearGradient
+                        colors={['#0f172a', '#1e293b', '#0f172a']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{
+                            width: '100%',
+                            aspectRatio: 1.586,
+                            borderRadius: 24,
+                            padding: 24,
+                            justifyContent: 'space-between',
+                            marginBottom: 24,
+                            borderWidth: 1.5,
+                            borderColor: '#f5a623',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 12 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 18,
+                            elevation: 10
+                        }}
                     >
+                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(245, 166, 35, 0.15)' }} />
+
+                        {/* Card Header Row */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
+                                    <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 }}>PAYVESSEL SECURE</Text>
+                                </View>
+                                <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#22c55e', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' }} />
+                                    <Text style={{ color: '#4ade80', fontSize: 9, fontWeight: '900' }}>SAMPLE PREVIEW</Text>
+                                </View>
+                            </View>
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 22, fontStyle: 'italic' }}>VISA</Text>
+                        </View>
+
+                        {/* Metallic Chip & Contactless */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, zIndex: 10 }}>
+                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: '#f5a623', borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
+                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 3 }} />
+                                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+                            </View>
+                            <Ionicons name="wifi-outline" size={24} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
+                        </View>
+
+                        {/* Card Number */}
+                        <View style={{ zIndex: 10 }}>
+                            <Text style={{ color: '#ffffff', fontSize: 20, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2.5, fontWeight: 'bold' }}>
+                                5532 •••• •••• 8829
+                            </Text>
+                        </View>
+
+                        {/* Card Footer */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 10 }}>
+                            <View>
+                                <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Card Holder</Text>
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginTop: 2 }}>ABU MAFHAL USER</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 16 }}>
+                                <View>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>Expires</Text>
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 2 }}>12/28</Text>
+                                </View>
+                                <View>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>CVV</Text>
+                                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13, marginTop: 2 }}>•••</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </LinearGradient>
+
+                    {/* WHY GET A VIRTUAL CARD BENEFITS GRID */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 14, letterSpacing: 1.5 }}>Why Get A Virtual Card?</Text>
+                    
+                    <View style={{ gap: 12, marginBottom: 24 }}>
+                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="globe-outline" size={22} color="#3b82f6" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Global Merchant Acceptance</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>Pay seamlessly on Netflix, Amazon, Apple, ChatGPT AI, Spotify & 100k+ global stores.</Text>
+                            </View>
+                        </View>
+
+                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="flash-outline" size={22} color="#10b981" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Instant 5-Second Issuance</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>No paper documentation or bank branch visits. Card activates instantly.</Text>
+                            </View>
+                        </View>
+
+                        <View style={{ backgroundColor: '#ffffff', padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons name="shield-checkmark-outline" size={22} color="#d97706" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Bank-Grade Security Controls</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, lineHeight: 16 }}>1-Tap Freeze, custom monthly spending limits, and US Billing Address included.</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* SUPPORTED MERCHANTS BAR */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Supported Platforms</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            {SUPPORTED_MERCHANTS.map((m, i) => (
+                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                                    <Ionicons name={m.icon as any} size={18} color={m.color} />
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </ScrollView>
+
+                    {/* CTA ISSUANCE BUTTON */}
+                    <TouchableOpacity
+                        onPress={() => {
+                            setShowCreateModal(true);
+                            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        }}
+                        style={{ width: '100%', backgroundColor: '#0f172a', height: 56, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6, flexDirection: 'row', gap: 8 }}
+                    >
+                        <Ionicons name="card" size={20} color="#ffffff" />
                         <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Issue Virtual Card ($3 Fee)</Text>
                     </TouchableOpacity>
-                </View>
+
+                </ScrollView>
             )}
 
             {/* MODAL: LIMITS & CONTROLS */}
