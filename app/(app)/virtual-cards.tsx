@@ -591,9 +591,33 @@ export default function VirtualCardsScreen() {
                         </Text>
                     </View>
 
-                    {/* ULTRA-PREMIUM SAMPLE PREVIEW CARD VISUAL */}
+                    {/* SAMPLE CARD SKIN CUSTOMIZER SELECTOR */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8 }}>Preview Card Skin</Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {(Object.keys(CARD_SKINS) as Array<keyof typeof CARD_SKINS>).map(skinKey => (
+                                <TouchableOpacity
+                                    key={skinKey}
+                                    onPress={() => {
+                                        setActiveSkin(skinKey);
+                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    }}
+                                    style={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: 10,
+                                        backgroundColor: CARD_SKINS[skinKey].colors[0],
+                                        borderWidth: activeSkin === skinKey ? 2 : 0,
+                                        borderColor: '#d97706'
+                                    }}
+                                />
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* EXACT ULTRA-PREMIUM VIRTUAL CARD PREVIEW (100% MATCHING MAIN APP CARD) */}
                     <LinearGradient
-                        colors={['#0f172a', '#1e293b', '#0f172a']}
+                        colors={skinTheme.colors as any}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={{
@@ -604,7 +628,7 @@ export default function VirtualCardsScreen() {
                             justifyContent: 'space-between',
                             marginBottom: 18,
                             borderWidth: 1.5,
-                            borderColor: '#f5a623',
+                            borderColor: skinTheme.accent,
                             position: 'relative',
                             overflow: 'hidden',
                             shadowColor: '#000',
@@ -614,43 +638,43 @@ export default function VirtualCardsScreen() {
                             elevation: 8
                         }}
                     >
-                        <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(245, 166, 35, 0.15)' }} />
+                        <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
 
-                        {/* Card Header Row */}
+                        {/* Top Row: Brand & Status Badge */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }}>
-                                    <Text style={{ color: '#f5a623', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL SECURE</Text>
+                                    <Text style={{ color: skinTheme.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>PAYVESSEL SECURE</Text>
                                 </View>
                                 <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: '#22c55e', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                                     <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22c55e' }} />
-                                    <Text style={{ color: '#4ade80', fontSize: 8, fontWeight: '900' }}>SAMPLE PREVIEW</Text>
+                                    <Text style={{ color: '#4ade80', fontSize: 8, fontWeight: '900' }}>ACTIVE</Text>
                                 </View>
                             </View>
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 20, fontStyle: 'italic' }}>VISA</Text>
                         </View>
 
-                        {/* Metallic Chip & Contactless */}
+                        {/* Metallic Chip & Contactless Symbol */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 }}>
-                            <View style={{ width: 38, height: 28, borderRadius: 6, backgroundColor: '#f5a623', borderWidth: 1, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 5 }}>
+                            <View style={{ width: 38, height: 28, borderRadius: 6, backgroundColor: skinTheme.accent, borderWidth: 1, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 5 }}>
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 2 }} />
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
                             </View>
                             <Ionicons name="wifi-outline" size={20} color="#ffffff" style={{ transform: [{ rotate: '90deg' }], opacity: 0.7 }} />
                         </View>
 
-                        {/* Card Number */}
+                        {/* 16-Digit Card Number */}
                         <View style={{ zIndex: 10 }}>
                             <Text style={{ color: '#ffffff', fontSize: 18, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, fontWeight: 'bold' }}>
                                 4111 •••• •••• 8829
                             </Text>
                         </View>
 
-                        {/* Card Footer */}
+                        {/* Bottom Info: Holder Name, Expiry & CVV */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 10 }}>
                             <View>
                                 <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>Card Holder</Text>
-                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 1 }}>ABU MAFHAL USER</Text>
+                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginTop: 1 }}>{cardHolderName || 'ABU MAFHAL USER'}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', gap: 14 }}>
                                 <View>
@@ -659,7 +683,7 @@ export default function VirtualCardsScreen() {
                                 </View>
                                 <View>
                                     <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 7, fontWeight: '800', textTransform: 'uppercase' }}>CVV</Text>
-                                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12, marginTop: 1 }}>•••</Text>
+                                    <Text style={{ color: skinTheme.accent, fontWeight: '900', fontSize: 12, marginTop: 1 }}>•••</Text>
                                 </View>
                             </View>
                         </View>
