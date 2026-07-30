@@ -968,7 +968,7 @@ Metadata:
                                         }} 
                                         className="w-[48%] bg-amber-50 border border-amber-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm"
                                     >
-                                        <Ionicons name="crown-outline" size={14} color="#D97706" />
+                                        <MaterialCommunityIcons name="crown-outline" size={14} color="#D97706" />
                                         <Text className="font-black text-[10px] uppercase tracking-widest text-amber-700">
                                             {selectedUser?.role === 'super_admin' ? 'Super Admin 👑' : selectedUser?.role === 'admin' ? 'Admin 🛡️' : 'Make Admin 👑'}
                                         </Text>
