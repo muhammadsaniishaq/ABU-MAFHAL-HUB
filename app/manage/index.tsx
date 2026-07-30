@@ -426,34 +426,90 @@ export default function AdminBento() {
                     </View>
                 </View>
 
-                {/* Quick Actions Panel */}
-                <View style={s.quickActionsSection}>
-                    <Text style={s.sectionHeader}>Quick Actions</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
-                        {QUICK_ACTIONS.map((action, i) => (
+                {/* Dynamic Quick Actions / Master Control Panel */}
+                {adminProfile?.role === 'super_admin' ? (
+                    <View style={s.quickActionsSection}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={s.sectionHeader}>👑 Super Admin Master Controls</Text>
+                            <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                                <Text style={{ color: T.gold, fontSize: 10, fontWeight: 'bold' }}>ROOT PERMISSIONS</Text>
+                            </View>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
                             <TouchableOpacity 
-                                key={i} 
-                                style={s.quickActionBtn}
-                                onPress={() => router.push(action.route as any)}
+                                style={[s.quickActionBtn, { backgroundColor: '#1e1b4b', borderColor: '#6366f1' }]}
+                                onPress={() => router.push('/manage/staff')}
                                 activeOpacity={0.8}
                             >
-                                <View style={s.quickActionIconCircle}>
-                                    <Ionicons name={action.icon as any} size={22} color={T.navy} />
+                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
+                                    <Ionicons name="people-outline" size={20} color="#818cf8" />
                                 </View>
-                                <Text style={s.quickActionLabel}>{action.label}</Text>
+                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Staff & Roles</Text>
                             </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
 
-                {/* Bento Categories Collapsible Accordion Grid */}
+                            <TouchableOpacity 
+                                style={[s.quickActionBtn, { backgroundColor: '#431407', borderColor: '#f97316' }]}
+                                onPress={() => router.push('/manage/features')}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(249, 115, 22, 0.2)' }]}>
+                                    <Ionicons name="toggle-outline" size={20} color="#fb923c" />
+                                </View>
+                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Feature Flags</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={[s.quickActionBtn, { backgroundColor: '#450a0a', borderColor: '#ef4444' }]}
+                                onPress={() => router.push('/manage/security')}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                                    <Ionicons name="shield-checkmark-outline" size={20} color="#f87171" />
+                                </View>
+                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Security Hub</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={[s.quickActionBtn, { backgroundColor: '#78350f', borderColor: '#f5a623' }]}
+                                onPress={() => router.push('/manage/panic')}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[s.quickActionIconCircle, { backgroundColor: 'rgba(245, 166, 35, 0.2)' }]}>
+                                    <Ionicons name="warning-outline" size={20} color="#fbbf24" />
+                                </View>
+                                <Text style={[s.quickActionLabel, { color: '#ffffff' }]}>Panic Room</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                ) : (
+                    <View style={s.quickActionsSection}>
+                        <Text style={s.sectionHeader}>Staff Operational Actions</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
+                            {QUICK_ACTIONS.map((action, i) => (
+                                <TouchableOpacity 
+                                    key={i} 
+                                    style={s.quickActionBtn}
+                                    onPress={() => router.push(action.route as any)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={s.quickActionIconCircle}>
+                                        <Ionicons name={action.icon as any} size={22} color={T.navy} />
+                                    </View>
+                                    <Text style={s.quickActionLabel}>{action.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* Bento Categories Accordion Grid (Filtered for Staff Admins) */}
                 <View style={s.bentoGridSection}>
                     {renderSectionAccordion('operations')}
                     {renderSectionAccordion('banking')}
                     {renderSectionAccordion('finance')}
-                    {renderSectionAccordion('technical')}
+                    {adminProfile?.role === 'super_admin' && renderSectionAccordion('technical')}
                     {renderSectionAccordion('internal')}
-                    {renderSectionAccordion('redZone')}
+                    {adminProfile?.role === 'super_admin' && renderSectionAccordion('redZone')}
                 </View>
 
             </ScrollView>
