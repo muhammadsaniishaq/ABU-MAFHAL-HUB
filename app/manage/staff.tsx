@@ -517,7 +517,7 @@ export default function StaffManager() {
                                                         style={{
                                                             flexDirection: 'row',
                                                             alignItems: 'center',
-                                                            justify: 'space-between',
+                                                            justifyContent: 'space-between',
                                                             padding: 10,
                                                             borderRadius: 14,
                                                             backgroundColor: isHidden ? '#fef2f2' : '#f8fafc',
