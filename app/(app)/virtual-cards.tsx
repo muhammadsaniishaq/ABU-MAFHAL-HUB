@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
@@ -26,7 +26,7 @@ const { width: W } = Dimensions.get('window');
 const SUPPORTED_MERCHANTS = [
     { name: 'Netflix', icon: 'logo-netflix', color: '#E50914' },
     { name: 'Amazon', icon: 'logo-amazon', color: '#FF9900' },
-    { name: 'Apple', icon: 'logo-apple', color: '#A2AAAD' },
+    { name: 'Apple', icon: 'logo-apple', color: '#000000' },
     { name: 'Google Play', icon: 'logo-google', color: '#4285F4' },
     { name: 'ChatGPT AI', icon: 'sparkles', color: '#10A37F' },
     { name: 'Spotify', icon: 'musical-notes', color: '#1DB954' },
@@ -222,35 +222,35 @@ export default function VirtualCardsScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#090d16' }}>
+        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
             <Stack.Screen options={{ 
-                title: 'Payvessel Cards', 
-                headerTintColor: '#ffffff', 
-                headerStyle: { backgroundColor: '#090d16' }, 
-                headerTitleStyle: { color: '#ffffff', fontWeight: '900', fontSize: 18 } 
+                title: 'Payvessel Virtual Cards', 
+                headerTintColor: '#0f172a', 
+                headerStyle: { backgroundColor: '#ffffff' }, 
+                headerTitleStyle: { color: '#0f172a', fontWeight: '900', fontSize: 18 } 
             }} />
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
 
             {loading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color="#f5a623" />
-                    <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Payvessel Cards...</Text>
+                    <ActivityIndicator size="large" color="#d97706" />
+                    <Text style={{ color: '#64748b', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Loading Payvessel Cards...</Text>
                 </View>
             ) : cards.length > 0 && selectedCard ? (
                 <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 }} showsVerticalScrollIndicator={false}>
                     
                     {/* Header Top Bar: Main Wallet & New Card Button */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.7)', padding: 14, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', marginBottom: 20 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
                         <View>
-                            <Text style={{ color: '#94a3b8', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
-                            <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
+                            <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Main Wallet Balance</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900', marginTop: 2 }}>₦{walletBalance.toLocaleString()}</Text>
                         </View>
                         <TouchableOpacity 
                             onPress={() => setShowCreateModal(true)}
-                            style={{ backgroundColor: '#f5a623', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ backgroundColor: '#0f172a', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                         >
-                            <Ionicons name="add-circle" size={18} color="#0f172a" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>+ New Card</Text>
+                            <Ionicons name="add-circle" size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 12 }}>+ New Card</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -269,16 +269,16 @@ export default function VirtualCardsScreen() {
                                             paddingHorizontal: 14,
                                             paddingVertical: 8,
                                             borderRadius: 16,
-                                            backgroundColor: selectedCard.id === c.id ? '#f5a623' : 'rgba(30, 41, 59, 0.7)',
+                                            backgroundColor: selectedCard.id === c.id ? '#0f172a' : '#ffffff',
                                             borderWidth: 1,
-                                            borderColor: selectedCard.id === c.id ? '#f5a623' : 'rgba(255, 255, 255, 0.1)',
+                                            borderColor: selectedCard.id === c.id ? '#0f172a' : '#e2e8f0',
                                             flexDirection: 'row',
                                             alignItems: 'center',
                                             gap: 6
                                         }}
                                     >
-                                        <Ionicons name="card" size={14} color={selectedCard.id === c.id ? '#0f172a' : '#ffffff'} />
-                                        <Text style={{ color: selectedCard.id === c.id ? '#0f172a' : '#ffffff', fontWeight: '900', fontSize: 11 }}>
+                                        <Ionicons name="card" size={14} color={selectedCard.id === c.id ? '#ffffff' : '#0f172a'} />
+                                        <Text style={{ color: selectedCard.id === c.id ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 11 }}>
                                             Card #{i + 1} ({c.currency})
                                         </Text>
                                     </TouchableOpacity>
@@ -287,11 +287,11 @@ export default function VirtualCardsScreen() {
                         </ScrollView>
                     )}
 
-                    {/* ULTRA-MODERN 3D METALLIC VIRTUAL CARD VISUAL */}
+                    {/* ULTRA-LUXURY ROYAL 3D VIRTUAL CARD VISUAL */}
                     <LinearGradient
                         colors={selectedCard.currency === 'USD' 
-                            ? ['#1e1b4b', '#312e81', '#0f172a', '#1e1b4b'] 
-                            : ['#451a03', '#7c2d12', '#0f172a', '#451a03']}
+                            ? ['#0f172a', '#1e293b', '#0f172a'] 
+                            : ['#451a03', '#7c2d12', '#0f172a']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={{
@@ -302,19 +302,18 @@ export default function VirtualCardsScreen() {
                             justifyContent: 'space-between',
                             marginBottom: 20,
                             borderWidth: 1.5,
-                            borderColor: selectedCard.status === 'frozen' ? '#ef4444' : 'rgba(245, 166, 35, 0.4)',
+                            borderColor: selectedCard.status === 'frozen' ? '#ef4444' : '#d97706',
                             position: 'relative',
                             overflow: 'hidden',
-                            shadowColor: selectedCard.currency === 'USD' ? '#6366f1' : '#f97316',
+                            shadowColor: '#000',
                             shadowOffset: { width: 0, height: 12 },
-                            shadowOpacity: 0.35,
-                            shadowRadius: 20,
-                            elevation: 12
+                            shadowOpacity: 0.25,
+                            shadowRadius: 18,
+                            elevation: 10
                         }}
                     >
-                        {/* Metallic Holographic Watermark */}
-                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(245, 166, 35, 0.12)' }} />
-                        <View style={{ position: 'absolute', bottom: -60, left: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(99, 102, 241, 0.15)' }} />
+                        {/* Metallic Watermark */}
+                        <View style={{ position: 'absolute', top: -50, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(217, 119, 6, 0.15)' }} />
 
                         {/* Top Row: Payvessel Badge & Live Status Pulse */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
@@ -334,7 +333,7 @@ export default function VirtualCardsScreen() {
 
                         {/* Metallic Chip & Contactless Symbol */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, zIndex: 10 }}>
-                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: '#d97706', borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
+                            <View style={{ width: 44, height: 32, borderRadius: 7, backgroundColor: '#f5a623', borderWidth: 1.5, borderColor: '#fef08a', justifyContent: 'center', paddingHorizontal: 6 }}>
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginVertical: 3 }} />
                                 <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
                             </View>
@@ -370,10 +369,10 @@ export default function VirtualCardsScreen() {
                     </LinearGradient>
 
                     {/* Card Balance Display Header */}
-                    <View style={{ backgroundColor: 'rgba(30, 41, 59, 0.7)', borderRadius: 22, padding: 20, marginBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 22, padding: 20, marginBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
                         <View>
-                            <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Available Card Balance</Text>
-                            <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: '900', marginTop: 2 }}>
+                            <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Available Card Balance</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 32, fontWeight: '900', marginTop: 2 }}>
                                 {selectedCard.currency === 'USD' ? '$' : '₦'}{selectedCard.balance.toFixed(2)}
                             </Text>
                         </View>
@@ -382,22 +381,22 @@ export default function VirtualCardsScreen() {
                                 setShowFullDetails(!showFullDetails);
                                 if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
-                            style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: '#f5a623', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                            style={{ backgroundColor: '#fffbeb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: '#fde68a', flexDirection: 'row', alignItems: 'center', gap: 6 }}
                         >
-                            <Ionicons name={showFullDetails ? "eye-off-outline" : "eye-outline"} size={18} color="#f5a623" />
-                            <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12 }}>
+                            <Ionicons name={showFullDetails ? "eye-off-outline" : "eye-outline"} size={18} color="#d97706" />
+                            <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 12 }}>
                                 {showFullDetails ? 'Mask Details' : 'Reveal Details'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    {/* MODERN QUICK ACTIONS FLOATING GRID */}
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Card Controls & Security</Text>
+                    {/* MODERN QUICK ACTIONS GRID */}
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Card Controls & Security</Text>
                     
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
                         <TouchableOpacity 
                             onPress={() => setShowFundModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#10b981', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#10b981', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                         >
                             <Ionicons name="card-outline" size={20} color="#ffffff" />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>+ Fund Card</Text>
@@ -405,7 +404,7 @@ export default function VirtualCardsScreen() {
 
                         <TouchableOpacity 
                             onPress={() => setShowWithdrawModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#3b82f6', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#3b82f6', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                         >
                             <Ionicons name="wallet-outline" size={20} color="#ffffff" />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>💸 Withdraw</Text>
@@ -413,7 +412,7 @@ export default function VirtualCardsScreen() {
 
                         <TouchableOpacity 
                             onPress={handleToggleFreeze}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: selectedCard.status === 'active' ? '#ef4444' : '#22c55e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                         >
                             <Ionicons name={selectedCard.status === 'active' ? "lock-closed-outline" : "lock-open-outline"} size={20} color="#ffffff" />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>
@@ -423,22 +422,22 @@ export default function VirtualCardsScreen() {
 
                         <TouchableOpacity 
                             onPress={() => setShowAddressModal(true)}
-                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#1e293b', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                            style={{ flex: 1, minWidth: '45%', backgroundColor: '#ffffff', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
                         >
-                            <Ionicons name="location-outline" size={20} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>Billing Address</Text>
+                            <Ionicons name="location-outline" size={20} color="#0f172a" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>Billing Address</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* SUPPORTED MERCHANTS SHOWCASE */}
-                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Supported International Merchants</Text>
+                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.5 }}>Supported Merchants</Text>
                     
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             {SUPPORTED_MERCHANTS.map((m, i) => (
-                                <View key={i} style={{ backgroundColor: 'rgba(30, 41, 59, 0.7)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                                <View key={i} style={{ backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 }}>
                                     <Ionicons name={m.icon as any} size={18} color={m.color} />
-                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{m.name}</Text>
                                 </View>
                             ))}
                         </View>
@@ -447,7 +446,7 @@ export default function VirtualCardsScreen() {
                     {/* Terminate Card Danger Zone */}
                     <TouchableOpacity
                         onPress={handleTerminateCard}
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: '#ef4444', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                        style={{ backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', padding: 16, borderRadius: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                     >
                         <Ionicons name="trash-outline" size={18} color="#ef4444" />
                         <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 13 }}>Terminate Card & Refund Balance</Text>
@@ -455,58 +454,58 @@ export default function VirtualCardsScreen() {
 
                 </ScrollView>
             ) : (
-                /* NO VIRTUAL CARD EMPTY STATE WITH LUXURY UI */
+                /* NO VIRTUAL CARD EMPTY STATE WITH LIGHT THEME */
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-                    <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(245, 166, 35, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 1.5, borderColor: '#f5a623' }}>
-                        <Ionicons name="card" size={46} color="#f5a623" />
+                    <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 1.5, borderColor: '#fde68a' }}>
+                        <Ionicons name="card" size={46} color="#d97706" />
                     </View>
-                    <Text style={{ color: '#ffffff', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>Get Your Virtual Dollar Card</Text>
-                    <Text style={{ color: '#94a3b8', textAlign: 'center', fontSize: 13, lineHeight: 20, marginBottom: 30, maxWidth: 330 }}>
+                    <Text style={{ color: '#0f172a', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>Get Your Virtual Card</Text>
+                    <Text style={{ color: '#64748b', textAlign: 'center', fontSize: 13, lineHeight: 20, marginBottom: 30, maxWidth: 330 }}>
                         Create an instant Payvessel Virtual Card for seamless international online payments. Works anywhere VISA and Mastercard are accepted.
                     </Text>
 
                     <TouchableOpacity
                         onPress={() => setShowCreateModal(true)}
-                        style={{ width: '100%', backgroundColor: '#f5a623', height: 54, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#f5a623', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 }}
+                        style={{ width: '100%', backgroundColor: '#0f172a', height: 54, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 }}
                     >
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Issue Virtual Card ($3 Fee)</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Issue Virtual Card ($3 Fee)</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
             {/* MODAL 1: CREATE VIRTUAL CARD */}
             <Modal visible={showCreateModal} animationType="slide" transparent presentationStyle="overFullScreen">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#1e293b', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '900' }}>Issue Virtual Card</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>Issue Virtual Card</Text>
                             <TouchableOpacity onPress={() => setShowCreateModal(false)}>
                                 <Ionicons name="close-circle" size={26} color="#94a3b8" />
                             </TouchableOpacity>
                         </View>
 
                         {/* Currency Selection */}
-                        <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Select Card Currency</Text>
+                        <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Select Card Currency</Text>
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                             <TouchableOpacity
                                 onPress={() => setCardCurrency('USD')}
-                                style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'USD' ? '#f5a623' : '#0f172a', alignItems: 'center', borderWidth: 1, borderColor: '#f5a623' }}
+                                style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'USD' ? '#0f172a' : '#f8fafc', alignItems: 'center', borderWidth: 1, borderColor: cardCurrency === 'USD' ? '#0f172a' : '#e2e8f0' }}
                             >
-                                <Text style={{ color: cardCurrency === 'USD' ? '#0f172a' : '#ffffff', fontWeight: '900', fontSize: 14 }}>🇺🇸 USD Dollar Card</Text>
-                                <Text style={{ color: cardCurrency === 'USD' ? '#0f172a' : '#94a3b8', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For International Bills</Text>
+                                <Text style={{ color: cardCurrency === 'USD' ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 14 }}>🇺🇸 USD Dollar Card</Text>
+                                <Text style={{ color: cardCurrency === 'USD' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For International Bills</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 onPress={() => setCardCurrency('NGN')}
-                                style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'NGN' ? '#f5a623' : '#0f172a', alignItems: 'center', borderWidth: 1, borderColor: '#f5a623' }}
+                                style={{ flex: 1, padding: 14, borderRadius: 16, backgroundColor: cardCurrency === 'NGN' ? '#0f172a' : '#f8fafc', alignItems: 'center', borderWidth: 1, borderColor: cardCurrency === 'NGN' ? '#0f172a' : '#e2e8f0' }}
                             >
-                                <Text style={{ color: cardCurrency === 'NGN' ? '#0f172a' : '#ffffff', fontWeight: '900', fontSize: 14 }}>🇳🇬 NGN Naira Card</Text>
-                                <Text style={{ color: cardCurrency === 'NGN' ? '#0f172a' : '#94a3b8', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For Local Merchant Bills</Text>
+                                <Text style={{ color: cardCurrency === 'NGN' ? '#ffffff' : '#0f172a', fontWeight: '900', fontSize: 14 }}>🇳🇬 NGN Naira Card</Text>
+                                <Text style={{ color: cardCurrency === 'NGN' ? '#94a3b8' : '#64748b', fontSize: 9, marginTop: 2, fontWeight: '700' }}>For Local Merchant Bills</Text>
                             </TouchableOpacity>
                         </View>
 
                         {/* Initial Funding Chips */}
-                        <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Initial Funding Amount ({cardCurrency})</Text>
+                        <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Initial Funding Amount ({cardCurrency})</Text>
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                             {['10', '25', '50', '100'].map(val => (
                                 <TouchableOpacity
@@ -516,13 +515,13 @@ export default function VirtualCardsScreen() {
                                         flex: 1,
                                         paddingVertical: 10,
                                         borderRadius: 12,
-                                        backgroundColor: initialFundAmount === val ? 'rgba(245, 166, 35, 0.2)' : '#0f172a',
+                                        backgroundColor: initialFundAmount === val ? '#fffbeb' : '#f8fafc',
                                         borderWidth: 1,
-                                        borderColor: initialFundAmount === val ? '#f5a623' : '#334155',
+                                        borderColor: initialFundAmount === val ? '#d97706' : '#e2e8f0',
                                         alignItems: 'center'
                                     }}
                                 >
-                                    <Text style={{ color: initialFundAmount === val ? '#f5a623' : '#ffffff', fontWeight: '900', fontSize: 12 }}>
+                                    <Text style={{ color: initialFundAmount === val ? '#d97706' : '#0f172a', fontWeight: '900', fontSize: 12 }}>
                                         {cardCurrency === 'USD' ? '$' : '₦'}{val}
                                     </Text>
                                 </TouchableOpacity>
@@ -530,28 +529,28 @@ export default function VirtualCardsScreen() {
                         </View>
 
                         <TextInput
-                            style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 14, borderRadius: 16, fontSize: 16, fontWeight: 'bold', borderWidth: 1, borderColor: '#334155', marginBottom: 16 }}
+                            style={{ backgroundColor: '#f8fafc', color: '#0f172a', padding: 14, borderRadius: 16, fontSize: 16, fontWeight: 'bold', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}
                             placeholder="Or enter custom amount"
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             value={initialFundAmount}
                             onChangeText={setInitialFundAmount}
                         />
 
                         {/* Fee Breakdown */}
-                        <View style={{ backgroundColor: '#0f172a', padding: 14, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#334155' }}>
+                        <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 11 }}>Card Creation Fee</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>$3.00 (₦4,800)</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>Card Creation Fee</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>$3.00 (₦4,800)</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 11 }}>Initial Card Funding</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>{cardCurrency === 'USD' ? '$' : '₦'}{initialFundAmount || 0}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 11 }}>Initial Card Funding</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 11, fontWeight: 'bold' }}>{cardCurrency === 'USD' ? '$' : '₦'}{initialFundAmount || 0}</Text>
                             </View>
-                            <View style={{ height: 1, backgroundColor: '#334155', marginVertical: 6 }} />
+                            <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 6 }} />
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#f5a623', fontSize: 13, fontWeight: '900' }}>Total Wallet Charge</Text>
-                                <Text style={{ color: '#f5a623', fontSize: 13, fontWeight: '900' }}>
+                                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '900' }}>Total Wallet Charge</Text>
+                                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '900' }}>
                                     ₦{((3 + (Number(initialFundAmount) || 0)) * 1600).toLocaleString()}
                                 </Text>
                             </View>
@@ -560,9 +559,9 @@ export default function VirtualCardsScreen() {
                         <TouchableOpacity
                             onPress={handleCreateCard}
                             disabled={actionLoading}
-                            style={{ backgroundColor: '#f5a623', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ backgroundColor: '#0f172a', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                         >
-                            {actionLoading ? <ActivityIndicator color="#0f172a" /> : <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Issue Card Instantly 💳</Text>}
+                            {actionLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Issue Card Instantly 💳</Text>}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -570,16 +569,16 @@ export default function VirtualCardsScreen() {
 
             {/* MODAL 2: FUND CARD */}
             <Modal visible={showFundModal} animationType="slide" transparent presentationStyle="overFullScreen">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#1e293b', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '900' }}>+ Fund Virtual Card</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>+ Fund Virtual Card</Text>
                             <TouchableOpacity onPress={() => setShowFundModal(false)}>
                                 <Ionicons name="close-circle" size={26} color="#94a3b8" />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 12 }}>Enter funding amount in {selectedCard?.currency}:</Text>
+                        <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 12 }}>Enter funding amount in {selectedCard?.currency}:</Text>
                         
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                             {['10', '25', '50', '100'].map(val => (
@@ -590,13 +589,13 @@ export default function VirtualCardsScreen() {
                                         flex: 1,
                                         paddingVertical: 10,
                                         borderRadius: 12,
-                                        backgroundColor: fundAmountInput === val ? 'rgba(34, 197, 94, 0.2)' : '#0f172a',
+                                        backgroundColor: fundAmountInput === val ? '#ecfdf5' : '#f8fafc',
                                         borderWidth: 1,
-                                        borderColor: fundAmountInput === val ? '#22c55e' : '#334155',
+                                        borderColor: fundAmountInput === val ? '#10b981' : '#e2e8f0',
                                         alignItems: 'center'
                                     }}
                                 >
-                                    <Text style={{ color: fundAmountInput === val ? '#4ade80' : '#ffffff', fontWeight: '900', fontSize: 12 }}>
+                                    <Text style={{ color: fundAmountInput === val ? '#10b981' : '#0f172a', fontWeight: '900', fontSize: 12 }}>
                                         {selectedCard?.currency === 'USD' ? '$' : '₦'}{val}
                                     </Text>
                                 </TouchableOpacity>
@@ -604,16 +603,16 @@ export default function VirtualCardsScreen() {
                         </View>
 
                         <TextInput
-                            style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 14, borderRadius: 16, fontSize: 18, fontWeight: 'bold', borderWidth: 1, borderColor: '#334155', marginBottom: 16 }}
+                            style={{ backgroundColor: '#f8fafc', color: '#0f172a', padding: 14, borderRadius: 16, fontSize: 18, fontWeight: 'bold', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}
                             placeholder={`Amount (${selectedCard?.currency})`}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             value={fundAmountInput}
                             onChangeText={setFundAmountInput}
                         />
 
                         {selectedCard && (
-                            <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '900', marginBottom: 20 }}>
+                            <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '900', marginBottom: 20 }}>
                                 Equivalent Wallet Charge: ₦{((Number(fundAmountInput) || 0) * (selectedCard.currency === 'USD' ? 1600 : 1)).toLocaleString()}
                             </Text>
                         )}
@@ -621,7 +620,7 @@ export default function VirtualCardsScreen() {
                         <TouchableOpacity
                             onPress={handleFundCard}
                             disabled={actionLoading}
-                            style={{ backgroundColor: '#10b981', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ backgroundColor: '#10b981', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                         >
                             {actionLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Confirm Funding 💳</Text>}
                         </TouchableOpacity>
@@ -631,20 +630,20 @@ export default function VirtualCardsScreen() {
 
             {/* MODAL 3: WITHDRAW FROM CARD */}
             <Modal visible={showWithdrawModal} animationType="slide" transparent presentationStyle="overFullScreen">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#1e293b', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '900' }}>💸 Withdraw to Wallet</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>💸 Withdraw to Wallet</Text>
                             <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
                                 <Ionicons name="close-circle" size={26} color="#94a3b8" />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 12 }}>Available Card Balance: {selectedCard?.currency === 'USD' ? '$' : '₦'}{selectedCard?.balance}</Text>
+                        <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 12 }}>Available Card Balance: {selectedCard?.currency === 'USD' ? '$' : '₦'}{selectedCard?.balance}</Text>
                         <TextInput
-                            style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 14, borderRadius: 16, fontSize: 18, fontWeight: 'bold', borderWidth: 1, borderColor: '#334155', marginBottom: 16 }}
+                            style={{ backgroundColor: '#f8fafc', color: '#0f172a', padding: 14, borderRadius: 16, fontSize: 18, fontWeight: 'bold', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}
                             placeholder={`Amount (${selectedCard?.currency})`}
-                            placeholderTextColor="#64748b"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             value={withdrawAmountInput}
                             onChangeText={setWithdrawAmountInput}
@@ -653,7 +652,7 @@ export default function VirtualCardsScreen() {
                         <TouchableOpacity
                             onPress={handleWithdrawFromCard}
                             disabled={actionLoading}
-                            style={{ backgroundColor: '#3b82f6', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                            style={{ backgroundColor: '#3b82f6', height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#3b82f6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                         >
                             {actionLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16 }}>Withdraw to Main Wallet 💸</Text>}
                         </TouchableOpacity>
@@ -663,45 +662,45 @@ export default function VirtualCardsScreen() {
 
             {/* MODAL 4: BILLING ADDRESS */}
             <Modal visible={showAddressModal} animationType="slide" transparent presentationStyle="overFullScreen">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: '#1e293b', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, borderWidth: 1, borderColor: '#e2e8f0' }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '900' }}>📍 US Billing Address</Text>
+                            <Text style={{ color: '#0f172a', fontSize: 20, fontWeight: '900' }}>📍 US Billing Address</Text>
                             <TouchableOpacity onPress={() => setShowAddressModal(false)}>
                                 <Ionicons name="close-circle" size={26} color="#94a3b8" />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 16 }}>Use these exact details when checking out on US/International merchant platforms:</Text>
+                        <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>Use these exact details when checking out on US/International merchant platforms:</Text>
 
-                        <View style={{ backgroundColor: '#0f172a', padding: 16, borderRadius: 18, gap: 12, borderWidth: 1, borderColor: '#334155', marginBottom: 20 }}>
+                        <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>Street</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.street || '350 Fifth Avenue'}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 12 }}>Street</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.street || '350 Fifth Avenue'}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>City</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.city || 'New York'}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 12 }}>City</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.city || 'New York'}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>State</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.state || 'NY'}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 12 }}>State</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.state || 'NY'}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>Zip Code</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.zip || '10118'}</Text>
+                                <Text style={{ color: '#64748b', fontSize: 12 }}>Zip Code</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>{selectedCard?.billing_address?.zip || '10118'}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>Country</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>United States (US)</Text>
+                                <Text style={{ color: '#64748b', fontSize: 12 }}>Country</Text>
+                                <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: 'bold' }}>United States (US)</Text>
                             </View>
                         </View>
 
                         <TouchableOpacity
                             onPress={() => setShowAddressModal(false)}
-                            style={{ backgroundColor: '#f5a623', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}
+                            style={{ backgroundColor: '#0f172a', height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }}
                         >
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 15 }}>Close</Text>
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Close</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
