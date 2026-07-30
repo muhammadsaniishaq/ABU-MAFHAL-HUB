@@ -14,27 +14,31 @@ import {
   Image 
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 
 const C = {
-  bg: '#030712',
-  cardBg: '#0b0f19',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
-  gold: '#f5a623',
-  goldGlow: '#fbbf24',
-  goldDark: '#d4890e',
+  bg: '#f8fafc',
+  cardBg: '#ffffff',
+  cardBorder: '#e2e8f0',
+  navy: '#0f172a',
+  navyLight: '#1e293b',
+  gold: '#d97706',
+  goldBright: '#f5a623',
+  goldBg: '#fffbeb',
+  goldBorder: '#fde68a',
+  textMain: '#0f172a',
+  textSub: '#64748b',
   white: '#ffffff',
-  textSub: '#94a3b8',
   red: '#ef4444',
   green: '#10b981',
-  blue: '#3b82f6',
-  purple: '#8b5cf6',
-  cyan: '#06b6d4',
-  indigo: '#6366f1',
+  blue: '#2563eb',
+  purple: '#7c3aed',
+  cyan: '#0891b2',
+  indigo: '#4f46e5',
 };
 
 interface StaffMember {
@@ -61,7 +65,6 @@ export default function SuperAdminMasterHubScreen() {
     pendingKYC: 0,
     pendingLoans: 0,
     totalAdmins: 0,
-    todayVolume: 0,
   });
 
   // Kill Switches State
@@ -127,7 +130,6 @@ export default function SuperAdminMasterHubScreen() {
         pendingKYC: kCount || 0,
         pendingLoans: lCount || 0,
         totalAdmins: staffData?.length || 0,
-        todayVolume: sumBalance * 0.12, // Dynamic system index
       });
 
       // Load Settings / Kill Switches
@@ -166,7 +168,7 @@ export default function SuperAdminMasterHubScreen() {
         .from('app_settings')
         .upsert({ key: dbKey, value: String(newVal) }, { onConflict: 'key' });
 
-      Alert.alert('System Override ⚡', `${dbKey.replace('_', ' ').toUpperCase()} is now ${newVal ? 'ENABLED (LOCKED)' : 'DISABLED (ACTIVE)'}`);
+      Alert.alert('Setting Updated ⚙️', `${dbKey.replace('_', ' ').toUpperCase()} is now ${newVal ? 'ENABLED (LOCKED)' : 'DISABLED (ACTIVE)'}`);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -174,18 +176,16 @@ export default function SuperAdminMasterHubScreen() {
 
   const handleChangeStaffRole = async (member: StaffMember, newRole: string) => {
     Alert.alert(
-      'Elevate / Modify Role',
+      'Modify Staff Role',
       `Assign ${newRole.toUpperCase()} privilege to ${member.full_name || 'this admin'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm Elevation',
+          text: 'Confirm Change',
           onPress: async () => {
             try {
-              // 1. Disable lockdown trigger if present
               await supabase.rpc('disable_lockdown_trigger').then(() => {}, () => {});
 
-              // 2. Update profiles
               const { error } = await supabase
                 .from('profiles')
                 .update({ role: newRole })
@@ -193,13 +193,12 @@ export default function SuperAdminMasterHubScreen() {
 
               if (error) throw error;
 
-              // 3. Update auth metadata
               await supabase.from('auth.users' as any).update({
                 raw_app_meta_data: { role: newRole }
               }).eq('id', member.id).then(() => {}, () => {});
 
               loadMasterHubData();
-              Alert.alert('Access Granted 👑', `Role updated to ${newRole.toUpperCase()}`);
+              Alert.alert('Success 🎉', `Role updated to ${newRole.toUpperCase()}`);
             } catch (e: any) {
               Alert.alert('Error', e.message);
             }
@@ -214,7 +213,7 @@ export default function SuperAdminMasterHubScreen() {
     const actionLabel = newStatus === 'banned' ? 'Ban / Suspend' : 'Reactivate';
 
     Alert.alert(
-      `${actionLabel} Staff Admin`,
+      `${actionLabel} Staff Member`,
       `Are you sure you want to ${actionLabel.toLowerCase()} ${member.full_name || 'this admin'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -231,7 +230,7 @@ export default function SuperAdminMasterHubScreen() {
               if (error) throw error;
 
               loadMasterHubData();
-              Alert.alert('Security Action Complete 🛡️', `Staff status changed to ${newStatus}`);
+              Alert.alert('Success 🎉', `Staff status changed to ${newStatus}`);
             } catch (e: any) {
               Alert.alert('Error', e.message);
             }
@@ -249,7 +248,6 @@ export default function SuperAdminMasterHubScreen() {
     try {
       setSendingBroadcast(true);
 
-      // Save to app_settings as active announcement
       await supabase.from('app_settings').upsert({
         key: 'global_announcement_banner',
         value: JSON.stringify({
@@ -263,7 +261,7 @@ export default function SuperAdminMasterHubScreen() {
       setBroadcastVisible(false);
       setBroadcastTitle('');
       setBroadcastBody('');
-      Alert.alert('Broadcast Published 📢', 'Global broadcast notification has been published to all active users across the platform!');
+      Alert.alert('Broadcast Sent 📢', 'Global broadcast notification has been published to all active users!');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
@@ -276,7 +274,7 @@ export default function SuperAdminMasterHubScreen() {
       <Stack.Screen 
         options={{
           title: 'SUPER ADMIN COMMAND CENTER',
-          headerStyle: { backgroundColor: '#030712' },
+          headerStyle: { backgroundColor: '#0f172a' },
           headerTintColor: '#f5a623',
           headerTitleStyle: { fontWeight: '900', fontSize: 15 }
         }} 
@@ -284,48 +282,44 @@ export default function SuperAdminMasterHubScreen() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 18, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
         
-        {/* Futuristic Cyber Command Header */}
+        {/* Royal Luxury Banner Header */}
         <LinearGradient
-          colors={['#1e1b4b', '#0f172a', '#030712']}
+          colors={['#0f172a', '#1e293b', '#334155']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={s.cyberHeader}
+          style={s.royalHeader}
         >
-          {/* Glowing Orbs */}
-          <View style={s.glowOrbRight} />
-          <View style={s.glowOrbLeft} />
-
-          <View style={s.cyberTopRow}>
-            <View>
+          <View style={s.royalHeaderRow}>
+            <View style={{ flex: 1 }}>
               <View style={s.crownPill}>
-                <Ionicons name="ribbon" size={14} color={C.gold} />
+                <MaterialCommunityIcons name="crown" size={14} color={C.goldBright} />
                 <Text style={s.crownPillTxt}>SUPER ADMIN MASTER KEY</Text>
               </View>
-              <Text style={s.cyberTitle}>ROOT COMMAND CENTER</Text>
+              <Text style={s.royalTitle}>Root Governance & Control</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <View style={s.livePulseDot} />
-                <Text style={s.livePulseTxt}>SYSTEM ONLINE • 99.99% RESILIENCE</Text>
+                <View style={s.liveGreenDot} />
+                <Text style={s.liveGreenTxt}>CORE SYSTEM ONLINE & SECURED</Text>
               </View>
             </View>
 
             <TouchableOpacity 
               onPress={() => setBroadcastVisible(true)}
-              style={s.broadcastButton}
-              activeOpacity={0.8}
+              style={s.broadcastHeaderBtn}
+              activeOpacity={0.85}
             >
-              <Ionicons name="megaphone" size={16} color={C.bg} />
-              <Text style={s.broadcastButtonTxt}>Broadcast</Text>
+              <Ionicons name="megaphone-outline" size={16} color={C.navy} />
+              <Text style={s.broadcastBtnTxt}>Broadcast</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
 
-        {/* Tab Navigation Pill Bar */}
+        {/* Tab Selector Bar */}
         <View style={s.tabBar}>
           <TouchableOpacity 
             onPress={() => setActiveTab('overview')}
             style={[s.tabBtn, activeTab === 'overview' && s.tabBtnActive]}
           >
-            <Ionicons name="stats-chart" size={14} color={activeTab === 'overview' ? C.gold : C.textSub} />
+            <Ionicons name="pie-chart" size={14} color={activeTab === 'overview' ? C.navy : C.textSub} />
             <Text style={[s.tabBtnTxt, activeTab === 'overview' && s.tabBtnTxtActive]}>Vault</Text>
           </TouchableOpacity>
 
@@ -333,7 +327,7 @@ export default function SuperAdminMasterHubScreen() {
             onPress={() => setActiveTab('switches')}
             style={[s.tabBtn, activeTab === 'switches' && s.tabBtnActive]}
           >
-            <Ionicons name="power" size={14} color={activeTab === 'switches' ? C.gold : C.textSub} />
+            <Ionicons name="options" size={14} color={activeTab === 'switches' ? C.navy : C.textSub} />
             <Text style={[s.tabBtnTxt, activeTab === 'switches' && s.tabBtnTxtActive]}>Kill Switches</Text>
           </TouchableOpacity>
 
@@ -341,74 +335,76 @@ export default function SuperAdminMasterHubScreen() {
             onPress={() => setActiveTab('staff')}
             style={[s.tabBtn, activeTab === 'staff' && s.tabBtnActive]}
           >
-            <Ionicons name="people" size={14} color={activeTab === 'staff' ? C.gold : C.textSub} />
-            <Text style={[s.tabBtnTxt, activeTab === 'staff' && s.tabBtnTxtActive]}>Staff Hierarchy</Text>
+            <Ionicons name="people" size={14} color={activeTab === 'staff' ? C.navy : C.textSub} />
+            <Text style={[s.tabBtnTxt, activeTab === 'staff' && s.tabBtnTxtActive]}>Staff Roster</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             onPress={() => setActiveTab('security')}
             style={[s.tabBtn, activeTab === 'security' && s.tabBtnActive]}
           >
-            <Ionicons name="shield-checkmark" size={14} color={activeTab === 'security' ? C.gold : C.textSub} />
+            <Ionicons name="shield-checkmark" size={14} color={activeTab === 'security' ? C.navy : C.textSub} />
             <Text style={[s.tabBtnTxt, activeTab === 'security' && s.tabBtnTxtActive]}>RedZone</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ─── TAB 1: OVERVIEW & VAULT METRICS ─── */}
+        {/* ─── TAB 1: VAULT OVERVIEW ─── */}
         {activeTab === 'overview' && (
           <>
-            <Text style={s.sectionHeader}>🏛️ LIQUIDITY & SYSTEM RESERVES</Text>
-            <View style={s.vaultCardMain}>
-              <LinearGradient
-                colors={['rgba(245, 166, 35, 0.12)', 'rgba(15, 23, 42, 0.6)']}
-                style={s.vaultGradient}
-              >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View>
-                    <Text style={s.vaultTitle}>TOTAL USER CAPITAL</Text>
-                    <Text style={s.vaultAmount}>₦{vaultData.totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-                  </View>
-                  <View style={s.vaultIconBg}>
-                    <Ionicons name="wallet" size={24} color={C.gold} />
-                  </View>
+            <Text style={s.sectionHeaderTitle}>🏛️ SYSTEM CAPITAL & VAULT</Text>
+            <View style={s.mainVaultCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={s.vaultSubTitle}>TOTAL DEPOSIT LIQUIDITY</Text>
+                  <Text style={s.vaultMainAmount}>₦{vaultData.totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                 </View>
+                <View style={s.vaultIconCircle}>
+                  <Ionicons name="wallet-outline" size={24} color={C.gold} />
+                </View>
+              </View>
 
-                {/* Liquidity Reserve Health Bar */}
-                <View style={{ marginTop: 16 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ color: C.textSub, fontSize: 10, fontWeight: 'bold' }}>RESERVE COVERAGE RATIO</Text>
-                    <Text style={{ color: C.green, fontSize: 10, fontWeight: 'bold' }}>100% FULLY BACKED</Text>
-                  </View>
-                  <View style={s.healthTrack}>
-                    <View style={s.healthFill} />
-                  </View>
+              <View style={s.vaultDivider} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="shield-checkmark-sharp" size={14} color={C.green} />
+                  <Text style={{ color: C.green, fontSize: 11, fontWeight: 'bold' }}>100% Reserve Backing Active</Text>
                 </View>
-              </LinearGradient>
+                <Text style={{ color: C.textSub, fontSize: 10, fontWeight: 'bold' }}>Realtime Audit</Text>
+              </View>
             </View>
 
-            <View style={s.grid2Col}>
-              <View style={s.statBox}>
-                <Ionicons name="people-outline" size={20} color={C.blue} />
-                <Text style={s.statBoxNum}>{vaultData.totalUsers.toLocaleString()}</Text>
-                <Text style={s.statBoxLabel}>Total Platform Users</Text>
+            <View style={s.statGrid}>
+              <View style={s.statCard}>
+                <View style={[s.statIconBox, { backgroundColor: 'rgba(37, 99, 235, 0.1)' }]}>
+                  <Ionicons name="people-outline" size={18} color={C.blue} />
+                </View>
+                <Text style={s.statCardNum}>{vaultData.totalUsers.toLocaleString()}</Text>
+                <Text style={s.statCardLabel}>Active Users</Text>
               </View>
 
-              <View style={s.statBox}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={C.purple} />
-                <Text style={s.statBoxNum}>{vaultData.totalAdmins}</Text>
-                <Text style={s.statBoxLabel}>Active Staff Admins</Text>
+              <View style={s.statCard}>
+                <View style={[s.statIconBox, { backgroundColor: 'rgba(124, 58, 237, 0.1)' }]}>
+                  <Ionicons name="key-outline" size={18} color={C.purple} />
+                </View>
+                <Text style={s.statCardNum}>{vaultData.totalAdmins}</Text>
+                <Text style={s.statCardLabel}>Staff & Admins</Text>
               </View>
 
-              <View style={s.statBox}>
-                <Ionicons name="scan-outline" size={20} color={vaultData.pendingKYC > 0 ? C.red : C.green} />
-                <Text style={[s.statBoxNum, vaultData.pendingKYC > 0 && { color: C.red }]}>{vaultData.pendingKYC}</Text>
-                <Text style={s.statBoxLabel}>Pending KYC Verification</Text>
+              <View style={s.statCard}>
+                <View style={[s.statIconBox, { backgroundColor: vaultData.pendingKYC > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                  <Ionicons name="scan-outline" size={18} color={vaultData.pendingKYC > 0 ? C.red : C.green} />
+                </View>
+                <Text style={[s.statCardNum, vaultData.pendingKYC > 0 && { color: C.red }]}>{vaultData.pendingKYC}</Text>
+                <Text style={s.statCardLabel}>Pending KYC</Text>
               </View>
 
-              <View style={s.statBox}>
-                <Ionicons name="cash-outline" size={20} color={C.gold} />
-                <Text style={s.statBoxNum}>{vaultData.pendingLoans}</Text>
-                <Text style={s.statBoxLabel}>Pending Loan Requests</Text>
+              <View style={s.statCard}>
+                <View style={[s.statIconBox, { backgroundColor: 'rgba(217, 119, 6, 0.1)' }]}>
+                  <Ionicons name="cash-outline" size={18} color={C.gold} />
+                </View>
+                <Text style={s.statCardNum}>{vaultData.pendingLoans}</Text>
+                <Text style={s.statCardLabel}>Pending Loans</Text>
               </View>
             </View>
           </>
@@ -417,92 +413,92 @@ export default function SuperAdminMasterHubScreen() {
         {/* ─── TAB 2: KILL SWITCHES ─── */}
         {(activeTab === 'switches' || activeTab === 'overview') && (
           <>
-            <Text style={s.sectionHeader}>⚡ MASTER KILL-SWITCH MATRIX</Text>
-            <View style={s.glassCard}>
-              <View style={s.switchItem}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="globe-outline" size={16} color={C.red} />
-                    <Text style={s.switchTitle}>Global Maintenance Mode</Text>
-                  </View>
-                  <Text style={s.switchSub}>Locks full user mobile app and displays custom maintenance banner</Text>
+            <Text style={s.sectionHeaderTitle}>⚡ MASTER SYSTEM KILL SWITCHES</Text>
+            <View style={s.whiteCard}>
+              <View style={s.switchRow}>
+                <View style={s.switchIconBox}>
+                  <Ionicons name="globe-outline" size={18} color={C.red} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.switchTitle}>Global Maintenance Mode</Text>
+                  <Text style={s.switchSub}>Lock mobile app & show maintenance message</Text>
                 </View>
                 <Switch
                   value={killSwitches.globalMaintenance}
                   onValueChange={() => handleToggleSwitch('globalMaintenance', 'maintenance_mode', killSwitches.globalMaintenance)}
-                  trackColor={{ false: '#1e293b', true: C.red }}
+                  trackColor={{ false: '#cbd5e1', true: C.red }}
                   thumbColor={C.white}
                 />
               </View>
 
-              <View style={s.divider} />
+              <View style={s.itemDivider} />
 
-              <View style={s.switchItem}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="arrow-down-circle-outline" size={16} color={C.gold} />
-                    <Text style={s.switchTitle}>Lock Automated Deposits</Text>
-                  </View>
-                  <Text style={s.switchSub}>Pause incoming bank transfer & gateway deposits</Text>
+              <View style={s.switchRow}>
+                <View style={s.switchIconBox}>
+                  <Ionicons name="arrow-down-circle-outline" size={18} color={C.gold} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.switchTitle}>Lock Automated Deposits</Text>
+                  <Text style={s.switchSub}>Pause incoming bank deposits & gateways</Text>
                 </View>
                 <Switch
                   value={killSwitches.lockDeposits}
                   onValueChange={() => handleToggleSwitch('lockDeposits', 'lock_deposits', killSwitches.lockDeposits)}
-                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  trackColor={{ false: '#cbd5e1', true: C.gold }}
                   thumbColor={C.white}
                 />
               </View>
 
-              <View style={s.divider} />
+              <View style={s.itemDivider} />
 
-              <View style={s.switchItem}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="arrow-up-circle-outline" size={16} color={C.red} />
-                    <Text style={s.switchTitle}>Lock Outbound Payouts</Text>
-                  </View>
-                  <Text style={s.switchSub}>Freeze user wallet withdrawals & bank payouts</Text>
+              <View style={s.switchRow}>
+                <View style={s.switchIconBox}>
+                  <Ionicons name="arrow-up-circle-outline" size={18} color={C.red} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.switchTitle}>Lock Outbound Payouts</Text>
+                  <Text style={s.switchSub}>Freeze user wallet withdrawals & payouts</Text>
                 </View>
                 <Switch
                   value={killSwitches.lockWithdrawals}
                   onValueChange={() => handleToggleSwitch('lockWithdrawals', 'lock_withdrawals', killSwitches.lockWithdrawals)}
-                  trackColor={{ false: '#1e293b', true: C.red }}
+                  trackColor={{ false: '#cbd5e1', true: C.red }}
                   thumbColor={C.white}
                 />
               </View>
 
-              <View style={s.divider} />
+              <View style={s.itemDivider} />
 
-              <View style={s.switchItem}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="logo-bitcoin" size={16} color={C.gold} />
-                    <Text style={s.switchTitle}>Lock Crypto Trading</Text>
-                  </View>
-                  <Text style={s.switchSub}>Pause crypto buy, sell, swap, and wallet transactions</Text>
+              <View style={s.switchRow}>
+                <View style={s.switchIconBox}>
+                  <Ionicons name="logo-bitcoin" size={18} color={C.gold} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.switchTitle}>Lock Crypto Operations</Text>
+                  <Text style={s.switchSub}>Pause crypto buy, sell, and swap services</Text>
                 </View>
                 <Switch
                   value={killSwitches.lockCrypto}
                   onValueChange={() => handleToggleSwitch('lockCrypto', 'lock_crypto', killSwitches.lockCrypto)}
-                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  trackColor={{ false: '#cbd5e1', true: C.gold }}
                   thumbColor={C.white}
                 />
               </View>
 
-              <View style={s.divider} />
+              <View style={s.itemDivider} />
 
-              <View style={s.switchItem}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="phone-portrait-outline" size={16} color={C.cyan} />
-                    <Text style={s.switchTitle}>Lock VTU & Telecom Services</Text>
-                  </View>
+              <View style={s.switchRow}>
+                <View style={s.switchIconBox}>
+                  <Ionicons name="phone-portrait-outline" size={18} color={C.cyan} />
+                </View>
+                <View style={{ flex: 1, marginHorizontal: 10 }}>
+                  <Text style={s.switchTitle}>Lock VTU & Telecom Services</Text>
                   <Text style={s.switchSub}>Pause Airtime, Data, and Cable TV purchases</Text>
                 </View>
                 <Switch
                   value={killSwitches.lockTelecom}
                   onValueChange={() => handleToggleSwitch('lockTelecom', 'lock_telecom', killSwitches.lockTelecom)}
-                  trackColor={{ false: '#1e293b', true: C.gold }}
+                  trackColor={{ false: '#cbd5e1', true: C.gold }}
                   thumbColor={C.white}
                 />
               </View>
@@ -513,8 +509,8 @@ export default function SuperAdminMasterHubScreen() {
         {/* ─── TAB 3: STAFF HIERARCHY & ROLES ─── */}
         {(activeTab === 'staff' || activeTab === 'overview') && (
           <>
-            <Text style={s.sectionHeader}>👑 STAFF HIERARCHY & ROLE MATRIX</Text>
-            <View style={s.glassCard}>
+            <Text style={s.sectionHeaderTitle}>👑 STAFF & ADMIN HIERARCHY</Text>
+            <View style={s.whiteCard}>
               {loading ? (
                 <ActivityIndicator size="small" color={C.gold} style={{ padding: 20 }} />
               ) : staffList.length === 0 ? (
@@ -522,23 +518,23 @@ export default function SuperAdminMasterHubScreen() {
               ) : (
                 staffList.map((member, idx) => (
                   <View key={member.id}>
-                    {idx > 0 && <View style={s.divider} />}
-                    <View style={s.staffItemRow}>
-                      <View style={s.staffAvatar}>
+                    {idx > 0 && <View style={s.itemDivider} />}
+                    <View style={s.staffRow}>
+                      <View style={s.staffAvatarCircle}>
                         <Text style={s.staffAvatarTxt}>{member.full_name?.[0]?.toUpperCase() || 'A'}</Text>
                       </View>
 
-                      <View style={{ flex: 1, marginHorizontal: 12 }}>
+                      <View style={{ flex: 1, marginHorizontal: 10 }}>
                         <Text style={s.staffNameTxt}>{member.full_name || 'Admin Member'}</Text>
                         <Text style={s.staffEmailTxt}>{member.email}</Text>
                         
                         <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                          <View style={[s.badgePill, { backgroundColor: member.role === 'super_admin' ? 'rgba(245, 166, 35, 0.2)' : 'rgba(59, 130, 246, 0.2)' }]}>
+                          <View style={[s.badgePill, { backgroundColor: member.role === 'super_admin' ? C.goldBg : '#eff6ff', borderColor: member.role === 'super_admin' ? C.goldBorder : '#bfdbfe' }]}>
                             <Text style={[s.badgePillTxt, { color: member.role === 'super_admin' ? C.gold : C.blue }]}>
                               {member.role === 'super_admin' ? '👑 SUPER ADMIN' : 'STAFF ADMIN'}
                             </Text>
                           </View>
-                          <View style={[s.badgePill, { backgroundColor: member.status === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
+                          <View style={[s.badgePill, { backgroundColor: member.status === 'active' ? '#ecfdf5' : '#fef2f2', borderColor: member.status === 'active' ? '#a7f3d0' : '#fecaca' }]}>
                             <Text style={[s.badgePillTxt, { color: member.status === 'active' ? C.green : C.red }]}>
                               {member.status.toUpperCase()}
                             </Text>
@@ -546,29 +542,29 @@ export default function SuperAdminMasterHubScreen() {
                         </View>
                       </View>
 
-                      <View style={{ gap: 6 }}>
+                      <View style={{ gap: 4 }}>
                         <TouchableOpacity
                           onPress={() => handleToggleStaffStatus(member)}
-                          style={[s.staffBtn, { backgroundColor: member.status === 'active' ? '#ef444425' : '#10b98125', borderColor: member.status === 'active' ? C.red : C.green }]}
+                          style={[s.actionBtn, { backgroundColor: member.status === 'active' ? '#fef2f2' : '#ecfdf5', borderColor: member.status === 'active' ? '#fecaca' : '#a7f3d0' }]}
                         >
-                          <Text style={{ color: member.status === 'active' ? C.red : C.green, fontWeight: '900', fontSize: 9 }}>
-                            {member.status === 'active' ? 'BAN ADMIN' : 'ACTIVATE'}
+                          <Text style={{ color: member.status === 'active' ? C.red : C.green, fontWeight: 'bold', fontSize: 10 }}>
+                            {member.status === 'active' ? 'BAN' : 'ACTIVATE'}
                           </Text>
                         </TouchableOpacity>
 
                         {member.role !== 'super_admin' ? (
                           <TouchableOpacity
                             onPress={() => handleChangeStaffRole(member, 'super_admin')}
-                            style={[s.staffBtn, { backgroundColor: 'rgba(245, 166, 35, 0.2)', borderColor: C.gold }]}
+                            style={[s.actionBtn, { backgroundColor: C.goldBg, borderColor: C.goldBorder }]}
                           >
-                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 9 }}>MAKE SUPER</Text>
+                            <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 10 }}>MAKE SUPER</Text>
                           </TouchableOpacity>
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleChangeStaffRole(member, 'admin')}
-                            style={[s.staffBtn, { backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: C.blue }]}
+                            style={[s.actionBtn, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
                           >
-                            <Text style={{ color: C.blue, fontWeight: '900', fontSize: 9 }}>MAKE ADMIN</Text>
+                            <Text style={{ color: C.blue, fontWeight: 'bold', fontSize: 10 }}>MAKE ADMIN</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -580,57 +576,57 @@ export default function SuperAdminMasterHubScreen() {
           </>
         )}
 
-        {/* ─── TAB 4: REDZONE SECURITY GRID ─── */}
+        {/* ─── TAB 4: REDZONE CONTROLS ─── */}
         {(activeTab === 'security' || activeTab === 'overview') && (
           <>
-            <Text style={s.sectionHeader}>🚨 REDZONE MASTER CONTROLS</Text>
-            <View style={s.redZoneGrid}>
+            <Text style={s.sectionHeaderTitle}>🚨 REDZONE MASTER CONTROLS</Text>
+            <View style={s.redGrid}>
               <TouchableOpacity 
                 onPress={() => router.push('/manage/panic')}
-                style={[s.redZoneCard, { borderColor: C.red }]}
+                style={[s.redCard, { borderColor: '#fca5a5' }]}
                 activeOpacity={0.8}
               >
-                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                  <Ionicons name="warning" size={22} color={C.red} />
+                <View style={[s.redIconCircle, { backgroundColor: '#fef2f2' }]}>
+                  <Ionicons name="warning-outline" size={20} color={C.red} />
                 </View>
-                <Text style={s.redZoneTitle}>PANIC ROOM</Text>
-                <Text style={s.redZoneSub}>Emergency System Lock</Text>
+                <Text style={s.redCardTitle}>PANIC ROOM</Text>
+                <Text style={s.redCardSub}>Emergency System Lock</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 onPress={() => router.push('/manage/security')}
-                style={[s.redZoneCard, { borderColor: C.blue }]}
+                style={[s.redCard, { borderColor: '#bfdbfe' }]}
                 activeOpacity={0.8}
               >
-                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                  <Ionicons name="shield-checkmark" size={22} color={C.blue} />
+                <View style={[s.redIconCircle, { backgroundColor: '#eff6ff' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={C.blue} />
                 </View>
-                <Text style={s.redZoneTitle}>SECURITY HUB</Text>
-                <Text style={s.redZoneSub}>Fraud Guard & 2FA</Text>
+                <Text style={s.redCardTitle}>SECURITY HUB</Text>
+                <Text style={s.redCardSub}>2FA & Fraud Guard</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 onPress={() => router.push('/manage/features')}
-                style={[s.redZoneCard, { borderColor: C.gold }]}
+                style={[s.redCard, { borderColor: C.goldBorder }]}
                 activeOpacity={0.8}
               >
-                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
-                  <Ionicons name="toggle" size={22} color={C.gold} />
+                <View style={[s.redIconCircle, { backgroundColor: C.goldBg }]}>
+                  <Ionicons name="toggle-outline" size={20} color={C.gold} />
                 </View>
-                <Text style={s.redZoneTitle}>FEATURE FLAGS</Text>
-                <Text style={s.redZoneSub}>Module Permissions</Text>
+                <Text style={s.redCardTitle}>FEATURE FLAGS</Text>
+                <Text style={s.redCardSub}>Module Access Control</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 onPress={() => router.push('/manage/secrets')}
-                style={[s.redZoneCard, { borderColor: C.purple }]}
+                style={[s.redCard, { borderColor: '#ddd6fe' }]}
                 activeOpacity={0.8}
               >
-                <View style={[s.redZoneIconBg, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
-                  <Ionicons name="key" size={22} color={C.purple} />
+                <View style={[s.redIconCircle, { backgroundColor: '#f5f3ff' }]}>
+                  <Ionicons name="key-outline" size={20} color={C.purple} />
                 </View>
-                <Text style={s.redZoneTitle}>API VAULT</Text>
-                <Text style={s.redZoneSub}>API Keys & Credentials</Text>
+                <Text style={s.redCardTitle}>API VAULT</Text>
+                <Text style={s.redCardSub}>API Keys & Credentials</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -644,44 +640,44 @@ export default function SuperAdminMasterHubScreen() {
           <View style={s.modalBox}>
             <View style={s.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="megaphone" size={18} color={C.gold} />
-                <Text style={s.modalHeaderTitle}>Broadcast Announcement</Text>
+                <Ionicons name="megaphone-outline" size={20} color={C.gold} />
+                <Text style={s.modalTitle}>Broadcast Announcement</Text>
               </View>
               <TouchableOpacity onPress={() => setBroadcastVisible(false)}>
-                <Ionicons name="close" size={22} color={C.white} />
+                <Ionicons name="close" size={22} color={C.textMain} />
               </TouchableOpacity>
             </View>
 
-            <Text style={s.inputLabel}>ANNOUNCEMENT TITLE</Text>
+            <Text style={s.inputLabel}>NOTICE TITLE</Text>
             <TextInput
               value={broadcastTitle}
               onChangeText={setBroadcastTitle}
-              placeholder="e.g. System Maintenance Notice"
-              placeholderTextColor="#64748b"
+              placeholder="e.g. Scheduled System Maintenance"
+              placeholderTextColor="#94a3b8"
               style={s.textInput}
             />
 
-            <Text style={s.inputLabel}>ANNOUNCEMENT MESSAGE BODY</Text>
+            <Text style={s.inputLabel}>NOTICE MESSAGE BODY</Text>
             <TextInput
               value={broadcastBody}
               onChangeText={setBroadcastBody}
-              placeholder="Write your broadcast notification for all platform users..."
-              placeholderTextColor="#64748b"
+              placeholder="Write your notice for all active users..."
+              placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={4}
-              style={[s.textInput, { height: 100, textAlignVertical: 'top' }]}
+              style={[s.textInput, { height: 90, textAlignVertical: 'top' }]}
             />
 
             <TouchableOpacity
               onPress={handleSendBroadcast}
               disabled={sendingBroadcast}
-              style={s.publishBtn}
+              style={s.sendBtn}
               activeOpacity={0.85}
             >
               {sendingBroadcast ? (
-                <ActivityIndicator color={C.bg} />
+                <ActivityIndicator color={C.white} />
               ) : (
-                <Text style={s.publishBtnTxt}>Publish Broadcast to All Users</Text>
+                <Text style={s.sendBtnTxt}>Publish Broadcast to All Users</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -696,34 +692,17 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
-  cyberHeader: {
+  royalHeader: {
     padding: 20,
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
     marginBottom: 16,
-    position: 'relative',
-    overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  glowOrbRight: {
-    position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#6366f120',
-  },
-  glowOrbLeft: {
-    position: 'absolute',
-    bottom: -50,
-    left: -50,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: '#f5a62315',
-  },
-  cyberTopRow: {
+  royalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -732,41 +711,38 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
     alignSelf: 'flex-start',
     marginBottom: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
   },
   crownPillTxt: {
-    color: C.gold,
+    color: C.goldBright,
     fontSize: 9,
     fontWeight: '900',
     letterSpacing: 1,
   },
-  cyberTitle: {
+  royalTitle: {
     color: C.white,
     fontWeight: '900',
     fontSize: 18,
-    letterSpacing: 1,
   },
-  livePulseDot: {
+  liveGreenDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: C.green,
   },
-  livePulseTxt: {
+  liveGreenTxt: {
     color: C.green,
     fontSize: 9,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
-  broadcastButton: {
-    backgroundColor: C.gold,
+  broadcastHeaderBtn: {
+    backgroundColor: C.goldBright,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
@@ -774,14 +750,14 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  broadcastButtonTxt: {
-    color: C.bg,
+  broadcastBtnTxt: {
+    color: C.navy,
     fontWeight: '900',
     fontSize: 11,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: C.cardBg,
+    backgroundColor: C.white,
     borderRadius: 16,
     padding: 4,
     borderWidth: 1,
@@ -799,9 +775,9 @@ const s = StyleSheet.create({
     gap: 4,
   },
   tabBtnActive: {
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    backgroundColor: C.goldBg,
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
+    borderColor: C.goldBorder,
   },
   tabBtnTxt: {
     color: C.textSub,
@@ -812,124 +788,141 @@ const s = StyleSheet.create({
     color: C.gold,
     fontWeight: '900',
   },
-  sectionHeader: {
+  sectionHeaderTitle: {
     color: C.gold,
     fontWeight: '900',
     fontSize: 11,
     letterSpacing: 1.5,
     marginBottom: 10,
-    marginTop: 6,
+    marginTop: 4,
   },
-  vaultCardMain: {
+  mainVaultCard: {
+    backgroundColor: C.white,
     borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
-    marginBottom: 16,
-  },
-  vaultGradient: {
     padding: 18,
+    borderWidth: 1,
+    borderColor: C.goldBorder,
+    marginBottom: 16,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  vaultTitle: {
+  vaultSubTitle: {
     color: C.gold,
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
-  vaultAmount: {
-    color: C.white,
+  vaultMainAmount: {
+    color: C.textMain,
     fontWeight: '900',
-    fontSize: 22,
+    fontSize: 24,
     marginTop: 4,
   },
-  vaultIconBg: {
+  vaultIconCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    backgroundColor: C.goldBg,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.goldBorder,
   },
-  healthTrack: {
-    height: 6,
-    backgroundColor: '#1e293b',
-    borderRadius: 3,
-    overflow: 'hidden',
+  vaultDivider: {
+    height: 1,
+    backgroundColor: C.cardBorder,
+    marginVertical: 14,
   },
-  healthFill: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: C.green,
-    borderRadius: 3,
-  },
-  grid2Col: {
+  statGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 20,
   },
-  statBox: {
+  statCard: {
     width: (W - 46) / 2,
-    backgroundColor: C.cardBg,
+    backgroundColor: C.white,
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.cardBorder,
   },
-  statBoxNum: {
-    color: C.white,
+  statIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  statCardNum: {
+    color: C.textMain,
     fontWeight: '900',
     fontSize: 18,
-    marginTop: 6,
   },
-  statBoxLabel: {
+  statCardLabel: {
     color: C.textSub,
     fontSize: 10,
     marginTop: 2,
   },
-  glassCard: {
-    backgroundColor: C.cardBg,
+  whiteCard: {
+    backgroundColor: C.white,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
     borderColor: C.cardBorder,
     marginBottom: 20,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  switchItem: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 4,
+  },
+  switchIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: C.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   switchTitle: {
-    color: C.white,
+    color: C.textMain,
     fontWeight: 'bold',
     fontSize: 13,
   },
   switchSub: {
     color: C.textSub,
     fontSize: 10,
-    marginTop: 2,
+    marginTop: 1,
   },
-  divider: {
+  itemDivider: {
     height: 1,
     backgroundColor: C.cardBorder,
-    marginVertical: 12,
+    marginVertical: 10,
   },
-  staffItemRow: {
+  staffRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
   },
-  staffAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#1e293b',
+  staffAvatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.goldBg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: C.gold,
+    borderColor: C.goldBorder,
   },
   staffAvatarTxt: {
     color: C.gold,
@@ -937,7 +930,7 @@ const s = StyleSheet.create({
     fontSize: 14,
   },
   staffNameTxt: {
-    color: C.white,
+    color: C.textMain,
     fontWeight: 'bold',
     fontSize: 13,
   },
@@ -949,33 +942,34 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    borderWidth: 1,
   },
   badgePillTxt: {
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
-  staffBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  actionBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
   },
-  redZoneGrid: {
+  redGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 20,
   },
-  redZoneCard: {
+  redCard: {
     width: (W - 46) / 2,
-    backgroundColor: C.cardBg,
+    backgroundColor: C.white,
     padding: 14,
     borderRadius: 18,
     borderWidth: 1,
   },
-  redZoneIconBg: {
+  redIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 12,
@@ -983,29 +977,28 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  redZoneTitle: {
-    color: C.white,
+  redCardTitle: {
+    color: C.textMain,
     fontWeight: '900',
     fontSize: 12,
-    letterSpacing: 0.5,
   },
-  redZoneSub: {
+  redCardSub: {
     color: C.textSub,
     fontSize: 10,
     marginTop: 2,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     justifyContent: 'center',
     padding: 20,
   },
   modalBox: {
-    backgroundColor: C.cardBg,
+    backgroundColor: C.white,
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: C.gold,
+    borderColor: C.goldBorder,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1013,8 +1006,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  modalHeaderTitle: {
-    color: C.gold,
+  modalTitle: {
+    color: C.textMain,
     fontWeight: '900',
     fontSize: 15,
   },
@@ -1027,22 +1020,22 @@ const s = StyleSheet.create({
     marginTop: 10,
   },
   textInput: {
-    backgroundColor: '#030712',
+    backgroundColor: C.bg,
     borderRadius: 14,
     padding: 12,
-    color: C.white,
+    color: C.textMain,
     borderWidth: 1,
     borderColor: C.cardBorder,
   },
-  publishBtn: {
-    backgroundColor: C.gold,
+  sendBtn: {
+    backgroundColor: C.navy,
     borderRadius: 14,
     padding: 14,
     alignItems: 'center',
     marginTop: 20,
   },
-  publishBtnTxt: {
-    color: C.bg,
+  sendBtnTxt: {
+    color: C.white,
     fontWeight: '900',
     fontSize: 13,
   },
