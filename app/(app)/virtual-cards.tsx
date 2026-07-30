@@ -167,10 +167,27 @@ export default function VirtualCardsScreen() {
         };
     };
 
+    // Cross-platform Alert Helper for Web & Mobile
+    const showAlert = (title: string, message?: string, buttons?: any[]) => {
+        if (Platform.OS === 'web') {
+            if (buttons && buttons.length > 1) {
+                const confirmed = window.confirm(`${title}\n\n${message || ''}`);
+                if (confirmed) {
+                    const confirmBtn = buttons.find(b => b.style !== 'cancel' && b.onPress);
+                    if (confirmBtn && confirmBtn.onPress) confirmBtn.onPress();
+                }
+            } else {
+                window.alert(`${title}\n\n${message || ''}`);
+            }
+        } else {
+            Alert.alert(title, message, buttons);
+        }
+    };
+
     const handleCreateCard = async () => {
         const fundNum = Number(initialFundAmount) || 0;
         if (fundNum < 5 && cardCurrency === 'USD') {
-            return Alert.alert('Minimum Funding', 'Minimum initial funding for USD Virtual Card is $5');
+            return showAlert('Minimum Funding', 'Minimum initial funding for USD Virtual Card is $5');
         }
 
         try {
@@ -186,12 +203,12 @@ export default function VirtualCardsScreen() {
             });
 
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Virtual Card Created 🎉', `Your Payvessel ${cardCurrency} Virtual Card is now active and ready for online payments!`);
+            showAlert('Virtual Card Created 🎉', `Your Payvessel ${cardCurrency} Virtual Card is now active and ready for online payments!`);
             
             setShowCreateModal(false);
             loadData();
         } catch (e: any) {
-            Alert.alert('Creation Failed ❌', e.message);
+            showAlert('Creation Failed ❌', e.message);
         } finally {
             setActionLoading(false);
         }
@@ -199,7 +216,7 @@ export default function VirtualCardsScreen() {
 
     const handleFundCard = async () => {
         const amount = Number(fundAmountInput);
-        if (!amount || amount <= 0) return Alert.alert('Invalid Amount', 'Please enter a valid funding amount.');
+        if (!amount || amount <= 0) return showAlert('Invalid Amount', 'Please enter a valid funding amount.');
         if (!selectedCard) return;
 
         try {
@@ -215,12 +232,12 @@ export default function VirtualCardsScreen() {
             });
 
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Card Funded 🎉', `${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} added to your card!`);
+            showAlert('Card Funded 🎉', `${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} added to your card!`);
             setShowFundModal(false);
             setFundAmountInput('');
             loadData();
         } catch (e: any) {
-            Alert.alert('Funding Error ❌', e.message);
+            showAlert('Funding Error ❌', e.message);
         } finally {
             setActionLoading(false);
         }
@@ -228,7 +245,7 @@ export default function VirtualCardsScreen() {
 
     const handleWithdrawFromCard = async () => {
         const amount = Number(withdrawAmountInput);
-        if (!amount || amount <= 0) return Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+        if (!amount || amount <= 0) return showAlert('Invalid Amount', 'Please enter a valid amount.');
         if (!selectedCard) return;
 
         try {
@@ -244,12 +261,12 @@ export default function VirtualCardsScreen() {
             });
 
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Withdrawn Successfully 💸', `${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} transferred back to your main wallet!`);
+            showAlert('Withdrawn Successfully 💸', `${selectedCard.currency === 'USD' ? '$' : '₦'}${amount} transferred back to your main wallet!`);
             setShowWithdrawModal(false);
             setWithdrawAmountInput('');
             loadData();
         } catch (e: any) {
-            Alert.alert('Withdrawal Error ❌', e.message);
+            showAlert('Withdrawal Error ❌', e.message);
         } finally {
             setActionLoading(false);
         }
@@ -263,9 +280,9 @@ export default function VirtualCardsScreen() {
             setSelectedCard(prev => prev ? { ...prev, status: newStatus as any } : null);
             setCards(prev => prev.map(c => c.id === selectedCard.id ? { ...c, status: newStatus as any } : c));
             if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Alert.alert('Security Status Updated 🛡️', `Card is now ${newStatus.toUpperCase()}`);
+            showAlert('Security Status Updated 🛡️', `Card is now ${newStatus.toUpperCase()}`);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            showAlert('Error', e.message);
         } finally {
             setActionLoading(false);
         }
@@ -274,7 +291,7 @@ export default function VirtualCardsScreen() {
     const handleTerminateCard = async () => {
         if (!selectedCard) return;
 
-        Alert.alert(
+        showAlert(
             'Terminate Virtual Card ⚠️',
             'Are you sure you want to terminate this virtual card? Any remaining balance will be refunded immediately to your main wallet.',
             [
@@ -285,14 +302,12 @@ export default function VirtualCardsScreen() {
                     onPress: async () => {
                         try {
                             setActionLoading(true);
-                            const { data: { user } } = await supabase.auth.getUser();
-                            if (!user) return;
-
-                            await payvesselCardService.terminateCard(selectedCard.id, user.id, selectedCard.currency);
-                            Alert.alert('Card Terminated 🗑️', 'Card closed and remaining balance refunded to your wallet.');
+                            await payvesselCardService.terminateCard(selectedCard.id, selectedCard.user_id);
+                            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            showAlert('Card Terminated 🗑️', 'Card terminated and remaining balance refunded to your main wallet.');
                             loadData();
                         } catch (e: any) {
-                            Alert.alert('Error', e.message);
+                            showAlert('Termination Error ❌', e.message);
                         } finally {
                             setActionLoading(false);
                         }
