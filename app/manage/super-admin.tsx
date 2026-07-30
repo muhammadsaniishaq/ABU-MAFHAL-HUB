@@ -278,7 +278,7 @@ export default function SuperAdminMasterHubScreen() {
           title: 'SUPER ADMIN COMMAND CENTER',
           headerStyle: { backgroundColor: '#030712' },
           headerTintColor: '#f5a623',
-          headerTitleStyle: { fontWeight: '900', fontSize: 15, letterSpacing: 1 }
+          headerTitleStyle: { fontWeight: '900', fontSize: 15 }
         }} 
       />
 
