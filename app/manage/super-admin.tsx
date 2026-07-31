@@ -86,6 +86,17 @@ export default function SuperAdminMasterHubScreen() {
   const [broadcastBody, setBroadcastBody] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
+  // Create Admin Modal State
+  const [createAdminVisible, setCreateAdminVisible] = useState(false);
+  const [newAdminForm, setNewAdminForm] = useState({
+    fullName: '',
+    personalEmail: '',
+    usernamePrefix: '',
+    password: 'Password123!',
+    role: 'admin' as 'admin' | 'super_admin'
+  });
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
+
   useEffect(() => {
     loadMasterHubData();
   }, []);
@@ -266,6 +277,95 @@ export default function SuperAdminMasterHubScreen() {
       Alert.alert('Error', e.message);
     } finally {
       setSendingBroadcast(false);
+    }
+  };
+
+  const handleCreateAdminSubmit = async () => {
+    const { fullName, personalEmail, usernamePrefix, password, role } = newAdminForm;
+    if (!fullName.trim()) {
+      return Alert.alert('Required', 'Please enter staff full name');
+    }
+
+    const cleanPrefix = (usernamePrefix.trim() || fullName.trim().split(' ')[0]).toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    const corporateEmail = `${cleanPrefix}@abumafhal.com.ng`;
+    const targetAuthEmail = personalEmail.trim() || corporateEmail;
+
+    try {
+      setCreatingAdmin(true);
+
+      // 1. SignUp / Create Account in Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: targetAuthEmail,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            role: role
+          }
+        }
+      });
+
+      const newUserId = authData.user?.id;
+
+      // 2. Ensure Profile role is set to admin or super_admin
+      if (newUserId) {
+        await supabase.from('profiles').upsert({
+          id: newUserId,
+          email: targetAuthEmail,
+          full_name: fullName.trim(),
+          role: role,
+          status: 'active'
+        }, { onConflict: 'id' });
+      }
+
+      // 3. Register Corporate Email
+      await supabase.from('corporate_admin_emails').insert({
+        user_id: newUserId || null,
+        username: cleanPrefix,
+        email: corporateEmail,
+        display_name: fullName.trim(),
+        role: role
+      });
+
+      // 4. AUTOMATIC WELCOME & LOGIN DETAILS EMAIL DISPATCH
+      const emailSubject = `👑 Welcome to Abu Mafhal Admin Portal - Your Login Details`;
+      const emailText = `Hello ${fullName.trim()},\n\nCongratulations! You have been appointed as an official ${role.toUpperCase().replace('_', ' ')} for Abu Mafhal Sub.\n\nHere are your official login credentials:\n----------------------------------------\nOfficial Corporate Email: ${corporateEmail}\nAccount Email: ${targetAuthEmail}\nTemporary Password: ${password}\nAssigned Role: ${role.toUpperCase().replace('_', ' ')}\n\nHow to Access:\n1. Open the Abu Mafhal App or Web Portal.\n2. Log in using your email address and password.\n3. Access the Admin Management Console from your profile menu.\n\nPlease keep your credentials secure.`;
+      const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 24px; background: #0f172a; color: #ffffff; border-radius: 16px; border: 1px solid #d97706;"><h2 style="color: #f5a623; margin-top: 0;">👑 Welcome to Abu Mafhal Admin Portal</h2><p style="font-size: 14px; line-height: 1.6;">Hello <strong>${fullName.trim()}</strong>,</p><p style="font-size: 14px; line-height: 1.6;">Congratulations! You have been appointed as an official <strong>${role.toUpperCase().replace('_', ' ')}</strong> for Abu Mafhal Sub.</p><div style="background: rgba(255,255,255,0.08); padding: 16px; border-radius: 12px; border-left: 4px solid #f5a623; margin: 16px 0;"><p style="margin: 4px 0; font-size: 13px;"><strong>Official Corporate Email:</strong> <span style="color: #f5a623;">${corporateEmail}</span></p><p style="margin: 4px 0; font-size: 13px;"><strong>Account Login Email:</strong> ${targetAuthEmail}</p><p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #1e293b; padding: 2px 6px; borderRadius: 4px; color: #34d399;">${password}</code></p><p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${role.toUpperCase().replace('_', ' ')}</p></div><p style="font-size: 13px; color: #94a3b8;">Log in to the app or portal to access your Admin Command Center.</p></div>`;
+
+      const recipients = [corporateEmail];
+      if (personalEmail.trim() && personalEmail.trim().toLowerCase() !== corporateEmail.toLowerCase()) {
+        recipients.push(personalEmail.trim());
+      }
+
+      for (const recipient of recipients) {
+        await supabase.from('in_app_emails').insert({
+          sender_email: 'authority@abumafhal.com.ng',
+          sender_name: 'Abu Mafhal Master Governance',
+          recipient_email: recipient,
+          subject: emailSubject,
+          body_text: emailText,
+          body_html: emailHtml,
+          is_read: false,
+          folder: 'inbox'
+        });
+
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: { to: recipient, from: 'authority@abumafhal.com.ng', subject: emailSubject, text: emailText, html: emailHtml }
+          });
+        } catch (edgeErr) {
+          console.warn("External email dispatch note:", edgeErr);
+        }
+      }
+
+      Alert.alert('Admin Created 🎉', `Account for ${fullName.trim()} created successfully!\n\nOfficial Email: ${corporateEmail}\nWelcome credentials dispatched to in-app mailbox & email.`);
+      setCreateAdminVisible(false);
+      setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin' });
+      loadMasterHubData();
+    } catch (e: any) {
+      Alert.alert('Creation Failed', e.message || 'Could not create admin account');
+    } finally {
+      setCreatingAdmin(false);
     }
   };
 
@@ -509,7 +609,16 @@ export default function SuperAdminMasterHubScreen() {
         {/* ─── TAB 3: STAFF HIERARCHY & ROLES ─── */}
         {(activeTab === 'staff' || activeTab === 'overview') && (
           <>
-            <Text style={s.sectionHeaderTitle}>👑 STAFF & ADMIN HIERARCHY</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 10 }}>
+              <Text style={s.sectionHeaderTitle}>👑 STAFF & ADMIN HIERARCHY</Text>
+              <TouchableOpacity 
+                onPress={() => setCreateAdminVisible(true)}
+                style={{ backgroundColor: C.navy, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: C.goldBorder }}
+              >
+                <Ionicons name="person-add" size={14} color={C.goldBright} />
+                <Text style={{ color: C.goldBright, fontWeight: '900', fontSize: 10, letterSpacing: 0.5 }}>+ CREATE NEW ADMIN</Text>
+              </TouchableOpacity>
+            </View>
             <View style={s.whiteCard}>
               {loading ? (
                 <ActivityIndicator size="small" color={C.gold} style={{ padding: 20 }} />
@@ -692,6 +801,96 @@ export default function SuperAdminMasterHubScreen() {
                 <Text style={s.sendBtnTxt}>Publish Broadcast to All Users</Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create New Admin & Corporate Mail Modal */}
+      <Modal visible={createAdminVisible} transparent animationType="slide" onRequestClose={() => setCreateAdminVisible(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalBox, { maxHeight: '90%' }]}>
+            <View style={s.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="person-add" size={20} color={C.goldBright} />
+                <Text style={s.modalTitle}>Create Admin & Auto Corporate Email</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCreateAdminVisible(false)}>
+                <Ionicons name="close" size={22} color={C.textMain} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.inputLabel}>STAFF FULL NAME *</Text>
+              <TextInput
+                placeholder="e.g. Musa Ibrahim"
+                value={newAdminForm.fullName}
+                onChangeText={(t) => {
+                  const autoPrefix = t.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                  setNewAdminForm({ ...newAdminForm, fullName: t, usernamePrefix: newAdminForm.usernamePrefix || autoPrefix });
+                }}
+                style={s.textInput}
+              />
+
+              <Text style={s.inputLabel}>CORPORATE EMAIL PREFIX (@abumafhal.com.ng) *</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.cardBorder, borderRadius: 14, paddingHorizontal: 12, marginBottom: 4 }}>
+                <TextInput
+                  placeholder="e.g. musa"
+                  value={newAdminForm.usernamePrefix}
+                  onChangeText={(t) => setNewAdminForm({ ...newAdminForm, usernamePrefix: t.toLowerCase() })}
+                  style={{ flex: 1, paddingVertical: 12, color: C.textMain, fontWeight: '700', fontSize: 13 }}
+                  autoCapitalize="none"
+                />
+                <Text style={{ color: C.gold, fontWeight: '900', fontSize: 12 }}>@abumafhal.com.ng</Text>
+              </View>
+
+              <Text style={s.inputLabel}>PERSONAL EMAIL (FOR CREDENTIALS DELIVERY)</Text>
+              <TextInput
+                placeholder="e.g. musa.ibrahim@gmail.com"
+                value={newAdminForm.personalEmail}
+                onChangeText={(t) => setNewAdminForm({ ...newAdminForm, personalEmail: t })}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={s.textInput}
+              />
+
+              <Text style={s.inputLabel}>TEMPORARY INITIAL PASSWORD</Text>
+              <TextInput
+                placeholder="Password123!"
+                value={newAdminForm.password}
+                onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
+                style={s.textInput}
+              />
+
+              <Text style={s.inputLabel}>ASSIGNED ROLE</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={() => setNewAdminForm({ ...newAdminForm, role: 'admin' })}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: newAdminForm.role === 'admin' ? C.navy : C.cardBorder, backgroundColor: newAdminForm.role === 'admin' ? C.navy : C.bg, alignItems: 'center' }}
+                >
+                  <Text style={{ color: newAdminForm.role === 'admin' ? C.white : C.textMain, fontWeight: '900', fontSize: 11 }}>STAFF ADMIN 🛡️</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setNewAdminForm({ ...newAdminForm, role: 'super_admin' })}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: newAdminForm.role === 'super_admin' ? C.gold : C.cardBorder, backgroundColor: newAdminForm.role === 'super_admin' ? C.goldBg : C.bg, alignItems: 'center' }}
+                >
+                  <Text style={{ color: newAdminForm.role === 'super_admin' ? C.gold : C.textMain, fontWeight: '900', fontSize: 11 }}>SUPER ADMIN 👑</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleCreateAdminSubmit}
+                disabled={creatingAdmin}
+                style={[s.sendBtn, { backgroundColor: C.navy, marginTop: 24 }]}
+                activeOpacity={0.85}
+              >
+                {creatingAdmin ? (
+                  <ActivityIndicator color={C.goldBright} />
+                ) : (
+                  <Text style={[s.sendBtnTxt, { color: C.goldBright }]}>CREATE ADMIN & DISPATCH WELCOME MAIL</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
