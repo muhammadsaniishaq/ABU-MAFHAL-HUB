@@ -94,6 +94,8 @@ export default function SuperAdminMasterHubScreen() {
   const [searchUserQuery, setSearchUserQuery] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [copiedDomainEmail, setCopiedDomainEmail] = useState(false);
+  const [memberCategoryFilter, setMemberCategoryFilter] = useState<'user' | 'admin' | 'all'>('user');
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(true);
 
   const [newAdminForm, setNewAdminForm] = useState({
     fullName: '',
@@ -181,6 +183,8 @@ export default function SuperAdminMasterHubScreen() {
           lockKYC: !!swMap.lock_kyc,
         });
       }
+
+      await fetchExistingUsersList();
     } catch (e) {
       console.log('Error loading master hub:', e);
     } finally {
@@ -912,86 +916,211 @@ export default function SuperAdminMasterHubScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Mode A: Select Registered User */}
+              {/* Mode A: Select Registered Member (Categorized Dropdown: User vs Admin) */}
               {createMode === 'existing' && (
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Select Member Account ({existingUsers.length}) *</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 10 }}>
-                    <Ionicons name="search-outline" size={16} color="#64748b" style={{ marginRight: 8 }} />
-                    <TextInput
-                      placeholder="Search member by name, email or phone..."
-                      value={searchUserQuery}
-                      onChangeText={setSearchUserQuery}
-                      style={{ flex: 1, paddingVertical: 9, color: '#0f172a', fontSize: 12, fontWeight: '500', outlineStyle: 'none' as any }}
-                    />
-                    {searchUserQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchUserQuery('')}>
-                        <Ionicons name="close-circle" size={16} color="#94a3b8" />
-                      </TouchableOpacity>
-                    )}
+                  <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>
+                    Select Registered Member *
+                  </Text>
+
+                  {/* 2-Category Segmented Filter Tabs: User vs Admin vs All */}
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => setMemberCategoryFilter('user')}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        backgroundColor: memberCategoryFilter === 'user' ? '#0f172a' : '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: memberCategoryFilter === 'user' ? '#0f172a' : '#cbd5e1',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ color: memberCategoryFilter === 'user' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
+                        👥 Users ({existingUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin').length})
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setMemberCategoryFilter('admin')}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        backgroundColor: memberCategoryFilter === 'admin' ? '#d97706' : '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: memberCategoryFilter === 'admin' ? '#d97706' : '#cbd5e1',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ color: memberCategoryFilter === 'admin' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
+                        🛡️ Admins ({existingUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length})
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setMemberCategoryFilter('all')}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        backgroundColor: memberCategoryFilter === 'all' ? '#334155' : '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: memberCategoryFilter === 'all' ? '#334155' : '#cbd5e1',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ color: memberCategoryFilter === 'all' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
+                        🌐 All ({existingUsers.length})
+                      </Text>
+                    </TouchableOpacity>
                   </View>
 
-                  <ScrollView style={{ maxHeight: 160, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 6 }}>
-                    {existingUsers
-                      .filter(u => {
-                        if (!searchUserQuery.trim()) return true;
-                        const q = searchUserQuery.toLowerCase();
-                        return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.phone || '').toLowerCase().includes(q);
-                      })
-                      .map(u => {
-                        const isSelected = selectedUserId === u.id;
+                  {/* Dropdown Card Trigger / Selected Member Pill */}
+                  <TouchableOpacity
+                    onPress={() => setMemberDropdownOpen(!memberDropdownOpen)}
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: selectedUserId ? '#f5a623' : '#cbd5e1',
+                      borderRadius: 14,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: memberDropdownOpen ? 8 : 12
+                    }}
+                  >
+                    {selectedUserId ? (
+                      (() => {
+                        const selectedUser = existingUsers.find(u => u.id === selectedUserId);
                         return (
-                          <TouchableOpacity
-                            key={u.id}
-                            onPress={() => {
-                              setSelectedUserId(u.id);
-                              const autoPrefix = (u.full_name || 'admin').trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
-                              setNewAdminForm({
-                                fullName: u.full_name || '',
-                                personalEmail: u.email || '',
-                                usernamePrefix: autoPrefix,
-                                password: 'Password123!',
-                                role: u.role === 'super_admin' ? 'super_admin' : 'admin',
-                                department: 'finance',
-                                sendMail: true
-                              });
-                            }}
-                            style={{ 
-                              padding: 10, 
-                              borderRadius: 12, 
-                              backgroundColor: isSelected ? '#0f172a' : '#ffffff', 
-                              borderWidth: 1, 
-                              borderColor: isSelected ? '#f5a623' : '#e2e8f0',
-                              flexDirection: 'row', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              marginBottom: 6 
-                            }}
-                          >
-                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isSelected ? '#f5a623' : '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-                              <Text style={{ color: isSelected ? '#0f172a' : '#475569', fontWeight: '700', fontSize: 13 }}>
-                                {(u.full_name || u.email || 'A')[0].toUpperCase()}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+                              <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 13 }}>
+                                {(selectedUser?.full_name || selectedUser?.email || 'M')[0].toUpperCase()}
                               </Text>
                             </View>
-
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '600', fontSize: 12 }} numberOfLines={1}>
-                                {u.full_name || 'Member Account'}
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+                                {selectedUser?.full_name || 'Selected Member'}
                               </Text>
-                              <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 10 }} numberOfLines={1}>
-                                {u.email} {u.phone ? `• ${u.phone}` : ''}
-                              </Text>
-                            </View>
-
-                            <View style={{ backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                              <Text style={{ color: isSelected ? '#f5a623' : '#475569', fontWeight: '700', fontSize: 9 }}>
-                                {isSelected ? '✓ Selected' : (u.role || 'user').toUpperCase()}
+                              <Text style={{ color: '#64748b', fontSize: 11 }} numberOfLines={1}>
+                                {selectedUser?.email} {selectedUser?.phone ? `• ${selectedUser.phone}` : ''}
                               </Text>
                             </View>
-                          </TouchableOpacity>
+                            <View style={{ backgroundColor: selectedUser?.role === 'super_admin' ? '#fffbeb' : selectedUser?.role === 'admin' ? '#eff6ff' : '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginHorizontal: 6 }}>
+                              <Text style={{ color: selectedUser?.role === 'super_admin' ? '#d97706' : selectedUser?.role === 'admin' ? '#2563eb' : '#16a34a', fontWeight: '700', fontSize: 10 }}>
+                                {(selectedUser?.role || 'user').toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
                         );
-                      })}
-                  </ScrollView>
+                      })()
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Ionicons name="person-circle-outline" size={20} color="#64748b" />
+                        <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '500' }}>
+                          Tap to select member from {memberCategoryFilter === 'user' ? 'Regular Users' : memberCategoryFilter === 'admin' ? 'Admins' : 'All Members'}...
+                        </Text>
+                      </View>
+                    )}
+
+                    <Ionicons name={memberDropdownOpen ? "chevron-up" : "chevron-down"} size={18} color="#64748b" />
+                  </TouchableOpacity>
+
+                  {/* Dropdown Expanded Drawer */}
+                  {memberDropdownOpen && (
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 10, marginBottom: 12, elevation: 4 }}>
+                      {/* Search Input within Dropdown */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 8 }}>
+                        <Ionicons name="search-outline" size={15} color="#64748b" style={{ marginRight: 6 }} />
+                        <TextInput
+                          placeholder="Filter by name, email or phone number..."
+                          value={searchUserQuery}
+                          onChangeText={setSearchUserQuery}
+                          style={{ flex: 1, paddingVertical: 8, color: '#0f172a', fontSize: 12, fontWeight: '500', outlineStyle: 'none' as any }}
+                        />
+                        {searchUserQuery.length > 0 && (
+                          <TouchableOpacity onPress={() => setSearchUserQuery('')}>
+                            <Ionicons name="close-circle" size={15} color="#94a3b8" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Scrollable Member List */}
+                      <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                        {existingUsers
+                          .filter(u => {
+                            // Category filter
+                            const isStaff = u.role === 'admin' || u.role === 'super_admin';
+                            if (memberCategoryFilter === 'user' && isStaff) return false;
+                            if (memberCategoryFilter === 'admin' && !isStaff) return false;
+
+                            // Search query filter
+                            if (!searchUserQuery.trim()) return true;
+                            const q = searchUserQuery.toLowerCase();
+                            return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.phone || '').toLowerCase().includes(q);
+                          })
+                          .map(u => {
+                            const isSelected = selectedUserId === u.id;
+                            const isStaff = u.role === 'admin' || u.role === 'super_admin';
+                            return (
+                              <TouchableOpacity
+                                key={u.id}
+                                onPress={() => {
+                                  setSelectedUserId(u.id);
+                                  setMemberDropdownOpen(false); // Collapse dropdown on select
+                                  const autoPrefix = (u.full_name || 'admin').trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                                  setNewAdminForm({
+                                    fullName: u.full_name || '',
+                                    personalEmail: u.email || '',
+                                    usernamePrefix: autoPrefix,
+                                    password: 'Password123!',
+                                    role: u.role === 'super_admin' ? 'super_admin' : 'admin',
+                                    department: 'finance',
+                                    sendMail: true
+                                  });
+                                }}
+                                style={{ 
+                                  padding: 10, 
+                                  borderRadius: 10, 
+                                  backgroundColor: isSelected ? '#0f172a' : '#f8fafc', 
+                                  borderWidth: 1, 
+                                  borderColor: isSelected ? '#f5a623' : '#e2e8f0',
+                                  flexDirection: 'row', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  marginBottom: 6 
+                                }}
+                              >
+                                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isSelected ? '#f5a623' : isStaff ? '#fffbeb' : '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
+                                  <Text style={{ color: isSelected ? '#0f172a' : isStaff ? '#d97706' : '#475569', fontWeight: '700', fontSize: 12 }}>
+                                    {(u.full_name || u.email || 'M')[0].toUpperCase()}
+                                  </Text>
+                                </View>
+
+                                <View style={{ flex: 1, marginRight: 8 }}>
+                                  <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '600', fontSize: 12 }} numberOfLines={1}>
+                                    {u.full_name || 'Member Account'}
+                                  </Text>
+                                  <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 10 }} numberOfLines={1}>
+                                    {u.email} {u.phone ? `• ${u.phone}` : ''}
+                                  </Text>
+                                </View>
+
+                                <View style={{ backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : isStaff ? '#fffbeb' : '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                  <Text style={{ color: isSelected ? '#f5a623' : isStaff ? '#d97706' : '#16a34a', fontWeight: '700', fontSize: 9 }}>
+                                    {isSelected ? '✓ Selected' : (u.role || 'user').toUpperCase()}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
               )}
 
