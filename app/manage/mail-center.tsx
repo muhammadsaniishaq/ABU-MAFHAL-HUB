@@ -361,7 +361,8 @@ export default function MailCenterScreen() {
 
   // 2. Send Official Mail
   const handleSendOfficialMail = async () => {
-    if (!recipientInput.trim()) {
+    const rawRecipient = recipientInput.trim();
+    if (!rawRecipient) {
       return Alert.alert("Required", "Please specify recipient email address");
     }
     if (!subjectInput.trim() || !bodyInput.trim()) {
@@ -370,45 +371,81 @@ export default function MailCenterScreen() {
 
     try {
       setSendingMail(true);
-      const recipient = recipientInput.trim().toLowerCase();
 
-      // A. Save in-app email for recipient & sender
-      const { data: mailRecord, error: dbErr } = await supabase.from('in_app_emails').insert({
-        sender_email: senderAccount,
-        sender_name: 'Abu Mafhal Official',
-        recipient_email: recipient,
-        subject: subjectInput.trim(),
-        body_text: bodyInput.trim(),
-        body_html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subjectInput.trim()}</h2><p style="font-size: 14px; line-height: 1.6;">${bodyInput.trim().replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Corporate Mail System (${senderAccount})</p></div>`,
-        is_read: false,
-        folder: 'inbox'
-      }).select().single();
+      let targetEmails: string[] = [];
 
-      if (dbErr) console.warn("In-App email DB log note:", dbErr);
-
-      // B. Trigger real email delivery via Edge Function or Resend
-      try {
-        await supabase.functions.invoke('send-email', {
-          body: {
-            to: recipient,
-            from: senderAccount,
-            subject: subjectInput.trim(),
-            text: bodyInput.trim(),
-            html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subjectInput.trim()}</h2><p style="font-size: 14px; line-height: 1.6;">${bodyInput.trim().replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Corporate Mail System (${senderAccount})</p></div>`
-          }
-        });
-      } catch (edgeErr) {
-        console.warn("External email dispatch note (Delivered in-app):", edgeErr);
+      if (rawRecipient.toLowerCase() === 'all' || rawRecipient.toLowerCase() === 'all_users') {
+        const { data: userProfiles } = await supabase.from('profiles').select('email').not('email', 'is', null);
+        if (userProfiles && userProfiles.length > 0) {
+          targetEmails = userProfiles.map(u => u.email).filter(Boolean);
+        }
+      } else if (rawRecipient.includes(',')) {
+        targetEmails = rawRecipient.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'));
+      } else {
+        targetEmails = [rawRecipient.toLowerCase()];
       }
 
-      Alert.alert("Email Sent 📤", `Official message sent to ${recipient} successfully!`);
+      if (targetEmails.length === 0) {
+        throw new Error("No valid recipient email address specified.");
+      }
+
+      let attachmentText = '';
+      let attachmentHtml = '';
+      if (attachments.length > 0) {
+        attachmentText = '\n\nAttached Files:\n' + attachments.map(a => `• ${a.name} (${a.type})`).join('\n');
+        attachmentHtml = `<div style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;"><p style="margin: 0 0 6px 0; font-size: 11px; color: #f5a623; font-weight: bold;">ATTACHMENTS (${attachments.length}):</p>` +
+          attachments.map(a => `<p style="margin: 2px 0; font-size: 11px; color: #cbd5e1;">📎 ${a.name}</p>`).join('') +
+          `</div>`;
+      }
+
+      const finalBodyText = bodyInput.trim() + attachmentText;
+      const formattedHtml = `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623; margin-top: 0;">${subjectInput.trim()}</h2><p style="font-size: 14px; line-height: 1.6;">${bodyInput.trim().replace(/\n/g, '<br/>')}</p>${attachmentHtml}<hr style="border-color: #334155; margin-top: 20px;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Corporate Mail System (${senderAccount})</p></div>`;
+
+      // Dispatch to each target recipient
+      for (const recipient of targetEmails) {
+        const { error: dbErr } = await supabase.from('in_app_emails').insert({
+          sender_email: senderAccount,
+          sender_name: 'Abu Mafhal Official',
+          recipient_email: recipient,
+          subject: subjectInput.trim(),
+          body_text: finalBodyText,
+          body_html: formattedHtml,
+          is_read: false,
+          folder: 'inbox',
+          metadata: { attachments: attachments }
+        });
+
+        if (dbErr) {
+          console.error("In-App email DB insert error:", dbErr);
+          throw new Error(dbErr.message || "Failed to save email to database");
+        }
+
+        // Trigger external email dispatch via Edge Function
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              to: recipient,
+              from: senderAccount,
+              subject: subjectInput.trim(),
+              text: finalBodyText,
+              html: formattedHtml
+            }
+          });
+        } catch (edgeErr) {
+          console.warn("External email dispatch note (Delivered in-app):", edgeErr);
+        }
+      }
+
+      Alert.alert("Email Dispatched 🎉", `Official email successfully sent to ${targetEmails.length} recipient(s)!`);
       setComposeVisible(false);
       setSubjectInput('');
       setBodyInput('');
       setRecipientInput('');
-      fetchMails();
+      setAttachments([]);
+      setActiveTab('sent');
+      await fetchMails();
     } catch (err: any) {
-      Alert.alert("Send Error", err.message || "Failed to deliver email");
+      Alert.alert("Send Error ⚠️", err.message || "Failed to deliver email. Please check internet connection.");
     } finally {
       setSendingMail(false);
     }
