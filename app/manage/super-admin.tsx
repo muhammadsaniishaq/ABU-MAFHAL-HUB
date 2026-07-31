@@ -92,6 +92,8 @@ export default function SuperAdminMasterHubScreen() {
   const [existingUsers, setExistingUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchUserQuery, setSearchUserQuery] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [copiedDomainEmail, setCopiedDomainEmail] = useState(false);
 
   const [newAdminForm, setNewAdminForm] = useState({
     fullName: '',
@@ -103,6 +105,15 @@ export default function SuperAdminMasterHubScreen() {
     sendMail: true
   });
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+
+  const generateRandomAdminPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    let pass = '';
+    for (let i = 0; i < 12; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewAdminForm(prev => ({ ...prev, password: pass }));
+  };
 
   useEffect(() => {
     loadMasterHubData();
@@ -863,18 +874,23 @@ export default function SuperAdminMasterHubScreen() {
       {/* Create New Admin & Corporate Mail Modal */}
       <Modal visible={createAdminVisible} transparent animationType="slide" onRequestClose={() => setCreateAdminVisible(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalBox, { maxHeight: '92%', backgroundColor: '#ffffff', borderRadius: 28, padding: 20 }]}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <View style={{ flex: 1, marginRight: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 4 }}>
-                  <Ionicons name="shield-checkmark" size={12} color="#d97706" />
-                  <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 }}>PROVISION STAFF & CORPORATE MAIL</Text>
+          <View style={[s.modalBox, { maxHeight: '92%', backgroundColor: '#ffffff', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: '#e2e8f0' }]}>
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 6 }}>
+                  <Ionicons name="shield-checkmark-sharp" size={12} color="#16a34a" />
+                  <Text style={{ color: '#15803d', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Staff & Corporate Access Control</Text>
                 </View>
-                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Admin Management Console</Text>
+                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 17 }}>Provision Admin Account</Text>
+                <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '400', marginTop: 2 }}>Setup staff privileges, department scope & corporate email address.</Text>
               </View>
-              <TouchableOpacity onPress={() => setCreateAdminVisible(false)}>
-                <Ionicons name="close" size={24} color="#0f172a" />
+
+              <TouchableOpacity 
+                onPress={() => setCreateAdminVisible(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
 
@@ -882,16 +898,16 @@ export default function SuperAdminMasterHubScreen() {
             <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', padding: 4, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
               <TouchableOpacity
                 onPress={() => { setCreateMode('existing'); setSelectedUserId(null); }}
-                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'existing' ? '#0f172a' : 'transparent' }}
+                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'existing' ? '#0f172a' : 'transparent' }}
               >
-                <Text style={{ color: createMode === 'existing' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 11 }}>👤 Select Registered User</Text>
+                <Text style={{ color: createMode === 'existing' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 11 }}>👤 Select Registered Member</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => { setCreateMode('new'); setSelectedUserId(null); setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true }); }}
-                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'new' ? '#0f172a' : 'transparent' }}
+                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'new' ? '#0f172a' : 'transparent' }}
               >
-                <Text style={{ color: createMode === 'new' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 11 }}>➕ Brand New Admin</Text>
+                <Text style={{ color: createMode === 'new' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 11 }}>➕ Brand New Staff Admin</Text>
               </TouchableOpacity>
             </View>
 
@@ -899,14 +915,14 @@ export default function SuperAdminMasterHubScreen() {
               {/* Mode A: Select Registered User */}
               {createMode === 'existing' && (
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Search & Filter Registered Users ({existingUsers.length}) *</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 14, paddingHorizontal: 12, marginBottom: 10 }}>
-                    <Ionicons name="search" size={16} color="#64748b" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Select Member Account ({existingUsers.length}) *</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 10 }}>
+                    <Ionicons name="search-outline" size={16} color="#64748b" style={{ marginRight: 8 }} />
                     <TextInput
-                      placeholder="Search by name, email, or phone number..."
+                      placeholder="Search member by name, email or phone..."
                       value={searchUserQuery}
                       onChangeText={setSearchUserQuery}
-                      style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontSize: 12, fontWeight: '700', outlineStyle: 'none' as any }}
+                      style={{ flex: 1, paddingVertical: 9, color: '#0f172a', fontSize: 12, fontWeight: '500', outlineStyle: 'none' as any }}
                     />
                     {searchUserQuery.length > 0 && (
                       <TouchableOpacity onPress={() => setSearchUserQuery('')}>
@@ -915,7 +931,7 @@ export default function SuperAdminMasterHubScreen() {
                     )}
                   </View>
 
-                  <ScrollView style={{ maxHeight: 180, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 8 }}>
+                  <ScrollView style={{ maxHeight: 160, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 6 }}>
                     {existingUsers
                       .filter(u => {
                         if (!searchUserQuery.trim()) return true;
@@ -941,7 +957,7 @@ export default function SuperAdminMasterHubScreen() {
                               });
                             }}
                             style={{ 
-                              padding: 12, 
+                              padding: 10, 
                               borderRadius: 12, 
                               backgroundColor: isSelected ? '#0f172a' : '#ffffff', 
                               borderWidth: 1, 
@@ -952,24 +968,24 @@ export default function SuperAdminMasterHubScreen() {
                               marginBottom: 6 
                             }}
                           >
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isSelected ? '#f5a623' : '#e2e8f0', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-                              <Text style={{ color: isSelected ? '#0f172a' : '#334155', fontWeight: '900', fontSize: 14 }}>
+                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isSelected ? '#f5a623' : '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+                              <Text style={{ color: isSelected ? '#0f172a' : '#475569', fontWeight: '700', fontSize: 13 }}>
                                 {(u.full_name || u.email || 'A')[0].toUpperCase()}
                               </Text>
                             </View>
 
                             <View style={{ flex: 1, marginRight: 8 }}>
-                              <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
-                                {u.full_name || 'Registered Member'}
+                              <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '600', fontSize: 12 }} numberOfLines={1}>
+                                {u.full_name || 'Member Account'}
                               </Text>
-                              <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 11 }} numberOfLines={1}>
+                              <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 10 }} numberOfLines={1}>
                                 {u.email} {u.phone ? `• ${u.phone}` : ''}
                               </Text>
                             </View>
 
-                            <View style={{ backgroundColor: isSelected ? '#fffbeb' : '#eff6ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? '#fde68a' : '#bfdbfe' }}>
-                              <Text style={{ color: isSelected ? '#d97706' : '#2563eb', fontWeight: '900', fontSize: 10 }}>
-                                {isSelected ? '✓ SELECTED' : (u.role || 'user').toUpperCase()}
+                            <View style={{ backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                              <Text style={{ color: isSelected ? '#f5a623' : '#475569', fontWeight: '700', fontSize: 9 }}>
+                                {isSelected ? '✓ Selected' : (u.role || 'user').toUpperCase()}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -980,7 +996,7 @@ export default function SuperAdminMasterHubScreen() {
               )}
 
               {/* Form Input Fields */}
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Staff Full Name *</Text>
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Staff Full Name *</Text>
               <TextInput
                 placeholder="e.g. Musa Ibrahim"
                 value={newAdminForm.fullName}
@@ -988,72 +1004,125 @@ export default function SuperAdminMasterHubScreen() {
                   const autoPrefix = t.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
                   setNewAdminForm({ ...newAdminForm, fullName: t, usernamePrefix: newAdminForm.usernamePrefix || autoPrefix });
                 }}
-                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
+                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '500', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
               />
 
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Corporate Email Prefix (@abumafhal.com.ng) *</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 6 }}>
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Corporate Email Handle (@abumafhal.com.ng) *</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 8 }}>
                 <TextInput
                   placeholder="e.g. musa"
                   value={newAdminForm.usernamePrefix}
                   onChangeText={(t) => setNewAdminForm({ ...newAdminForm, usernamePrefix: t.toLowerCase() })}
-                  style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, outlineStyle: 'none' as any }}
+                  style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13, outlineStyle: 'none' as any }}
                   autoCapitalize="none"
                 />
-                <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 12 }}>@abumafhal.com.ng</Text>
+                <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>@abumafhal.com.ng</Text>
               </View>
 
-              <View style={{ backgroundColor: '#0f172a', padding: 8, borderRadius: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="at" size={14} color="#f5a623" />
-                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>Live Domain Email: <Text style={{ color: '#f5a623', fontWeight: '900' }}>{(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng</Text></Text>
+              {/* Live Domain Email Preview Card */}
+              <View style={{ backgroundColor: '#0f172a', padding: 10, borderRadius: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                  <Ionicons name="at-circle" size={16} color="#f5a623" />
+                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '400' }}>
+                    Corporate Address: <Text style={{ color: '#f5a623', fontWeight: '700' }}>{(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng</Text>
+                  </Text>
+                </View>
+
+                <TouchableOpacity 
+                  onPress={async () => {
+                    const emailToCopy = `${(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng`;
+                    try {
+                      const { Clipboard } = require('react-native');
+                      Clipboard.setString(emailToCopy);
+                    } catch (e) {}
+                    setCopiedDomainEmail(true);
+                    setTimeout(() => setCopiedDomainEmail(false), 2000);
+                  }}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  <Ionicons name={copiedDomainEmail ? "checkmark" : "copy-outline"} size={12} color="#ffffff" />
+                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '600' }}>{copiedDomainEmail ? "Copied" : "Copy"}</Text>
+                </TouchableOpacity>
               </View>
 
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Personal Email (Delivery Address) *</Text>
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Personal Email (Delivery Address) *</Text>
               <TextInput
                 placeholder="e.g. musa.ibrahim@gmail.com"
                 value={newAdminForm.personalEmail}
                 onChangeText={(t) => setNewAdminForm({ ...newAdminForm, personalEmail: t })}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
+                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '500', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
               />
 
+              {/* Password Generator & Visibility Toggle */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase' }}>Temporary Initial Password *</Text>
-                <TouchableOpacity onPress={generateRandomPassword}>
-                  <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 10 }}>🎲 Auto-Generate</Text>
+                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600' }}>Temporary Initial Password *</Text>
+                <TouchableOpacity onPress={generateRandomAdminPassword}>
+                  <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 11 }}>🎲 Auto-Generate</Text>
                 </TouchableOpacity>
               </View>
-              <TextInput
-                placeholder="Password123!"
-                value={newAdminForm.password}
-                onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
-                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
-              />
 
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Assigned Privilege Level</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 14 }}>
+                <TextInput
+                  placeholder="Password123!"
+                  value={newAdminForm.password}
+                  onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
+                  secureTextEntry={!showAdminPassword}
+                  style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13, outlineStyle: 'none' as any }}
+                />
+                <TouchableOpacity onPress={() => setShowAdminPassword(!showAdminPassword)}>
+                  <Ionicons name={showAdminPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Role Selection Cards */}
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Assigned Governance Privilege</Text>
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                 <TouchableOpacity
                   onPress={() => setNewAdminForm({ ...newAdminForm, role: 'admin' })}
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: newAdminForm.role === 'admin' ? '#0f172a' : '#cbd5e1', backgroundColor: newAdminForm.role === 'admin' ? '#0f172a' : '#f8fafc', alignItems: 'center' }}
+                  style={{ 
+                    flex: 1, 
+                    padding: 12, 
+                    borderRadius: 14, 
+                    borderWidth: 1.5, 
+                    borderColor: newAdminForm.role === 'admin' ? '#0f172a' : '#e2e8f0', 
+                    backgroundColor: newAdminForm.role === 'admin' ? '#0f172a' : '#ffffff' 
+                  }}
                 >
-                  <Text style={{ color: newAdminForm.role === 'admin' ? '#ffffff' : '#334155', fontWeight: '900', fontSize: 11 }}>STAFF ADMIN 🛡️</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="shield-outline" size={14} color={newAdminForm.role === 'admin' ? '#f5a623' : '#0f172a'} />
+                    <Text style={{ color: newAdminForm.role === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 12 }}>Staff Admin</Text>
+                  </View>
+                  <Text style={{ color: newAdminForm.role === 'admin' ? '#94a3b8' : '#64748b', fontSize: 10, lineHeight: 14 }}>Standard management & user support.</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setNewAdminForm({ ...newAdminForm, role: 'super_admin' })}
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: newAdminForm.role === 'super_admin' ? '#d97706' : '#cbd5e1', backgroundColor: newAdminForm.role === 'super_admin' ? '#fffbeb' : '#f8fafc', alignItems: 'center' }}
+                  style={{ 
+                    flex: 1, 
+                    padding: 12, 
+                    borderRadius: 14, 
+                    borderWidth: 1.5, 
+                    borderColor: newAdminForm.role === 'super_admin' ? '#d97706' : '#e2e8f0', 
+                    backgroundColor: newAdminForm.role === 'super_admin' ? '#fffbeb' : '#ffffff' 
+                  }}
                 >
-                  <Text style={{ color: newAdminForm.role === 'super_admin' ? '#d97706' : '#334155', fontWeight: '900', fontSize: 11 }}>SUPER ADMIN 👑</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="ribbon-outline" size={14} color="#d97706" />
+                    <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>Super Admin 👑</Text>
+                  </View>
+                  <Text style={{ color: '#b45309', fontSize: 10, lineHeight: 14 }}>Full governance & API Vault control.</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Department & Access Privilege</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {/* Department Permission Pills */}
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Departmental Permission Scope</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {[
                     { id: 'finance', label: '💰 Finance & Wallets' },
-                    { id: 'telecom', label: '📱 Telecom VTU' },
+                    { id: 'telecom', label: '📱 Telecom & VTU' },
                     { id: 'crypto', label: '🪙 Crypto & Cards' },
                     { id: 'support', label: '🎧 Customer Support' },
                     { id: 'master', label: '👑 Master Governance' }
@@ -1063,15 +1132,16 @@ export default function SuperAdminMasterHubScreen() {
                       <TouchableOpacity
                         key={dept.id}
                         onPress={() => setNewAdminForm({ ...newAdminForm, department: dept.id as any })}
-                        style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: isDeptSelected ? '#0f172a' : '#f8fafc', borderWidth: 1, borderColor: isDeptSelected ? '#f5a623' : '#e2e8f0' }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: isDeptSelected ? '#0f172a' : '#f8fafc', borderWidth: 1, borderColor: isDeptSelected ? '#f5a623' : '#e2e8f0' }}
                       >
-                        <Text style={{ color: isDeptSelected ? '#f5a623' : '#334155', fontWeight: '900', fontSize: 11 }}>{dept.label}</Text>
+                        <Text style={{ color: isDeptSelected ? '#f5a623' : '#475569', fontWeight: '600', fontSize: 11 }}>{dept.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
               </ScrollView>
 
+              {/* Primary Action Submit Button */}
               <TouchableOpacity
                 onPress={handleCreateAdminSubmit}
                 disabled={creatingAdmin}
@@ -1081,9 +1151,12 @@ export default function SuperAdminMasterHubScreen() {
                 {creatingAdmin ? (
                   <ActivityIndicator color="#f5a623" />
                 ) : (
-                  <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>
-                    {selectedUserId ? 'PROVISION ADMIN & SEND CREDENTIALS 🚀' : 'CREATE ADMIN & DISPATCH WELCOME MAIL 🚀'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="sparkles-outline" size={16} color="#f5a623" />
+                    <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 13 }}>
+                      {selectedUserId ? 'Provision Admin & Deliver Credentials' : 'Create Admin Account & Dispatch Credentials'}
+                    </Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </ScrollView>

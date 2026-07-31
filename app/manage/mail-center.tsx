@@ -136,6 +136,17 @@ export default function MailCenterScreen() {
   const [adminPassword, setAdminPassword] = useState('Password123!');
   const [adminRole, setAdminRole] = useState<'admin' | 'super_admin'>('admin');
   const [creatingAdminMail, setCreatingAdminMail] = useState(false);
+  const [showCorporatePassword, setShowCorporatePassword] = useState(false);
+  const [copiedCorpEmail, setCopiedCorpEmail] = useState(false);
+
+  const generateCorpPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    let pass = '';
+    for (let i = 0; i < 12; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setAdminPassword(pass);
+  };
 
   useEffect(() => {
     initMailCenter();
@@ -760,45 +771,124 @@ export default function MailCenterScreen() {
 
       {/* MODAL 1: Create Corporate Admin Email (Super Admin) */}
       <Modal visible={createAdminMailVisible} transparent animationType="slide" onRequestClose={() => setCreateAdminMailVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="at-circle" size={24} color="#f5a623" />
-                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 15 }}>Create Corporate Admin Mail</Text>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.65)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: '#e2e8f0' }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 6 }}>
+                  <Ionicons name="at-circle" size={14} color="#d97706" />
+                  <Text style={{ color: '#b45309', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Domain Authority @{DOMAIN}</Text>
+                </View>
+                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 17 }}>Create Corporate Admin Email</Text>
+                <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '400', marginTop: 2 }}>Provision official staff email address & credentials.</Text>
               </View>
-              <TouchableOpacity onPress={() => setCreateAdminMailVisible(false)}>
-                <Ionicons name="close" size={22} color="#0f172a" />
+
+              <TouchableOpacity 
+                onPress={() => setCreateAdminMailVisible(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Email Prefix (@{DOMAIN})</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 12 }}>
+            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Email Handle (@{DOMAIN}) *</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 8 }}>
               <TextInput 
                 placeholder="e.g. musa"
                 value={adminUsername}
-                onChangeText={setAdminUsername}
-                style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13 }}
+                onChangeText={(t) => setAdminUsername(t.toLowerCase())}
+                style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13 }}
                 autoCapitalize="none"
               />
-              <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 12 }}>@{DOMAIN}</Text>
+              <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>@{DOMAIN}</Text>
             </View>
 
-            <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Staff Full Name</Text>
+            {/* Live Domain Badge */}
+            <View style={{ backgroundColor: '#0f172a', padding: 10, borderRadius: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                <Ionicons name="mail-open-outline" size={14} color="#f5a623" />
+                <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '400' }}>
+                  Live Corporate Email: <Text style={{ color: '#f5a623', fontWeight: '700' }}>{(adminUsername.trim() || 'musa').toLowerCase()}@{DOMAIN}</Text>
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => {
+                  const mailStr = `${(adminUsername.trim() || 'musa').toLowerCase()}@${DOMAIN}`;
+                  try {
+                    const { Clipboard } = require('react-native');
+                    Clipboard.setString(mailStr);
+                  } catch (e) {}
+                  setCopiedCorpEmail(true);
+                  setTimeout(() => setCopiedCorpEmail(false), 2000);
+                }}
+                style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <Ionicons name={copiedCorpEmail ? "checkmark" : "copy-outline"} size={12} color="#ffffff" />
+                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '600' }}>{copiedCorpEmail ? "Copied" : "Copy"}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Staff Full Name *</Text>
             <TextInput 
               placeholder="e.g. Musa Ibrahim"
               value={adminFullName}
               onChangeText={setAdminFullName}
-              style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 12 }}
+              style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '500', fontSize: 13, marginBottom: 12 }}
             />
 
-            <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Initial Password</Text>
-            <TextInput 
-              placeholder="Password123!"
-              value={adminPassword}
-              onChangeText={setAdminPassword}
-              style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 16 }}
-            />
+            {/* Password Generator & Eye Toggle */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600' }}>Initial Password *</Text>
+              <TouchableOpacity onPress={generateCorpPassword}>
+                <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 11 }}>🎲 Auto-Generate</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 14 }}>
+              <TextInput 
+                placeholder="Password123!"
+                value={adminPassword}
+                onChangeText={setAdminPassword}
+                secureTextEntry={!showCorporatePassword}
+                style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13 }}
+              />
+              <TouchableOpacity onPress={() => setShowCorporatePassword(!showCorporatePassword)}>
+                <Ionicons name={showCorporatePassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Role Cards */}
+            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Corporate Permission Role</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              <TouchableOpacity
+                onPress={() => setAdminRole('admin')}
+                style={{ 
+                  flex: 1, 
+                  padding: 10, 
+                  borderRadius: 12, 
+                  borderWidth: 1.5, 
+                  borderColor: adminRole === 'admin' ? '#0f172a' : '#e2e8f0', 
+                  backgroundColor: adminRole === 'admin' ? '#0f172a' : '#ffffff' 
+                }}
+              >
+                <Text style={{ color: adminRole === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 11 }}>Staff Admin 🛡️</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setAdminRole('super_admin')}
+                style={{ 
+                  flex: 1, 
+                  padding: 10, 
+                  borderRadius: 12, 
+                  borderWidth: 1.5, 
+                  borderColor: adminRole === 'super_admin' ? '#d97706' : '#e2e8f0', 
+                  backgroundColor: adminRole === 'super_admin' ? '#fffbeb' : '#ffffff' 
+                }}
+              >
+                <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 11 }}>Super Admin 👑</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity 
               onPress={handleCreateCorporateEmail}
@@ -808,7 +898,10 @@ export default function MailCenterScreen() {
               {creatingAdminMail ? (
                 <ActivityIndicator color="#f5a623" />
               ) : (
-                <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>Generate Corporate Account</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="sparkles-outline" size={16} color="#f5a623" />
+                  <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 13 }}>Provision Corporate Account</Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
