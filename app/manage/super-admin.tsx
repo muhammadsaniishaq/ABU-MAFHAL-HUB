@@ -94,6 +94,7 @@ export default function SuperAdminMasterHubScreen() {
   const [searchUserQuery, setSearchUserQuery] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [copiedDomainEmail, setCopiedDomainEmail] = useState(false);
+  const [copiedAllPayload, setCopiedAllPayload] = useState(false);
   const [memberCategoryFilter, setMemberCategoryFilter] = useState<'user' | 'admin' | 'all'>('user');
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(true);
 
@@ -682,7 +683,7 @@ export default function SuperAdminMasterHubScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 10 }}>
               <Text style={s.sectionHeaderTitle}>👑 STAFF & ADMIN HIERARCHY</Text>
               <TouchableOpacity 
-                onPress={() => setCreateAdminVisible(true)}
+                onPress={openCreateAdminModal}
                 style={{ backgroundColor: C.navy, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: C.goldBorder }}
               >
                 <Ionicons name="person-add" size={14} color={C.goldBright} />
@@ -878,412 +879,460 @@ export default function SuperAdminMasterHubScreen() {
       {/* Create New Admin & Corporate Mail Modal */}
       <Modal visible={createAdminVisible} transparent animationType="slide" onRequestClose={() => setCreateAdminVisible(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalBox, { maxHeight: '92%', backgroundColor: '#ffffff', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: '#e2e8f0' }]}>
-            {/* Modal Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 6 }}>
-                  <Ionicons name="shield-checkmark-sharp" size={12} color="#16a34a" />
-                  <Text style={{ color: '#15803d', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Staff & Corporate Access Control</Text>
+          <View style={[s.modalBox, { maxHeight: '92%', backgroundColor: '#ffffff', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#e2e8f0' }]}>
+            {/* Modal Compact Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 14, alignSelf: 'flex-start', marginBottom: 4 }}>
+                  <Ionicons name="shield-checkmark" size={11} color="#16a34a" />
+                  <Text style={{ color: '#15803d', fontSize: 9.5, fontWeight: '700', letterSpacing: 0.3 }}>Governance Access Vault</Text>
                 </View>
-                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 17 }}>Provision Admin Account</Text>
-                <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '400', marginTop: 2 }}>Setup staff privileges, department scope & corporate email address.</Text>
+                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 15 }}>Provision Admin & Staff Account</Text>
               </View>
 
               <TouchableOpacity 
                 onPress={() => setCreateAdminVisible(false)}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
+                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
               >
-                <Ionicons name="close" size={18} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Mode Switcher Tabs */}
-            <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', padding: 4, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
-              <TouchableOpacity
-                onPress={() => { setCreateMode('existing'); setSelectedUserId(null); }}
-                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'existing' ? '#0f172a' : 'transparent' }}
-              >
-                <Text style={{ color: createMode === 'existing' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 11 }}>👤 Select Registered Member</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => { setCreateMode('new'); setSelectedUserId(null); setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true }); }}
-                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: createMode === 'new' ? '#0f172a' : 'transparent' }}
-              >
-                <Text style={{ color: createMode === 'new' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 11 }}>➕ Brand New Staff Admin</Text>
+                <Ionicons name="close" size={16} color="#64748b" />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Mode A: Select Registered Member (Categorized Dropdown: User vs Admin) */}
-              {createMode === 'existing' && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>
-                    Select Registered Member *
-                  </Text>
+              {/* SECTION 1: ACCOUNT TARGET & SELECTION MODE */}
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#f1f5f9', padding: 12, marginBottom: 10 }}>
+                <Text style={{ color: '#475569', fontSize: 9.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+                  1. Target Staff Selection Mode *
+                </Text>
 
-                  {/* 2-Category Segmented Filter Tabs: User vs Admin vs All */}
-                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-                    <TouchableOpacity
-                      onPress={() => setMemberCategoryFilter('user')}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 7,
-                        borderRadius: 10,
-                        backgroundColor: memberCategoryFilter === 'user' ? '#0f172a' : '#f8fafc',
-                        borderWidth: 1,
-                        borderColor: memberCategoryFilter === 'user' ? '#0f172a' : '#cbd5e1',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text style={{ color: memberCategoryFilter === 'user' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
-                        👥 Users ({existingUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin').length})
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setMemberCategoryFilter('admin')}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 7,
-                        borderRadius: 10,
-                        backgroundColor: memberCategoryFilter === 'admin' ? '#d97706' : '#f8fafc',
-                        borderWidth: 1,
-                        borderColor: memberCategoryFilter === 'admin' ? '#d97706' : '#cbd5e1',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text style={{ color: memberCategoryFilter === 'admin' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
-                        🛡️ Admins ({existingUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length})
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setMemberCategoryFilter('all')}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 7,
-                        borderRadius: 10,
-                        backgroundColor: memberCategoryFilter === 'all' ? '#334155' : '#f8fafc',
-                        borderWidth: 1,
-                        borderColor: memberCategoryFilter === 'all' ? '#334155' : '#cbd5e1',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text style={{ color: memberCategoryFilter === 'all' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 11 }}>
-                        🌐 All ({existingUsers.length})
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Dropdown Card Trigger / Selected Member Pill */}
+                {/* Mode Switcher Tabs */}
+                <View style={{ flexDirection: 'row', backgroundColor: '#ffffff', padding: 3, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10 }}>
                   <TouchableOpacity
-                    onPress={() => setMemberDropdownOpen(!memberDropdownOpen)}
-                    style={{
-                      backgroundColor: '#f8fafc',
-                      borderWidth: 1,
-                      borderColor: selectedUserId ? '#f5a623' : '#cbd5e1',
-                      borderRadius: 14,
-                      padding: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: memberDropdownOpen ? 8 : 12
-                    }}
+                    onPress={() => { setCreateMode('existing'); setSelectedUserId(null); }}
+                    style={{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 8, backgroundColor: createMode === 'existing' ? '#0f172a' : 'transparent' }}
                   >
-                    {selectedUserId ? (
-                      (() => {
-                        const selectedUser = existingUsers.find(u => u.id === selectedUserId);
-                        return (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-                              <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 13 }}>
-                                {(selectedUser?.full_name || selectedUser?.email || 'M')[0].toUpperCase()}
-                              </Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
-                                {selectedUser?.full_name || 'Selected Member'}
-                              </Text>
-                              <Text style={{ color: '#64748b', fontSize: 11 }} numberOfLines={1}>
-                                {selectedUser?.email} {selectedUser?.phone ? `• ${selectedUser.phone}` : ''}
-                              </Text>
-                            </View>
-                            <View style={{ backgroundColor: selectedUser?.role === 'super_admin' ? '#fffbeb' : selectedUser?.role === 'admin' ? '#eff6ff' : '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginHorizontal: 6 }}>
-                              <Text style={{ color: selectedUser?.role === 'super_admin' ? '#d97706' : selectedUser?.role === 'admin' ? '#2563eb' : '#16a34a', fontWeight: '700', fontSize: 10 }}>
-                                {(selectedUser?.role || 'user').toUpperCase()}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })()
-                    ) : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                        <Ionicons name="person-circle-outline" size={20} color="#64748b" />
-                        <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '500' }}>
-                          Tap to select member from {memberCategoryFilter === 'user' ? 'Regular Users' : memberCategoryFilter === 'admin' ? 'Admins' : 'All Members'}...
-                        </Text>
-                      </View>
-                    )}
-
-                    <Ionicons name={memberDropdownOpen ? "chevron-up" : "chevron-down"} size={18} color="#64748b" />
+                    <Text style={{ color: createMode === 'existing' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 10.5 }}>👤 Registered Member</Text>
                   </TouchableOpacity>
 
-                  {/* Dropdown Expanded Drawer */}
-                  {memberDropdownOpen && (
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 10, marginBottom: 12, elevation: 4 }}>
-                      {/* Search Input within Dropdown */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 8 }}>
-                        <Ionicons name="search-outline" size={15} color="#64748b" style={{ marginRight: 6 }} />
-                        <TextInput
-                          placeholder="Filter by name, email or phone number..."
-                          value={searchUserQuery}
-                          onChangeText={setSearchUserQuery}
-                          style={{ flex: 1, paddingVertical: 8, color: '#0f172a', fontSize: 12, fontWeight: '500', outlineStyle: 'none' as any }}
-                        />
-                        {searchUserQuery.length > 0 && (
-                          <TouchableOpacity onPress={() => setSearchUserQuery('')}>
-                            <Ionicons name="close-circle" size={15} color="#94a3b8" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      {/* Scrollable Member List */}
-                      <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
-                        {existingUsers
-                          .filter(u => {
-                            // Category filter
-                            const isStaff = u.role === 'admin' || u.role === 'super_admin';
-                            if (memberCategoryFilter === 'user' && isStaff) return false;
-                            if (memberCategoryFilter === 'admin' && !isStaff) return false;
-
-                            // Search query filter
-                            if (!searchUserQuery.trim()) return true;
-                            const q = searchUserQuery.toLowerCase();
-                            return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.phone || '').toLowerCase().includes(q);
-                          })
-                          .map(u => {
-                            const isSelected = selectedUserId === u.id;
-                            const isStaff = u.role === 'admin' || u.role === 'super_admin';
-                            return (
-                              <TouchableOpacity
-                                key={u.id}
-                                onPress={() => {
-                                  setSelectedUserId(u.id);
-                                  setMemberDropdownOpen(false); // Collapse dropdown on select
-                                  const autoPrefix = (u.full_name || 'admin').trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
-                                  setNewAdminForm({
-                                    fullName: u.full_name || '',
-                                    personalEmail: u.email || '',
-                                    usernamePrefix: autoPrefix,
-                                    password: 'Password123!',
-                                    role: u.role === 'super_admin' ? 'super_admin' : 'admin',
-                                    department: 'finance',
-                                    sendMail: true
-                                  });
-                                }}
-                                style={{ 
-                                  padding: 10, 
-                                  borderRadius: 10, 
-                                  backgroundColor: isSelected ? '#0f172a' : '#f8fafc', 
-                                  borderWidth: 1, 
-                                  borderColor: isSelected ? '#f5a623' : '#e2e8f0',
-                                  flexDirection: 'row', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center', 
-                                  marginBottom: 6 
-                                }}
-                              >
-                                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: isSelected ? '#f5a623' : isStaff ? '#fffbeb' : '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
-                                  <Text style={{ color: isSelected ? '#0f172a' : isStaff ? '#d97706' : '#475569', fontWeight: '700', fontSize: 12 }}>
-                                    {(u.full_name || u.email || 'M')[0].toUpperCase()}
-                                  </Text>
-                                </View>
-
-                                <View style={{ flex: 1, marginRight: 8 }}>
-                                  <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '600', fontSize: 12 }} numberOfLines={1}>
-                                    {u.full_name || 'Member Account'}
-                                  </Text>
-                                  <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 10 }} numberOfLines={1}>
-                                    {u.email} {u.phone ? `• ${u.phone}` : ''}
-                                  </Text>
-                                </View>
-
-                                <View style={{ backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : isStaff ? '#fffbeb' : '#f0fdf4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                  <Text style={{ color: isSelected ? '#f5a623' : isStaff ? '#d97706' : '#16a34a', fontWeight: '700', fontSize: 9 }}>
-                                    {isSelected ? '✓ Selected' : (u.role || 'user').toUpperCase()}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                      </ScrollView>
-                    </View>
-                  )}
+                  <TouchableOpacity
+                    onPress={() => { setCreateMode('new'); setSelectedUserId(null); setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true }); }}
+                    style={{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 8, backgroundColor: createMode === 'new' ? '#0f172a' : 'transparent' }}
+                  >
+                    <Text style={{ color: createMode === 'new' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: 10.5 }}>➕ Brand New Admin</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
 
-              {/* Form Input Fields */}
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Staff Full Name *</Text>
-              <TextInput
-                placeholder="e.g. Musa Ibrahim"
-                value={newAdminForm.fullName}
-                onChangeText={(t) => {
-                  const autoPrefix = t.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
-                  setNewAdminForm({ ...newAdminForm, fullName: t, usernamePrefix: newAdminForm.usernamePrefix || autoPrefix });
-                }}
-                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '500', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
-              />
+                {/* Mode A: Select Registered Member (Categorized Dropdown: User vs Admin) */}
+                {createMode === 'existing' && (
+                  <View style={{ marginTop: 2 }}>
+                    {/* 2-Category Filter Pills */}
+                    <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setMemberCategoryFilter('user')}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          backgroundColor: memberCategoryFilter === 'user' ? '#0f172a' : '#ffffff',
+                          borderWidth: 1,
+                          borderColor: memberCategoryFilter === 'user' ? '#0f172a' : '#cbd5e1',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ color: memberCategoryFilter === 'user' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 10 }}>
+                          👥 Users ({existingUsers.filter(u => u.role !== 'admin' && u.role !== 'super_admin').length})
+                        </Text>
+                      </TouchableOpacity>
 
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Corporate Email Handle (@abumafhal.com.ng) *</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 8 }}>
-                <TextInput
-                  placeholder="e.g. musa"
-                  value={newAdminForm.usernamePrefix}
-                  onChangeText={(t) => setNewAdminForm({ ...newAdminForm, usernamePrefix: t.toLowerCase() })}
-                  style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13, outlineStyle: 'none' as any }}
-                  autoCapitalize="none"
-                />
-                <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>@abumafhal.com.ng</Text>
+                      <TouchableOpacity
+                        onPress={() => setMemberCategoryFilter('admin')}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          backgroundColor: memberCategoryFilter === 'admin' ? '#d97706' : '#ffffff',
+                          borderWidth: 1,
+                          borderColor: memberCategoryFilter === 'admin' ? '#d97706' : '#cbd5e1',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ color: memberCategoryFilter === 'admin' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 10 }}>
+                          🛡️ Admins ({existingUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => setMemberCategoryFilter('all')}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          backgroundColor: memberCategoryFilter === 'all' ? '#334155' : '#ffffff',
+                          borderWidth: 1,
+                          borderColor: memberCategoryFilter === 'all' ? '#334155' : '#cbd5e1',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ color: memberCategoryFilter === 'all' ? '#ffffff' : '#475569', fontWeight: '600', fontSize: 10 }}>
+                          🌐 All ({existingUsers.length})
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Dropdown Card Trigger / Selected Member Pill */}
+                    <TouchableOpacity
+                      onPress={() => setMemberDropdownOpen(!memberDropdownOpen)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderWidth: 1,
+                        borderColor: selectedUserId ? '#f5a623' : '#cbd5e1',
+                        borderRadius: 10,
+                        padding: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      {selectedUserId ? (
+                        (() => {
+                          const selectedUser = existingUsers.find(u => u.id === selectedUserId);
+                          return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 6 }}>
+                              <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
+                                <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 11 }}>
+                                  {(selectedUser?.full_name || selectedUser?.email || 'M')[0].toUpperCase()}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#0f172a', fontWeight: '600', fontSize: 11.5 }} numberOfLines={1}>
+                                  {selectedUser?.full_name || 'Selected Member'}
+                                </Text>
+                                <Text style={{ color: '#64748b', fontSize: 9.5 }} numberOfLines={1}>
+                                  {selectedUser?.email}
+                                </Text>
+                              </View>
+                              <View style={{ backgroundColor: selectedUser?.role === 'super_admin' ? '#fffbeb' : selectedUser?.role === 'admin' ? '#eff6ff' : '#f0fdf4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ color: selectedUser?.role === 'super_admin' ? '#d97706' : selectedUser?.role === 'admin' ? '#2563eb' : '#16a34a', fontWeight: '700', fontSize: 8.5 }}>
+                                  {(selectedUser?.role || 'user').toUpperCase()}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        })()
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                          <Ionicons name="person-circle-outline" size={16} color="#64748b" />
+                          <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '500' }}>
+                            Tap to select member from {memberCategoryFilter === 'user' ? 'Users' : memberCategoryFilter === 'admin' ? 'Admins' : 'All'}...
+                          </Text>
+                        </View>
+                      )}
+
+                      <Ionicons name={memberDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color="#64748b" />
+                    </TouchableOpacity>
+
+                    {/* Dropdown Expanded Drawer */}
+                    {memberDropdownOpen && (
+                      <View style={{ backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', padding: 8, marginTop: 6, elevation: 3 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 8, marginBottom: 6 }}>
+                          <Ionicons name="search-outline" size={13} color="#64748b" style={{ marginRight: 4 }} />
+                          <TextInput
+                            placeholder="Filter by name, email or phone..."
+                            value={searchUserQuery}
+                            onChangeText={setSearchUserQuery}
+                            style={{ flex: 1, paddingVertical: 6, color: '#0f172a', fontSize: 11, fontWeight: '500', outlineStyle: 'none' as any }}
+                          />
+                          {searchUserQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchUserQuery('')}>
+                              <Ionicons name="close-circle" size={13} color="#94a3b8" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+
+                        <ScrollView style={{ maxHeight: 140 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                          {existingUsers
+                            .filter(u => {
+                              const isStaff = u.role === 'admin' || u.role === 'super_admin';
+                              if (memberCategoryFilter === 'user' && isStaff) return false;
+                              if (memberCategoryFilter === 'admin' && !isStaff) return false;
+                              if (!searchUserQuery.trim()) return true;
+                              const q = searchUserQuery.toLowerCase();
+                              return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.phone || '').toLowerCase().includes(q);
+                            })
+                            .map(u => {
+                              const isSelected = selectedUserId === u.id;
+                              const isStaff = u.role === 'admin' || u.role === 'super_admin';
+                              return (
+                                <TouchableOpacity
+                                  key={u.id}
+                                  onPress={() => {
+                                    setSelectedUserId(u.id);
+                                    setMemberDropdownOpen(false);
+                                    const autoPrefix = (u.full_name || 'admin').trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                                    setNewAdminForm({
+                                      fullName: u.full_name || '',
+                                      personalEmail: u.email || '',
+                                      usernamePrefix: autoPrefix,
+                                      password: 'Password123!',
+                                      role: u.role === 'super_admin' ? 'super_admin' : 'admin',
+                                      department: 'finance',
+                                      sendMail: true
+                                    });
+                                  }}
+                                  style={{ 
+                                    padding: 8, 
+                                    borderRadius: 8, 
+                                    backgroundColor: isSelected ? '#0f172a' : '#f8fafc', 
+                                    borderWidth: 1, 
+                                    borderColor: isSelected ? '#f5a623' : '#e2e8f0',
+                                    flexDirection: 'row', 
+                                    justifyContent: 'space-between', 
+                                    alignItems: 'center', 
+                                    marginBottom: 4 
+                                  }}
+                                >
+                                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isSelected ? '#f5a623' : isStaff ? '#fffbeb' : '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginRight: 6 }}>
+                                    <Text style={{ color: isSelected ? '#0f172a' : isStaff ? '#d97706' : '#475569', fontWeight: '700', fontSize: 10 }}>
+                                      {(u.full_name || u.email || 'M')[0].toUpperCase()}
+                                    </Text>
+                                  </View>
+
+                                  <View style={{ flex: 1, marginRight: 6 }}>
+                                    <Text style={{ color: isSelected ? '#ffffff' : '#0f172a', fontWeight: '600', fontSize: 11 }} numberOfLines={1}>
+                                      {u.full_name || 'Member Account'}
+                                    </Text>
+                                    <Text style={{ color: isSelected ? '#94a3b8' : '#64748b', fontSize: 9 }} numberOfLines={1}>
+                                      {u.email} {u.phone ? `• ${u.phone}` : ''}
+                                    </Text>
+                                  </View>
+
+                                  <View style={{ backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : isStaff ? '#fffbeb' : '#f0fdf4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                                    <Text style={{ color: isSelected ? '#f5a623' : isStaff ? '#d97706' : '#16a34a', fontWeight: '700', fontSize: 8 }}>
+                                      {isSelected ? '✓ Selected' : (u.role || 'user').toUpperCase()}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
 
-              {/* Live Domain Email Preview Card */}
-              <View style={{ backgroundColor: '#0f172a', padding: 10, borderRadius: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                  <Ionicons name="at-circle" size={16} color="#f5a623" />
-                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '400' }}>
-                    Corporate Address: <Text style={{ color: '#f5a623', fontWeight: '700' }}>{(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng</Text>
+              {/* SECTION 2: STAFF PROFILE & CORPORATE EMAIL HANDLES */}
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#f1f5f9', padding: 12, marginBottom: 10 }}>
+                <Text style={{ color: '#475569', fontSize: 9.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+                  2. Staff Identity & Corporate Mail Handle *
+                </Text>
+
+                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600', marginBottom: 3 }}>Staff Full Name *</Text>
+                <TextInput
+                  placeholder="e.g. Musa Ibrahim"
+                  value={newAdminForm.fullName}
+                  onChangeText={(t) => {
+                    const autoPrefix = t.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                    setNewAdminForm({ ...newAdminForm, fullName: t, usernamePrefix: newAdminForm.usernamePrefix || autoPrefix });
+                  }}
+                  style={{ backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, color: '#0f172a', fontWeight: '500', fontSize: 11.5, marginBottom: 8, outlineStyle: 'none' as any }}
+                />
+
+                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600', marginBottom: 3 }}>Corporate Email Handle (@abumafhal.com.ng) *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 6 }}>
+                  <TextInput
+                    placeholder="e.g. musa"
+                    value={newAdminForm.usernamePrefix}
+                    onChangeText={(t) => setNewAdminForm({ ...newAdminForm, usernamePrefix: t.toLowerCase() })}
+                    style={{ flex: 1, paddingVertical: 7, color: '#0f172a', fontWeight: '600', fontSize: 11.5, outlineStyle: 'none' as any }}
+                    autoCapitalize="none"
+                  />
+                  <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 11 }}>@abumafhal.com.ng</Text>
+                </View>
+
+                {/* Live Domain Email Badge Card */}
+                <View style={{ backgroundColor: '#0f172a', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, marginRight: 6 }}>
+                    <Ionicons name="at-circle" size={13} color="#f5a623" />
+                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '400' }}>
+                      Corporate Email: <Text style={{ color: '#f5a623', fontWeight: '700' }}>{(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng</Text>
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={async () => {
+                      const emailToCopy = `${(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng`;
+                      try {
+                        const { Clipboard } = require('react-native');
+                        Clipboard.setString(emailToCopy);
+                      } catch (e) {}
+                      setCopiedDomainEmail(true);
+                      setTimeout(() => setCopiedDomainEmail(false), 2000);
+                    }}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                  >
+                    <Ionicons name={copiedDomainEmail ? "checkmark" : "copy-outline"} size={11} color="#ffffff" />
+                    <Text style={{ color: '#ffffff', fontSize: 9.5, fontWeight: '600' }}>{copiedDomainEmail ? "Copied" : "Copy"}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600', marginBottom: 3 }}>Personal Email (Delivery Address) *</Text>
+                <TextInput
+                  placeholder="e.g. musa.ibrahim@gmail.com"
+                  value={newAdminForm.personalEmail}
+                  onChangeText={(t) => setNewAdminForm({ ...newAdminForm, personalEmail: t })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={{ backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, color: '#0f172a', fontWeight: '500', fontSize: 11.5, outlineStyle: 'none' as any }}
+                />
+              </View>
+
+              {/* SECTION 3: CREDENTIALS & SECURITY GENERATOR */}
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#f1f5f9', padding: 12, marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ color: '#475569', fontSize: 9.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    3. Account Credentials & Security *
+                  </Text>
+                  <TouchableOpacity onPress={generateRandomAdminPassword}>
+                    <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 10 }}>🎲 Auto-Generate</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 8 }}>
+                  <TextInput
+                    placeholder="Password123!"
+                    value={newAdminForm.password}
+                    onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
+                    secureTextEntry={!showAdminPassword}
+                    style={{ flex: 1, paddingVertical: 7, color: '#0f172a', fontWeight: '600', fontSize: 11.5, outlineStyle: 'none' as any }}
+                  />
+                  <TouchableOpacity onPress={() => setShowAdminPassword(!showAdminPassword)}>
+                    <Ionicons name={showAdminPassword ? "eye-off-outline" : "eye-outline"} size={16} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Password Entropy & Payload Copy */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="key-outline" size={12} color="#16a34a" />
+                    <Text style={{ color: '#16a34a', fontSize: 9.5, fontWeight: '600' }}>12-Char Entropy Key</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      const corpMail = `${(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng`;
+                      const payload = `👑 ABU MAFHAL ADMIN CREDENTIALS\nName: ${newAdminForm.fullName}\nCorporate Mail: ${corpMail}\nLogin Email: ${newAdminForm.personalEmail || corpMail}\nPassword: ${newAdminForm.password}\nRole: ${newAdminForm.role.toUpperCase()}`;
+                      try {
+                        const { Clipboard } = require('react-native');
+                        Clipboard.setString(payload);
+                      } catch (e) {}
+                      setCopiedAllPayload(true);
+                      setTimeout(() => setCopiedAllPayload(false), 2000);
+                    }}
+                    style={{ backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                  >
+                    <Ionicons name={copiedAllPayload ? "checkmark" : "copy-outline"} size={11} color="#2563eb" />
+                    <Text style={{ color: '#2563eb', fontSize: 9.5, fontWeight: '700' }}>{copiedAllPayload ? "Copied Payload!" : "Copy Credential Packet"}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* SECTION 4: GOVERNANCE ROLE & PERMISSION BREAKDOWN */}
+              <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#f1f5f9', padding: 12, marginBottom: 10 }}>
+                <Text style={{ color: '#475569', fontSize: 9.5, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>
+                  4. Governance Privilege & Scope *
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setNewAdminForm({ ...newAdminForm, role: 'admin' })}
+                    style={{ 
+                      flex: 1, 
+                      padding: 10, 
+                      borderRadius: 12, 
+                      borderWidth: 1.5, 
+                      borderColor: newAdminForm.role === 'admin' ? '#0f172a' : '#e2e8f0', 
+                      backgroundColor: newAdminForm.role === 'admin' ? '#0f172a' : '#ffffff' 
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                      <Ionicons name="shield-outline" size={13} color={newAdminForm.role === 'admin' ? '#f5a623' : '#0f172a'} />
+                      <Text style={{ color: newAdminForm.role === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 11 }}>Staff Admin</Text>
+                    </View>
+                    <Text style={{ color: newAdminForm.role === 'admin' ? '#94a3b8' : '#64748b', fontSize: 9, lineHeight: 12 }}>Standard management & user support.</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setNewAdminForm({ ...newAdminForm, role: 'super_admin' })}
+                    style={{ 
+                      flex: 1, 
+                      padding: 10, 
+                      borderRadius: 12, 
+                      borderWidth: 1.5, 
+                      borderColor: newAdminForm.role === 'super_admin' ? '#d97706' : '#e2e8f0', 
+                      backgroundColor: newAdminForm.role === 'super_admin' ? '#fffbeb' : '#ffffff' 
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                      <Ionicons name="ribbon-outline" size={13} color="#d97706" />
+                      <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 11 }}>Super Admin 👑</Text>
+                    </View>
+                    <Text style={{ color: '#b45309', fontSize: 9, lineHeight: 12 }}>Full governance & API Vault control.</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Role Capabilities Summary Box */}
+                <View style={{ backgroundColor: newAdminForm.role === 'super_admin' ? 'rgba(217, 119, 6, 0.1)' : '#ffffff', borderWidth: 1, borderColor: newAdminForm.role === 'super_admin' ? '#fde68a' : '#e2e8f0', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+                  <Text style={{ color: newAdminForm.role === 'super_admin' ? '#b45309' : '#334155', fontWeight: '700', fontSize: 9.5, marginBottom: 3 }}>
+                    Privilege Breakdown: {newAdminForm.role === 'super_admin' ? 'Super Admin Vault Access' : 'Staff Admin Support Access'}
+                  </Text>
+                  <Text style={{ color: newAdminForm.role === 'super_admin' ? '#d97706' : '#64748b', fontSize: 9, lineHeight: 12 }}>
+                    {newAdminForm.role === 'super_admin' 
+                      ? '• Full System Governance • API Vault Secrets • Redzone Panic Switches • Admin Provisioning'
+                      : '• Customer Care & In-App Mail • Manual Wallet Refunds • VTU Diagnostics • KYC Review'}
                   </Text>
                 </View>
 
-                <TouchableOpacity 
-                  onPress={async () => {
-                    const emailToCopy = `${(newAdminForm.usernamePrefix || 'musa').toLowerCase()}@abumafhal.com.ng`;
-                    try {
-                      const { Clipboard } = require('react-native');
-                      Clipboard.setString(emailToCopy);
-                    } catch (e) {}
-                    setCopiedDomainEmail(true);
-                    setTimeout(() => setCopiedDomainEmail(false), 2000);
-                  }}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                >
-                  <Ionicons name={copiedDomainEmail ? "checkmark" : "copy-outline"} size={12} color="#ffffff" />
-                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '600' }}>{copiedDomainEmail ? "Copied" : "Copy"}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Personal Email (Delivery Address) *</Text>
-              <TextInput
-                placeholder="e.g. musa.ibrahim@gmail.com"
-                value={newAdminForm.personalEmail}
-                onChangeText={(t) => setNewAdminForm({ ...newAdminForm, personalEmail: t })}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '500', fontSize: 13, marginBottom: 12, outlineStyle: 'none' as any }}
-              />
-
-              {/* Password Generator & Visibility Toggle */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600' }}>Temporary Initial Password *</Text>
-                <TouchableOpacity onPress={generateRandomAdminPassword}>
-                  <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 11 }}>🎲 Auto-Generate</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 14 }}>
-                <TextInput
-                  placeholder="Password123!"
-                  value={newAdminForm.password}
-                  onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
-                  secureTextEntry={!showAdminPassword}
-                  style={{ flex: 1, paddingVertical: 10, color: '#0f172a', fontWeight: '600', fontSize: 13, outlineStyle: 'none' as any }}
-                />
-                <TouchableOpacity onPress={() => setShowAdminPassword(!showAdminPassword)}>
-                  <Ionicons name={showAdminPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Role Selection Cards */}
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Assigned Governance Privilege</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                <TouchableOpacity
-                  onPress={() => setNewAdminForm({ ...newAdminForm, role: 'admin' })}
-                  style={{ 
-                    flex: 1, 
-                    padding: 12, 
-                    borderRadius: 14, 
-                    borderWidth: 1.5, 
-                    borderColor: newAdminForm.role === 'admin' ? '#0f172a' : '#e2e8f0', 
-                    backgroundColor: newAdminForm.role === 'admin' ? '#0f172a' : '#ffffff' 
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Ionicons name="shield-outline" size={14} color={newAdminForm.role === 'admin' ? '#f5a623' : '#0f172a'} />
-                    <Text style={{ color: newAdminForm.role === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 12 }}>Staff Admin</Text>
+                {/* Department Permission Pills */}
+                <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '600', marginBottom: 4 }}>Department Scope</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {[
+                      { id: 'finance', label: '💰 Finance' },
+                      { id: 'telecom', label: '📱 Telecom' },
+                      { id: 'crypto', label: '🪙 Crypto' },
+                      { id: 'support', label: '🎧 Support' },
+                      { id: 'master', label: '👑 Governance' }
+                    ].map(dept => {
+                      const isDeptSelected = newAdminForm.department === dept.id;
+                      return (
+                        <TouchableOpacity
+                          key={dept.id}
+                          onPress={() => setNewAdminForm({ ...newAdminForm, department: dept.id as any })}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: isDeptSelected ? '#0f172a' : '#ffffff', borderWidth: 1, borderColor: isDeptSelected ? '#f5a623' : '#e2e8f0' }}
+                        >
+                          <Text style={{ color: isDeptSelected ? '#f5a623' : '#475569', fontWeight: '600', fontSize: 10 }}>{dept.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <Text style={{ color: newAdminForm.role === 'admin' ? '#94a3b8' : '#64748b', fontSize: 10, lineHeight: 14 }}>Standard management & user support.</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setNewAdminForm({ ...newAdminForm, role: 'super_admin' })}
-                  style={{ 
-                    flex: 1, 
-                    padding: 12, 
-                    borderRadius: 14, 
-                    borderWidth: 1.5, 
-                    borderColor: newAdminForm.role === 'super_admin' ? '#d97706' : '#e2e8f0', 
-                    backgroundColor: newAdminForm.role === 'super_admin' ? '#fffbeb' : '#ffffff' 
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Ionicons name="ribbon-outline" size={14} color="#d97706" />
-                    <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>Super Admin 👑</Text>
-                  </View>
-                  <Text style={{ color: '#b45309', fontSize: 10, lineHeight: 14 }}>Full governance & API Vault control.</Text>
-                </TouchableOpacity>
+                </ScrollView>
               </View>
 
-              {/* Department Permission Pills */}
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Departmental Permission Scope</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {[
-                    { id: 'finance', label: '💰 Finance & Wallets' },
-                    { id: 'telecom', label: '📱 Telecom & VTU' },
-                    { id: 'crypto', label: '🪙 Crypto & Cards' },
-                    { id: 'support', label: '🎧 Customer Support' },
-                    { id: 'master', label: '👑 Master Governance' }
-                  ].map(dept => {
-                    const isDeptSelected = newAdminForm.department === dept.id;
-                    return (
-                      <TouchableOpacity
-                        key={dept.id}
-                        onPress={() => setNewAdminForm({ ...newAdminForm, department: dept.id as any })}
-                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: isDeptSelected ? '#0f172a' : '#f8fafc', borderWidth: 1, borderColor: isDeptSelected ? '#f5a623' : '#e2e8f0' }}
-                      >
-                        <Text style={{ color: isDeptSelected ? '#f5a623' : '#475569', fontWeight: '600', fontSize: 11 }}>{dept.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-
-              {/* Primary Action Submit Button */}
+              {/* SECTION 5: PRIMARY SUBMIT & DISPATCH CONTROL */}
               <TouchableOpacity
                 onPress={handleCreateAdminSubmit}
                 disabled={creatingAdmin}
-                style={{ backgroundColor: '#0f172a', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 20 }}
+                style={{ backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 10 }}
                 activeOpacity={0.85}
               >
                 {creatingAdmin ? (
                   <ActivityIndicator color="#f5a623" />
                 ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="sparkles-outline" size={16} color="#f5a623" />
-                    <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 13 }}>
-                      {selectedUserId ? 'Provision Admin & Deliver Credentials' : 'Create Admin Account & Dispatch Credentials'}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="sparkles" size={14} color="#f5a623" />
+                    <Text style={{ color: '#f5a623', fontWeight: '700', fontSize: 12 }}>
+                      {selectedUserId ? 'Provision Admin Account & Dispatch Credentials' : 'Create Admin Account & Send Welcome Package'}
                     </Text>
                   </View>
                 )}
