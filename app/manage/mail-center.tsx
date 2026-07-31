@@ -85,6 +85,17 @@ const AI_EMAIL_PRESETS = [
   }
 ];
 
+const formatMailTime = (createdAt?: string) => {
+  if (!createdAt) return '';
+  try {
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '';
+  }
+};
+
 export default function MailCenterScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -156,9 +167,12 @@ export default function MailCenterScreen() {
       const { data, error } = await supabase
         .from('in_app_emails')
         .select('*')
-        .or(`recipient_email.eq.${user.email},sender_email.eq.${user.email},recipient_email.ilike.%@${DOMAIN}%,sender_email.ilike.%@${DOMAIN}%`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
+      if (error) {
+        console.warn("Fetch Mails DB Note:", error.message);
+      }
       if (data) {
         setEmails(data as InAppEmail[]);
       }
@@ -409,9 +423,18 @@ export default function MailCenterScreen() {
     }
   };
 
-  const filteredMails = emails.filter(m => {
-    if (activeTab === 'inbox') return m.recipient_email.toLowerCase() === currentUserEmail.toLowerCase() || m.recipient_email.toLowerCase().includes(`@${DOMAIN}`);
-    if (activeTab === 'sent') return m.sender_email.toLowerCase() === currentUserEmail.toLowerCase() || m.sender_email.toLowerCase().includes(`@${DOMAIN}`);
+  const filteredMails = (emails || []).filter(m => {
+    if (!m) return false;
+    const recipient = (m.recipient_email || '').toLowerCase();
+    const sender = (m.sender_email || '').toLowerCase();
+    const userEm = (currentUserEmail || '').toLowerCase();
+
+    if (activeTab === 'inbox') {
+      return recipient === userEm || recipient.includes(`@${DOMAIN}`) || sender.includes(`@${DOMAIN}`);
+    }
+    if (activeTab === 'sent') {
+      return sender === userEm || sender.includes(`@${DOMAIN}`);
+    }
     return true;
   });
 
@@ -572,7 +595,7 @@ export default function MailCenterScreen() {
                         {activeTab === 'inbox' ? mail.sender_email : `To: ${mail.recipient_email}`}
                       </Text>
                       <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600' }}>
-                        {new Date(mail.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatMailTime(mail?.created_at)}
                       </Text>
                     </View>
                     <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12, marginTop: 2 }} numberOfLines={1}>{mail.subject}</Text>
