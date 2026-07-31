@@ -164,19 +164,51 @@ export default function CommunicationManager() {
             }
 
 
-            // 3. Email Dispatch: Log in in_app_emails table for In-App Mailbox & call Edge Function
+            // 3. Email Dispatch: Log in in_app_emails table for In-App Mailbox, create notifications alert, & call Edge Function
             if (activeTab === 'email') {
                 try {
-                    await supabase.from('in_app_emails').insert({
-                        sender_email: 'admin@abumafhal.com.ng',
-                        sender_name: 'Abu Mafhal Official Support',
-                        recipient_email: recipientInput.includes('@') ? recipientInput : 'user@abumafhal.com.ng',
-                        subject: subject,
-                        body_text: body,
-                        body_html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subject}</h2><p style="font-size: 14px; line-height: 1.6;">${body.replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Official Domain Authority (admin@abumafhal.com.ng)</p></div>`,
-                        is_read: false,
-                        folder: 'inbox'
-                    });
+                    let targetProfiles: { id?: string; email: string }[] = [];
+
+                    if (recipientMode === 'all') {
+                        const { data: users } = await supabase.from('profiles').select('id, email').not('email', 'is', null).limit(500);
+                        if (users) targetProfiles = users.map(u => ({ id: u.id, email: u.email }));
+                    } else if (recipientMode === 'admins') {
+                        const { data: users } = await supabase.from('profiles').select('id, email').in('role', ['admin', 'super_admin']).not('email', 'is', null);
+                        if (users) targetProfiles = users.map(u => ({ id: u.id, email: u.email }));
+                    } else if (recipientInput.includes('@')) {
+                        const { data: user } = await supabase.from('profiles').select('id, email').eq('email', recipientInput.trim()).maybeSingle();
+                        targetProfiles = [{ id: user?.id, email: recipientInput.trim() }];
+                    } else {
+                        targetProfiles = [{ email: 'user@abumafhal.com.ng' }];
+                    }
+
+                    if (targetProfiles.length > 0) {
+                        const mailRows = targetProfiles.map(p => ({
+                            sender_email: 'admin@abumafhal.com.ng',
+                            sender_name: 'Abu Mafhal Official Support',
+                            recipient_email: p.email,
+                            subject: subject,
+                            body_text: body,
+                            body_html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subject}</h2><p style="font-size: 14px; line-height: 1.6;">${body.replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Official Domain Authority (admin@abumafhal.com.ng)</p></div>`,
+                            is_read: false,
+                            folder: 'inbox'
+                        }));
+                        await supabase.from('in_app_emails').insert(mailRows);
+
+                        // Insert into notifications table so all recipients get broadcast alerts
+                        const userIds = targetProfiles.map(p => p.id).filter(Boolean) as string[];
+                        if (userIds.length > 0) {
+                            const notifRows = userIds.map(id => ({
+                                user_id: id,
+                                title: subject || 'Official Email Notice',
+                                body: body,
+                                type: 'email',
+                                data: { priority: isHighPriority ? 'high' : 'normal', route: '/manage/mail-center' },
+                                created_at: new Date().toISOString()
+                            }));
+                            await supabase.from('notifications').insert(notifRows);
+                        }
+                    }
                 } catch (inAppErr) {
                     console.warn("In-app email insert note:", inAppErr);
                 }

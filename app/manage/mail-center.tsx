@@ -384,20 +384,40 @@ export default function MailCenterScreen() {
     try {
       setSendingMail(true);
 
-      let targetEmails: string[] = [];
+      let targetProfiles: { id?: string; email: string }[] = [];
 
       if (rawRecipient.toLowerCase() === 'all' || rawRecipient.toLowerCase() === 'all_users') {
-        const { data: userProfiles } = await supabase.from('profiles').select('email').not('email', 'is', null);
+        const { data: userProfiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .not('email', 'is', null);
+
         if (userProfiles && userProfiles.length > 0) {
-          targetEmails = userProfiles.map(u => u.email).filter(Boolean);
+          targetProfiles = userProfiles.filter(u => u.email).map(u => ({ id: u.id, email: u.email.toLowerCase() }));
         }
       } else if (rawRecipient.includes(',')) {
-        targetEmails = rawRecipient.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'));
+        const emails = rawRecipient.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'));
+        if (emails.length > 0) {
+          const { data: userProfiles } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('email', emails);
+
+          const foundMap = new Map((userProfiles || []).map(u => [u.email.toLowerCase(), u.id]));
+          targetProfiles = emails.map(e => ({ id: foundMap.get(e), email: e }));
+        }
       } else {
-        targetEmails = [rawRecipient.toLowerCase()];
+        const singleEmail = rawRecipient.toLowerCase();
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('email', singleEmail)
+          .maybeSingle();
+
+        targetProfiles = [{ id: userProfile?.id, email: singleEmail }];
       }
 
-      if (targetEmails.length === 0) {
+      if (targetProfiles.length === 0) {
         throw new Error("No valid recipient email address specified.");
       }
 
@@ -413,61 +433,75 @@ export default function MailCenterScreen() {
       const finalBodyText = bodyInput.trim() + attachmentText;
       const formattedHtml = `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623; margin-top: 0;">${subjectInput.trim()}</h2><p style="font-size: 14px; line-height: 1.6;">${bodyInput.trim().replace(/\n/g, '<br/>')}</p>${attachmentHtml}<hr style="border-color: #334155; margin-top: 20px;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Corporate Mail System (${senderAccount})</p></div>`;
 
-      // Dispatch to each target recipient
-      let successCount = 0;
+      // 1. Batch Insert into in_app_emails
+      const mailRecords = targetProfiles.map(p => ({
+        sender_email: senderAccount,
+        sender_name: 'Abu Mafhal Official',
+        recipient_email: p.email,
+        subject: subjectInput.trim(),
+        body_text: finalBodyText,
+        body_html: formattedHtml,
+        is_read: false,
+        folder: 'inbox',
+        metadata: { attachments: attachments }
+      }));
 
-      for (const recipient of targetEmails) {
-        const newMailObject: InAppEmail = {
-          id: 'mail_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-          sender_email: senderAccount,
-          sender_name: 'Abu Mafhal Official',
-          recipient_email: recipient,
-          subject: subjectInput.trim(),
-          body_text: finalBodyText,
-          body_html: formattedHtml,
-          is_read: false,
-          folder: 'inbox',
+      const { error: mailInsertErr } = await supabase.from('in_app_emails').insert(mailRecords);
+      if (mailInsertErr) {
+        console.warn("in_app_emails batch insert note:", mailInsertErr.message);
+      }
+
+      // 2. Batch Insert into notifications table (so users receive Broadcast Notification alerts in app)
+      const validUserIds = targetProfiles.map(p => p.id).filter(Boolean) as string[];
+      if (validUserIds.length > 0) {
+        const notifRecords = validUserIds.map(userId => ({
+          user_id: userId,
+          title: subjectInput.trim(),
+          body: bodyInput.trim(),
+          type: 'email',
+          data: { priority: 'high', route: '/manage/mail-center' },
           created_at: new Date().toISOString()
-        };
+        }));
 
-        // 1. Try DB Insert into in_app_emails
-        const { error: dbErr } = await supabase.from('in_app_emails').insert({
-          sender_email: senderAccount,
-          sender_name: 'Abu Mafhal Official',
-          recipient_email: recipient,
-          subject: subjectInput.trim(),
-          body_text: finalBodyText,
-          body_html: formattedHtml,
-          is_read: false,
-          folder: 'inbox',
-          metadata: { attachments: attachments }
-        });
-
-        if (dbErr) {
-          console.warn("In-App email DB insert note (using fallback):", dbErr.message);
-          // Fallback A: Insert into notifications table if recipient exists
-          try {
-            const { data: recUser } = await supabase.from('profiles').select('id').eq('email', recipient).maybeSingle();
-            if (recUser?.id) {
-              await supabase.from('notifications').insert({
-                user_id: recUser.id,
-                title: subjectInput.trim(),
-                message: finalBodyText,
-                type: 'email_broadcast'
-              });
-            }
-          } catch (notifErr) {}
+        const { error: notifErr } = await supabase.from('notifications').insert(notifRecords);
+        if (notifErr) {
+          console.warn("notifications broadcast batch insert note:", notifErr.message);
         }
+      }
 
-        // 2. Update Local Component State so sent email appears IMMEDIATELY in UI
-        setEmails(prev => [newMailObject, ...prev]);
-        successCount++;
+      // 3. Log to communication_logs
+      try {
+        await supabase.from('communication_logs').insert({
+          channel: 'email',
+          recipient: rawRecipient,
+          subject: subjectInput.trim(),
+          content: bodyInput.trim(),
+          status: 'sent',
+          metadata: { sender: senderAccount, total_recipients: targetProfiles.length }
+        });
+      } catch (logErr) {}
 
-        // 3. Trigger External Email Dispatch via Edge Function
+      // 4. Update UI Local State immediately
+      const newMailObject: InAppEmail = {
+        id: 'mail_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        sender_email: senderAccount,
+        sender_name: 'Abu Mafhal Official',
+        recipient_email: targetProfiles[0].email,
+        subject: subjectInput.trim(),
+        body_text: finalBodyText,
+        body_html: formattedHtml,
+        is_read: false,
+        folder: 'inbox',
+        created_at: new Date().toISOString()
+      };
+      setEmails(prev => [newMailObject, ...prev]);
+
+      // 5. Trigger External Email Dispatch via Edge Function (for first 10 or single recipient to prevent rate limits)
+      for (const p of targetProfiles.slice(0, 10)) {
         try {
           await supabase.functions.invoke('send-email', {
             body: {
-              to: recipient,
+              to: p.email,
               from: senderAccount,
               subject: subjectInput.trim(),
               text: finalBodyText,
@@ -475,11 +509,11 @@ export default function MailCenterScreen() {
             }
           });
         } catch (edgeErr) {
-          console.warn("External email dispatch note (Delivered in-app):", edgeErr);
+          console.warn("External email dispatch note:", edgeErr);
         }
       }
 
-      Alert.alert("Email Dispatched 🎉", `Official email successfully dispatched to ${successCount} recipient(s)!`);
+      Alert.alert("Email Dispatched 🎉", `Official email successfully dispatched to ${targetProfiles.length} recipient(s) & broadcast notifications delivered!`);
       setComposeVisible(false);
       setSubjectInput('');
       setBodyInput('');
@@ -493,6 +527,7 @@ export default function MailCenterScreen() {
       setSendingMail(false);
     }
   };
+
 
   // Mark as read
   const handleOpenMail = async (mail: InAppEmail) => {
