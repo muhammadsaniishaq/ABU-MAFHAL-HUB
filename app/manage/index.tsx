@@ -24,8 +24,9 @@ const T = {
 // MODULE CONFIGURATION
 const modules = {
     operations: [
-        { title: 'Users', icon: 'people-outline', route: '/manage/users', color: '#3B82F6' },
-        { title: 'Transactions', icon: 'receipt-outline', route: '/manage/transactions', color: '#10B981' },
+        { title: 'Users Control', icon: 'people-outline', route: '/manage/users', color: '#3B82F6' },
+        { title: 'Mail Center', icon: 'mail-unread-outline', route: '/manage/mail-center', color: '#F59E0B' },
+        { title: 'KYC Requests', icon: 'id-card-outline', route: '/manage/kyc', color: '#10B981', badge: 0 },
         { title: 'KYC Queue', icon: 'scan-outline', route: '/manage/kyc', color: '#8B5CF6', badge: 0 },
         { title: 'NIN Pricing', icon: 'pricetag-outline', route: '/manage/nin-pricing', color: '#059669' },
         { title: 'SMM Pricing', icon: 'thumbs-up-outline', route: '/manage/smm-pricing', color: '#8B5CF6' },

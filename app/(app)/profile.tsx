@@ -562,6 +562,22 @@ export default function ProfileScreen() {
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
 
+                            {/* Mail Inbox */}
+                            <TouchableOpacity 
+                                onPress={() => router.push('/manage/mail-center')} 
+                                activeOpacity={0.6}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
+                            >
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(245, 166, 35, 0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="mail" size={14} color="#d97706" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Official Mail Inbox 📧</Text>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Read official emails & support correspondence</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
+                            </TouchableOpacity>
+
                             {/* Bank Accounts */}
                             <TouchableOpacity 
                                 onPress={() => router.push('/beneficiaries')} 

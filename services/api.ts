@@ -843,6 +843,36 @@ export const api = {
         }
     },
 
+    // --- OFFICIAL COMMUNICATIONS & DOMAIN EMAIL ---
+    communications: {
+        sendOfficialEmail: async (params: { to: string; from?: string; subject: string; text: string; html?: string }) => {
+            const { to, from = 'admin@abumafhal.com.ng', subject, text, html } = params;
+
+            // 1. Insert into in_app_emails database table immediately
+            const { data: mailRecord, error: dbError } = await supabase.from('in_app_emails').insert({
+                sender_email: from,
+                sender_name: 'Abu Mafhal Official',
+                recipient_email: to.trim().toLowerCase(),
+                subject: subject.trim(),
+                body_text: text.trim(),
+                body_html: html || `<p>${text}</p>`,
+                is_read: false,
+                folder: 'inbox'
+            }).select().single();
+
+            // 2. Invoke send-email Edge Function
+            try {
+                await supabase.functions.invoke('send-email', {
+                    body: { to, from, subject, text, html }
+                });
+            } catch (edgeErr) {
+                console.warn("[sendOfficialEmail] Edge function dispatch note:", edgeErr);
+            }
+
+            return { success: true, mailRecord };
+        }
+    },
+
     // Mock response for legacy components
     mock: (data: any, delay = 1000) => new Promise(resolve => setTimeout(() => resolve(data), delay)),
 };

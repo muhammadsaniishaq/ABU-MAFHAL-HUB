@@ -164,8 +164,24 @@ export default function CommunicationManager() {
             }
 
 
-            // 3. Fallback/Secondary: Edge Function Call (Good for Emails/SMS/Remote Push)
-            // We still call this because it handles Email/SMS sending via 3rd party APIs
+            // 3. Email Dispatch: Log in in_app_emails table for In-App Mailbox & call Edge Function
+            if (activeTab === 'email') {
+                try {
+                    await supabase.from('in_app_emails').insert({
+                        sender_email: 'admin@abumafhal.com.ng',
+                        sender_name: 'Abu Mafhal Official Support',
+                        recipient_email: recipientInput.includes('@') ? recipientInput : 'user@abumafhal.com.ng',
+                        subject: subject,
+                        body_text: body,
+                        body_html: `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623;">${subject}</h2><p style="font-size: 14px; line-height: 1.6;">${body.replace(/\n/g, '<br/>')}</p><hr style="border-color: #334155;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Official Domain Authority (admin@abumafhal.com.ng)</p></div>`,
+                        is_read: false,
+                        folder: 'inbox'
+                    });
+                } catch (inAppErr) {
+                    console.warn("In-app email insert note:", inAppErr);
+                }
+            }
+
             if (activeTab !== 'push' || isScheduled) { // Skip for immediate push since we did it above
                 const { data, error } = await supabase.functions.invoke('send-communication', {
                     body: payload

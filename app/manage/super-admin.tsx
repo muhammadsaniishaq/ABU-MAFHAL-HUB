@@ -628,6 +628,18 @@ export default function SuperAdminMasterHubScreen() {
                 <Text style={s.redCardTitle}>API VAULT</Text>
                 <Text style={s.redCardSub}>API Keys & Credentials</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push('/manage/mail-center')}
+                style={[s.redCard, { borderColor: '#fde68a' }]}
+                activeOpacity={0.8}
+              >
+                <View style={[s.redIconCircle, { backgroundColor: '#fffbeb' }]}>
+                  <Ionicons name="mail-unread-outline" size={20} color={C.gold} />
+                </View>
+                <Text style={s.redCardTitle}>CORPORATE MAIL</Text>
+                <Text style={s.redCardSub}>@abumafhal.com.ng Hub</Text>
+              </TouchableOpacity>
             </View>
           </>
         )}
