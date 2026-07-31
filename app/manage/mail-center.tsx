@@ -16,6 +16,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { AIService } from '../../services/ai';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -340,23 +341,34 @@ export default function MailCenterScreen() {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  // AI Generator Handler
-  const handleGenerateAiEmail = (preset?: typeof AI_EMAIL_PRESETS[0]) => {
-    setAiGenerating(true);
-    setTimeout(() => {
-      if (preset) {
-        setSubjectInput(preset.subject);
-        setBodyInput(`Dear Valued Customer,\n\nWe hope this email finds you well.\n\n${preset.prompt}\n\nKey Highlights:\n• Instant 24/7 Automated Delivery\n• Zero Commission & Transparent Fees\n• Verified Bank Grade Security\n\nIf you have any questions or require assistance, our 24/7 support team is always available to assist you.\n\nWarm regards,\nAbu Mafhal Official Support Team\nhttps://abumafhal.com.ng`);
-      } else if (aiCustomPrompt.trim()) {
-        const topic = aiCustomPrompt.trim();
-        setSubjectInput(`Important Notice: ${topic}`);
-        setBodyInput(`Dear Valued Customer,\n\n${topic}\n\nWe appreciate your continued trust in Abu Mafhal Sub. Please let us know if you require any further clarification or support.\n\nSincerely,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`);
+  // AI Generator Handler (OpenAI Neural API + Bilingual Engine)
+  const handleGenerateAiEmail = async (preset?: typeof AI_EMAIL_PRESETS[0]) => {
+    try {
+      setAiGenerating(true);
+      const promptToUse = preset ? preset.prompt : aiCustomPrompt.trim();
+      const presetTitle = preset ? preset.title : undefined;
+
+      if (!promptToUse) {
+        setAiGenerating(false);
+        return Alert.alert("Instruction Required", "Please select an AI topic preset or type your custom instruction in Hausa/English.");
       }
+
+      const generated = await AIService.generateEmail(promptToUse, presetTitle);
+
+      if (generated?.subject && generated?.body) {
+        setSubjectInput(generated.subject);
+        setBodyInput(generated.body);
+        setAiModalVisible(false);
+        setAiCustomPrompt('');
+        Alert.alert("AI Draft Formatted ✨", "Cortex AI has written a professional corporate email based on your instruction!");
+      } else {
+        Alert.alert("Generation Note", "AI engine could not format the output. Please try again.");
+      }
+    } catch (err: any) {
+      Alert.alert("AI Engine Error", err.message || "Failed to generate email content");
+    } finally {
       setAiGenerating(false);
-      setAiModalVisible(false);
-      setAiCustomPrompt('');
-      Alert.alert("AI Draft Generated ✨", "Your email subject and message body have been formatted professionally!");
-    }, 500);
+    }
   };
 
   // 2. Send Official Mail
