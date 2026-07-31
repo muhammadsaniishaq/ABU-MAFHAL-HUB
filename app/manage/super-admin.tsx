@@ -1347,6 +1347,8 @@ const s = StyleSheet.create({
     color: C.textMain,
     borderWidth: 1,
     borderColor: C.cardBorder,
+    outlineStyle: 'none' as any,
+    overflow: 'hidden',
   },
   sendBtn: {
     backgroundColor: C.navy,

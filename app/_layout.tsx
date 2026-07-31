@@ -33,6 +33,28 @@ import { Session } from '@supabase/supabase-js';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import '../global.css';
 
+// Suppress browser focus outlines globally across web app
+if (typeof document !== 'undefined') {
+  try {
+    const styleId = 'global-outline-suppress';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        input, textarea, select, button, [contenteditable="true"] {
+          outline: none !important;
+          box-shadow: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+        *:focus {
+          outline: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  } catch (e) {}
+}
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
 
