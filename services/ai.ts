@@ -3,7 +3,11 @@ import { supabase } from './supabase';
 // Fallback Hausa & Typos Bilingual Neural Generator Engine
 function fallbackBilingualEmailGenerator(prompt: string, presetTitle?: string): { subject: string; body: string } {
   const p = prompt.toLowerCase();
-  const isHausa = p.includes('maraba') || p.includes('sakon') || p.includes('sanarwa') || p.includes('godiya') || p.includes('gyara') || p.includes('gaiya') || p.includes('yanzu') || p.includes('abokan') || p.includes('kuka') || p.includes('tura') || p.includes('tambaya') || p.includes('kudi') || p.includes('saura');
+  
+  // Check if prompt explicitly requests English (e.g., "turanci", "english", "sauya zuwa turanci", "a turanci")
+  const wantsEnglish = p.includes('turanci') || p.includes('english') || p.includes('to english') || p.includes('in english') || p.includes('sauya zuwa turanci') || p.includes('a turanci') || p.includes('fara a turanci');
+
+  const isHausa = !wantsEnglish && (p.includes('maraba') || p.includes('sakon') || p.includes('sanarwa') || p.includes('godiya') || p.includes('gyara') || p.includes('gaiya') || p.includes('yanzu') || p.includes('abokan') || p.includes('kuka') || p.includes('tura') || p.includes('tambaya') || p.includes('kudi') || p.includes('saura') || p.includes('hausa'));
 
   let subject = isHausa ? "Sanarwa ta Hukuma daga Abu Mafhal Sub" : "Official Notice from Abu Mafhal Governance";
   let body = "";
@@ -49,14 +53,19 @@ function fallbackBilingualEmailGenerator(prompt: string, presetTitle?: string): 
       body = `Dear Valued Customer,\n\nGreat news! We have activated an exclusive cashback bonus offer for all your VTU data and airtime purchases this week.\n\nOffer Highlights:\n• Instant cashback credited directly to your main wallet.\n• Available on all networks (MTN, Airtel, Glo, 9mobile).\n\nWarm regards,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`;
     }
   } else {
-    // Clean custom notice generator without quoting the raw user prompt text
-    const cleanPrompt = prompt.trim();
-    if (isHausa) {
-      subject = presetTitle ? `${presetTitle}` : "Sanarwa ta Hukuma daga Abu Mafhal Sub";
-      body = `Zuwa Ga Abokan Cinikinmu Masu Daraja,\n\nMuna aiko muku da wannan sanarwa mai mahimmanci dangane da tsarin gudanarwa na Abu Mafhal Sub.\n\nBayanai:\n${cleanPrompt}\n\nIdan kuna da wata tambaya ko buqatar karin bayani, zaku iya tuntubar sashenmu na taimako a kowane lokaci a cikin manhajar.\n\nBabbaba da aminci,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`;
+    // Clean custom notice generator without quoting raw prompt text
+    let cleanText = prompt
+      .replace(/sauya\s+wannan\s+sako\s+zuwa\s+turanci:?/gi, '')
+      .replace(/rubuta\s+(a\s+)?turanci:?/gi, '')
+      .replace(/translate\s+(this\s+)?(message\s+)?to\s+english:?/gi, '')
+      .trim();
+
+    if (wantsEnglish || !isHausa) {
+      subject = presetTitle ? `${presetTitle}` : "Official Governance Notice - Abu Mafhal Sub";
+      body = `Dear Valued Customer,\n\nWe are writing to communicate an official governance notice regarding your Abu Mafhal Sub account and services.\n\nNotice Details:\n${cleanText || 'Please review the updated service guidelines in your mobile app.'}\n\nIf you have any questions or require immediate support, our 24/7 Customer Care team is standing by to assist you.\n\nWarm regards,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`;
     } else {
-      subject = presetTitle ? `${presetTitle}` : "Official Governance Announcement - Abu Mafhal Sub";
-      body = `Dear Valued Customer,\n\nWe are writing to communicate an official governance notice regarding Abu Mafhal Sub services.\n\nNotice Details:\n${cleanPrompt}\n\nIf you have any questions or require immediate assistance, please reach out to our 24/7 Customer Care team within the app.\n\nWarm regards,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`;
+      subject = presetTitle ? `${presetTitle}` : "Sanarwa ta Hukuma daga Abu Mafhal Sub";
+      body = `Zuwa Ga Abokan Cinikinmu Masu Daraja,\n\nMuna aiko muku da wannan sanarwa mai mahimmanci dangane da tsarin gudanarwa na Abu Mafhal Sub.\n\nBayanai:\n${cleanText || 'Muna rokonku da ku duba sababbin sharauda a cikin manhaja.'}\n\nIdan kuna da wata tambaya ko buqatar karin bayani, zaku iya tuntubar sashenmu na taimako a kowane lokaci a cikin manhajar.\n\nBabbaba da aminci,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng`;
     }
   }
 
@@ -148,10 +157,13 @@ export const AIService = {
 
       const systemPrompt = `You are Cortex AI Executive Email Specialist for Abu Mafhal Sub (Digital VTU, Virtual Cards & Crypto Platform).
 Your Job:
-1. Understand the user's input/instruction completely, whether written in Hausa, English, or Pidgin.
-2. If the user input is in Hausa or explicitly asks for Hausa, draft a pristine, elegant corporate email in Hausa. Otherwise, write it in clear, executive English.
-3. CRITICAL REQUIREMENT: Do NOT echo, quote, or include phrases like "User instruction:", "Our system processed your request regarding:", or repeat the raw prompt text inside the email. Craft a standalone, beautifully structured complete email with:
-   - Greeting (e.g., "Dear Valued Customer," or "Zuwa Ga Abokan Cinikinmu Masu Daraja,")
+1. Understand the user's instruction/prompt completely, whether written in Hausa, English, or Pidgin.
+2. CRITICAL LANGUAGE RULE:
+   - If the user instruction is written in Hausa BUT asks to translate, convert, or write the email in English (e.g., mentions "turanci", "english", "sauya zuwa turanci", "a turanci"), YOU MUST DRAFT THE ENTIRE EMAIL (SUBJECT & BODY) IN PRISTINE, EXECUTIVE ENGLISH!
+   - If the instruction explicitly asks for Hausa (mentions "hausa", "a hausa"), draft the email in Hausa.
+   - If no specific language target is mentioned in a Hausa prompt, default to writing a high-quality executive English corporate email.
+3. CRITICAL REQUIREMENT: Do NOT echo, quote, or include phrases like "User instruction:", "Instruction:", "Sauya wannan sako...", or repeat raw instruction text inside the output. Craft a standalone, beautifully structured complete email with:
+   - Greeting (e.g., "Dear Valued Customer,")
    - Clear, highly accurate introduction and main message expanding on the instruction
    - Bullet points or action steps if relevant
    - Formal sign-off ("Warm regards,\nAbu Mafhal Official Governance\nhttps://abumafhal.com.ng")

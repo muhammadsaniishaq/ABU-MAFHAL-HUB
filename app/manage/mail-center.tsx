@@ -496,10 +496,10 @@ export default function MailCenterScreen() {
       };
       setEmails(prev => [newMailObject, ...prev]);
 
-      // 5. Trigger External Email Dispatch via Edge Function (for first 10 or single recipient to prevent rate limits)
+      // 5. Trigger External Email Dispatch via Edge Function & Direct Resend API Fallback
       for (const p of targetProfiles.slice(0, 10)) {
         try {
-          await supabase.functions.invoke('send-email', {
+          const { error: invokeErr } = await supabase.functions.invoke('send-email', {
             body: {
               to: p.email,
               from: senderAccount,
@@ -508,6 +508,32 @@ export default function MailCenterScreen() {
               html: formattedHtml
             }
           });
+
+          if (invokeErr) {
+            console.warn("Edge Function note, checking direct Resend API fallback...", invokeErr.message);
+            const { data: resendSecret } = await supabase
+              .from('system_secrets')
+              .select('value')
+              .eq('key', 'RESEND_API_KEY')
+              .maybeSingle();
+
+            if (resendSecret?.value) {
+              await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${resendSecret.value.trim()}`
+                },
+                body: JSON.stringify({
+                  from: 'Abu Mafhal Sub <onboarding@resend.dev>',
+                  to: [p.email],
+                  subject: subjectInput.trim(),
+                  text: finalBodyText,
+                  html: formattedHtml
+                })
+              });
+            }
+          }
         } catch (edgeErr) {
           console.warn("External email dispatch note:", edgeErr);
         }
