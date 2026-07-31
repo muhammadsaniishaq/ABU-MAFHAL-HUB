@@ -415,7 +415,7 @@ export default function SuperAdminMasterHubScreen() {
       Alert.alert('Admin Configured 🎉', `Account for ${fullName.trim()} activated successfully!\n\nOfficial Email: ${corporateEmail}\nWelcome credentials dispatched to in-app mailbox & email.`);
       setCreateAdminVisible(false);
       setSelectedUserId(null);
-      setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin' });
+      setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true });
       loadMasterHubData();
     } catch (e: any) {
       Alert.alert('Configuration Failed', e.message || 'Could not configure admin account');
