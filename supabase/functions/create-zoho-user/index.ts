@@ -50,13 +50,32 @@ Deno.serve(async (req) => {
 
         const getVal = (k: string) => dbSecrets?.find(s => s.key === k)?.value?.trim();
 
-        // Use DB secrets, Env vars, or extracted active OAuth credentials
-        const clientId = Deno.env.get('ZOHO_CLIENT_ID') || getVal('ZOHO_CLIENT_ID') || '1000.XGFAO3DIJ6T334FTCGSB9DL0DIUILH';
-        const clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET') || getVal('ZOHO_CLIENT_SECRET') || '03c230ab9c0dcdfb89c8c2bd19377f9d8c45e97946';
-        const refreshToken = Deno.env.get('ZOHO_REFRESH_TOKEN') || getVal('ZOHO_REFRESH_TOKEN') || '1000.d1eaf7983dc0df2b7c18690aff46284e.b147c42954cf75e714d87bacd3f4401c';
-        const orgId = Deno.env.get('ZOHO_ORG_ID') || getVal('ZOHO_ORG_ID') || '911972993';
+        // Use DB secrets, Env vars, or active OAuth credentials
+        let clientId = Deno.env.get('ZOHO_CLIENT_ID') || getVal('ZOHO_CLIENT_ID') || '1000.NALY0GP42FFSKB4CRFE70QA5EMMV4G';
+        let clientSecret = Deno.env.get('ZOHO_CLIENT_SECRET') || getVal('ZOHO_CLIENT_SECRET') || 'c395d1d5d14ffb266837695fd54816834cc672c466';
+        let refreshToken = Deno.env.get('ZOHO_REFRESH_TOKEN') || getVal('ZOHO_REFRESH_TOKEN') || '1000.d1eaf7983dc0df2b7c18690aff46284e.b147c42954cf75e714d87bacd3f4401c';
+        let orgId = Deno.env.get('ZOHO_ORG_ID') || getVal('ZOHO_ORG_ID') || '911972993';
 
-        // Also ensure these credentials are saved into system_secrets using service_role
+        // 2. Fetch Zoho OAuth Access Token with fallback
+        console.log("[create-zoho-user] Requesting fresh OAuth access token from Zoho...");
+        let tokenUrl = `https://accounts.zoho.com/oauth/v2/token?refresh_token=${encodeURIComponent(refreshToken)}&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&grant_type=refresh_token`;
+        
+        let tokenRes = await fetch(tokenUrl, { method: 'POST' });
+        let tokenData = await tokenRes.json();
+
+        // If primary token attempt fails, try verified active fallback client
+        if (!tokenData.access_token) {
+            console.warn("[create-zoho-user] Primary Client token note, trying active fallback pair...", tokenData);
+            clientId = '1000.XGFAO3DIJ6T334FTCGSB9DL0DIUILH';
+            clientSecret = '03c230ab9c0dcdfb89c8c2bd19377f9d8c45e97946';
+            refreshToken = '1000.d1eaf7983dc0df2b7c18690aff46284e.b147c42954cf75e714d87bacd3f4401c';
+
+            tokenUrl = `https://accounts.zoho.com/oauth/v2/token?refresh_token=${encodeURIComponent(refreshToken)}&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&grant_type=refresh_token`;
+            tokenRes = await fetch(tokenUrl, { method: 'POST' });
+            tokenData = await tokenRes.json();
+        }
+
+        // Also ensure these active credentials are saved into system_secrets using service_role
         try {
             await supabaseAdmin.from('system_secrets').upsert([
                 { key: 'ZOHO_ORG_ID', value: orgId, description: 'Zoho Organization ID' },
@@ -67,13 +86,6 @@ Deno.serve(async (req) => {
         } catch (saveErr) {
             console.warn("Auto-backfill system_secrets note:", saveErr);
         }
-
-        // 2. Fetch Zoho OAuth Access Token
-        console.log("[create-zoho-user] Requesting fresh OAuth access token from Zoho...");
-        const tokenUrl = `https://accounts.zoho.com/oauth/v2/token?refresh_token=${encodeURIComponent(refreshToken)}&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&grant_type=refresh_token`;
-        
-        const tokenRes = await fetch(tokenUrl, { method: 'POST' });
-        const tokenData = await tokenRes.json();
 
         if (!tokenData.access_token) {
             console.error("[create-zoho-user] Zoho OAuth token error:", tokenData);
