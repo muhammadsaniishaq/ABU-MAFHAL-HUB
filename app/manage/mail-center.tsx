@@ -290,9 +290,9 @@ export default function MailCenterScreen() {
         role: adminRole
       });
 
-      if (corpErr && corpErr.message.includes('already exists')) {
+      if (corpErr) {
         setCreatingAdminMail(false);
-        return Alert.alert('Already Exists ⚠️', `Corporate email ${fullCorporateEmail} already exists.`);
+        return Alert.alert('Creation Error ⚠️', corpErr.message || `Corporate email ${fullCorporateEmail} already exists or could not be created.`);
       }
 
       // DIRECT PROVISIONING TO ZOHO ORGANIZATION MAIL API

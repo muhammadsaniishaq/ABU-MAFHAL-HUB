@@ -420,9 +420,9 @@ export default function SuperAdminMasterHubScreen() {
         role: role
       });
 
-      if (insertCorpErr && insertCorpErr.message.includes('already exists')) {
+      if (insertCorpErr) {
         setCreatingAdmin(false);
-        return Alert.alert('Already Exists ⚠️', `Corporate email ${corporateEmail} already exists.`);
+        return Alert.alert('Creation Error ⚠️', insertCorpErr.message || `Corporate email ${corporateEmail} already exists or could not be saved.`);
       }
 
       // DIRECT PROVISIONING TO ZOHO ORGANIZATION MAIL API
