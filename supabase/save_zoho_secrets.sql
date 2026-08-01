@@ -1,4 +1,5 @@
 -- 1. Ensure RLS allows authenticated users / admins to manage system_secrets
+DROP POLICY IF EXISTS "Allow authenticated admins system_secrets" ON public.system_secrets;
 CREATE POLICY "Allow authenticated admins system_secrets" 
 ON public.system_secrets FOR ALL 
 USING (true);
