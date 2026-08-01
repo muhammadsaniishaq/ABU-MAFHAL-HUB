@@ -354,9 +354,32 @@ export default function SuperAdminMasterHubScreen() {
     try {
       setCreatingAdmin(true);
 
-      let targetUserId = selectedUserId;
+      // 1. STRICT DUPLICATE CHECK: Check if corporate email or username handle already exists in DB
+      const { data: existingCorp } = await supabase
+        .from('corporate_admin_emails')
+        .select('id, username, email')
+        .or(`username.eq.${cleanPrefix},email.eq.${corporateEmail}`)
+        .maybeSingle();
 
+      if (existingCorp) {
+        setCreatingAdmin(false);
+        return Alert.alert('Already Exists ⚠️', `The corporate email '${corporateEmail}' is already assigned to a staff member. Please specify a unique email prefix.`);
+      }
+
+      // 2. CHECK IF USER ALREADY HAS A CORPORATE EMAIL
+      let targetUserId = selectedUserId;
       if (targetUserId) {
+        const { data: existingUserCorp } = await supabase
+          .from('corporate_admin_emails')
+          .select('email')
+          .eq('user_id', targetUserId)
+          .maybeSingle();
+
+        if (existingUserCorp) {
+          setCreatingAdmin(false);
+          return Alert.alert('Corporate Email Active ℹ️', `This staff member already has an active corporate email: ${existingUserCorp.email}`);
+        }
+
         // Mode A: Existing User Selected -> Upgrade Role to Admin/Super Admin
         await supabase.from('profiles').update({
           role: role,
@@ -389,13 +412,18 @@ export default function SuperAdminMasterHubScreen() {
       }
 
       // Register Corporate Email
-      await supabase.from('corporate_admin_emails').insert({
-        user_id: targetUserId,
+      const { error: insertCorpErr } = await supabase.from('corporate_admin_emails').insert({
+        user_id: targetUserId || null,
         username: cleanPrefix,
         email: corporateEmail,
         display_name: fullName.trim(),
         role: role
       });
+
+      if (insertCorpErr && insertCorpErr.message.includes('already exists')) {
+        setCreatingAdmin(false);
+        return Alert.alert('Already Exists ⚠️', `Corporate email ${corporateEmail} already exists.`);
+      }
 
       // AUTOMATIC WELCOME & LOGIN DETAILS EMAIL DISPATCH
       const emailSubject = `👑 Welcome to Abu Mafhal Admin Portal - Your Login Details`;
@@ -420,15 +448,41 @@ export default function SuperAdminMasterHubScreen() {
         });
 
         try {
-          await supabase.functions.invoke('send-email', {
+          const { error: edgeErr } = await supabase.functions.invoke('send-email', {
             body: { to: recipient, from: 'authority@abumafhal.com.ng', subject: emailSubject, text: emailText, html: emailHtml }
           });
+
+          if (edgeErr) {
+            const { data: resendSecret } = await supabase
+              .from('system_secrets')
+              .select('value')
+              .eq('key', 'RESEND_API_KEY')
+              .maybeSingle();
+
+            if (resendSecret?.value) {
+              await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${resendSecret.value.trim()}`
+                },
+                body: JSON.stringify({
+                  from: 'Abu Mafhal Sub <onboarding@resend.dev>',
+                  reply_to: 'authority@abumafhal.com.ng',
+                  to: [recipient],
+                  subject: emailSubject,
+                  text: emailText,
+                  html: emailHtml
+                })
+              });
+            }
+          }
         } catch (edgeErr) {
           console.warn("External email dispatch note:", edgeErr);
         }
       }
 
-      Alert.alert('Admin Configured 🎉', `Account for ${fullName.trim()} activated successfully!\n\nOfficial Email: ${corporateEmail}\nWelcome credentials dispatched to in-app mailbox & email.`);
+      Alert.alert('Admin Configured 🎉', `Account for ${fullName.trim()} activated successfully!\n\nOfficial Email: ${corporateEmail}\nWelcome credentials dispatched to in-app mailbox & external email.`);
       setCreateAdminVisible(false);
       setSelectedUserId(null);
       setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true });

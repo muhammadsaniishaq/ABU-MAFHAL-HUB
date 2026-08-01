@@ -215,7 +215,6 @@ export default function MailCenterScreen() {
     setRefreshing(false);
   };
 
-  // 1. Create Corporate Admin Mail (@abumafhal.com.ng)
   const handleCreateCorporateEmail = async () => {
     const cleanUsername = adminUsername.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
     if (!cleanUsername) {
@@ -230,8 +229,20 @@ export default function MailCenterScreen() {
     try {
       setCreatingAdminMail(true);
 
+      // Check if corporate email handle already exists in DB
+      const { data: existingCorp } = await supabase
+        .from('corporate_admin_emails')
+        .select('id, username, email')
+        .or(`username.eq.${cleanUsername},email.eq.${fullCorporateEmail}`)
+        .maybeSingle();
+
+      if (existingCorp) {
+        setCreatingAdminMail(false);
+        return Alert.alert('Already Exists ⚠️', `The corporate email handle '${fullCorporateEmail}' already exists! Please choose a different handle.`);
+      }
+
       // A. Create User in Auth & Profiles (or link existing)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData } = await supabase.auth.signUp({
         email: fullCorporateEmail,
         password: adminPassword,
         options: {
@@ -264,8 +275,9 @@ export default function MailCenterScreen() {
         role: adminRole
       });
 
-      if (corpErr && !corpErr.message.includes('already exists')) {
-        console.warn("Corporate table insert note:", corpErr.message);
+      if (corpErr && corpErr.message.includes('already exists')) {
+        setCreatingAdminMail(false);
+        return Alert.alert('Already Exists ⚠️', `Corporate email ${fullCorporateEmail} already exists.`);
       }
 
       // D. Send Welcome Email in-app
@@ -444,8 +456,8 @@ export default function MailCenterScreen() {
       const finalBodyText = bodyInput.trim() + attachmentText;
       const formattedHtml = `<div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #ffffff; border-radius: 12px;"><h2 style="color: #f5a623; margin-top: 0;">${subjectInput.trim()}</h2><p style="font-size: 14px; line-height: 1.6;">${bodyInput.trim().replace(/\n/g, '<br/>')}</p>${attachmentHtml}<hr style="border-color: #334155; margin-top: 20px;"/><p style="font-size: 11px; color: #94a3b8;">Sent via Abu Mafhal Corporate Mail System (${senderAccount})</p></div>`;
 
-      // 1. Batch Insert into in_app_emails
-      const mailRecords = targetProfiles.map(p => ({
+      // 1. Batch Insert into in_app_emails for Inbox & Sent Items
+      const inboxRecords = targetProfiles.map(p => ({
         sender_email: senderAccount,
         sender_name: 'Abu Mafhal Official',
         recipient_email: p.email,
@@ -457,10 +469,19 @@ export default function MailCenterScreen() {
         metadata: { attachments: attachments }
       }));
 
-      const { error: mailInsertErr } = await supabase.from('in_app_emails').insert(mailRecords);
-      if (mailInsertErr) {
-        console.warn("in_app_emails batch insert note:", mailInsertErr.message);
-      }
+      const sentRecord = {
+        sender_email: senderAccount,
+        sender_name: 'Abu Mafhal Official',
+        recipient_email: targetProfiles.map(p => p.email).join(', '),
+        subject: subjectInput.trim(),
+        body_text: finalBodyText,
+        body_html: formattedHtml,
+        is_read: true,
+        folder: 'sent',
+        metadata: { attachments: attachments }
+      };
+
+      await supabase.from('in_app_emails').insert([...inboxRecords, sentRecord]);
 
       // 2. Batch Insert into notifications table (so users receive Broadcast Notification alerts in app)
       const validUserIds = targetProfiles.map(p => p.id).filter(Boolean) as string[];
@@ -501,8 +522,8 @@ export default function MailCenterScreen() {
         subject: subjectInput.trim(),
         body_text: finalBodyText,
         body_html: formattedHtml,
-        is_read: false,
-        folder: 'inbox',
+        is_read: true,
+        folder: 'sent',
         created_at: new Date().toISOString()
       };
       setEmails(prev => [newMailObject, ...prev]);
@@ -537,6 +558,7 @@ export default function MailCenterScreen() {
                 },
                 body: JSON.stringify({
                   from: 'Abu Mafhal Sub <onboarding@resend.dev>',
+                  reply_to: senderAccount,
                   to: [p.email],
                   subject: subjectInput.trim(),
                   text: finalBodyText,
@@ -581,11 +603,15 @@ export default function MailCenterScreen() {
     const sender = (m.sender_email || '').toLowerCase();
     const userEm = (currentUserEmail || '').toLowerCase();
 
+    const activeCorpEmails = corporateAccounts.map(c => c.email.toLowerCase());
+    const isRecipientForMe = recipient === userEm || activeCorpEmails.includes(recipient);
+    const isSenderFromMe = sender === userEm || activeCorpEmails.includes(sender);
+
     if (activeTab === 'inbox') {
-      return recipient === userEm || recipient.includes(`@${DOMAIN}`) || sender.includes(`@${DOMAIN}`);
+      return (m.folder === 'inbox' || !m.folder) && (isRecipientForMe || (!userEm && recipient.includes(`@${DOMAIN}`)));
     }
     if (activeTab === 'sent') {
-      return sender === userEm || sender.includes(`@${DOMAIN}`);
+      return m.folder === 'sent' || isSenderFromMe;
     }
     return true;
   });
