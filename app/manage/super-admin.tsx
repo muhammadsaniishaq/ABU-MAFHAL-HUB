@@ -50,6 +50,7 @@ interface StaffMember {
   balance: number;
   avatar_url?: string;
   created_at?: string;
+  corporate_email?: string | null;
 }
 
 export default function SuperAdminMasterHubScreen() {
@@ -137,14 +138,25 @@ export default function SuperAdminMasterHubScreen() {
         }
       }
 
-      // Fetch Staff Members
+      // Fetch Staff Members & Corporate Email Mapping
       const { data: staffData } = await supabase
         .from('profiles')
         .select('id, full_name, email, role, status, balance, avatar_url, created_at')
         .in('role', ['admin', 'super_admin'])
         .order('role', { ascending: false });
 
-      if (staffData) setStaffList(staffData);
+      const { data: corpEmails } = await supabase
+        .from('corporate_admin_emails')
+        .select('user_id, email, username');
+
+      const corpMap = new Map((corpEmails || []).map(c => [c.user_id, c.email]));
+
+      const enrichedStaff = (staffData || []).map((s: any) => ({
+        ...s,
+        corporate_email: corpMap.get(s.id) || (s.email?.endsWith('@abumafhal.com.ng') ? s.email : null)
+      }));
+
+      if (enrichedStaff) setStaffList(enrichedStaff);
 
       // Fetch Vault Metrics
       const [{ count: uCount }, { data: balData }, { count: kCount }, { count: lCount }] = await Promise.all([
@@ -497,6 +509,7 @@ export default function SuperAdminMasterHubScreen() {
       Alert.alert('Admin Configured 🎉', `Account for ${fullName.trim()} activated successfully!\n\nOfficial Email: ${corporateEmail}\nWelcome credentials dispatched to in-app mailbox & external email.`);
       setCreateAdminVisible(false);
       setSelectedUserId(null);
+      await loadMasterHubData();
       setNewAdminForm({ fullName: '', personalEmail: '', usernamePrefix: '', password: 'Password123!', role: 'admin', department: 'finance', sendMail: true });
       loadMasterHubData();
     } catch (e: any) {
@@ -773,6 +786,15 @@ export default function SuperAdminMasterHubScreen() {
                       <View style={{ flex: 1, marginHorizontal: 10 }}>
                         <Text style={s.staffNameTxt}>{member.full_name || 'Admin Member'}</Text>
                         <Text style={s.staffEmailTxt}>{member.email}</Text>
+                        
+                        {member.corporate_email && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <Ionicons name="at-circle" size={11} color="#d97706" />
+                            <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '700' }}>
+                              {member.corporate_email}
+                            </Text>
+                          </View>
+                        )}
                         
                         <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
                           <View style={[s.badgePill, { backgroundColor: member.role === 'super_admin' ? C.goldBg : '#eff6ff', borderColor: member.role === 'super_admin' ? C.goldBorder : '#bfdbfe' }]}>

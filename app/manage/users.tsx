@@ -38,6 +38,7 @@ interface UserProfile {
     credit_balance?: number;
     crypto_enabled?: boolean;
     virtual_cards_enabled?: boolean;
+    corporate_email?: string | null;
 }
 
 interface Transaction {
@@ -255,10 +256,17 @@ export default function UserManagement() {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            const { data: corpEmails } = await supabase
+                .from('corporate_admin_emails')
+                .select('user_id, email, username');
+
+            const corpMap = new Map((corpEmails || []).map(c => [c.user_id, c.email]));
             
             const enrichedData = (data || []).map((u: any) => ({
                 ...u,
-                account_number: u.virtual_accounts?.[0]?.account_number || u.virtual_accounts?.account_number || null
+                account_number: u.virtual_accounts?.[0]?.account_number || u.virtual_accounts?.account_number || null,
+                corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null)
             }));
             setUsers(enrichedData);
         } catch (error: any) {
@@ -1447,6 +1455,12 @@ Metadata:
                                     {item.role === 'admin' && (
                                         <View className="bg-amber-100/70 px-2 py-0.5 rounded-md">
                                             <Text className="text-[8px] font-black tracking-widest text-amber-700 uppercase">ADMIN</Text>
+                                        </View>
+                                    )}
+                                    {item.corporate_email && (
+                                        <View className="bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md flex-row items-center gap-1">
+                                            <Ionicons name="at-circle" size={9} color="#D97706" />
+                                            <Text className="text-[8.5px] font-black tracking-tight text-amber-700">{item.corporate_email}</Text>
                                         </View>
                                     )}
                                     {item.kyc_verified && (
