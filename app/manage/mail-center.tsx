@@ -543,12 +543,14 @@ export default function MailCenterScreen() {
       };
       setEmails(prev => [newMailObject, ...prev]);
 
-      // 5. Trigger External Email Dispatch via Edge Function & Direct Resend API Fallback
+      // 5. Trigger External Email Dispatch & Corporate Email Forwarding + Push Notification
       for (const p of targetProfiles.slice(0, 10)) {
         try {
+          const targetCleanEmail = p.email.toLowerCase().trim();
+
           const { error: invokeErr } = await supabase.functions.invoke('send-email', {
             body: {
-              to: p.email,
+              to: targetCleanEmail,
               from: senderAccount,
               subject: subjectInput.trim(),
               text: finalBodyText,
@@ -574,12 +576,55 @@ export default function MailCenterScreen() {
                 body: JSON.stringify({
                   from: 'Abu Mafhal Sub <onboarding@resend.dev>',
                   reply_to: senderAccount,
-                  to: [p.email],
+                  to: [targetCleanEmail],
                   subject: subjectInput.trim(),
                   text: finalBodyText,
                   html: formattedHtml
                 })
               });
+            }
+          }
+
+          // CORPORATE FORWARDING TO ADMIN'S PERSONAL REGISTERED EMAIL + PUSH NOTIFICATION
+          const { data: corpAdmin } = await supabase
+            .from('corporate_admin_emails')
+            .select('user_id, display_name')
+            .eq('email', targetCleanEmail)
+            .maybeSingle();
+
+          if (corpAdmin?.user_id) {
+            // A. Trigger Push Notification to Admin's App
+            await supabase.from('notifications').insert({
+              user_id: corpAdmin.user_id,
+              title: `📨 New Official Email: ${subjectInput.trim().slice(0, 45)}`,
+              body: `Received from ${senderAccount}. Open Mail Center to read full message.`,
+              type: 'email',
+              data: { priority: 'high', route: '/manage/mail-center', sender: senderAccount },
+              created_at: new Date().toISOString()
+            });
+
+            // B. Forward email to Admin's personal registered email profile
+            const { data: adminProf } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', corpAdmin.user_id)
+              .maybeSingle();
+
+            const personalEmail = adminProf?.email?.toLowerCase().trim();
+            if (personalEmail && personalEmail !== targetCleanEmail) {
+              try {
+                await supabase.functions.invoke('send-email', {
+                  body: {
+                    to: personalEmail,
+                    from: senderAccount,
+                    subject: `[Corporate FWD: ${corpAdmin.display_name}] ${subjectInput.trim()}`,
+                    text: finalBodyText,
+                    html: formattedHtml
+                  }
+                });
+              } catch (fwdErr) {
+                console.warn("Personal mail forward note:", fwdErr);
+              }
             }
           }
         } catch (edgeErr) {

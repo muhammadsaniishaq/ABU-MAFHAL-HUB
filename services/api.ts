@@ -847,12 +847,13 @@ export const api = {
     communications: {
         sendOfficialEmail: async (params: { to: string; from?: string; subject: string; text: string; html?: string }) => {
             const { to, from = 'admin@abumafhal.com.ng', subject, text, html } = params;
+            const targetEmail = to.trim().toLowerCase();
 
             // 1. Insert into in_app_emails database table immediately
-            const { data: mailRecord, error: dbError } = await supabase.from('in_app_emails').insert({
+            const { data: mailRecord } = await supabase.from('in_app_emails').insert({
                 sender_email: from,
                 sender_name: 'Abu Mafhal Official',
-                recipient_email: to.trim().toLowerCase(),
+                recipient_email: targetEmail,
                 subject: subject.trim(),
                 body_text: text.trim(),
                 body_html: html || `<p>${text}</p>`,
@@ -863,10 +864,52 @@ export const api = {
             // 2. Invoke send-email Edge Function
             try {
                 await supabase.functions.invoke('send-email', {
-                    body: { to, from, subject, text, html }
+                    body: { to: targetEmail, from, subject, text, html }
                 });
             } catch (edgeErr) {
                 console.warn("[sendOfficialEmail] Edge function dispatch note:", edgeErr);
+            }
+
+            // 3. Corporate Email Forwarding to Admin Personal Email & Push Notification
+            try {
+                const { data: corpAdmin } = await supabase
+                    .from('corporate_admin_emails')
+                    .select('user_id, display_name')
+                    .eq('email', targetEmail)
+                    .maybeSingle();
+
+                if (corpAdmin?.user_id) {
+                    // Push Notification
+                    await supabase.from('notifications').insert({
+                        user_id: corpAdmin.user_id,
+                        title: `📨 New Official Email: ${subject.slice(0, 45)}`,
+                        body: `Received from ${from}. Check your Mail Center for full details.`,
+                        type: 'email',
+                        data: { priority: 'high', route: '/manage/mail-center' },
+                        created_at: new Date().toISOString()
+                    });
+
+                    // Forward to Personal Email
+                    const { data: adminProf } = await supabase
+                        .from('profiles')
+                        .select('email')
+                        .eq('id', corpAdmin.user_id)
+                        .maybeSingle();
+
+                    if (adminProf?.email && adminProf.email.toLowerCase() !== targetEmail) {
+                        await supabase.functions.invoke('send-email', {
+                            body: {
+                                to: adminProf.email.toLowerCase(),
+                                from,
+                                subject: `[Corporate FWD: ${corpAdmin.display_name}] ${subject}`,
+                                text,
+                                html
+                            }
+                        });
+                    }
+                }
+            } catch (fwdErr) {
+                console.warn("[sendOfficialEmail] Corporate forward note:", fwdErr);
             }
 
             return { success: true, mailRecord };
