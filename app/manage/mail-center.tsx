@@ -160,6 +160,21 @@ export default function MailCenterScreen() {
         setCurrentUserEmail(user.email || '');
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
         if (profile?.role) setUserRole(profile.role);
+
+        // AUTO-DETECT ADMIN'S CORPORATE EMAIL DIRECTLY FROM LOGGED-IN ACCOUNT
+        const { data: userCorp } = await supabase
+          .from('corporate_admin_emails')
+          .select('email')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (userCorp?.email) {
+          setSenderAccount(userCorp.email);
+        } else if (user.email?.endsWith(`@${DOMAIN}`)) {
+          setSenderAccount(user.email);
+        } else {
+          setSenderAccount(user.email || `support@${DOMAIN}`);
+        }
       }
 
       await fetchMails();
@@ -995,9 +1010,13 @@ export default function MailCenterScreen() {
               </ScrollView>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>From (Domain Sender)</Text>
-                <View style={{ backgroundColor: '#0f172a', padding: 10, borderRadius: 12, marginBottom: 10 }}>
-                  <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12 }}>{senderAccount}</Text>
+                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>From (Auto-Assigned Corporate Sender)</Text>
+                <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#334155', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13 }}>{senderAccount}</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 9.5, fontWeight: '600', marginTop: 2 }}>🔒 Linked directly from your logged-in Staff Account profile</Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={18} color="#10b981" />
                 </View>
 
                 <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Recipient Email *</Text>
