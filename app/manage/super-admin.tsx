@@ -435,9 +435,12 @@ export default function SuperAdminMasterHubScreen() {
       }
 
       // AUTOMATIC WELCOME & LOGIN DETAILS EMAIL DISPATCH
+      const isExistingUser = selectedUserId !== null;
+      const displayPassword = isExistingUser ? '(Your Existing Account Password)' : password;
+
       const emailSubject = `👑 Welcome to Abu Mafhal Admin Portal - Your Login Details`;
-      const emailText = `Hello ${fullName.trim()},\n\nCongratulations! You have been appointed as an official ${role.toUpperCase().replace('_', ' ')} for Abu Mafhal Sub.\n\nHere are your official login credentials:\n----------------------------------------\nOfficial Corporate Email: ${corporateEmail}\nAccount Login Email: ${targetAuthEmail}\nTemporary Password: ${password}\nAssigned Role: ${role.toUpperCase().replace('_', ' ')}\n\nHow to Access:\n1. Open the Abu Mafhal App or Web Portal.\n2. Log in using your email address and password.\n3. Access the Admin Management Console from your profile menu.\n\nPlease keep your credentials secure.`;
-      const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 24px; background: #0f172a; color: #ffffff; border-radius: 16px; border: 1px solid #d97706;"><h2 style="color: #f5a623; margin-top: 0;">👑 Welcome to Abu Mafhal Admin Portal</h2><p style="font-size: 14px; line-height: 1.6;">Hello <strong>${fullName.trim()}</strong>,</p><p style="font-size: 14px; line-height: 1.6;">Congratulations! You have been appointed as an official <strong>${role.toUpperCase().replace('_', ' ')}</strong> for Abu Mafhal Sub.</p><div style="background: rgba(255,255,255,0.08); padding: 16px; border-radius: 12px; border-left: 4px solid #f5a623; margin: 16px 0;"><p style="margin: 4px 0; font-size: 13px;"><strong>Official Corporate Email:</strong> <span style="color: #f5a623;">${corporateEmail}</span></p><p style="margin: 4px 0; font-size: 13px;"><strong>Account Login Email:</strong> ${targetAuthEmail}</p><p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #1e293b; padding: 2px 6px; borderRadius: 4px; color: #34d399;">${password}</code></p><p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${role.toUpperCase().replace('_', ' ')}</p></div><p style="font-size: 13px; color: #94a3b8;">Log in to the app or portal to access your Admin Command Center.</p></div>`;
+      const emailText = `Hello ${fullName.trim()},\n\nCongratulations! You have been appointed as an official ${role.toUpperCase().replace('_', ' ')} for Abu Mafhal Sub.\n\nHere are your official login credentials:\n----------------------------------------\nOfficial Corporate Email: ${corporateEmail}\nAccount Login Email: ${targetAuthEmail}\nPassword: ${displayPassword}\nAssigned Role: ${role.toUpperCase().replace('_', ' ')}\n\nHow to Access:\n1. Open the Abu Mafhal App or Web Portal.\n2. Log in using your email address and password.\n3. Access the Admin Management Console from your profile menu.\n\nPlease keep your credentials secure.`;
+      const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 24px; background: #0f172a; color: #ffffff; border-radius: 16px; border: 1px solid #d97706;"><h2 style="color: #f5a623; margin-top: 0;">👑 Welcome to Abu Mafhal Admin Portal</h2><p style="font-size: 14px; line-height: 1.6;">Hello <strong>${fullName.trim()}</strong>,</p><p style="font-size: 14px; line-height: 1.6;">Congratulations! You have been appointed as an official <strong>${role.toUpperCase().replace('_', ' ')}</strong> for Abu Mafhal Sub.</p><div style="background: rgba(255,255,255,0.08); padding: 16px; border-radius: 12px; border-left: 4px solid #f5a623; margin: 16px 0;"><p style="margin: 4px 0; font-size: 13px;"><strong>Official Corporate Email:</strong> <span style="color: #f5a623;">${corporateEmail}</span></p><p style="margin: 4px 0; font-size: 13px;"><strong>Account Login Email:</strong> ${targetAuthEmail}</p><p style="margin: 4px 0; font-size: 13px;"><strong>Password:</strong> <code style="background: #1e293b; padding: 2px 6px; borderRadius: 4px; color: #34d399;">${displayPassword}</code></p><p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${role.toUpperCase().replace('_', ' ')}</p></div><p style="font-size: 13px; color: #94a3b8;">Log in to the app or portal to access your Admin Command Center.</p></div>`;
 
       const recipients = [corporateEmail];
       if (personalEmail.trim() && personalEmail.trim().toLowerCase() !== corporateEmail.toLowerCase()) {
@@ -1261,18 +1264,27 @@ export default function SuperAdminMasterHubScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 8 }}>
-                  <TextInput
-                    placeholder="Password123!"
-                    value={newAdminForm.password}
-                    onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
-                    secureTextEntry={!showAdminPassword}
-                    style={{ flex: 1, paddingVertical: 7, color: '#0f172a', fontWeight: '600', fontSize: 11.5, outlineStyle: 'none' as any }}
-                  />
-                  <TouchableOpacity onPress={() => setShowAdminPassword(!showAdminPassword)}>
-                    <Ionicons name={showAdminPassword ? "eye-off-outline" : "eye-outline"} size={16} color="#64748b" />
-                  </TouchableOpacity>
-                </View>
+                {selectedUserId ? (
+                  <View style={{ backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', padding: 8, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color="#16a34a" />
+                    <Text style={{ color: '#15803d', fontSize: 10, fontWeight: '700' }}>
+                      🔒 Registered Member (Uses their own existing account password)
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, marginBottom: 8 }}>
+                    <TextInput
+                      placeholder="Password123!"
+                      value={newAdminForm.password}
+                      onChangeText={(t) => setNewAdminForm({ ...newAdminForm, password: t })}
+                      secureTextEntry={!showAdminPassword}
+                      style={{ flex: 1, paddingVertical: 7, color: '#0f172a', fontWeight: '600', fontSize: 11.5, outlineStyle: 'none' as any }}
+                    />
+                    <TouchableOpacity onPress={() => setShowAdminPassword(!showAdminPassword)}>
+                      <Ionicons name={showAdminPassword ? "eye-off-outline" : "eye-outline"} size={16} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Password Entropy & Payload Copy */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
