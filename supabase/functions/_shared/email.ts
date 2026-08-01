@@ -36,7 +36,37 @@ export const sendEmail = async (
         }
     }
 
-    // METHOD 1: Resend HTTP API (Fastest & 100% reliable in Edge Functions)
+    // METHOD 1: SMTP / Nodemailer (Zoho, Google, Custom SMTP) - Prioritized if configured
+    if (zohoUser && zohoPass) {
+        try {
+            console.log(`[sendEmail] Sending email via Zoho/SMTP (${smtpHost}) to ${to}...`);
+            const portNum = parseInt(smtpPort, 10);
+            const transporter = nodemailer.createTransport({
+                host: smtpHost,
+                port: portNum,
+                secure: portNum === 465,
+                auth: {
+                    user: zohoUser.trim(),
+                    pass: zohoPass.trim(),
+                },
+            });
+
+            const info = await transporter.sendMail({
+                from: `Abu Mafhal Sub <${zohoUser.trim()}>`,
+                to,
+                subject,
+                text,
+                html: html || text,
+            });
+
+            console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
+            return info;
+        } catch (smtpErr) {
+            console.error("[sendEmail] SMTP exception, attempting Resend API fallback:", smtpErr);
+        }
+    }
+
+    // METHOD 2: Resend HTTP API (Fallback or standalone)
     if (resendApiKey) {
         try {
             console.log(`[sendEmail] Sending email via Resend API to ${to}...`);
@@ -64,36 +94,6 @@ export const sendEmail = async (
             }
         } catch (err) {
             console.error("[sendEmail] Resend API exception:", err);
-        }
-    }
-
-    // METHOD 2: SMTP / Nodemailer (Zoho, Google, Custom SMTP)
-    if (zohoUser && zohoPass) {
-        try {
-            console.log(`[sendEmail] Sending email via SMTP (${smtpHost}) to ${to}...`);
-            const portNum = parseInt(smtpPort, 10);
-            const transporter = nodemailer.createTransport({
-                host: smtpHost,
-                port: portNum,
-                secure: portNum === 465,
-                auth: {
-                    user: zohoUser.trim(),
-                    pass: zohoPass.trim(),
-                },
-            });
-
-            const info = await transporter.sendMail({
-                from: `Abu Mafhal Sub <${zohoUser.trim()}>`,
-                to,
-                subject,
-                text,
-                html,
-            });
-
-            console.log("[sendEmail] Email successfully sent via SMTP to %s (ID: %s)", to, info.messageId);
-            return info;
-        } catch (smtpErr) {
-            console.error("[sendEmail] SMTP exception:", smtpErr);
         }
     }
 
