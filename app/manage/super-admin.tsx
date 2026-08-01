@@ -425,6 +425,15 @@ export default function SuperAdminMasterHubScreen() {
         return Alert.alert('Already Exists ⚠️', `Corporate email ${corporateEmail} already exists.`);
       }
 
+      // DIRECT PROVISIONING TO ZOHO ORGANIZATION MAIL API
+      try {
+        await supabase.functions.invoke('create-zoho-user', {
+          body: { username: cleanPrefix, fullName: fullName.trim(), password }
+        });
+      } catch (zohoErr) {
+        console.warn("Direct Zoho API provision note:", zohoErr);
+      }
+
       // AUTOMATIC WELCOME & LOGIN DETAILS EMAIL DISPATCH
       const emailSubject = `👑 Welcome to Abu Mafhal Admin Portal - Your Login Details`;
       const emailText = `Hello ${fullName.trim()},\n\nCongratulations! You have been appointed as an official ${role.toUpperCase().replace('_', ' ')} for Abu Mafhal Sub.\n\nHere are your official login credentials:\n----------------------------------------\nOfficial Corporate Email: ${corporateEmail}\nAccount Login Email: ${targetAuthEmail}\nTemporary Password: ${password}\nAssigned Role: ${role.toUpperCase().replace('_', ' ')}\n\nHow to Access:\n1. Open the Abu Mafhal App or Web Portal.\n2. Log in using your email address and password.\n3. Access the Admin Management Console from your profile menu.\n\nPlease keep your credentials secure.`;

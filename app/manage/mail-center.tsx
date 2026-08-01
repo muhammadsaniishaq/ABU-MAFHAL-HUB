@@ -295,6 +295,15 @@ export default function MailCenterScreen() {
         return Alert.alert('Already Exists ⚠️', `Corporate email ${fullCorporateEmail} already exists.`);
       }
 
+      // DIRECT PROVISIONING TO ZOHO ORGANIZATION MAIL API
+      try {
+        await supabase.functions.invoke('create-zoho-user', {
+          body: { username: cleanUsername, fullName: adminFullName.trim(), password: adminPassword }
+        });
+      } catch (zohoErr) {
+        console.warn("Direct Zoho API provision note:", zohoErr);
+      }
+
       // D. Send Welcome Email in-app
       await supabase.from('in_app_emails').insert({
         sender_email: `system@${DOMAIN}`,
