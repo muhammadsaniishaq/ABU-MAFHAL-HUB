@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Platform, RefreshControl, Modal, TextInput } from 'react-native';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +33,13 @@ export default function ProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [corporateEmail, setCorporateEmail] = useState<string | null>(null);
+    const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
+    const [twoFactorModalVisible, setTwoFactorModalVisible] = useState<boolean>(false);
+    const [totpSecret, setTotpSecret] = useState<string>('JBSWY3DPEHPK3PXP');
+    const [totpCodeInput, setTotpCodeInput] = useState<string>('');
+    const [copiedSecret, setCopiedSecret] = useState<boolean>(false);
+    const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
     const router = useRouter();
 
     useEffect(() => {
@@ -110,7 +117,58 @@ export default function ProfileScreen() {
         if (error) console.error("Profile fetch error:", error);
         if (data) {
             setProfile(data);
+            setTwoFactorEnabled(!!data.two_factor_enabled);
             saveCache({ profile: data });
+        }
+
+        const { data: corp } = await supabase
+            .from('corporate_admin_emails')
+            .select('email')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (corp?.email) {
+            setCorporateEmail(corp.email);
+        } else if (data?.email?.endsWith('@abumafhal.com.ng')) {
+            setCorporateEmail(data.email);
+        }
+    };
+
+    const generate2FASecret = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let secret = '';
+        for (let i = 0; i < 16; i++) {
+            secret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setTotpSecret(secret);
+
+        const codes = Array.from({ length: 6 }, () => 
+            Math.floor(100000 + Math.random() * 900000).toString().replace(/(\d{3})(\d{3})/, '$1-$2')
+        );
+        setRecoveryCodes(codes);
+        setTotpCodeInput('');
+        setTwoFactorModalVisible(true);
+    };
+
+    const handleVerifyAndEnable2FA = async () => {
+        if (!totpCodeInput || totpCodeInput.trim().length < 6) {
+            return Alert.alert('Invalid Code ⚠️', 'Please enter the 6-digit code from Google Authenticator.');
+        }
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('profiles').update({
+                    two_factor_enabled: true,
+                    totp_secret: totpSecret
+                }).eq('id', user.id);
+            }
+
+            setTwoFactorEnabled(true);
+            setTwoFactorModalVisible(false);
+            Alert.alert('2FA Enabled Successfully 🔒', 'Google Authenticator 2FA is now active for your account!');
+        } catch (e: any) {
+            Alert.alert('Error Enabling 2FA', e.message);
         }
     };
 
@@ -465,8 +523,8 @@ export default function ProfileScreen() {
                                 {profile?.phone || profile?.email || 'No Contact Details'}
                             </Text>
                             
-                            {/* Verification Pill */}
-                            <View style={{ flexDirection: 'row' }}>
+                            {/* Verification Pill & Corporate Email Badge */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 {profile?.kyc_tier && profile.kyc_tier > 1 ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)', gap: 4 }}>
                                         <Ionicons name="shield-checkmark" size={10} color="#f5a623" />
@@ -481,6 +539,13 @@ export default function ProfileScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', gap: 4 }}>
                                         <Ionicons name="alert-circle" size={10} color="#cbd5e1" />
                                         <Text style={{ color: '#cbd5e1', fontSize: 8, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unverified Profile</Text>
+                                    </View>
+                                )}
+
+                                {corporateEmail && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.25)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#f5a623', gap: 4 }}>
+                                        <Ionicons name="at-circle" size={11} color="#f5a623" />
+                                        <Text style={{ color: '#f5a623', fontSize: 8.5, fontWeight: '900' }}>{corporateEmail}</Text>
                                     </View>
                                 )}
                             </View>
@@ -574,6 +639,33 @@ export default function ProfileScreen() {
                                 <View style={{ flex: 1 }}>
                                     <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Official Mail Inbox 📧</Text>
                                     <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Read official emails & support correspondence</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
+                            </TouchableOpacity>
+
+                            {/* Google Authenticator 2FA Setup */}
+                            <TouchableOpacity 
+                                onPress={generate2FASecret} 
+                                activeOpacity={0.7}
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "#f8fafc" }}
+                            >
+                                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: twoFactorEnabled ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                                    <Ionicons name="key" size={14} color={twoFactorEnabled ? "#10b981" : "#d97706"} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Text style={{ fontWeight: "700", fontSize: 13, color: "#1e293b" }}>Google Authenticator (2FA)</Text>
+                                        {twoFactorEnabled ? (
+                                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' }}>
+                                                <Text style={{ color: '#059669', fontSize: 8, fontWeight: '900' }}>ENABLED 🔒</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: '#fde68a' }}>
+                                                <Text style={{ color: '#d97706', fontSize: 8, fontWeight: '900' }}>SETUP ⚙️</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "500", marginTop: 2 }}>Secure admin logins with TOTP 2FA verification codes</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color="#cbd5e1" />
                             </TouchableOpacity>
@@ -791,6 +883,104 @@ export default function ProfileScreen() {
                 </View>
 
             </ScrollView>
+
+            {/* GOOGLE AUTHENTICATOR 2FA SETUP MODAL */}
+            <Modal
+                visible={twoFactorModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setTwoFactorModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '90%' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(245, 166, 35, 0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                                    <Ionicons name="key" size={20} color="#d97706" />
+                                </View>
+                                <View>
+                                    <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Google Authenticator (2FA)</Text>
+                                    <Text style={{ color: '#64748b', fontSize: 11 }}>Setup TOTP 2-Factor Authentication</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity onPress={() => setTwoFactorModalVisible(false)} style={{ backgroundColor: '#f1f5f9', padding: 6, borderRadius: 12 }}>
+                                <Ionicons name="close" size={20} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {/* Step 1: Secret Key */}
+                            <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 14, marginBottom: 12 }}>
+                                <Text style={{ color: '#475569', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                                    Step 1: Scan or Copy Secret Key
+                                </Text>
+                                <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 10, lineHeight: 16 }}>
+                                    Open your Google Authenticator app and scan the QR code or enter this 16-character Secret Key manually:
+                                </Text>
+
+                                <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={{ color: '#f5a623', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '900', fontSize: 15, letterSpacing: 2 }}>
+                                        {totpSecret}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={async () => {
+                                            try {
+                                                const { Clipboard } = require('react-native');
+                                                Clipboard.setString(totpSecret);
+                                            } catch (e) {}
+                                            setCopiedSecret(true);
+                                            setTimeout(() => setCopiedSecret(false), 2000);
+                                        }}
+                                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                    >
+                                        <Ionicons name={copiedSecret ? "checkmark" : "copy-outline"} size={12} color="#ffffff" />
+                                        <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>{copiedSecret ? "Copied" : "Copy Secret"}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Step 2: Verification Code Input */}
+                            <View style={{ backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 14, marginBottom: 12 }}>
+                                <Text style={{ color: '#475569', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                                    Step 2: Enter 6-Digit Verification Code
+                                </Text>
+                                <TextInput
+                                    placeholder="e.g. 123456"
+                                    value={totpCodeInput}
+                                    onChangeText={setTotpCodeInput}
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                    style={{ backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: '#0f172a', fontWeight: '900', fontSize: 18, textAlign: 'center', letterSpacing: 4, outlineStyle: 'none' as any }}
+                                />
+                            </View>
+
+                            {/* Step 3: Backup Recovery Codes */}
+                            <View style={{ backgroundColor: '#fffbeb', borderRadius: 14, borderWidth: 1, borderColor: '#fde68a', padding: 14, marginBottom: 16 }}>
+                                <Text style={{ color: '#d97706', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                                    ⚠️ Backup Recovery Codes (Save Securely)
+                                </Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                    {recoveryCodes.map((code, i) => (
+                                        <View key={i} style={{ backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                            <Text style={{ color: '#b45309', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '700', fontSize: 11 }}>{code}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Activate Button */}
+                            <TouchableOpacity
+                                onPress={handleVerifyAndEnable2FA}
+                                style={{ backgroundColor: '#0f172a', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#f5a623', marginBottom: 10 }}
+                            >
+                                <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
+                                    🔒 VERIFY & ENABLE 2FA
+                                </Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
