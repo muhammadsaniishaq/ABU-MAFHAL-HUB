@@ -1,4 +1,4 @@
-import { View, Text, Switch, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, Switch, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Platform, KeyboardAvoidingView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
@@ -471,19 +471,19 @@ export default function AdminSettings() {
 
                         <Text style={s.groupLabel}>Global Announcement</Text>
                         <View style={s.card}>
-                            <ToggleRow title="Enable Announcement" subtitle="Show this to all users on app launch" icon="megaphone" color="#8B5CF6" value={announcementActive} onValueChange={setAnnouncementActive} />
+                            <ToggleRow title="Enable Announcement" subtitle="Show this popup banner to all users on app launch" icon="megaphone" color="#8B5CF6" value={announcementActive} onValueChange={setAnnouncementActive} />
                             <View style={s.divider} />
-                            <InputRow label="Announcement Text" value={announcementText} onChangeText={setAnnouncementText} placeholder="Message displayed to all users" />
+                            <InputRow label="Announcement Text" value={announcementText} onChangeText={setAnnouncementText} placeholder="Type message displayed to all users..." multiline />
                             
                             <View style={s.inputGroup}>
-                                <Text style={s.label}>Media URL or Upload Image</Text>
+                                <Text style={s.label}>Banner Media URL or Upload Image</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <View style={{ flex: 1 }}>
                                         <TextInput 
                                             value={announcementUrl} 
                                             onChangeText={setAnnouncementUrl} 
                                             style={s.inputMono} 
-                                            placeholder="https://... or upload ->"
+                                            placeholder="https://... or tap upload ->"
                                             placeholderTextColor="#94a3b8" 
                                         />
                                     </View>
@@ -506,6 +506,27 @@ export default function AdminSettings() {
                                     </TouchableOpacity>
                                 </View>
                             </View>
+
+                            {/* LIVE CROP PREVIEW IN ADMIN SETTINGS */}
+                            {announcementUrl ? (
+                                <View style={{ marginTop: 12, backgroundColor: '#0f172a', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
+                                    <View style={{ height: 140, backgroundColor: '#1e293b', overflow: 'hidden' }}>
+                                        <Image 
+                                            source={{ uri: announcementUrl }} 
+                                            style={{ width: '100%', height: '100%' }} 
+                                            resizeMode="cover" 
+                                        />
+                                    </View>
+                                    <View style={{ padding: 12, alignItems: 'center' }}>
+                                        <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Live Cropped Banner Preview ✨</Text>
+                                        {announcementText ? (
+                                            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' }} numberOfLines={2}>
+                                                {announcementText}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                </View>
+                            ) : null}
                         </View>
                         
                         <TouchableOpacity onPress={handleUpdateSettings} style={s.saveBtn} activeOpacity={0.8}>
