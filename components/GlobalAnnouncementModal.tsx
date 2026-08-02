@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     },
     mediaContainer: {
         width: '100%',
-        height: 220,
+        height: 280,
         backgroundColor: '#0f172a',
         overflow: 'hidden'
     },
