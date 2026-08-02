@@ -60,9 +60,9 @@ export const sendEmail = async (
             });
 
             console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
-            return info;
-        } catch (smtpErr) {
-            console.error("[sendEmail] SMTP exception, attempting Resend API fallback:", smtpErr);
+            return { success: true, method: 'SMTP', messageId: info.messageId, info };
+        } catch (smtpErr: any) {
+            console.error("[sendEmail] SMTP exception, attempting Resend API fallback:", smtpErr?.message || smtpErr);
         }
     }
 
@@ -88,15 +88,18 @@ export const sendEmail = async (
             const resData = await resendRes.json();
             if (resendRes.ok) {
                 console.log("[sendEmail] Email successfully sent via Resend API:", resData.id);
-                return resData;
+                return { success: true, method: 'Resend', id: resData.id, resData };
             } else {
-                console.warn("[sendEmail] Resend API warning:", resData);
+                console.warn("[sendEmail] Resend API error:", resData);
+                return { success: false, method: 'Resend', error: resData.message || resData.name || "Resend API delivery error", resData };
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("[sendEmail] Resend API exception:", err);
+            return { success: false, method: 'Resend', error: err.message || "Resend API network exception" };
         }
     }
 
     console.warn("[sendEmail] No working email credentials found. Please configure RESEND_API_KEY or ZOHO_EMAIL/ZOHO_PASSWORD in Admin Settings -> API Vault.");
-    return null;
+    return { success: false, error: "No working email credentials found. Please configure SMTP Password (ZOHO_PASSWORD) in Admin Vault or verify domain in Resend." };
 };
+

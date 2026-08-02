@@ -108,9 +108,15 @@ Deno.serve(async (req) => {
         const createResult = await createRes.json();
         console.log("[create-zoho-user] Zoho User creation result:", createResult);
 
+        const isSuccess = createResult?.status?.code === 200 || createResult?.status?.code === 201;
+        const errorMessage = !isSuccess 
+            ? (createResult?.data?.moreInfo || createResult?.status?.description || createResult?.message || "Zoho API returned non-200 status")
+            : null;
+
         return new Response(JSON.stringify({
-            success: true,
-            message: "User created directly in Zoho Organization Mail!",
+            success: isSuccess,
+            message: isSuccess ? "User created directly in Zoho Organization Mail!" : "Zoho API provisioning restricted",
+            error: errorMessage,
             createResult,
             corporateEmail: targetEmail
         }), {

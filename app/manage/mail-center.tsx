@@ -10,7 +10,8 @@ import {
   Modal, 
   FlatList, 
   Dimensions, 
-  RefreshControl 
+  RefreshControl,
+  Linking
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
@@ -296,18 +297,27 @@ export default function MailCenterScreen() {
       }
 
       // DIRECT PROVISIONING TO ZOHO ORGANIZATION MAIL API
+      let zohoStatusText = '';
       try {
-        await supabase.functions.invoke('create-zoho-user', {
+        const { data: zohoRes, error: zohoErr } = await supabase.functions.invoke('create-zoho-user', {
           body: { username: cleanUsername, fullName: adminFullName.trim(), password: adminPassword }
         });
-      } catch (zohoErr) {
+
+        if (zohoRes?.success) {
+          zohoStatusText = '\n\n✅ Real Zoho Organization Account Provisioned!';
+        } else if (zohoRes?.error || zohoErr) {
+          const zohoMsg = zohoRes?.error || zohoErr?.message || 'Operation restricted by Zoho Admin scopes';
+          zohoStatusText = `\n\n⚠️ App Profile Activated. Zoho Mail API note: ${zohoMsg}.\n(You can also add this mailbox in Zoho Admin Console: https://mailadmin.zoho.com)`;
+        }
+      } catch (zohoErr: any) {
         console.warn("Direct Zoho API provision note:", zohoErr);
+        zohoStatusText = `\n\n⚠️ Zoho API provision note: ${zohoErr.message}`;
       }
 
       // D. Send Welcome Email in-app
       await supabase.from('in_app_emails').insert({
-        sender_email: `system@${DOMAIN}`,
-        sender_name: 'Abu Mafhal Domain Authority',
+        sender_email: `admin@${DOMAIN}`,
+        sender_name: 'Abu Mafhal Official',
         recipient_email: fullCorporateEmail,
         subject: `Welcome to Abu Mafhal Corporate Mail (${fullCorporateEmail})`,
         body_text: `Congratulations ${adminFullName.trim()}!\n\nYour official corporate email account ${fullCorporateEmail} has been activated with ${adminRole.toUpperCase()} permissions.\n\nTemporary Password: ${adminPassword}`,
@@ -315,7 +325,7 @@ export default function MailCenterScreen() {
         folder: 'inbox'
       });
 
-      Alert.alert("Corporate Mail Created 🎉", `Official Email ${fullCorporateEmail} created successfully!\n\nCredentials sent to in-app mailbox.`);
+      Alert.alert("Corporate Mail Created 🎉", `Official Email ${fullCorporateEmail} created successfully!${zohoStatusText}\n\nCredentials sent to in-app mailbox.`);
       setCreateAdminMailVisible(false);
       setAdminUsername('');
       setAdminFullName('');
@@ -556,11 +566,14 @@ export default function MailCenterScreen() {
       setEmails(prev => [newMailObject, ...prev]);
 
       // 5. Trigger External Email Dispatch & Corporate Email Forwarding + Push Notification
+      let externalDeliveryError: string | null = null;
+      let externalSuccessCount = 0;
+
       for (const p of targetProfiles.slice(0, 10)) {
         try {
           const targetCleanEmail = p.email.toLowerCase().trim();
 
-          const { error: invokeErr } = await supabase.functions.invoke('send-email', {
+          const { data: edgeRes, error: invokeErr } = await supabase.functions.invoke('send-email', {
             body: {
               to: targetCleanEmail,
               from: senderAccount,
@@ -570,31 +583,10 @@ export default function MailCenterScreen() {
             }
           });
 
-          if (invokeErr) {
-            console.warn("Edge Function note, checking direct Resend API fallback...", invokeErr.message);
-            const { data: resendSecret } = await supabase
-              .from('system_secrets')
-              .select('value')
-              .eq('key', 'RESEND_API_KEY')
-              .maybeSingle();
-
-            const activeKey = resendSecret?.value?.trim() || ['re_Adn9F4gY', 'EdMX5zTmaMzEejCQLELYkxMW'].join('_');
-
-            await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${activeKey}`
-              },
-              body: JSON.stringify({
-                from: 'Abu Mafhal Sub <onboarding@resend.dev>',
-                reply_to: senderAccount,
-                to: [targetCleanEmail],
-                subject: subjectInput.trim(),
-                text: finalBodyText,
-                html: formattedHtml
-              })
-            });
+          if (edgeRes?.success) {
+            externalSuccessCount++;
+          } else {
+            externalDeliveryError = edgeRes?.error || invokeErr?.message || "External SMTP/Resend delivery failed";
           }
 
           // CORPORATE FORWARDING TO ADMIN'S PERSONAL REGISTERED EMAIL + PUSH NOTIFICATION
@@ -639,12 +631,21 @@ export default function MailCenterScreen() {
               }
             }
           }
-        } catch (edgeErr) {
+        } catch (edgeErr: any) {
           console.warn("External email dispatch note:", edgeErr);
+          externalDeliveryError = edgeErr?.message || "External dispatch exception";
         }
       }
 
-      Alert.alert("Email Dispatched 🎉", `Official email successfully dispatched to ${targetProfiles.length} recipient(s) & broadcast notifications delivered!`);
+      if (externalDeliveryError && externalSuccessCount === 0) {
+        Alert.alert(
+          "Delivery Note ⚠️", 
+          `Email recorded in app history, BUT external delivery to real inbox returned an error:\n\n${externalDeliveryError}\n\n💡 Tip: To send to external Gmail/Yahoo accounts, please save your Zoho App Password (ZOHO_PASSWORD) in Admin Secrets Vault.`
+        );
+      } else {
+        Alert.alert("Email Dispatched 🎉", `Official email successfully dispatched to ${targetProfiles.length} recipient(s) & broadcast notifications delivered!`);
+      }
+
       setComposeVisible(false);
       setSubjectInput('');
       setBodyInput('');
@@ -674,16 +675,16 @@ export default function MailCenterScreen() {
     const recipient = (m.recipient_email || '').toLowerCase();
     const sender = (m.sender_email || '').toLowerCase();
     const userEm = (currentUserEmail || '').toLowerCase();
+    const activeSender = (senderAccount || '').toLowerCase();
 
-    const activeCorpEmails = corporateAccounts.map(c => c.email.toLowerCase());
-    const isRecipientForMe = recipient === userEm || activeCorpEmails.includes(recipient);
-    const isSenderFromMe = sender === userEm || activeCorpEmails.includes(sender);
+    const isRecipientForMe = recipient === userEm || recipient === activeSender;
+    const isSenderFromMe = sender === userEm || sender === activeSender;
 
     if (activeTab === 'inbox') {
       return (m.folder === 'inbox' || !m.folder) && (isRecipientForMe || (!userEm && recipient.includes(`@${DOMAIN}`)));
     }
     if (activeTab === 'sent') {
-      return m.folder === 'sent' || isSenderFromMe;
+      return m.folder === 'sent' && isSenderFromMe;
     }
     return true;
   });
@@ -711,9 +712,19 @@ export default function MailCenterScreen() {
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start' }}>
-                <Ionicons name="mail" size={12} color="#f5a623" />
-                <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>DOMAIN: @{DOMAIN}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start' }}>
+                  <Ionicons name="mail" size={12} color="#f5a623" />
+                  <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>DOMAIN: @{DOMAIN}</Text>
+                </View>
+
+                <TouchableOpacity 
+                  onPress={() => Linking.openURL('https://mail.zoho.com')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}
+                >
+                  <Ionicons name="globe-outline" size={12} color="#ffffff" />
+                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>Webmail Login 🌐</Text>
+                </TouchableOpacity>
               </View>
               <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', marginTop: 8 }}>Official App Mailbox</Text>
               <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>Direct Email Dispatch & In-App Customer Inbox</Text>
@@ -876,7 +887,7 @@ export default function MailCenterScreen() {
               <View style={{ flex: 1, marginRight: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 6 }}>
                   <Ionicons name="at-circle" size={14} color="#d97706" />
-                  <Text style={{ color: '#b45309', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Domain Authority @{DOMAIN}</Text>
+                  <Text style={{ color: '#b45309', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Official Domain Mail @{DOMAIN}</Text>
                 </View>
                 <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 17 }}>Create Corporate Admin Email</Text>
                 <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '400', marginTop: 2 }}>Provision official staff email address & credentials.</Text>

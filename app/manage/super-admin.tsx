@@ -462,8 +462,8 @@ export default function SuperAdminMasterHubScreen() {
 
       // 1. Insert ONLY 1 record into in_app_emails for the Corporate Email Inbox
       await supabase.from('in_app_emails').insert({
-        sender_email: 'authority@abumafhal.com.ng',
-        sender_name: 'Abu Mafhal Master Governance',
+        sender_email: 'admin@abumafhal.com.ng',
+        sender_name: 'Abu Mafhal Official',
         recipient_email: corporateEmail,
         subject: emailSubject,
         body_text: emailText,
