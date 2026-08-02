@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { ClubKonnectClient, type ClubKonnectResponse } from "../_shared/clubkonnect.ts";
 import { BigiClient } from "../_shared/bigi.ts";
+import { BilalsadasubClient } from "../_shared/bilalsadasub.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -67,12 +68,13 @@ Deno.serve(async (req: Request) => {
         const { data: secretsData } = await rpcClient
             .from('system_secrets')
             .select('key, value')
-            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN']);
+            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN']);
             
         const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
         const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
         const bigiToken = secretsData?.find(s => s.key === 'BIGI_API_TOKEN')?.value;
         const bigiPin = secretsData?.find(s => s.key === 'BIGI_API_PIN')?.value;
+        const bilalToken = secretsData?.find(s => s.key === 'BILALSADASUB_TOKEN')?.value;
 
         // Fetch VTU vendor from app_settings
         const { data: settingsData } = await rpcClient
@@ -157,11 +159,19 @@ Deno.serve(async (req: Request) => {
             console.log(`[Bills] Balance Deducted. New Balance: ₦${newBalance}`);
         }
 
-        // 4. Call Provider (ClubKonnect or Bigi)
+        // 4. Call Provider (ClubKonnect, Bigi, or Bilalsadasub)
         let result: any;
         try {
             if (type === 'get_plans') {
-                if (vtuVendor === 'bigi') {
+                if (vtuVendor === 'bilalsadasub') {
+                    const netName = (data.network || 'MTN').toString().toUpperCase();
+                    const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${netName}`);
+                    const plansData = await res.json();
+                    return new Response(JSON.stringify({ success: true, data: plansData.data || plansData }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+                        status: 200
+                    });
+                } else if (vtuVendor === 'bigi') {
                     if (!bigiToken) throw new Error("Bigi API Token missing in settings");
                     const bigiClient = new BigiClient(bigiToken, bigiPin || '');
                     
@@ -193,7 +203,11 @@ Deno.serve(async (req: Request) => {
             }
 
             if (type === 'airtime') {
-                if (vtuVendor === 'bigi') {
+                if (vtuVendor === 'bilalsadasub') {
+                    if (!bilalToken) throw new Error("Bilalsadasub API Token missing in settings");
+                    const bilalClient = new BilalsadasubClient(bilalToken);
+                    result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
+                } else if (vtuVendor === 'bigi') {
                     if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
                     const bigiClient = new BigiClient(bigiToken, bigiPin);
                     result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
@@ -201,7 +215,11 @@ Deno.serve(async (req: Request) => {
                     result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
                 }
             } else if (type === 'data') {
-                if (vtuVendor === 'bigi') {
+                if (vtuVendor === 'bilalsadasub') {
+                    if (!bilalToken) throw new Error("Bilalsadasub API Token missing in settings");
+                    const bilalClient = new BilalsadasubClient(bilalToken);
+                    result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                } else if (vtuVendor === 'bigi') {
                     if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
                     const bigiClient = new BigiClient(bigiToken, bigiPin);
                     result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);

@@ -134,6 +134,7 @@ export default function AdminSettings() {
     const [openAiKey, setOpenAiKey] = useState('');
     const [bigiToken, setBigiToken] = useState('');
     const [bigiPin, setBigiPin] = useState('');
+    const [bilalToken, setBilalToken] = useState('');
 
     // Bigi API & Vendor Setting
     const [vtuVendor, setVtuVendor] = useState('clubkonnect');
@@ -217,6 +218,7 @@ export default function AdminSettings() {
                     if (secret.key === 'OPENAI_API_KEY') setOpenAiKey(secret.value);
                     if (secret.key === 'BIGI_API_TOKEN') setBigiToken(secret.value);
                     if (secret.key === 'BIGI_API_PIN') setBigiPin(secret.value);
+                    if (secret.key === 'BILALSADASUB_TOKEN') setBilalToken(secret.value);
                 });
             }
         } catch (e) { console.error(e); }
@@ -238,7 +240,8 @@ export default function AdminSettings() {
                 { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' },
                 { key: 'OPENAI_API_KEY', value: openAiKey, description: 'OpenAI API Key for Cortex AI' },
                 { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigisub SMS API Token' },
-                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigisub SMS API PIN' }
+                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigisub SMS API PIN' },
+                { key: 'BILALSADASUB_TOKEN', value: bilalToken, description: 'Bilalsadasub API Token' }
             ].filter(k => k.value && k.value.trim() !== '');
 
             if (keysToSave.length > 0) {
@@ -701,18 +704,24 @@ export default function AdminSettings() {
                                 <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
                                     <Text style={[s.label, { color: '#334155' }]}>Select Active VTU Vendor</Text>
                                     <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 12, lineHeight: 16 }}>Choose the provider that will handle Airtime and Data requests. Make sure the API keys for the chosen provider are set in the API Vault.</Text>
-                                    <View style={{ flexDirection: 'row' }}>
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
                                         <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1, marginRight: 8 }]} 
+                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1 }]} 
                                             onPress={() => setVtuVendor('clubkonnect')}
                                         >
                                             <Text style={[s.typeText, vtuVendor === 'clubkonnect' && { color: '#fff' }]}>ClubKonnect</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1, marginLeft: 8 }]} 
+                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1 }]} 
                                             onPress={() => setVtuVendor('bigi')}
                                         >
                                             <Text style={[s.typeText, vtuVendor === 'bigi' && { color: '#fff' }]}>Bigi API</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[s.typeBtn, vtuVendor === 'bilalsadasub' && s.typeBtnActive, { flex: 1 }]} 
+                                            onPress={() => setVtuVendor('bilalsadasub')}
+                                        >
+                                            <Text style={[s.typeText, vtuVendor === 'bilalsadasub' && { color: '#fff' }]}>Bilalsadasub</Text>
                                         </TouchableOpacity>
                                     </View>
                                     
@@ -725,6 +734,10 @@ export default function AdminSettings() {
                                         )}
                                     </TouchableOpacity>
                                 </View>
+
+                                <View style={s.divider} />
+                                <Text style={[s.label, { color: '#334155', marginBottom: 8 }]}>Bilalsadasub API Credentials</Text>
+                                <ApiInputRow placeholder="Bilalsadasub API Token" value={bilalToken} onChangeText={setBilalToken} isSecret={true} />
                             </View>
                         )}
 
