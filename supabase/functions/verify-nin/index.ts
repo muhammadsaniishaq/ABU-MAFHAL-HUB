@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// AgentHub base URL
+const AGENTHUB_BASE = 'https://agenthub.ng/api';
+
 // Always return HTTP 200 so SDK can read actual error body
 const jsonOk = (body: object) =>
   new Response(JSON.stringify(body), {
@@ -45,7 +48,7 @@ serve(async (req: Request) => {
     console.log('Auth OK for user:', user.id)
 
     const requestData = await req.json()
-    const { type, value, firstname, lastname, dob, gender } = requestData
+    const { type, value, firstname, lastname, dob, gender, service_code } = requestData
 
     const searchType = requestData.searchType || type
     const searchValue = requestData.searchValue || value
@@ -53,7 +56,6 @@ serve(async (req: Request) => {
     if (!searchType) {
       return jsonOk({ error: 'Missing search type' })
     }
-
 
     const priceId = requestData.priceId;
     if (!priceId) {
@@ -115,108 +117,114 @@ serve(async (req: Request) => {
         description: description
     });
 
-    // 2. Call IDPRO API
-    // Retrieve IDPRO API Key from system_secrets or environment
-    let IDPRO_API_KEY = Deno.env.get('IDPRO_API_KEY');
-    if (!IDPRO_API_KEY) {
+    // ── Retrieve AgentHub API Key ─────────────────────────────────────────────
+    let AGENTHUB_API_KEY = Deno.env.get('AGENTHUB_API_KEY');
+    if (!AGENTHUB_API_KEY) {
         const { data: secrets } = await supabaseAdmin
             .from('system_secrets')
             .select('value')
-            .eq('key', 'IDPRO_API_KEY')
+            .eq('key', 'AGENTHUB_API_KEY')
             .single();
         if (secrets && secrets.value) {
-            IDPRO_API_KEY = secrets.value;
+            AGENTHUB_API_KEY = secrets.value;
         }
     }
 
-    if (!IDPRO_API_KEY) {
-        // If API key is missing, refund the user
-        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: IDPRO API key not configured`);
-        console.error('IDPRO_API_KEY is not set in environment or system_secrets table')
+    if (!AGENTHUB_API_KEY) {
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: AgentHub API key not configured`);
+        console.error('AGENTHUB_API_KEY is not set in environment or system_secrets table')
         return jsonOk({ error: 'Verification service is not configured. Please contact support.' })
     }
 
-    let endpoint = 'https://idpro.ng/api/v1/nin';
+    // ── Build AgentHub endpoint & payload ────────────────────────────────────
+    let endpoint = '';
     let bodyPayload: any = {};
-    
-    // Switch between all the IDPRO services
+
     switch (searchType) {
-        case 'nin':
-            endpoint = 'https://idpro.ng/api/v1/nin';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'phone':
-            endpoint = 'https://idpro.ng/api/v1/phone';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'demographic':
-            endpoint = 'https://idpro.ng/api/v1/demo';
-            bodyPayload = { 
-                firstname, 
-                lastname, 
-                gender, 
-                dob 
-            };
-            break;
-        case 'bvn':
-            endpoint = 'https://idpro.ng/api/v1/bvn';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'bvn-phone':
-            endpoint = 'https://idpro.ng/api/v1/bvn-phone';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'bvn-card':
-            endpoint = 'https://idpro.ng/api/v1/bvncard';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'tracking-id':
-            endpoint = 'https://idpro.ng/api/v1/tracking-id';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'tracking-id-status':
-            endpoint = 'https://idpro.ng/api/v1/tracking-id/status';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'ipe':
-            endpoint = 'https://idpro.ng/api/v1/ipe';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'ipe-status':
-            endpoint = 'https://idpro.ng/api/v1/ipe/status';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'val':
-            endpoint = 'https://idpro.ng/api/v1/val';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'val-status':
-            endpoint = 'https://idpro.ng/api/v1/val/status';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'val-slip':
-            endpoint = 'https://idpro.ng/api/v1/val/slip';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'delink':
-            endpoint = 'https://idpro.ng/api/v1/delink';
-            bodyPayload = { number: searchValue };
-            break;
-        case 'delink-status':
-            endpoint = 'https://idpro.ng/api/v1/delink/status';
-            bodyPayload = { number: searchValue };
-            break;
-        default:
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid verification type`);
-            return jsonOk({ error: `Invalid verification type: ${searchType}` })
+
+      // ── NIN Verification ───────────────────────────────────────────────────
+      case 'nin':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+        bodyPayload = { nin: searchValue };
+        break;
+
+      // ── NIN Slip (PDF) ─────────────────────────────────────────────────────
+      // service_code: 401 = Premium, 402 = Standard, 403 = Regular (NIMC layout)
+      case 'nin-slip':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
+        bodyPayload = {
+          nin: searchValue,
+          service_code: service_code || requestData.service_code || '403',
+        };
+        break;
+
+      // ── Phone → NIN Lookup ─────────────────────────────────────────────────
+      case 'phone':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/phone-verify`;
+        bodyPayload = { phone: searchValue };
+        break;
+
+      // ── Demographic Verification ───────────────────────────────────────────
+      case 'demographic':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/demographic`;
+        bodyPayload = { firstname, lastname, gender, dob };
+        break;
+
+      // ── BVN Verification ───────────────────────────────────────────────────
+      case 'bvn':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn`;
+        bodyPayload = { bvn: searchValue };
+        break;
+
+      // ── BVN by Phone ───────────────────────────────────────────────────────
+      case 'bvn-phone':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-phone`;
+        bodyPayload = { phone: searchValue };
+        break;
+
+      // ── BVN Card ───────────────────────────────────────────────────────────
+      case 'bvn-card':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-card`;
+        bodyPayload = { bvn: searchValue };
+        break;
+
+      // ── NIN Tracking / Personalization ─────────────────────────────────────
+      case 'tracking-id':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+        bodyPayload = { nin: searchValue };
+        break;
+
+      // ── IPE Clearance ──────────────────────────────────────────────────────
+      // AgentHub does not have a separate IPE endpoint; use NIN verification
+      case 'ipe':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+        bodyPayload = { nin: searchValue };
+        break;
+
+      // ── Identity Validation ────────────────────────────────────────────────
+      case 'val':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+        bodyPayload = { nin: searchValue };
+        break;
+
+      // ── Delink (no direct AgentHub equivalent, use NIN) ────────────────────
+      case 'delink':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+        bodyPayload = { nin: searchValue };
+        break;
+
+      default:
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid verification type`);
+        return jsonOk({ error: `Invalid verification type: ${searchType}` })
     }
 
     try {
-        console.log(`Calling IDPRO API: ${endpoint} with payload:`, bodyPayload);
+        console.log(`Calling AgentHub API: ${endpoint} with payload:`, bodyPayload);
+
         const apiResponse = await fetch(endpoint, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${IDPRO_API_KEY}`,
+                'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
@@ -224,21 +232,50 @@ serve(async (req: Request) => {
         });
 
         const responseData = await apiResponse.json();
-        
-        // Handle IDPro statuses: "success", "pending" (for tracking/ipe), "failed"
-        const idproStatus = (responseData.status || '').toLowerCase();
-        if (idproStatus !== 'success' && idproStatus !== 'pending') {
-            console.error('IDPRO API Error:', responseData);
-            const idproMsg = responseData.message || 'NIN not found or verification failed';
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: ${idproMsg}`);
-            return jsonOk({ error: idproMsg, details: responseData })
+
+        // ── AgentHub response format ───────────────────────────────────────────
+        // Success: { status: true,  message: "...", data: {...} }
+        // Slip:    { status: true,  message: "Slip Generated Successfully", pdf_base64: "..." }
+        // Failure: { status: false, error:   "...", message: "Refunded" }
+        //
+        // Note: AgentHub uses boolean status (not string like IDPro)
+
+        if (responseData.status === true) {
+            // For NIN slip, return the pdf_base64 directly
+            if (searchType === 'nin-slip' && responseData.pdf_base64) {
+                return jsonOk({
+                    data: {
+                        status: 'success',
+                        message: responseData.message || 'Slip Generated Successfully',
+                        pdf_base64: responseData.pdf_base64,
+                    }
+                });
+            }
+
+            // Standard identity response — wrap in consistent structure
+            return jsonOk({
+                data: {
+                    status: 'success',
+                    message: responseData.message || 'Verification Successful',
+                    data: responseData.data ?? responseData,
+                }
+            });
         }
 
-        return jsonOk({ data: responseData })
+        // ── AgentHub failure ───────────────────────────────────────────────────
+        console.error('AgentHub API Error:', responseData);
+        const agentHubMsg =
+            responseData.error ||
+            responseData.message ||
+            'Verification failed. Record not found.';
+
+        // AgentHub already refunds on their side ("message": "Refunded")
+        // But we still refund the user's wallet locally since we charged them upfront
+        await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: ${agentHubMsg}`);
+        return jsonOk({ error: agentHubMsg, details: responseData });
 
     } catch (apiError: any) {
-        console.error('IDPRO Fetch Error:', apiError);
-        // Refund on network error
+        console.error('AgentHub Fetch Error:', apiError);
         await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Network error during verification`);
         return jsonOk({ error: 'Failed to reach verification provider. Please try again.' })
     }
@@ -250,7 +287,6 @@ serve(async (req: Request) => {
 })
 
 async function refundUser(supabaseAdmin: any, userId: string, amount: number, reason: string) {
-    // Fetch current balance
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('balance')

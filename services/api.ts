@@ -17,8 +17,8 @@ const airtimeProvider: AirtimeProvider = ClubKonnectProvider;
 // const airtimeProvider: AirtimeProvider = MockAirtimeProvider; // Backup
 const dataProvider: DataProvider = ClubKonnectProvider;
 const cryptoExchange: CryptoExchange = BinanceCryptoExchange; // Fixed Demo API limit issue
-import { IdProIdentityVerifier } from './idpro';
-const identityVerifier = IdProIdentityVerifier; // Live IdPro Edge Function
+import { AgentHubIdentityVerifier } from './agenthub';
+const identityVerifier = AgentHubIdentityVerifier; // AgentHub Edge Function (replaces IDPro)
 
 export const api = {
     // --- GENERIC HTTP ---

@@ -29,9 +29,9 @@ import { StandardSlip } from '../../../components/StandardSlip';
 import { RegularSlip } from '../../../components/RegularSlip';
 import { InformationSlip } from '../../../components/InformationSlip';
 
-// Simulated API Call
-const API_URL = "https://idpro.ng/api/v1/nin";
-const API_TOKEN = "lv_PhNuAXoBZhcsmsj5nLgh3r0WC6Raph6x"; 
+// API calls are handled via AgentHub Edge Function (services/agenthub.ts)
+const API_URL = "https://agenthub.ng/api/v1/identity/nin"; // AgentHub (was: idpro.ng)
+const API_TOKEN = ""; // Token managed server-side via AGENTHUB_API_KEY secret
 
 const DEFAULT_LAYOUTS = [
     { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
