@@ -158,6 +158,12 @@ serve(async (req: Request) => {
         };
         break;
 
+      // ── VNIN Slip (PDF) ────────────────────────────────────────────────────
+      case 'vnin-slip':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/vnin-slip`;
+        bodyPayload = { nin: searchValue };
+        break;
+
       // ── Phone → NIN Lookup ─────────────────────────────────────────────────
       case 'phone':
         endpoint = `${AGENTHUB_BASE}/v1/identity/phone-verify`;
@@ -241,8 +247,8 @@ serve(async (req: Request) => {
         // Note: AgentHub uses boolean status (not string like IDPro)
 
         if (responseData.status === true) {
-            // For NIN slip, return the pdf_base64 directly
-            if (searchType === 'nin-slip' && responseData.pdf_base64) {
+            // For any PDF slip (nin-slip, vnin-slip, etc.), return pdf_base64 directly
+            if (responseData.pdf_base64) {
                 return jsonOk({
                     data: {
                         status: 'success',

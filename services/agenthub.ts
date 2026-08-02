@@ -146,6 +146,14 @@ export const AgentHubIdentityVerifier = {
       priceId,
     }),
 
+  /**
+   * Generate a printable VNIN Slip PDF (returned as base64)
+   * @param nin - The NIN number
+   * @param priceId - Supabase service_pricing ID
+   */
+  generateVNINSlip: async (nin: string, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('vnin-slip', nin, { priceId }),
+
   /** IPE Clearance (uses NIN endpoint on AgentHub) */
   runIPEClearance: async (number: string, priceId?: string, addonPriceId?: string) =>
     AgentHubIdentityVerifier.invokeEdge('ipe', number, { priceId, addonPriceId }),
