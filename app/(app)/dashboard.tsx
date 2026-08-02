@@ -337,39 +337,44 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
       >
-        {/* ─── HEADER ─── */}
-        <LinearGradient 
-          colors={['#030a1a', '#0a1630', '#0d1b3e']} 
-          style={[s.headerContainer, { paddingTop: insets.top + 6 }]}
+        {/* ─── PREMIUM HEADER ─── */}
+        <LinearGradient
+          colors={['#06112b', '#0d1f4a', '#112660']}
+          style={[s.headerContainer, { paddingTop: insets.top + 12 }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          {/* ── Single compact top row: Avatar + Greeting + Actions ── */}
+          {/* Decorative circles */}
+          <View style={s.decorCircle1} />
+          <View style={s.decorCircle2} />
+
+          {/* ── Top bar: Logo + Brand + Admin + Bell ── */}
           <View style={s.headerTop}>
-            {/* Left: Avatar + name */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Image 
-                source={{ uri: userData?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150' }} 
-                style={s.avatarImage} 
-              />
-              <View style={{ marginLeft: 9, flex: 1 }}>
-                <Text style={s.welcomeSub}>Good day 👋</Text>
-                <Text style={s.welcomeName} numberOfLines={1}>{(userData?.full_name || 'User').split(' ')[0]}</Text>
+            <View style={s.brandRow}>
+              <View style={s.logoWrapper}>
+                <Image
+                  source={logoUrl ? { uri: logoUrl } : (settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
+                  style={s.headerLogo as any}
+                  resizeMode="contain"
+                />
+              </View>
+              <View>
+                <Text style={s.brandTxt}>{firstPart.toUpperCase()}</Text>
+                {rest ? <Text style={s.brandSub}>{rest.toUpperCase()}</Text> : null}
               </View>
             </View>
 
-            {/* Right: Admin badge + bell */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {['admin', 'super_admin'].includes(userData?.role || '') && (
                 <TouchableOpacity onPress={() => router.push('/manage')} style={s.adminConsoleBtn} activeOpacity={0.8}>
                   <LinearGradient colors={['#f5a623', '#d4890e']} style={s.adminConsoleBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                    <Ionicons name="shield-checkmark" size={9} color="#0d1b3e" style={{ marginRight: 2 }} />
+                    <Ionicons name="shield-checkmark" size={10} color="#0d1b3e" style={{ marginRight: 3 }} />
                     <Text style={s.adminConsoleBtnTxt}>Admin</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn} activeOpacity={0.8}>
-                <Ionicons name="notifications-outline" size={18} color={T.white} />
+                <Ionicons name="notifications-outline" size={20} color={T.white} />
                 {unreadCount > 0 && (
                   <View style={s.bellBadge}>
                     <Text style={s.bellBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
@@ -379,23 +384,46 @@ export default function Dashboard() {
             </View>
           </View>
 
-          {/* ── Slim Balance Card ── */}
+          {/* ── Welcome Row ── */}
+          <View style={s.welcomeRow}>
+            <View style={s.avatarWrapper}>
+              <Image
+                source={{ uri: userData?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150' }}
+                style={s.avatarImage}
+              />
+              <View style={s.avatarOnline} />
+            </View>
+            <View style={s.welcomeTextCol}>
+              <Text style={s.welcomeSub}>Welcome back 👋</Text>
+              <Text style={s.welcomeName} numberOfLines={1}>{userData?.full_name || 'Muhammad Sani'}</Text>
+              <View style={[s.verifiedPill, { backgroundColor: isVerified ? 'rgba(74,222,128,0.12)' : 'rgba(251,191,36,0.12)', marginTop: 3 }]}>
+                <Ionicons name={isVerified ? 'checkmark-circle' : 'alert-circle'} size={10} color={isVerified ? '#4ade80' : '#fbbf24'} style={{ marginRight: 3 }} />
+                <Text style={[s.verifiedTxt, { color: isVerified ? '#4ade80' : '#fbbf24' }]}>
+                  {isVerified ? 'Verified Account' : 'Unverified Account'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Floating Balance Card ── */}
           <View style={s.balanceCard}>
             <View style={s.watermarkWrapper}>
-              <Image 
-                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))} 
-                style={s.watermarkImage} resizeMode="contain" 
+              <Image
+                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
+                style={s.watermarkImage} resizeMode="contain"
               />
             </View>
 
-            {/* Balance left side */}
+            {/* Left: Balance info */}
             <View style={s.cardLeft}>
               <View style={s.balanceHeader}>
+                <Ionicons name="wallet-outline" size={11} color="rgba(255,255,255,0.45)" style={{ marginRight: 4 }} />
                 <Text style={s.balanceLabel}>Wallet Balance</Text>
-                <TouchableOpacity onPress={() => setShowBalance(!showBalance)} activeOpacity={0.7} style={{ marginLeft: 5 }}>
-                  <Ionicons name={showBalance ? 'eye-outline' : 'eye-off-outline'} size={13} color="rgba(255,255,255,0.5)" />
+                <TouchableOpacity onPress={() => setShowBalance(!showBalance)} activeOpacity={0.7} style={{ marginLeft: 6 }}>
+                  <Ionicons name={showBalance ? 'eye-outline' : 'eye-off-outline'} size={13} color="rgba(255,255,255,0.45)" />
                 </TouchableOpacity>
               </View>
+
               <View style={s.amountRow}>
                 {showBalance ? (
                   <Text style={s.amountMain}>
@@ -404,30 +432,27 @@ export default function Dashboard() {
                     <Text style={s.amountDec}>{balanceParts.dec}</Text>
                   </Text>
                 ) : (
-                  <Text style={s.amountMain}><Text style={s.amountSymbol}>₦</Text>••••</Text>
+                  <Text style={s.amountMain}><Text style={s.amountSymbol}>₦</Text>••••••</Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Text style={s.availLabel}>Available</Text>
-                <View style={[s.verifiedPill, { backgroundColor: isVerified ? 'rgba(34,197,94,0.15)' : 'rgba(245,166,35,0.15)' }]}>
-                  <Ionicons name={isVerified ? 'checkmark-circle' : 'alert-circle'} size={9} color={isVerified ? '#4ade80' : '#fbbf24'} style={{ marginRight: 2 }} />
-                  <Text style={[s.verifiedTxt, { color: isVerified ? '#4ade80' : '#fbbf24' }]}>{isVerified ? 'Verified' : 'Unverified'}</Text>
-                </View>
-              </View>
+              <Text style={s.availLabel}>Available Balance</Text>
             </View>
 
-            {/* Action buttons right side */}
+            {/* Right: Action buttons */}
             <View style={s.cardRight}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => handleActionPress({ route: '/(app)/wallet', label: 'Top Up' })}
                 style={s.fundBtn} activeOpacity={0.85}
               >
-                <Ionicons name="add" size={13} color={T.navy} />
-                <Text style={s.fundBtnTxt}>Fund</Text>
+                <LinearGradient colors={[T.gold, T.goldDk]} style={s.fundBtnInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Ionicons name="add-circle" size={14} color={T.navy} />
+                  <Text style={s.fundBtnTxt}>Fund Wallet</Text>
+                </LinearGradient>
               </TouchableOpacity>
+
               <TouchableOpacity onPress={() => router.push('/history')} style={s.historyBtn} activeOpacity={0.85}>
-                <Ionicons name="time-outline" size={10} color={T.white} style={{ marginRight: 3 }} />
-                <Text style={s.historyBtnTxt}>History</Text>
+                <Ionicons name="receipt-outline" size={12} color="rgba(255,255,255,0.75)" style={{ marginRight: 4 }} />
+                <Text style={s.historyBtnTxt}>Tx History</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -698,90 +723,114 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
   scrollView: { flex: 1 },
 
-  // ─── Header ───
+  // ─── Premium Header ───
   headerContainer: {
-    paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  decorCircle1: {
+    position: 'absolute', width: 180, height: 180, borderRadius: 90,
+    backgroundColor: 'rgba(245,166,35,0.06)',
+    top: -60, right: -40,
+  },
+  decorCircle2: {
+    position: 'absolute', width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(79,70,229,0.08)',
+    bottom: 0, left: -30,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 18,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoWrapper: {
-    width: 30, height: 30, borderRadius: 9, backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center', padding: 3,
-    shadowColor: T.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+    width: 36, height: 36, borderRadius: 12, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', padding: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5,
   },
-  headerLogo: { width: '100%', height: '100%', borderRadius: 7 },
-  brandTxt: { fontSize: 10.5, fontWeight: '900', color: T.white, letterSpacing: 0.3, lineHeight: 13 },
-  brandSub: { fontSize: 6.5, fontWeight: '700', color: T.gold, letterSpacing: 1.1, lineHeight: 9 },
+  headerLogo: { width: '100%', height: '100%', borderRadius: 8 },
+  brandTxt: { fontSize: 13, fontWeight: '900', color: T.white, letterSpacing: 0.5, lineHeight: 15 },
+  brandSub: { fontSize: 8, fontWeight: '700', color: T.gold, letterSpacing: 1.5, lineHeight: 10 },
   bellBtn: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
   bellBadge: {
-    position: 'absolute', top: -2, right: -2, width: 14, height: 14, borderRadius: 7,
-    backgroundColor: T.gold, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#030a1a',
+    position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: '#06112b', paddingHorizontal: 2,
   },
-  bellBadgeText: { fontSize: 7, fontWeight: '900', color: T.navy },
+  bellBadgeText: { fontSize: 7.5, fontWeight: '900', color: '#fff' },
 
-  // Avatar (now in top row)
+  // Welcome row
+  welcomeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  avatarWrapper: { position: 'relative' },
   avatarImage: {
-    width: 36, height: 36, borderRadius: 11, borderWidth: 1.5, borderColor: T.gold + 'bb',
+    width: 48, height: 48, borderRadius: 24,
+    borderWidth: 2.5, borderColor: T.gold,
     backgroundColor: T.navyMid,
   },
-  welcomeSub: { fontSize: 8.5, color: 'rgba(255,255,255,0.5)', fontWeight: '500' },
-  welcomeName: { fontSize: 13, fontWeight: '800', color: T.white },
-  welcomeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  welcomeTextCol: { flex: 1, marginLeft: 10 },
+  avatarOnline: {
+    position: 'absolute', bottom: 1, right: 1,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#22c55e',
+    borderWidth: 2, borderColor: '#06112b',
+  },
+  welcomeTextCol: { flex: 1, marginLeft: 12 },
+  welcomeSub: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '500', marginBottom: 1 },
+  welcomeName: { fontSize: 16, fontWeight: '900', color: T.white, letterSpacing: 0.2 },
   verifiedPill: {
     flexDirection: 'row', alignItems: 'center', borderRadius: 99,
-    paddingHorizontal: 6, paddingVertical: 2,
+    paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start',
   },
-  verifiedTxt: { fontSize: 7.5, fontWeight: '700' },
+  verifiedTxt: { fontSize: 9, fontWeight: '700' },
 
-  // ─── Slim Balance Card (inside header) ───
+  // ─── Floating Balance Card ───
   balanceCard: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     overflow: 'hidden',
     position: 'relative',
   },
-  watermarkWrapper: { position: 'absolute', right: -14, bottom: -14, width: 90, height: 90, opacity: 0.06 },
+  watermarkWrapper: { position: 'absolute', right: -20, top: -20, width: 100, height: 100, opacity: 0.05 },
   watermarkImage: { width: '100%', height: '100%' },
-  cardLeft: { flex: 1.3 },
-  balanceHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  balanceLabel: { fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: '600', letterSpacing: 0.2 },
-  amountRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  amountSymbol: { fontSize: 15, fontWeight: '700', color: T.white, marginRight: 1 },
-  amountMain: { fontSize: 22, fontWeight: '900', color: T.white, letterSpacing: -0.5 },
-  amountDec: { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.75)' },
-  availLabel: { fontSize: 8, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
-  cardRight: { alignItems: 'stretch', gap: 6, marginLeft: 10, minWidth: 80 },
+  cardLeft: { flex: 1.2 },
+  balanceHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  balanceLabel: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600', letterSpacing: 0.3 },
+  amountRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
+  amountSymbol: { fontSize: 18, fontWeight: '700', color: T.white, marginRight: 1, lineHeight: 34 },
+  amountMain: { fontSize: 30, fontWeight: '900', color: T.white, letterSpacing: -1 },
+  amountDec: { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.6)', marginBottom: 2 },
+  availLabel: { fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  cardRight: { alignItems: 'stretch', gap: 8, marginLeft: 12 },
   fundBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: T.gold, borderRadius: 9, paddingVertical: 8,
-    shadowColor: T.gold, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 5, elevation: 3,
+    borderRadius: 12, overflow: 'hidden',
+    shadowColor: T.gold, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
   },
-  fundBtnTxt: { fontSize: 10, fontWeight: '900', color: T.navy, marginLeft: 2 },
+  fundBtnInner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+  },
+  fundBtnTxt: { fontSize: 11, fontWeight: '900', color: T.navy, marginLeft: 4 },
   historyBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 7,
+    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', paddingVertical: 9,
   },
-  historyBtnTxt: { fontSize: 8.5, fontWeight: '700', color: T.white },
+  historyBtnTxt: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.8)' },
 
   // Banner card
   bannerCard: {
