@@ -1,5 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, Image, Dimensions, Platform, AppState } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { 
+    View, 
+    Text, 
+    Modal, 
+    StyleSheet, 
+    TouchableOpacity, 
+    Image, 
+    Dimensions, 
+    Platform, 
+    AppState,
+    ScrollView 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../services/supabase';
@@ -19,6 +30,12 @@ export default function GlobalAnnouncementModal() {
     const [visible, setVisible] = useState(false);
     const [config, setConfig] = useState<AnnouncementConfig | null>(null);
     const pathname = usePathname();
+
+    // Auto-Scroll Up Refs & State for long announcement text
+    const scrollViewRef = useRef<ScrollView>(null);
+    const scrollY = useRef(0);
+    const contentHeight = useRef(0);
+    const isInteracting = useRef(false);
 
     useEffect(() => {
         // Check when app comes to foreground safely
@@ -52,6 +69,32 @@ export default function GlobalAnnouncementModal() {
         }, [])
     );
 
+    // Auto-Scroll Up Effect when text is long
+    useEffect(() => {
+        if (!visible || !config?.text) return;
+        
+        scrollY.current = 0;
+        const interval = setInterval(() => {
+            if (isInteracting.current || !scrollViewRef.current) return;
+            
+            // Only auto-scroll if text height exceeds visible area (130px)
+            if (contentHeight.current > 130) {
+                scrollY.current += 0.8;
+                if (scrollY.current >= contentHeight.current - 120) {
+                    // Reached end of text: pause 2s then loop back to top
+                    setTimeout(() => {
+                        scrollY.current = 0;
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                    }, 2000);
+                } else {
+                    scrollViewRef.current?.scrollTo({ y: scrollY.current, animated: false });
+                }
+            }
+        }, 40);
+
+        return () => clearInterval(interval);
+    }, [visible, config?.text]);
+
     const checkAnnouncement = async () => {
         try {
             const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'global_announcement').maybeSingle();
@@ -65,7 +108,6 @@ export default function GlobalAnnouncementModal() {
             
             if (typeof data.value === 'object' && data.value !== null) {
                 parsed = data.value as AnnouncementConfig;
-                // Ensure isActive is boolean
                 parsed.isActive = !!parsed.isActive;
             } else if (typeof data.value === 'string' && data.value.trim().startsWith('{')) {
                 try {
@@ -89,7 +131,6 @@ export default function GlobalAnnouncementModal() {
             
             if (!parsed.isActive) return;
 
-            // Removed AsyncStorage last_seen check as per request
             setConfig(parsed);
             setVisible(true);
         } catch (error) {
@@ -116,23 +157,28 @@ export default function GlobalAnnouncementModal() {
                 )}
                 
                 <View style={styles.modalContainer}>
-                    <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
-                        <Ionicons name="close" size={24} color="#fff" />
+                    <TouchableOpacity style={styles.closeBtn} onPress={handleClose} activeOpacity={0.8}>
+                        <Ionicons name="close" size={20} color="#fff" />
                     </TouchableOpacity>
 
+                    {/* Banner Image / Video Container with Crop (resizeMode="cover") */}
                     {config.mediaUrl ? (
                         <View style={styles.mediaContainer}>
                             {config.mediaType === 'video' ? (
                                 <Video
                                     source={{ uri: config.mediaUrl }}
                                     style={styles.media}
-                                    resizeMode={ResizeMode.CONTAIN}
+                                    resizeMode={ResizeMode.COVER}
                                     shouldPlay
                                     isLooping
                                     isMuted={false}
                                 />
                             ) : (
-                                <Image source={{ uri: config.mediaUrl }} style={styles.media} resizeMode="contain" />
+                                <Image 
+                                    source={{ uri: config.mediaUrl }} 
+                                    style={styles.media} 
+                                    resizeMode="cover" 
+                                />
                             )}
                         </View>
                     ) : null}
@@ -140,11 +186,25 @@ export default function GlobalAnnouncementModal() {
                     <View style={styles.textContainer}>
                         <View style={styles.badge}>
                             <Ionicons name="megaphone" size={14} color="#fff" />
-                            <Text style={styles.badgeText}>Announcement</Text>
+                            <Text style={styles.badgeText}>Public Announcement</Text>
                         </View>
-                        <Text style={styles.announcementText}>{config.text}</Text>
 
-                        <TouchableOpacity style={styles.gotItBtn} onPress={handleClose}>
+                        {/* Scroll Container with Auto-Scroll Up for Long Text */}
+                        <View style={styles.scrollWrapper}>
+                            <ScrollView 
+                                ref={scrollViewRef}
+                                style={{ maxHeight: 150 }}
+                                contentContainerStyle={{ paddingVertical: 4 }}
+                                showsVerticalScrollIndicator={false}
+                                onContentSizeChange={(_, h) => { contentHeight.current = h; }}
+                                onTouchStart={() => { isInteracting.current = true; }}
+                                onTouchEnd={() => { setTimeout(() => { isInteracting.current = false; }, 3000); }}
+                            >
+                                <Text style={styles.announcementText}>{config.text}</Text>
+                            </ScrollView>
+                        </View>
+
+                        <TouchableOpacity style={styles.gotItBtn} onPress={handleClose} activeOpacity={0.85}>
                             <Text style={styles.gotItText}>Got it!</Text>
                         </TouchableOpacity>
                     </View>
@@ -159,7 +219,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.6)', // fallback for android if BlurView not supported well
+        backgroundColor: 'rgba(0,0,0,0.65)',
         padding: 20
     },
     modalContainer: {
@@ -176,27 +236,28 @@ const styles = StyleSheet.create({
     },
     closeBtn: {
         position: 'absolute',
-        top: 16,
-        right: 16,
+        top: 14,
+        right: 14,
         zIndex: 10,
-        width: 36,
-        height: 36,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center'
     },
     mediaContainer: {
         width: '100%',
-        height: width * 0.6,
-        backgroundColor: '#f1f5f9'
+        height: 220,
+        backgroundColor: '#0f172a',
+        overflow: 'hidden'
     },
     media: {
         width: '100%',
         height: '100%'
     },
     textContainer: {
-        padding: 24,
+        padding: 20,
         alignItems: 'center'
     },
     badge: {
@@ -204,35 +265,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#8B5CF6',
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 5,
         borderRadius: 20,
-        marginBottom: 16
+        marginBottom: 12
     },
     badgeText: {
         color: '#fff',
-        fontSize: 12,
-        fontWeight: '700',
+        fontSize: 11,
+        fontWeight: '800',
         marginLeft: 4,
         letterSpacing: 0.5
     },
+    scrollWrapper: {
+        width: '100%',
+        maxHeight: 150,
+        marginBottom: 20
+    },
     announcementText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: '#0F172A',
         textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: 24
+        lineHeight: 23
     },
     gotItBtn: {
         backgroundColor: '#060d21',
         width: '100%',
-        paddingVertical: 16,
+        paddingVertical: 14,
         borderRadius: 16,
         alignItems: 'center'
     },
     gotItText: {
         color: '#fff',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '800',
         letterSpacing: 0.5
     }
