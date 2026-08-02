@@ -511,11 +511,11 @@ export default function AdminSettings() {
                             <View style={{ marginTop: 12, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', padding: 12, borderRadius: 14 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                     <Ionicons name="information-circle" size={16} color="#d97706" />
-                                    <Text style={{ color: '#b45309', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>Recommended Banner Size & Dimensions</Text>
+                                    <Text style={{ color: '#b45309', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>Recommended Sleek Banner Dimensions</Text>
                                 </View>
                                 <Text style={{ color: '#78350f', fontSize: 11, lineHeight: 16, fontWeight: '500' }}>
-                                    • <Text style={{ fontWeight: '700' }}>Recommended Resolution:</Text> 1200 x 600 px (or 1080 x 540 px){'\n'}
-                                    • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2 : 1 (Landscape Wide){'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
+                                    • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
                                     • <Text style={{ fontWeight: '700' }}>File Format:</Text> High-quality JPG, PNG, or WEBP (under 2 MB)
                                 </Text>
                             </View>
@@ -523,7 +523,7 @@ export default function AdminSettings() {
                             {/* LIVE CROP PREVIEW IN ADMIN SETTINGS */}
                             {announcementUrl ? (
                                 <View style={{ marginTop: 12, backgroundColor: '#0f172a', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}>
-                                    <View style={{ height: 180, backgroundColor: '#1e293b', overflow: 'hidden' }}>
+                                    <View style={{ height: 130, backgroundColor: '#1e293b', overflow: 'hidden' }}>
                                         <Image 
                                             source={{ uri: announcementUrl }} 
                                             style={{ width: '100%', height: '100%' }} 
@@ -531,7 +531,7 @@ export default function AdminSettings() {
                                         />
                                     </View>
                                     <View style={{ padding: 12, alignItems: 'center' }}>
-                                        <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Live Cropped Banner Preview (280px Display) ✨</Text>
+                                        <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sleek Cropped Banner Preview (180px Display) ✨</Text>
                                         {announcementText ? (
                                             <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' }} numberOfLines={2}>
                                                 {announcementText}

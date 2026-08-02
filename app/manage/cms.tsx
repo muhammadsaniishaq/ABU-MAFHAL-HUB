@@ -608,11 +608,11 @@ export default function ContentManager() {
                         <View className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl mb-4">
                             <View className="flex-row items-center gap-1.5 mb-1">
                                 <Ionicons name="information-circle" size={16} color="#d97706" />
-                                <Text className="font-bold text-xs text-amber-800 uppercase tracking-wide">Recommended Banner Specifications</Text>
+                                <Text className="font-bold text-xs text-amber-800 uppercase tracking-wide">Recommended Sleek Banner Dimensions</Text>
                             </View>
                             <Text className="text-[11px] text-amber-900 leading-4 font-medium">
-                                • <Text className="font-bold">Recommended Resolution:</Text> 1200 x 600 px (or 1080 x 540 px){'\n'}
-                                • <Text className="font-bold">Aspect Ratio:</Text> 2 : 1 (Landscape Wide Banner){'\n'}
+                                • <Text className="font-bold">Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
+                                • <Text className="font-bold">Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
                                 • <Text className="font-bold">Format:</Text> High quality JPG, PNG, or WEBP (Under 2 MB)
                             </Text>
                         </View>
@@ -620,7 +620,7 @@ export default function ContentManager() {
                         {/* LIVE CROPPED BANNER PREVIEW */}
                         {announcementUrl ? (
                             <View className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 mb-5">
-                                <View className="h-44 bg-slate-800 overflow-hidden">
+                                <View className="h-32 bg-slate-800 overflow-hidden">
                                     <Image 
                                         source={{ uri: announcementUrl }} 
                                         className="w-full h-full" 
@@ -628,7 +628,7 @@ export default function ContentManager() {
                                     />
                                 </View>
                                 <View className="p-3 items-center">
-                                    <Text className="text-amber-400 font-extrabold text-[10px] uppercase tracking-wider">Live Cropped Banner Preview (280px Display) ✨</Text>
+                                    <Text className="text-amber-400 font-extrabold text-[10px] uppercase tracking-wider">Sleek Cropped Banner Preview (180px Display) ✨</Text>
                                     {announcementText ? (
                                         <Text className="text-white font-medium text-xs mt-1 text-center" numberOfLines={2}>
                                             {announcementText}
