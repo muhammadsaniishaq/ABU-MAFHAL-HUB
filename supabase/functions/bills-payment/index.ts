@@ -83,6 +83,78 @@ Deno.serve(async (req: Request) => {
             .eq('key', 'vtu_vendor');
         const vtuVendor = settingsData && settingsData.length > 0 ? settingsData[0].value : 'clubkonnect';
 
+        // Handle Airtime to Cash actions directly before balance deduction
+        if (type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
+            if (!bilalToken) {
+                throw new Error("Bilalsadasub API Token not configured in Admin Settings. Please set BILALSADASUB_TOKEN in API Vault.");
+            }
+            const bilalClient = new BilalsadasubClient(bilalToken);
+
+            if (type === 'cash_rates') {
+                const rates = await bilalClient.getCashRates();
+                return new Response(JSON.stringify({ success: true, data: rates }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
+            const pParams = data.providerParams || data;
+            const netVal = pParams.network;
+            const phoneVal = pParams.phone;
+
+            if (type === 'cash_step1') {
+                console.log(`[Bills] Airtime to Cash Step 1 (Request OTP) for ${phoneVal} on network ${netVal}`);
+                const step1Res = await bilalClient.requestCashOtp(netVal, phoneVal);
+                return new Response(JSON.stringify({ success: true, data: step1Res }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
+            if (type === 'cash_step2') {
+                console.log(`[Bills] Airtime to Cash Step 2 (Verify OTP) for ${phoneVal}`);
+                const step2Res = await bilalClient.verifyCashOtp(netVal, phoneVal, pParams.otp, pParams.sessionBlob);
+                return new Response(JSON.stringify({ success: true, data: step2Res }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
+            if (type === 'cash_step3') {
+                console.log(`[Bills] Airtime to Cash Step 3 (Finalise) for ${phoneVal}, amount: ₦${pParams.amount}`);
+                const step3Res = await bilalClient.finaliseCashConversion(
+                    netVal,
+                    phoneVal,
+                    Number(pParams.amount),
+                    pParams.sharePin,
+                    pParams.sessionBlob
+                );
+
+                // Credit user wallet with converted cash amount
+                const creditedAmount = parseFloat(step3Res.credited || (Number(pParams.amount) * 0.8));
+                if (creditedAmount > 0 && userId) {
+                    await rpcClient.rpc('deduct_balance', {
+                        user_id_param: userId,
+                        amount_param: -creditedAmount
+                    });
+
+                    await rpcClient.from('transactions').insert({
+                        user_id: userId,
+                        type: 'credit',
+                        amount: creditedAmount,
+                        status: 'completed',
+                        reference: step3Res.transid || `AC_${Date.now()}`,
+                        description: `Airtime to Cash (${phoneVal}) -> +₦${creditedAmount.toLocaleString()}`
+                    });
+                }
+
+                return new Response(JSON.stringify({ success: true, data: step3Res }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+        }
+
         // 2. Determine Pricing & Parameters
         let amountToCharge = 0;
         const client = new ClubKonnectClient(ckUserId, ckApiKey);
@@ -200,73 +272,6 @@ Deno.serve(async (req: Request) => {
                         status: 200
                     });
                 }
-            }
-
-            if (type === 'cash_rates') {
-                if (!bilalToken) throw new Error("Bilalsadasub Token not configured in settings");
-                const bilalClient = new BilalsadasubClient(bilalToken);
-                const rates = await bilalClient.getCashRates();
-                return new Response(JSON.stringify({ success: true, data: rates }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200
-                });
-            }
-
-            if (type === 'cash_step1') {
-                if (!bilalToken) throw new Error("Bilalsadasub Token missing in settings");
-                const bilalClient = new BilalsadasubClient(bilalToken);
-                const step1Res = await bilalClient.requestCashOtp(providerParams.network, providerParams.phone);
-                return new Response(JSON.stringify({ success: true, data: step1Res }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200
-                });
-            }
-
-            if (type === 'cash_step2') {
-                if (!bilalToken) throw new Error("Bilalsadasub Token missing in settings");
-                const bilalClient = new BilalsadasubClient(bilalToken);
-                const step2Res = await bilalClient.verifyCashOtp(providerParams.network, providerParams.phone, providerParams.otp, providerParams.sessionBlob);
-                return new Response(JSON.stringify({ success: true, data: step2Res }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200
-                });
-            }
-
-            if (type === 'cash_step3') {
-                if (!bilalToken) throw new Error("Bilalsadasub Token missing in settings");
-                const bilalClient = new BilalsadasubClient(bilalToken);
-                const step3Res = await bilalClient.finaliseCashConversion(
-                    providerParams.network,
-                    providerParams.phone,
-                    providerParams.amount,
-                    providerParams.sharePin,
-                    providerParams.sessionBlob
-                );
-
-                // Credit user wallet with converted cash amount
-                const creditedAmount = parseFloat(step3Res.credited || (providerParams.amount * 0.8));
-                if (creditedAmount > 0 && user) {
-                    // Deduct negative amount = credit user balance
-                    await rpcClient.rpc('deduct_balance', {
-                        user_id_param: user.id,
-                        amount_param: -creditedAmount
-                    });
-
-                    // Log credit transaction
-                    await rpcClient.from('transactions').insert({
-                        user_id: user.id,
-                        type: 'credit',
-                        amount: creditedAmount,
-                        status: 'completed',
-                        reference: step3Res.transid || `AC_${Date.now()}`,
-                        description: `Airtime to Cash (${providerParams.phone}) -> +₦${creditedAmount.toLocaleString()}`
-                    });
-                }
-
-                return new Response(JSON.stringify({ success: true, data: step3Res }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200
-                });
             }
 
             if (type === 'airtime' || type === 'data') {
