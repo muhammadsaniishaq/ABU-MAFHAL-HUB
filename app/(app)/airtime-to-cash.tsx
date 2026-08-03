@@ -353,22 +353,17 @@ export default function AirtimeToCashScreen() {
 
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
                 
-                {/* Curved Navy Header with Prominent Wallet Balance */}
+                {/* Curved Navy Header with Clean Centered Title */}
                 <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={s.headerContainer}>
                     <View style={s.headerTop}>
                         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
                             <Ionicons name="arrow-back" size={18} color="white" />
                         </TouchableOpacity>
-                        <View style={{ alignItems: 'center' }}>
+                        <View style={{ flex: 1, alignItems: 'center' }}>
                             <Text style={s.headerTitle}>Airtime ➔ Cash</Text>
                             <Text style={s.headerSubtitle}>Convert airtime directly into wallet cash</Text>
                         </View>
-                        <View style={s.headerBalanceBadge}>
-                            <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
-                            <Text style={s.headerBalanceVal}>
-                                ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
-                            </Text>
-                        </View>
+                        <View style={{ width: 32 }} />
                     </View>
                 </LinearGradient>
 
