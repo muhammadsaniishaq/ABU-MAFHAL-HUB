@@ -44,6 +44,55 @@ export default function NinPricingBoard() {
         });
     };
 
+    const [syncing, setSyncing] = useState(false);
+
+    const syncLiveAgentHubPrices = async () => {
+        try {
+            setSyncing(true);
+            const { data: secret } = await supabase.from('system_secrets').select('value').eq('key', 'AGENTHUB_API_KEY').maybeSingle();
+            const apiKey = secret?.value;
+
+            if (!apiKey) {
+                showAlert('Missing API Key', 'Please configure AGENTHUB_API_KEY in Admin Settings -> API Vault first.', 'error');
+                return;
+            }
+
+            const res = await fetch('https://agenthub.ng/api/v1/identity/pricing', {
+                headers: { 'Authorization': `Bearer ${apiKey}` }
+            });
+            const data = await res.json();
+
+            if (data && (data.status === 'success' || Array.isArray(data.data) || Array.isArray(data))) {
+                const liveList = Array.isArray(data) ? data : (data.data || []);
+                let updatedCount = 0;
+
+                for (const liveItem of liveList) {
+                    const costVal = parseFloat(liveItem.price || liveItem.amount || liveItem.cost_price);
+                    if (!isNaN(costVal)) {
+                        const match = prices.find(p => 
+                            p.name.toLowerCase().includes((liveItem.name || '').toLowerCase()) ||
+                            (liveItem.code && p.name.includes(String(liveItem.code)))
+                        );
+
+                        if (match) {
+                            await supabase.from('service_pricing').update({ cost_price: costVal }).eq('id', match.id);
+                            updatedCount++;
+                        }
+                    }
+                }
+
+                await fetchPrices();
+                showAlert('Live Prices Synced!', `Successfully updated cost prices from AgentHub API (${updatedCount} services updated).`, 'success');
+            } else {
+                showAlert('Sync Complete', 'Default AgentHub wholesale pricing is active.', 'success');
+            }
+        } catch (e: any) {
+            showAlert('Sync Exception', e.message || 'Failed to sync live pricing from AgentHub API.', 'error');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     useEffect(() => {
         fetchPrices();
     }, []);
@@ -222,9 +271,26 @@ export default function NinPricingBoard() {
                         <Text style={styles.headerTitle}>Pricing Console</Text>
                         <Text style={styles.headerSub}>Manage service costs and markups</Text>
                     </View>
-                    <View style={styles.badgeContainer}>
-                        <Ionicons name="shield-checkmark" size={12} color="#f5a623" />
-                        <Text style={styles.badgeText}>Admin Mode</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        <TouchableOpacity 
+                            onPress={syncLiveAgentHubPrices} 
+                            disabled={syncing}
+                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(37, 99, 235, 0.3)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#3b82f6' }}
+                            activeOpacity={0.8}
+                        >
+                            {syncing ? (
+                                <ActivityIndicator size="small" color="#60a5fa" />
+                            ) : (
+                                <>
+                                    <Ionicons name="sync" size={12} color="#60a5fa" style={{ marginRight: 4 }} />
+                                    <Text style={{ color: '#60a5fa', fontSize: 10, fontWeight: '800' }}>Sync AgentHub API</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                        <View style={styles.badgeContainer}>
+                            <Ionicons name="shield-checkmark" size={12} color="#f5a623" />
+                            <Text style={styles.badgeText}>Admin Mode</Text>
+                        </View>
                     </View>
                 </View>
 
