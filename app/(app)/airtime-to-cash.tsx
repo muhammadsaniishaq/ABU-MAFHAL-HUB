@@ -157,35 +157,39 @@ export default function AirtimeToCashScreen() {
     // 2. Verify OTP Action
     const handleVerifyOtp = async () => {
         const net = getSelectedNetwork();
-        if (!otp || otp.trim().length < (net.otpLength || 4)) {
-            Alert.alert("Validation Error", `Please enter the ${net.otpLength}-digit OTP sent to your phone.`);
-            return;
+        const cleanOtp = (otp || '').trim();
+
+        if (!cleanOtp || cleanOtp.length < (net.otpLength || 4)) {
+            showNotify("Validation Error", `Please enter the ${net.otpLength || 4}-digit OTP code sent via SMS to your line.`, "error");
+            return false;
         }
 
-        // If user enters OTP before tapping Send OTP, auto-send step 1 first
         if (!sessionBlob) {
-            await handleSendOtp();
-            return;
+            showNotify("OTP Session Missing", "Please tap 'Send OTP to Line' first to receive an SMS security code before verifying.", "error");
+            return false;
         }
 
         setLoadingVerify(true);
+        setStatusBanner({ text: `Verifying ${cleanOtp} with telecom provider...`, type: 'info' });
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
+            console.log(`[AirtimeToCash] Invoking cash_step2 for phone ${phone}, otp ${cleanOtp}`);
             const { data: response, error } = await supabase.functions.invoke('bills-payment', {
                 body: {
                     type: 'cash_step2',
                     providerParams: {
                         network: parseInt(networkId, 10),
                         phone: phone.trim(),
-                        otp: otp.trim(),
+                        otp: cleanOtp,
                         sessionBlob: sessionBlob
                     }
                 }
             });
 
             if (error || !response?.success) {
-                throw new Error(response?.error || response?.message || error?.message || "Invalid OTP code.");
+                const errMsg = response?.error || response?.message || error?.message || "Invalid OTP code entered.";
+                throw new Error(errMsg);
             }
 
             const newBlob = response?.data?.data;
@@ -196,9 +200,13 @@ export default function AirtimeToCashScreen() {
 
             setOtpVerified(true);
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            Alert.alert("OTP Verified", "OTP code verified successfully! You can now complete your conversion.");
+
+            showNotify("OTP Verified ✓", response?.data?.message || "Line verified successfully! Now enter amount & Share PIN below.", "success");
+            return true;
         } catch (err: any) {
-            Alert.alert("OTP Verification Failed", err.message || "OTP verification failed. Please check code or click Send OTP.");
+            console.error("[AirtimeToCash] Error in cash_step2:", err);
+            showNotify("OTP Verification Failed", err.message || "Invalid OTP. Please check the code or tap 'Send OTP to Line' again.", "error");
+            return false;
         } finally {
             setLoadingVerify(false);
         }
@@ -206,26 +214,34 @@ export default function AirtimeToCashScreen() {
 
     // 3. Finalise Conversion Action
     const handleConvertAirtime = async () => {
+        // Smart fallback: If user hasn't tapped verify yet, auto-verify OTP first!
+        if (!otpVerified) {
+            const verifiedOk = await handleVerifyOtp();
+            if (!verifiedOk) return;
+        }
+
         const numAmount = parseFloat(amount);
         if (isNaN(numAmount) || numAmount < 50) {
-            Alert.alert("Validation Error", "Minimum airtime amount to convert is ₦50.");
+            showNotify("Validation Error", "Minimum airtime amount to convert is ₦50.", "error");
             return;
         }
 
         if (airtimeBalance !== null && numAmount > airtimeBalance) {
-            Alert.alert("Validation Error", `Amount exceeds your airtime balance of ₦${airtimeBalance.toLocaleString()}`);
+            showNotify("Validation Error", `Amount exceeds your current airtime balance of ₦${airtimeBalance.toLocaleString()}`, "error");
             return;
         }
 
         if (!sharePin || sharePin.trim().length < 4) {
-            Alert.alert("Validation Error", "Please enter your 4-digit Share & Sell PIN.");
+            showNotify("Validation Error", "Please enter your 4-digit Share & Sell PIN.", "error");
             return;
         }
 
         setLoadingConvert(true);
+        setStatusBanner({ text: `Processing ₦${numAmount.toLocaleString()} airtime conversion...`, type: 'info' });
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
         try {
+            console.log(`[AirtimeToCash] Invoking cash_step3 for phone ${phone}, amount ₦${numAmount}`);
             const { data: response, error } = await supabase.functions.invoke('bills-payment', {
                 body: {
                     type: 'cash_step3',
@@ -240,7 +256,8 @@ export default function AirtimeToCashScreen() {
             });
 
             if (error || !response?.success) {
-                throw new Error(response?.error || response?.message || error?.message || "Airtime conversion failed.");
+                const errMsg = response?.error || response?.message || error?.message || "Airtime conversion failed.";
+                throw new Error(errMsg);
             }
 
             const credited = response?.data?.credited || (numAmount * (getBuybackPct() / 100));
@@ -266,7 +283,8 @@ export default function AirtimeToCashScreen() {
                 }
             });
         } catch (err: any) {
-            Alert.alert("Conversion Failed", err.message || "Failed to convert airtime. Please restart step 1.");
+            console.error("[AirtimeToCash] Error in cash_step3:", err);
+            showNotify("Conversion Failed", err.message || "Failed to convert airtime to cash.", "error");
         } finally {
             setLoadingConvert(false);
         }
