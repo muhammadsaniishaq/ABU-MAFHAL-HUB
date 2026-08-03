@@ -81,7 +81,7 @@ export default function AirtimeToCashScreen() {
             if (prof) {
                 if (prof.phone) {
                     setUserPhone(prof.phone);
-                    if (!phone) setPhone(prof.phone);
+                    handlePhoneChange(prof.phone);
                 }
                 setWalletBalance(prof.balance || 0);
             }
@@ -98,12 +98,17 @@ export default function AirtimeToCashScreen() {
         }
     };
 
+    // Auto-detect Network from phone prefix (MTN vs Airtel)
     const detectNetworkFromPhone = (num: string): string | null => {
-        const clean = num.replace(/[^0-9]/g, '');
+        if (!num) return null;
+        let clean = num.replace(/[^0-9]/g, '');
+        if (clean.startsWith('234')) {
+            clean = '0' + clean.substring(3);
+        }
         if (clean.length < 4) return null;
         const prefix = clean.substring(0, 4);
 
-        const mtnPrefixes = ['0803','0806','0813','0816','0810','0814','0903','0906','0703','0706','0913','0916','0702','0704'];
+        const mtnPrefixes = ['0803','0806','0813','0816','0810','0814','0903','0906','0703','0706','0913','0916','0702','0704','0707'];
         const airtelPrefixes = ['0802','0808','0812','0708','0701','0902','0907','0901','0912'];
 
         if (mtnPrefixes.includes(prefix)) return '1'; // MTN
@@ -118,6 +123,8 @@ export default function AirtimeToCashScreen() {
             setNetworkId(autoNet);
         }
     };
+
+    // Filter ONLY active networks (default MTN & AIRTEL)
     const getAvailableNetworks = () => {
         if (rates.length > 0) {
             const activeList = ALL_NETWORKS.filter(net => rates.some((r: any) => r.plan_id === net.id || (r.network || '').toLowerCase().includes(net.key)));
@@ -140,9 +147,11 @@ export default function AirtimeToCashScreen() {
 
     // 1. Send OTP Action
     const handleSendOtp = async () => {
-        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        let cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('234')) cleanPhone = '0' + cleanPhone.substring(3);
+
         if (!cleanPhone || cleanPhone.length < 11) {
-            showNotify("Validation Error", "Please enter a valid 11-digit phone number holding the airtime.", "error");
+            showNotify("Validation Error", "Please enter a valid 11-digit phone number.", "error");
             return;
         }
 
@@ -173,7 +182,7 @@ export default function AirtimeToCashScreen() {
             setSessionBlob(blob);
             setOtpSent(true);
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            showNotify("OTP Sent", response.data.message || `OTP security code successfully sent to ${cleanPhone}`, "success");
+            showNotify("OTP Sent ✓", response.data.message || `SMS security code sent to ${cleanPhone}. Enter OTP below to continue.`, "success");
         } catch (err: any) {
             console.error("[AirtimeToCash] Error in cash_step1:", err);
             showNotify("Error Sending OTP", err.message || "Failed to send OTP. Please check phone number and retry.", "error");
@@ -240,19 +249,24 @@ export default function AirtimeToCashScreen() {
         }
     };
 
-    // 3. Finalise Conversion Action (100% EXPLICIT AND ACTIVE)
+    // 3. Seamless Combined Submit Action (Send OTP -> Verify -> Finalise in 1 Flow)
     const handleConvertAirtime = async () => {
-        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        let cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('234')) cleanPhone = '0' + cleanPhone.substring(3);
+
         if (!cleanPhone || cleanPhone.length < 11) {
             showNotify("Validation Error", "Please enter a valid 11-digit phone number.", "error");
             return;
         }
 
-        if (!sessionBlob) {
-            showNotify("Missing OTP Step", "Please enter phone number and tap 'Send OTP to Line' first to receive security code.", "error");
+        // Auto-Trigger Step 1 if OTP was not sent yet
+        if (!sessionBlob && !otpSent) {
+            await handleSendOtp();
+            showNotify("OTP Sent", "Security OTP has been sent to your line. Please enter the OTP code to complete conversion.", "info");
             return;
         }
 
+        // Auto-Trigger Step 2 if OTP is entered but not verified
         if (!otpVerified && otp.trim().length >= 4) {
             const verifiedOk = await handleVerifyOtp();
             if (!verifiedOk) return;
@@ -391,7 +405,7 @@ export default function AirtimeToCashScreen() {
                                 </View>
                             )}
 
-                            {/* 1. CHOOSE NETWORK (2 Active Networks: MTN & AIRTEL) */}
+                            {/* 1. CHOOSE NETWORK (Auto-Detected or Selectable) */}
                             <Text style={s.stepTitle}>1 · CHOOSE NETWORK</Text>
                             <View style={s.network2ColumnGrid}>
                                 {displayNetworks.map((net) => {
@@ -403,7 +417,7 @@ export default function AirtimeToCashScreen() {
                                             key={net.id}
                                             style={[
                                                 s.network2Card,
-                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '15', borderWidth: 2 }
+                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '15', borderWidth: 2.5 }
                                             ]}
                                             onPress={() => setNetworkId(net.id)}
                                             activeOpacity={0.8}
@@ -411,8 +425,8 @@ export default function AirtimeToCashScreen() {
                                             <View style={s.logoCircle}>
                                                 <Image source={NETWORK_LOGOS[net.key]} style={s.networkLogoImage} resizeMode="contain" />
                                             </View>
-                                            <Text style={[s.networkCardTitle, isSelected && { color: net.color, fontWeight: '800' }]} numberOfLines={1}>
-                                                {net.name}
+                                            <Text style={[s.networkCardTitle, isSelected && { color: net.color, fontWeight: '900' }]} numberOfLines={1}>
+                                                {net.name} {isSelected && '✓'}
                                             </Text>
                                             <View style={[s.pctBadge, { backgroundColor: (net.color || '#22c55e') + '20' }]}>
                                                 <Text style={[s.pctBadgeText, { color: net.color || '#22c55e' }]}>{ratePct}% Payout</Text>
@@ -528,18 +542,7 @@ export default function AirtimeToCashScreen() {
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
                             </View>
 
-                            {/* Wallet Balance Display Right Above Submit Button */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, marginTop: 14, borderWidth: 1, borderColor: '#cbd5e1' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="wallet" size={18} color="#eab308" style={{ marginRight: 6 }} />
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Wallet Cash Balance:</Text>
-                                </View>
-                                <Text style={{ fontSize: 13, fontWeight: '900', color: '#0f172a' }}>
-                                    ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
-                                </Text>
-                            </View>
-
-                            {/* Sleek 100% EXPLICIT Submit Button */}
+                            {/* Main Active Submit Button */}
                             <TouchableOpacity
                                 onPress={handleConvertAirtime}
                                 disabled={loadingConvert}
@@ -559,7 +562,7 @@ export default function AirtimeToCashScreen() {
                         {/* RIGHT SUMMARY SIDE PANEL WITH GOLDEN WALLET CARD */}
                         <View style={[s.sideSummaryPanel, isWeb && s.webSidePanel]}>
                             
-                            {/* Prominent Golden Wallet Balance Card */}
+                            {/* Golden Wallet Balance Card */}
                             <LinearGradient colors={['#eab308', '#ca8a04', '#a16207']} style={s.goldenBalanceCard}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Text style={s.goldenBalLabel}>Wallet balance</Text>
