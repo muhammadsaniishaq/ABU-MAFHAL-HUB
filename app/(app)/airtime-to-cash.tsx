@@ -52,9 +52,21 @@ export default function AirtimeToCashScreen() {
     const [loadingVerify, setLoadingVerify] = useState<boolean>(false);
     const [loadingConvert, setLoadingConvert] = useState<boolean>(false);
 
+    // Status Banner for Feedback
+    const [statusBanner, setStatusBanner] = useState<{ text: string, type: 'error' | 'success' | 'info' } | null>(null);
+
     // Rates & Balance
     const [rates, setRates] = useState<any[]>([]);
     const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+    const showNotify = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
+        setStatusBanner({ text: `${title}: ${message}`, type });
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+            window.alert(`${title}\n\n${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
 
     useEffect(() => {
         fetchInitialData();
@@ -100,38 +112,43 @@ export default function AirtimeToCashScreen() {
 
     // 1. Send OTP Action
     const handleSendOtp = async () => {
-        if (!phone || phone.trim().length < 11) {
-            Alert.alert("Validation Error", "Please enter a valid 11-digit phone number holding the airtime.");
+        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        if (!cleanPhone || cleanPhone.length < 11) {
+            showNotify("Validation Error", "Please enter a valid 11-digit phone number holding the airtime.", "error");
             return;
         }
 
         setLoadingOtp(true);
+        setStatusBanner({ text: `Sending OTP to ${cleanPhone}...`, type: 'info' });
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
+            console.log(`[AirtimeToCash] Invoking cash_step1 for phone ${cleanPhone}, network ${networkId}`);
             const { data: response, error } = await supabase.functions.invoke('bills-payment', {
                 body: {
                     type: 'cash_step1',
                     providerParams: {
                         network: parseInt(networkId, 10),
-                        phone: phone.trim()
+                        phone: cleanPhone
                     }
                 }
             });
 
             if (error || !response?.success) {
-                throw new Error(response?.error || response?.message || error?.message || "Failed to send OTP.");
+                const errMsg = response?.error || response?.message || error?.message || "Failed to send OTP to line.";
+                throw new Error(errMsg);
             }
 
             const blob = response?.data?.data;
-            if (!blob) throw new Error(response?.data?.message || "Session blob token not returned by provider.");
+            if (!blob) throw new Error(response?.data?.message || "Telecom provider did not return session blob.");
 
             setSessionBlob(blob);
             setOtpSent(true);
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            Alert.alert("OTP Sent", response.data.message || `OTP security code sent to ${phone}`);
+            showNotify("OTP Sent", response.data.message || `OTP security code successfully sent to ${cleanPhone}`, "success");
         } catch (err: any) {
-            Alert.alert("Error Sending OTP", err.message || "Failed to send OTP. Please check phone number.");
+            console.error("[AirtimeToCash] Error in cash_step1:", err);
+            showNotify("Error Sending OTP", err.message || "Failed to send OTP. Please check phone number and retry.", "error");
         } finally {
             setLoadingOtp(false);
         }
@@ -289,6 +306,32 @@ export default function AirtimeToCashScreen() {
                         {/* LEFT MAIN FORM PANEL */}
                         <View style={[s.mainFormPanel, isWeb && s.webMainPanel]}>
                             
+                            {/* Live Status Banner for Instant Feedback */}
+                            {statusBanner && (
+                                <View style={[
+                                    s.statusBannerCard,
+                                    statusBanner.type === 'error' && { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
+                                    statusBanner.type === 'success' && { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
+                                    statusBanner.type === 'info' && { backgroundColor: '#eff6ff', borderColor: '#93c5fd' },
+                                ]}>
+                                    <Ionicons 
+                                        name={statusBanner.type === 'error' ? 'alert-circle' : statusBanner.type === 'success' ? 'checkmark-circle' : 'information-circle'} 
+                                        size={18} 
+                                        color={statusBanner.type === 'error' ? '#dc2626' : statusBanner.type === 'success' ? '#16a34a' : '#2563eb'} 
+                                        style={{ marginRight: 8 }}
+                                    />
+                                    <Text style={[
+                                        s.statusBannerText,
+                                        statusBanner.type === 'error' && { color: '#991b1b' },
+                                        statusBanner.type === 'success' && { color: '#166534' },
+                                        statusBanner.type === 'info' && { color: '#1e40af' },
+                                    ]}>{statusBanner.text}</Text>
+                                    <TouchableOpacity onPress={() => setStatusBanner(null)} style={{ marginLeft: 6 }}>
+                                        <Ionicons name="close" size={16} color="#64748b" />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
                             {/* 1. CHOOSE NETWORK (5-Column Grid Layout) */}
                             <Text style={s.stepTitle}>1 · CHOOSE NETWORK</Text>
                             <View style={s.network5ColumnGrid}>
@@ -832,5 +875,18 @@ const s = StyleSheet.create({
         fontSize: 10,
         color: '#92400e',
         lineHeight: 14,
+    },
+    statusBannerCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        marginBottom: 10,
+    },
+    statusBannerText: {
+        flex: 1,
+        fontSize: 11,
+        fontWeight: '700',
     },
 });
