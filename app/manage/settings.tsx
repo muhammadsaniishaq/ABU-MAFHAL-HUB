@@ -129,6 +129,7 @@ export default function AdminSettings() {
 
     // Identity & Communication Keys
     const [identityApiKey, setIdentityApiKey] = useState('');
+    const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [smileIdKey, setSmileIdKey] = useState('');
     const [termiiKey, setTermiiKey] = useState('');
     const [openAiKey, setOpenAiKey] = useState('');
@@ -213,6 +214,7 @@ export default function AdminSettings() {
                     if (secret.key === 'PAYVESSEL_BUSINESS_ID') setPayvesselBusinessId(secret.value);
                     if (secret.key === 'FLUTTERWAVE_SECRET_KEY') setFlutterwaveKey(secret.value);
                     if (secret.key === 'IDENTITY_API_KEY') setIdentityApiKey(secret.value);
+                    if (secret.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(secret.value);
                     if (secret.key === 'SMILE_ID_KEY') setSmileIdKey(secret.value);
                     if (secret.key === 'TERMII_API_KEY') setTermiiKey(secret.value);
                     if (secret.key === 'OPENAI_API_KEY') setOpenAiKey(secret.value);
@@ -236,6 +238,7 @@ export default function AdminSettings() {
                 { key: 'PAYVESSEL_BUSINESS_ID', value: payvesselBusinessId, description: 'Payvessel Business ID' },
                 { key: 'FLUTTERWAVE_SECRET_KEY', value: flutterwaveKey, description: 'Flutterwave Secret Key' },
                 { key: 'IDENTITY_API_KEY', value: identityApiKey, description: 'Identity Provider API Key' },
+                { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng)' },
                 { key: 'SMILE_ID_KEY', value: smileIdKey, description: 'SmileID API Key' },
                 { key: 'TERMII_API_KEY', value: termiiKey, description: 'Termii SMS API Key' },
                 { key: 'OPENAI_API_KEY', value: openAiKey, description: 'OpenAI API Key for Cortex AI' },
@@ -704,24 +707,30 @@ export default function AdminSettings() {
                                 <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
                                     <Text style={[s.label, { color: '#334155' }]}>Select Active VTU Vendor</Text>
                                     <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 12, lineHeight: 16 }}>Choose the provider that will handle Airtime and Data requests. Make sure the API keys for the chosen provider are set in the API Vault.</Text>
-                                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
                                         <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1 }]} 
+                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
                                             onPress={() => setVtuVendor('clubkonnect')}
                                         >
                                             <Text style={[s.typeText, vtuVendor === 'clubkonnect' && { color: '#fff' }]}>ClubKonnect</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1 }]} 
+                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
                                             onPress={() => setVtuVendor('bigi')}
                                         >
                                             <Text style={[s.typeText, vtuVendor === 'bigi' && { color: '#fff' }]}>Bigi API</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'bilalsadasub' && s.typeBtnActive, { flex: 1 }]} 
+                                            style={[s.typeBtn, vtuVendor === 'bilalsadasub' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
                                             onPress={() => setVtuVendor('bilalsadasub')}
                                         >
                                             <Text style={[s.typeText, vtuVendor === 'bilalsadasub' && { color: '#fff' }]}>Bilalsadasub</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[s.typeBtn, vtuVendor === 'auto' && s.typeBtnActive, { flex: 1, minWidth: '45%', backgroundColor: vtuVendor === 'auto' ? '#10b981' : '#f1f5f9' }]} 
+                                            onPress={() => setVtuVendor('auto')}
+                                        >
+                                            <Text style={[s.typeText, vtuVendor === 'auto' && { color: '#fff' }]}>Auto (Multi-API)</Text>
                                         </TouchableOpacity>
                                     </View>
                                     
@@ -751,7 +760,8 @@ export default function AdminSettings() {
                         </TouchableOpacity>
                         {expandedApi === 'identity' && (
                             <View style={s.accordionBody}>
-                                <ApiInputRow placeholder="Identity Provider Key (NIN/BVN)" value={identityApiKey} onChangeText={setIdentityApiKey} isSecret={true} />
+                                <ApiInputRow placeholder="AgentHub API Key (agenthub.ng - NIN/BVN)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
+                                <ApiInputRow placeholder="Legacy Identity Provider Key" value={identityApiKey} onChangeText={setIdentityApiKey} isSecret={true} />
                                 <ApiInputRow placeholder="SmileID API Key" value={smileIdKey} onChangeText={setSmileIdKey} isSecret={true} />
                                 <View style={s.divider} />
                                 <ApiInputRow placeholder="Termii SMS API Key" value={termiiKey} onChangeText={setTermiiKey} isSecret={true} />

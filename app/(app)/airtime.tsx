@@ -267,40 +267,57 @@ export default function AirtimeScreen() {
                 )}
 
                 {/* Network Section */}
-                <Text className="text-gray-800 font-bold text-lg mb-4">Select Network</Text>
-                <View style={s.networksContainer}>
-                    {NETWORKS_DATA.map((net) => (
-                        <TouchableOpacity
-                            key={net.id}
-                            style={[
-                                s.networkCard,
-                                network === net.id && s.networkCardSelected,
-                                network === net.id && { borderColor: net.color }
-                            ]}
-                            onPress={() => {
-                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                setNetwork(net.id);
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <Image 
-                                source={NETWORK_LOGOS[net.id]} 
-                                style={s.networkLogo as any} 
-                                resizeMode="contain" 
-                            />
-                            {network === net.id && (
-                                <View style={[s.checkmarkBubble, { backgroundColor: net.color }]}>
-                                    <Ionicons name="checkmark" size={9} color="white" />
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0d1b3e', marginBottom: 10, marginLeft: 4 }}>Select Network</Text>
+                <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', gap: 4, marginBottom: 16 }}>
+                    {NETWORKS_DATA.map((net) => {
+                        const isSelected = network === net.id;
+                        return (
+                            <TouchableOpacity
+                                key={net.id}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 2,
+                                    borderRadius: 14,
+                                    backgroundColor: isSelected ? net.color + '15' : '#ffffff',
+                                    borderWidth: 1.5,
+                                    borderColor: isSelected ? net.color : '#e2e8f0',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: isSelected ? 0.08 : 0.02,
+                                    shadowRadius: 4,
+                                    elevation: isSelected ? 3 : 1,
+                                    position: 'relative'
+                                }}
+                                onPress={() => {
+                                    if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                    setNetwork(net.id);
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <View style={{ width: 28, height: 28, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 4 }}>
+                                    <Image 
+                                        source={NETWORK_LOGOS[net.id]} 
+                                        style={{ width: '100%', height: '100%' }} 
+                                        resizeMode="contain" 
+                                    />
                                 </View>
-                            )}
-                            <Text style={[s.networkName, network === net.id && s.networkNameSelected, network === net.id && { color: net.color }]}>
-                                {net.name}
-                            </Text>
-                            <View style={[s.cashbackBadge, { backgroundColor: net.color + '15' }]}>
-                                <Text style={[s.cashbackText, { color: net.color }]}>{net.cashback}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                                <Text style={{ fontSize: 10, fontWeight: isSelected ? '800' : '600', color: isSelected ? net.color : '#334155', textAlign: 'center' }} numberOfLines={1}>
+                                    {net.name}
+                                </Text>
+                                <View style={{ backgroundColor: net.color + '20', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
+                                    <Text style={{ fontSize: 7.5, fontWeight: '800', color: net.color }}>{net.cashback}</Text>
+                                </View>
+                                {isSelected && (
+                                    <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: net.color, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
+                                        <Ionicons name="checkmark" size={8} color="white" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
                 {/* Top-up Mode (Direct vs PIN) */}

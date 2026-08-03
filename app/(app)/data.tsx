@@ -602,7 +602,7 @@ export default function DataScreen() {
                         <Ionicons name="cellular-outline" size={14} color="#0d1b3e" style={{ marginRight: 6 }} />
                         <Text style={s.sectionTitle}>Select Network</Text>
                     </View>
-                    <View style={s.networksRow}>
+                    <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', gap: 4, marginBottom: 16 }}>
                         {networksData.map((net) => {
                             const isSelected = network === net.id;
                             const styles = getNetworkStyles(net.id, isSelected);
@@ -610,30 +610,42 @@ export default function DataScreen() {
                                 <TouchableOpacity
                                     key={net.id}
                                     onPress={() => setNetwork(net.id)}
-                                    style={[
-                                        s.networkCard,
-                                        { backgroundColor: styles.bg, borderColor: styles.border },
-                                        isSelected && s.networkCardSelected
-                                    ]}
+                                    style={{
+                                        flex: 1,
+                                        paddingVertical: 10,
+                                        paddingHorizontal: 2,
+                                        borderRadius: 14,
+                                        backgroundColor: styles.bg,
+                                        borderWidth: 1.5,
+                                        borderColor: styles.border,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: isSelected ? 0.08 : 0.02,
+                                        shadowRadius: 4,
+                                        elevation: isSelected ? 3 : 1,
+                                        position: 'relative'
+                                    }}
                                     activeOpacity={0.8}
                                 >
-                                    <View style={s.networkLogoWrapper}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 4 }}>
                                         <Image 
                                             source={NETWORK_LOGOS[net.id]} 
-                                            style={s.networkLogo as any}
+                                            style={{ width: '100%', height: '100%' }}
                                             resizeMode="contain" 
                                         />
                                     </View>
-                                    <Text style={[s.networkName, isSelected && { color: styles.text, fontWeight: '800' }]}>
+                                    <Text style={{ fontSize: 10, fontWeight: isSelected ? '800' : '600', color: isSelected ? styles.text : '#334155', textAlign: 'center' }} numberOfLines={1}>
                                         {net.name}
                                     </Text>
-                                    <View style={[s.capabilityBadge, isSelected ? { backgroundColor: styles.border } : { backgroundColor: '#f1f5f9' }]}>
-                                        <Text style={[s.capabilityText, isSelected && { color: '#ffffff' }]}>
+                                    <View style={{ backgroundColor: isSelected ? styles.border : '#f1f5f9', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, marginTop: 3 }}>
+                                        <Text style={{ fontSize: 7.5, fontWeight: '800', color: isSelected ? '#ffffff' : '#64748b' }}>
                                             {net.status}
                                         </Text>
                                     </View>
                                     {isSelected && (
-                                        <View style={[s.checkBadge, { backgroundColor: styles.border }]}>
+                                        <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: styles.border, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
                                             <Ionicons name="checkmark" size={8} color="white" />
                                         </View>
                                     )}

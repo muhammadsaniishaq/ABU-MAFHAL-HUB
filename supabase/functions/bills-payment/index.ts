@@ -202,29 +202,53 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
-            if (type === 'airtime') {
-                if (vtuVendor === 'bilalsadasub') {
-                    if (!bilalToken) throw new Error("Bilalsadasub API Token missing in settings");
-                    const bilalClient = new BilalsadasubClient(bilalToken);
-                    result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
-                } else if (vtuVendor === 'bigi') {
-                    if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
-                    const bigiClient = new BigiClient(bigiToken, bigiPin);
-                    result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
-                } else {
-                    result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+            if (type === 'airtime' || type === 'data') {
+                // Determine vendor execution order with automatic failover
+                let vendorOrder: string[] = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                if (vtuVendor === 'bigi') vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                else if (vtuVendor === 'clubkonnect') vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                else if (vtuVendor === 'auto') vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+
+                let lastError: any = null;
+                for (const vendor of vendorOrder) {
+                    try {
+                        console.log(`[Bills] Trying VTU Vendor: ${vendor}`);
+                        if (vendor === 'bilalsadasub' && bilalToken) {
+                            const bilalClient = new BilalsadasubClient(bilalToken);
+                            if (type === 'airtime') {
+                                result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
+                            } else {
+                                result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                            }
+                        } else if (vendor === 'bigi' && bigiToken && bigiPin) {
+                            const bigiClient = new BigiClient(bigiToken, bigiPin);
+                            if (type === 'airtime') {
+                                result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
+                            } else {
+                                result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                            }
+                        } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
+                            if (type === 'airtime') {
+                                result = await client.buyAirtime(providerParams.network as '01' | '02' | '03' | '04', providerParams.phone as string, providerParams.amount as number, requestId);
+                            } else {
+                                result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                            }
+                        } else {
+                            continue;
+                        }
+
+                        if (result && (result.status === 'ORDER_RECEIVED' || result.status === 'ORDER_COMPLETED' || result.status === 'SUCCESS')) {
+                            console.log(`[Bills] VTU Transaction Succeeded via: ${vendor}`);
+                            break;
+                        }
+                    } catch (err: any) {
+                        console.warn(`[Bills] Vendor ${vendor} failed: ${err.message}. Trying next fallback provider...`);
+                        lastError = err;
+                    }
                 }
-            } else if (type === 'data') {
-                if (vtuVendor === 'bilalsadasub') {
-                    if (!bilalToken) throw new Error("Bilalsadasub API Token missing in settings");
-                    const bilalClient = new BilalsadasubClient(bilalToken);
-                    result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
-                } else if (vtuVendor === 'bigi') {
-                    if (!bigiToken || !bigiPin) throw new Error("Bigi API Token/PIN missing in settings");
-                    const bigiClient = new BigiClient(bigiToken, bigiPin);
-                    result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
-                } else {
-                    result = await client.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+
+                if (!result && lastError) {
+                    throw lastError;
                 }
             } else if (type === 'smile') {
                 result = await client.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
