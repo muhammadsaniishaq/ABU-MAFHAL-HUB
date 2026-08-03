@@ -128,15 +128,18 @@ export default function RootLayout() {
                 console.log("Session init error returned:", error.message);
                 if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Refresh token')) {
                     await forceSignOut();
+                    await AsyncStorage.removeItem('has_active_session');
                 }
                 setSession(null);
             } else {
                 setSession(session);
                 if (session?.user) {
-                    // Restore role from local cache immediately
+                    await AsyncStorage.setItem('has_active_session', 'true');
                     const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                     if (cached) setUserRole(cached);
                     fetchUserRole(session.user.id, session.user.email);
+                } else {
+                    await AsyncStorage.removeItem('has_active_session');
                 }
             }
             setAuthChecked(true);
@@ -144,9 +147,9 @@ export default function RootLayout() {
         }).catch(async (error) => {
             clearTimeout(bootTimer);
             console.log("Session init error thrown:", error?.message || error);
-            // If refresh token is invalid, clear session
             if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token') || error?.message?.includes('Refresh token')) {
                 await forceSignOut();
+                await AsyncStorage.removeItem('has_active_session');
                 setSession(null);
             }
             setAuthChecked(true);
@@ -156,10 +159,12 @@ export default function RootLayout() {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setSession(session);
             if (session?.user) {
+                await AsyncStorage.setItem('has_active_session', 'true');
                 const cached = await AsyncStorage.getItem(`user_role_${session.user.id}`);
                 if (cached) setUserRole(cached);
                 fetchUserRole(session.user.id, session.user.email);
             } else {
+                await AsyncStorage.removeItem('has_active_session');
                 setUserRole(null);
             }
             setAuthChecked(true);
@@ -210,9 +215,16 @@ export default function RootLayout() {
                 });
             }
         } else {
-            if (!isPublicScreen && !isAuthGroup) {
-                router.replace('/');
-            }
+            // Check if active session marker exists before forcing redirect to landing page on refresh
+            AsyncStorage.getItem('has_active_session').then((activeMarker) => {
+                if (!activeMarker && !isPublicScreen && !isAuthGroup) {
+                    router.replace('/');
+                }
+            }).catch(() => {
+                if (!isPublicScreen && !isAuthGroup) {
+                    router.replace('/');
+                }
+            });
         }
     }, [session, userRole, initialized, segments, loaded, authChecked]);
 

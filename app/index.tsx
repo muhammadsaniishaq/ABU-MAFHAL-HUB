@@ -100,14 +100,21 @@ export default function Splash() {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        const activeMarker = await AsyncStorage.getItem('has_active_session');
         const { data: { session } } = await supabase.auth.getSession();
+
         if (session && session.user) {
+          await AsyncStorage.setItem('has_active_session', 'true');
           const pinSaved = await AsyncStorage.getItem(`user_pin_${session.user.id}`);
           if (pinSaved) {
             router.replace('/(auth)/pin');
           } else {
             router.replace('/(app)/dashboard');
           }
+          return;
+        } else if (activeMarker === 'true') {
+          // If session marker exists, do not kick to landing page immediately
+          setIsReady(true);
           return;
         }
       } catch (e) {}
