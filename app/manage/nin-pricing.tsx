@@ -53,7 +53,7 @@ export default function NinPricingBoard() {
         try {
             // Auto-seed Personalization pricing entries if missing
             const persPricingDefaults = [
-                { id: 'pers_status', service_category: 'personalization', name: 'Personalization', cost_price: 250, markup_price: 0 }
+                { id: 'pers_status', service_category: 'personalization', name: 'Personalization', cost_price: 150, markup_price: 0 }
             ];
 
             for (const item of persPricingDefaults) {
@@ -70,11 +70,11 @@ export default function NinPricingBoard() {
 
             // Auto-seed BVN pricing entries if missing
             const bvnPricingDefaults = [
-                { id: 'bvn_num_basic', service_category: 'bvn', name: 'BVN Number - Basic', cost_price: 200, markup_price: 0 },
-                { id: 'bvn_num_advanced', service_category: 'bvn', name: 'BVN Number - Advanced', cost_price: 250, markup_price: 0 },
-                { id: 'bvn_phone_basic', service_category: 'bvn', name: 'Phone Number - Basic', cost_price: 250, markup_price: 0 },
-                { id: 'bvn_phone_advanced', service_category: 'bvn', name: 'Phone Number - Advanced', cost_price: 300, markup_price: 0 },
-                { id: 'bvn_card', service_category: 'bvn', name: 'BVN Card Layout', cost_price: 250, markup_price: 0 }
+                { id: 'bvn_num_basic', service_category: 'bvn', name: 'BVN Number - Basic', cost_price: 150, markup_price: 0 },
+                { id: 'bvn_num_advanced', service_category: 'bvn', name: 'BVN Number - Advanced', cost_price: 150, markup_price: 0 },
+                { id: 'bvn_phone_basic', service_category: 'bvn', name: 'Phone Number - Basic', cost_price: 150, markup_price: 0 },
+                { id: 'bvn_phone_advanced', service_category: 'bvn', name: 'Phone Number - Advanced', cost_price: 150, markup_price: 0 },
+                { id: 'bvn_card', service_category: 'bvn', name: 'BVN Card Layout', cost_price: 150, markup_price: 0 }
             ];
 
             for (const item of bvnPricingDefaults) {
