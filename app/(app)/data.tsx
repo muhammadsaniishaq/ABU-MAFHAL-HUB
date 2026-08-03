@@ -156,6 +156,7 @@ const NETWORK_LOGOS: Record<string, any> = {
     glo: require('../../assets/images/glo.png'),
     airtel: require('../../assets/images/airtel.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
+    vitel: require('../../assets/images/vitel.png'),
 };
 
 const NETWORKS_DATA = [
