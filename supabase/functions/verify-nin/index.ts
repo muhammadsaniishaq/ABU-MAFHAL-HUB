@@ -57,6 +57,35 @@ serve(async (req: Request) => {
       return jsonOk({ error: 'Missing search type' })
     }
 
+    // ── Handle Admin Live Pricing Sync (Server-to-Server) ──────────────────────
+    if (searchType === 'sync_prices') {
+      let AGENTHUB_API_KEY = Deno.env.get('AGENTHUB_API_KEY');
+      if (!AGENTHUB_API_KEY) {
+        const { data: secrets } = await supabaseAdmin
+          .from('system_secrets')
+          .select('value')
+          .eq('key', 'AGENTHUB_API_KEY')
+          .maybeSingle();
+        if (secrets?.value) AGENTHUB_API_KEY = secrets.value;
+      }
+
+      if (!AGENTHUB_API_KEY) {
+        return jsonOk({ error: 'AGENTHUB_API_KEY is not set in API Vault.' });
+      }
+
+      try {
+        console.log(`Fetching live AgentHub prices from ${AGENTHUB_BASE}/v1/identity/pricing`);
+        const agentHubRes = await fetch(`${AGENTHUB_BASE}/v1/identity/pricing`, {
+          headers: { 'Authorization': `Bearer ${AGENTHUB_API_KEY}` }
+        });
+        const agentData = await agentHubRes.json();
+        return jsonOk({ success: true, message: 'AgentHub pricing synced!', data: agentData });
+      } catch (err: any) {
+        console.error('AgentHub pricing fetch error:', err);
+        return jsonOk({ error: `AgentHub pricing fetch failed: ${err.message}` });
+      }
+    }
+
     const priceId = requestData.priceId;
     if (!priceId) {
       return jsonOk({ error: 'Missing priceId for verification service.' })
