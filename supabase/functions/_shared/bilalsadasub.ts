@@ -19,12 +19,14 @@ export class BilalsadasubClient {
      * 2 = AIRTEL
      * 3 = GLO
      * 4 = 9MOBILE / T2
+     * 5 = VITEL
      */
     private getNetworkId(network: string): number {
         const netLower = (network || '').toString().toLowerCase();
         if (netLower.includes('mtn') || netLower === '01' || netLower === '1') return 1;
         if (netLower.includes('airtel') || netLower === '04' || netLower === '2') return 2;
         if (netLower.includes('glo') || netLower === '02' || netLower === '3') return 3;
+        if (netLower.includes('vitel') || netLower === '05' || netLower === '5') return 5;
         if (netLower.includes('mobile') || netLower.includes('etisalat') || netLower.includes('t2') || netLower === '03' || netLower === '4') return 4;
         return 1;
     }

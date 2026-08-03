@@ -64,7 +64,23 @@ Deno.serve(async (req) => {
 
         let networksData: any = {};
 
-        if (vtuVendor === 'bigi') {
+        if (vtuVendor === 'bilalsadasub') {
+            const bilalNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2'];
+            for (const net of bilalNetworks) {
+                const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${net}`);
+                const bRes = await res.json();
+                const plansList = bRes?.data || bRes;
+                if (Array.isArray(plansList)) {
+                    networksData[net] = plansList.map((p: any) => ({
+                        PRODUCT_ID: (p.plan_id || p.id).toString(),
+                        PRODUCT_AMOUNT: (p.amount || 0).toString(),
+                        PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'}`,
+                        validity: p.plan_day || '30 days',
+                        volume: p.plan_name || ''
+                    }));
+                }
+            }
+        } else if (vtuVendor === 'bigi') {
             // Bigi Logic
             const { data: bigiTokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
             const bigiToken = bigiTokenSetting?.value;

@@ -163,6 +163,7 @@ const NETWORKS_DATA = [
     { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
     { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
     { id: '9mobile', name: '9mobile', color: '#006B3E', status: '4G Active', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
+    { id: 'vitel', name: 'VITEL', color: '#6366F1', status: '4G Active', prefixes: ['070', '091'] },
 ];
 
 const getNetworkStyles = (netId: string, isSelected: boolean) => {
@@ -178,6 +179,8 @@ const getNetworkStyles = (netId: string, isSelected: boolean) => {
             return { bg: '#f0fdf4', border: '#16a34a', text: '#166534' };
         case '9mobile':
             return { bg: '#ecfdf5', border: '#059669', text: '#065f46' };
+        case 'vitel':
+            return { bg: '#eef2ff', border: '#6366f1', text: '#3730a3' };
         default:
             return { bg: '#f1f5f9', border: '#475569', text: '#1e293b' };
     }
@@ -216,6 +219,7 @@ export default function DataScreen() {
                         let localId = 'mtn';
                         if (nameLower.includes('glo')) localId = 'glo';
                         if (nameLower.includes('airtel')) localId = 'airtel';
+                        if (nameLower.includes('vitel')) localId = 'vitel';
                         if (nameLower.includes('mobile') || nameLower.includes('etisalat') || nameLower.includes('t2mobile')) localId = '9mobile';
 
                         const base = NETWORKS_DATA.find(n => n.id === localId) || NETWORKS_DATA[0];
