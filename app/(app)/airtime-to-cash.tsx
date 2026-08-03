@@ -537,6 +537,20 @@ export default function AirtimeToCashScreen() {
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
                             </View>
 
+                            {/* Dynamic Payout Summary inside Main Form */}
+                            <View style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, marginTop: 14, borderWidth: 1.5, borderColor: '#e2e8f0' }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Network Rate</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>{getSelectedNetwork().name} ({currentRate}% Payout)</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: '#cbd5e1' }}>
+                                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a' }}>You Receive in Wallet</Text>
+                                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#16a34a' }}>
+                                        {youReceiveAmount > 0 ? `₦${youReceiveAmount.toLocaleString()}` : '₦0.00'}
+                                    </Text>
+                                </View>
+                            </View>
+
                             {/* Main Active Submit Button */}
                             <TouchableOpacity
                                 onPress={handleConvertAirtime}
@@ -554,51 +568,6 @@ export default function AirtimeToCashScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* RIGHT SUMMARY SIDE PANEL */}
-                        <View style={[s.sideSummaryPanel, isWeb && s.webSidePanel]}>
-                            {/* Conversion Summary Card */}
-                            <View style={s.summaryCard}>
-                                <Text style={s.summaryCardTitle}>CONVERSION SUMMARY</Text>
-                                
-                                <View style={s.summaryRow}>
-                                    <Text style={s.summaryLabel}>Network</Text>
-                                    <Text style={s.summaryValue}>{getSelectedNetwork().name}</Text>
-                                </View>
-                                
-                                <View style={s.summaryRow}>
-                                    <Text style={s.summaryLabel}>Rate</Text>
-                                    <Text style={s.summaryValue}>{currentRate}%</Text>
-                                </View>
-
-                                <View style={s.summaryRow}>
-                                    <Text style={s.summaryLabel}>Phone</Text>
-                                    <Text style={s.summaryValue}>{phone || '—'}</Text>
-                                </View>
-
-                                <View style={s.summaryRow}>
-                                    <Text style={s.summaryLabel}>Airtime sold</Text>
-                                    <Text style={s.summaryValue}>{numAmount > 0 ? `₦${numAmount.toLocaleString()}` : '—'}</Text>
-                                </View>
-
-                                <View style={s.summaryDivider} />
-
-                                <View style={s.summaryRow}>
-                                    <Text style={s.youReceiveLabel}>You receive</Text>
-                                    <Text style={s.youReceiveValue}>
-                                        {youReceiveAmount > 0 ? `₦${youReceiveAmount.toLocaleString()}` : '—'}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Notice Box */}
-                            <View style={s.noticeBox}>
-                                <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginRight: 6, marginTop: 2 }} />
-                                <Text style={s.noticeText}>
-                                    We use your network's Share & Sell to pull airtime from your line. Cash lands in your wallet once the transfer settles.
-                                </Text>
-                            </View>
-
-                        </View>
                     </View>
 
                 </ScrollView>
