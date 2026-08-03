@@ -106,7 +106,10 @@ export class BilalsadasubClient {
 
         const res = await fetch(`${this.baseUrl}/api/cash`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Token ${this.token}`
+            },
             body: params.toString()
         });
 
@@ -138,7 +141,10 @@ export class BilalsadasubClient {
 
         const res = await fetch(`${this.baseUrl}/api/cash`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Token ${this.token}`
+            },
             body: params.toString()
         });
 
@@ -172,7 +178,10 @@ export class BilalsadasubClient {
 
         const res = await fetch(`${this.baseUrl}/api/cash`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Token ${this.token}`
+            },
             body: params.toString()
         });
 
