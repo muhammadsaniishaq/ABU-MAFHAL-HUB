@@ -204,8 +204,8 @@ Deno.serve(async (req: Request) => {
              amountToCharge = Number(data.amount) * (Number(data.quantity) || 1);
              if (amountToCharge < 500) throw new Error("Invalid Education Amount");
              providerParams = { examType: data.examType, phone: data.phone, profileId: data.profileId, quantity: data.quantity || 1 };
-        } else if (type === 'get_plans') {
-             // Just pass through
+        } else if (type === 'get_plans' || type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
+             // Just pass through (already processed or non-deductible)
         } else {
              throw new Error(`Unsupported service type: ${type}`);
         }
