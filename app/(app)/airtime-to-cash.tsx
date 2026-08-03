@@ -554,24 +554,8 @@ export default function AirtimeToCashScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* RIGHT SUMMARY SIDE PANEL WITH GOLDEN WALLET CARD */}
+                        {/* RIGHT SUMMARY SIDE PANEL */}
                         <View style={[s.sideSummaryPanel, isWeb && s.webSidePanel]}>
-                            
-                            {/* Golden Wallet Balance Card */}
-                            <LinearGradient colors={['#eab308', '#ca8a04', '#a16207']} style={s.goldenBalanceCard}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Text style={s.goldenBalLabel}>Wallet balance</Text>
-                                    <Ionicons name="wallet-outline" size={20} color="#ffffff" />
-                                </View>
-                                <Text style={s.goldenBalAmount}>
-                                    ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
-                                </Text>
-                                <TouchableOpacity onPress={() => router.push('/wallet')} style={s.addMoneyBtn} activeOpacity={0.8}>
-                                    <Ionicons name="add-circle-outline" size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                                    <Text style={s.addMoneyBtnText}>+ Add Money</Text>
-                                </TouchableOpacity>
-                            </LinearGradient>
-
                             {/* Conversion Summary Card */}
                             <View style={s.summaryCard}>
                                 <Text style={s.summaryCardTitle}>CONVERSION SUMMARY</Text>
