@@ -254,10 +254,27 @@ export default function AirtimeToCashScreen() {
 
     return (
         <View style={s.pageWrapper}>
-            <Stack.Screen options={{ title: 'Airtime to Cash', headerStyle: { backgroundColor: '#121212' }, headerTintColor: '#fff' }} />
+            <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+                
+                {/* Curved Navy Header */}
+                <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={s.headerContainer}>
+                    <View style={s.headerTop}>
+                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+                            <Ionicons name="arrow-back" size={20} color="white" />
+                        </TouchableOpacity>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={s.headerTitle}>Airtime ➔ Cash</Text>
+                            <Text style={s.headerSubtitle}>Convert unwanted airtime to wallet cash</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => router.push('/wallet')} style={s.walletBtn} activeOpacity={0.7}>
+                            <Ionicons name="wallet-outline" size={18} color="#f5a623" />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
+
                 <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     
                     <View style={[s.layoutWrapper, isWeb && s.webLayoutWrapper]}>
@@ -265,9 +282,9 @@ export default function AirtimeToCashScreen() {
                         {/* LEFT MAIN FORM PANEL */}
                         <View style={[s.mainFormPanel, isWeb && s.webMainPanel]}>
                             
-                            {/* 1. CHOOSE NETWORK */}
+                            {/* 1. CHOOSE NETWORK (5-Column Grid Layout) */}
                             <Text style={s.stepTitle}>1 · CHOOSE NETWORK</Text>
-                            <View style={s.networkGrid}>
+                            <View style={s.network5ColumnGrid}>
                                 {NETWORKS_DATA.map((net) => {
                                     const isSelected = networkId === net.id;
                                     const matchRate = rates.find((r: any) => r.plan_id === net.id || (r.network || '').toLowerCase().includes(net.key));
@@ -276,8 +293,8 @@ export default function AirtimeToCashScreen() {
                                         <TouchableOpacity
                                             key={net.id}
                                             style={[
-                                                s.networkCard,
-                                                isSelected && s.networkCardSelected
+                                                s.network5Card,
+                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '12', borderWidth: 2 }
                                             ]}
                                             onPress={() => setNetworkId(net.id)}
                                             activeOpacity={0.8}
@@ -285,9 +302,11 @@ export default function AirtimeToCashScreen() {
                                             <View style={s.logoCircle}>
                                                 <Image source={NETWORK_LOGOS[net.key]} style={s.networkLogoImage} resizeMode="contain" />
                                             </View>
-                                            <Text style={[s.networkCardTitle, isSelected && { color: '#ffffff' }]}>{net.name}</Text>
-                                            <View style={s.pctBadge}>
-                                                <Text style={s.pctBadgeText}>{ratePct}%</Text>
+                                            <Text style={[s.networkCardTitle, isSelected && { color: net.color, fontWeight: '800' }]} numberOfLines={1}>
+                                                {net.name}
+                                            </Text>
+                                            <View style={[s.pctBadge, { backgroundColor: (net.color || '#22c55e') + '20' }]}>
+                                                <Text style={[s.pctBadgeText, { color: net.color || '#22c55e' }]}>{ratePct}%</Text>
                                             </View>
                                         </TouchableOpacity>
                                     );
@@ -297,11 +316,12 @@ export default function AirtimeToCashScreen() {
                             {/* 2. PHONE NUMBER WITH AIRTIME */}
                             <Text style={s.stepTitle}>2 · PHONE NUMBER WITH AIRTIME</Text>
                             <View style={s.phoneInputWrapper}>
+                                <Ionicons name="call-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="08012345678"
-                                    placeholderTextColor="#555555"
+                                    placeholderTextColor="#94a3b8"
                                     keyboardType="phone-pad"
                                     maxLength={11}
                                     style={s.phoneInput}
@@ -315,7 +335,7 @@ export default function AirtimeToCashScreen() {
                                     {loadingOtp ? (
                                         <ActivityIndicator color="#ffffff" size="small" />
                                     ) : (
-                                        <Text style={s.sendOtpBtnText}>{otpSent ? 'Resend OTP' : 'Send OTP'}</Text>
+                                        <Text style={s.sendOtpBtnText}>{otpSent ? 'Resend' : 'Send OTP'}</Text>
                                     )}
                                 </TouchableOpacity>
                             </View>
@@ -326,11 +346,12 @@ export default function AirtimeToCashScreen() {
                             {otpSent ? (
                                 <View style={s.otpBoxActive}>
                                     <View style={s.phoneInputWrapper}>
+                                        <Ionicons name="keypad-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                         <TextInput
                                             value={otp}
                                             onChangeText={setOtp}
                                             placeholder={`Enter ${getSelectedNetwork().otpLength}-digit code...`}
-                                            placeholderTextColor="#555555"
+                                            placeholderTextColor="#94a3b8"
                                             keyboardType="number-pad"
                                             maxLength={getSelectedNetwork().otpLength}
                                             style={[s.phoneInput, { letterSpacing: 4, fontWeight: '800' }]}
@@ -365,7 +386,7 @@ export default function AirtimeToCashScreen() {
                                         value={amount}
                                         onChangeText={setAmount}
                                         placeholder="0"
-                                        placeholderTextColor="#555555"
+                                        placeholderTextColor="#94a3b8"
                                         keyboardType="number-pad"
                                         style={s.amountInput}
                                     />
@@ -375,17 +396,17 @@ export default function AirtimeToCashScreen() {
 
                             <View style={s.inputBlock}>
                                 <View style={s.pinInputRow}>
+                                    <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                     <TextInput
                                         value={sharePin}
                                         onChangeText={setSharePin}
                                         placeholder="Share & Sell PIN"
-                                        placeholderTextColor="#555555"
+                                        placeholderTextColor="#94a3b8"
                                         secureTextEntry
                                         keyboardType="number-pad"
                                         maxLength={4}
                                         style={s.pinInput}
                                     />
-                                    <Ionicons name="lock-closed-outline" size={18} color="#666666" style={{ marginRight: 12 }} />
                                 </View>
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
                             </View>
@@ -458,7 +479,7 @@ export default function AirtimeToCashScreen() {
 
                             {/* Notice Box */}
                             <View style={s.noticeBox}>
-                                <Ionicons name="information-circle" size={18} color="#eab308" style={{ marginRight: 8, marginTop: 2 }} />
+                                <Ionicons name="information-circle" size={18} color="#d97706" style={{ marginRight: 8, marginTop: 2 }} />
                                 <Text style={s.noticeText}>
                                     We use your network's Share & Sell to pull airtime from your line. Cash lands in your wallet once the transfer settles.
                                 </Text>
@@ -476,14 +497,53 @@ export default function AirtimeToCashScreen() {
 const s = StyleSheet.create({
     pageWrapper: {
         flex: 1,
-        backgroundColor: '#121212',
+        backgroundColor: '#f4f6fb',
+    },
+    headerContainer: {
+        paddingTop: Platform.OS === 'ios' ? 54 : 40,
+        paddingBottom: 20,
+        paddingHorizontal: 16,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    backBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    walletBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        color: '#ffffff',
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    headerSubtitle: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 2,
     },
     container: {
         padding: 16,
     },
     layoutWrapper: {
         flexDirection: 'column',
-        gap: 20,
+        gap: 16,
     },
     webLayoutWrapper: {
         flexDirection: 'row',
@@ -493,11 +553,16 @@ const s = StyleSheet.create({
     },
     mainFormPanel: {
         flex: 1,
-        backgroundColor: '#1e1e1e',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: '#2e2e2e',
+        padding: 20,
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     webMainPanel: {
         flex: 2,
@@ -513,103 +578,100 @@ const s = StyleSheet.create({
     stepTitle: {
         fontSize: 11,
         fontWeight: '900',
-        color: '#888888',
+        color: '#475569',
         letterSpacing: 1,
-        marginTop: 16,
+        marginTop: 14,
         marginBottom: 10,
         textTransform: 'uppercase',
     },
-    networkGrid: {
+    // 5-Column Grid Layout (Fits 5 networks in 1 row)
+    network5ColumnGrid: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
+        justifyContent: 'space-between',
+        gap: 4,
         marginBottom: 8,
+        width: '100%',
     },
-    networkCard: {
-        width: 100,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
+    network5Card: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 2,
         borderRadius: 14,
-        backgroundColor: '#262626',
+        backgroundColor: '#f8fafc',
         borderWidth: 1.5,
-        borderColor: '#333333',
+        borderColor: '#cbd5e1',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    networkCardSelected: {
-        borderColor: '#eab308',
-        backgroundColor: '#2e2a18',
     },
     logoCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         overflow: 'hidden',
-        backgroundColor: '#000000',
+        backgroundColor: '#ffffff',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     networkLogoImage: {
         width: '100%',
         height: '100%',
     },
     networkCardTitle: {
-        fontSize: 10.5,
-        fontWeight: '800',
-        color: '#888888',
-        marginBottom: 4,
+        fontSize: 9.5,
+        fontWeight: '700',
+        color: '#334155',
+        marginBottom: 3,
+        textAlign: 'center',
     },
     pctBadge: {
-        backgroundColor: 'rgba(34, 197, 94, 0.15)',
-        paddingHorizontal: 6,
+        paddingHorizontal: 5,
         paddingVertical: 2,
         borderRadius: 6,
     },
     pctBadgeText: {
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '800',
-        color: '#22c55e',
     },
     phoneInputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#262626',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#333333',
-        paddingHorizontal: 14,
-        height: 52,
+        backgroundColor: '#f8fafc',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#cbd5e1',
+        paddingHorizontal: 12,
+        height: 50,
     },
     phoneInput: {
         flex: 1,
-        color: '#ffffff',
-        fontSize: 15,
+        color: '#0d1b3e',
+        fontSize: 14.5,
         fontWeight: '700',
     },
     sendOtpBtn: {
-        backgroundColor: '#333333',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        backgroundColor: '#2563eb',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 10,
     },
     sendOtpBtnText: {
         color: '#ffffff',
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     helperSubtext: {
         fontSize: 10.5,
-        color: '#666666',
+        color: '#64748b',
         marginTop: 6,
     },
     otpBoxDotted: {
-        backgroundColor: '#222222',
+        backgroundColor: '#f8fafc',
         borderWidth: 1.5,
-        borderColor: '#333333',
+        borderColor: '#cbd5e1',
         borderStyle: 'dashed',
         borderRadius: 14,
-        padding: 24,
+        padding: 20,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -617,7 +679,7 @@ const s = StyleSheet.create({
         marginBottom: 8,
     },
     otpPlaceholderText: {
-        color: '#555555',
+        color: '#94a3b8',
         fontSize: 12,
     },
     inputBlock: {
@@ -625,62 +687,70 @@ const s = StyleSheet.create({
     },
     inputFieldLabel: {
         fontSize: 11,
-        color: '#777777',
+        fontWeight: '700',
+        color: '#475569',
         marginBottom: 6,
     },
     amountInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#262626',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#333333',
-        paddingHorizontal: 14,
-        height: 52,
+        backgroundColor: '#f8fafc',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#cbd5e1',
+        paddingHorizontal: 12,
+        height: 50,
     },
     nairaPrefix: {
-        color: '#888888',
-        fontSize: 18,
-        fontWeight: '700',
+        color: '#64748b',
+        fontSize: 17,
+        fontWeight: '800',
         marginRight: 6,
     },
     amountInput: {
         flex: 1,
-        color: '#ffffff',
-        fontSize: 18,
+        color: '#0d1b3e',
+        fontSize: 17,
         fontWeight: '800',
     },
     pinInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#262626',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#333333',
-        paddingHorizontal: 14,
-        height: 52,
+        backgroundColor: '#f8fafc',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#cbd5e1',
+        paddingHorizontal: 12,
+        height: 50,
         marginTop: 6,
     },
     pinInput: {
         flex: 1,
-        color: '#ffffff',
-        fontSize: 15,
+        color: '#0d1b3e',
+        fontSize: 14.5,
         fontWeight: '700',
     },
     actionConvertBtn: {
         backgroundColor: '#2563eb',
-        borderRadius: 14,
-        height: 54,
+        borderRadius: 16,
+        height: 52,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 24,
+        marginTop: 22,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     actionConvertBtnDisabled: {
-        backgroundColor: '#333333',
+        backgroundColor: '#cbd5e1',
+        shadowOpacity: 0,
+        elevation: 0,
     },
     actionConvertBtnText: {
         color: '#ffffff',
-        fontSize: 14.5,
+        fontSize: 14,
         fontWeight: '800',
     },
     goldenBalanceCard: {
@@ -693,7 +763,7 @@ const s = StyleSheet.create({
         elevation: 4,
     },
     goldenBalLabel: {
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: 'rgba(255, 255, 255, 0.85)',
         fontSize: 11,
         fontWeight: '700',
         textTransform: 'uppercase',
@@ -702,77 +772,77 @@ const s = StyleSheet.create({
         color: '#ffffff',
         fontSize: 26,
         fontWeight: '900',
-        marginVertical: 8,
+        marginVertical: 6,
     },
     addMoneyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 10,
         alignSelf: 'flex-start',
     },
     addMoneyBtnText: {
         color: '#ffffff',
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     summaryCard: {
-        backgroundColor: '#1e1e1e',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: '#2e2e2e',
+        padding: 18,
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
     },
     summaryCardTitle: {
         fontSize: 11,
         fontWeight: '900',
-        color: '#888888',
+        color: '#475569',
         letterSpacing: 1,
-        marginBottom: 16,
+        marginBottom: 14,
     },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     summaryLabel: {
-        fontSize: 12.5,
-        color: '#888888',
+        fontSize: 12,
+        color: '#64748b',
     },
     summaryValue: {
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '700',
-        color: '#ffffff',
+        color: '#0d1b3e',
     },
     summaryDivider: {
         height: 1,
-        backgroundColor: '#2e2e2e',
-        marginVertical: 12,
+        backgroundColor: '#cbd5e1',
+        marginVertical: 10,
     },
     youReceiveLabel: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '800',
-        color: '#ffffff',
+        color: '#0d1b3e',
     },
     youReceiveValue: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '900',
-        color: '#22c55e',
+        color: '#16a34a',
     },
     noticeBox: {
         flexDirection: 'row',
-        backgroundColor: '#1e1e1e',
+        backgroundColor: '#fffbeb',
         borderRadius: 16,
         padding: 14,
-        borderWidth: 1,
-        borderColor: '#2e2e2e',
+        borderWidth: 1.5,
+        borderColor: '#fde68a',
     },
     noticeText: {
         flex: 1,
         fontSize: 11,
-        color: '#888888',
+        color: '#92400e',
         lineHeight: 16,
     },
 });
