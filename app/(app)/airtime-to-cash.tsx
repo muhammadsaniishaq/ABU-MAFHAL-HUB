@@ -15,7 +15,8 @@ const NETWORKS_DATA = [
     { id: '1', key: 'mtn', name: 'MTN', color: '#FFCC00', otpLength: 6 },
     { id: '2', key: 'airtel', name: 'Airtel', color: '#FF0000', otpLength: 4 },
     { id: '3', key: 'glo', name: 'Glo', color: '#0F6A37', otpLength: 6 },
-    { id: '4', key: '9mobile', name: '9mobile / T2', color: '#006B3E', otpLength: 6 },
+    { id: '4', key: '9mobile', name: '9mobile', color: '#006B3E', otpLength: 6 },
+    { id: '5', key: 'vitel', name: 'VITEL', color: '#6366F1', otpLength: 6 },
 ];
 
 const NETWORK_LOGOS: Record<string, any> = {
@@ -23,6 +24,7 @@ const NETWORK_LOGOS: Record<string, any> = {
     airtel: require('../../assets/images/airtel.png'),
     glo: require('../../assets/images/glo.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
+    vitel: require('../../assets/images/vitel.png'),
 };
 
 export default function AirtimeToCashScreen() {
@@ -96,7 +98,7 @@ export default function AirtimeToCashScreen() {
 
     // Step 1: Request OTP
     const handleRequestOtp = async () => {
-        if (!phone || phone.length < 11) {
+        if (!phone || phone.trim().length < 11) {
             Alert.alert("Validation", "Please enter a valid 11-digit phone number.");
             return;
         }
@@ -119,15 +121,15 @@ export default function AirtimeToCashScreen() {
                 throw new Error(response?.message || error?.message || "Failed to send OTP.");
             }
 
-            const blob = response.data.data;
-            if (!blob) throw new Error("No session token received from network provider.");
+            const blob = response?.data?.data;
+            if (!blob) throw new Error(response?.data?.message || "Could not retrieve session token from telecom provider.");
 
             setSessionBlob(blob);
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             setStep(2);
             Alert.alert("OTP Sent", response.data.message || `OTP has been sent to ${phone}`);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to send OTP. Please check your details.");
+            Alert.alert("Error", err.message || "Failed to send OTP. Please check phone number.");
         } finally {
             setLoadingStep1(false);
         }
@@ -136,7 +138,7 @@ export default function AirtimeToCashScreen() {
     // Step 2: Verify OTP
     const handleVerifyOtp = async () => {
         const net = getSelectedNetwork();
-        if (!otp || otp.length < (net.otpLength || 4)) {
+        if (!otp || otp.trim().length < (net.otpLength || 4)) {
             Alert.alert("Validation", `Please enter the ${net.otpLength}-digit OTP sent to your phone.`);
             return;
         }
@@ -158,19 +160,19 @@ export default function AirtimeToCashScreen() {
             });
 
             if (error || !response?.success) {
-                throw new Error(response?.message || error?.message || "Invalid OTP entered.");
+                throw new Error(response?.message || error?.message || "Invalid OTP code entered.");
             }
 
-            const newBlob = response.data.data;
-            const fetchedBal = response.data.balance;
+            const newBlob = response?.data?.data;
+            const fetchedBal = response?.data?.balance;
 
             if (newBlob) setSessionBlob(newBlob);
             if (fetchedBal !== undefined) setAirtimeBalance(parseFloat(fetchedBal));
 
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             setStep(3);
         } catch (err: any) {
-            Alert.alert("Verification Failed", err.message || "Invalid OTP. Please restart from Step 1 if session expired.");
+            Alert.alert("Verification Failed", err.message || "Invalid OTP code. Please try again.");
         } finally {
             setLoadingStep2(false);
         }
@@ -185,11 +187,11 @@ export default function AirtimeToCashScreen() {
         }
 
         if (airtimeBalance !== null && numAmount > airtimeBalance) {
-            Alert.alert("Validation", `Amount exceeds your airtime balance of ₦${airtimeBalance.toLocaleString()}`);
+            Alert.alert("Validation", `Amount exceeds your current line airtime balance of ₦${airtimeBalance.toLocaleString()}`);
             return;
         }
 
-        if (!sharePin || sharePin.length < 4) {
+        if (!sharePin || sharePin.trim().length < 4) {
             Alert.alert("Validation", "Please enter your 4-digit Share & Sell PIN.");
             return;
         }
@@ -215,7 +217,7 @@ export default function AirtimeToCashScreen() {
                 throw new Error(response?.message || error?.message || "Airtime conversion failed.");
             }
 
-            const credited = response.data.credited || (numAmount * (getBuybackPct() / 100));
+            const credited = response?.data?.credited || (numAmount * (getBuybackPct() / 100));
 
             // Notify user
             if (userId) {
@@ -234,11 +236,11 @@ export default function AirtimeToCashScreen() {
                 params: {
                     amount: `+₦${credited.toLocaleString()}`,
                     type: 'Airtime to Cash',
-                    reference: response.data.transid || `AC_${Date.now()}`
+                    reference: response?.data?.transid || `AC_${Date.now()}`
                 }
             });
         } catch (err: any) {
-            Alert.alert("Conversion Failed", err.message || "Failed to convert airtime. Please restart from Step 1.");
+            Alert.alert("Conversion Failed", err.message || "Failed to convert airtime to cash.");
         } finally {
             setLoadingStep3(false);
         }
@@ -258,19 +260,20 @@ export default function AirtimeToCashScreen() {
     return (
         <View style={s.pageWrapper}>
             <Stack.Screen options={{ headerShown: false }} />
+            <StatusBar style="light" />
 
             <KeyboardAvoidingView 
                 behavior={Platform.OS === "ios" ? "padding" : "height"} 
                 style={{ flex: 1 }}
             >
-                {/* Curved Header */}
-                <LinearGradient colors={['#060d21', '#0d1b3e']} style={s.headerContainer}>
+                {/* Curved Modern Header */}
+                <LinearGradient colors={['#060d21', '#0d1b3e', '#142258']} style={s.headerContainer}>
                     <View style={s.headerTop}>
-                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
                             <Ionicons name="arrow-back" size={20} color="white" />
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
-                            <Text style={s.headerTitle}>Airtime to Cash</Text>
+                            <Text style={s.headerTitle}>Airtime ➔ Cash</Text>
                             {walletBalance !== null && (
                                 <View style={s.balanceBadge}>
                                     <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
@@ -280,7 +283,7 @@ export default function AirtimeToCashScreen() {
                                 </View>
                             )}
                         </View>
-                        <TouchableOpacity onPress={resetWizard} style={{ width: 32, alignItems: 'center' }}>
+                        <TouchableOpacity onPress={resetWizard} style={s.refreshBtn} activeOpacity={0.7}>
                             <Ionicons name="refresh" size={18} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
@@ -292,25 +295,13 @@ export default function AirtimeToCashScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* KYC Tier Warning if not Tier 2 */}
-                    {!isTier2 && (
-                        <View style={s.kycWarningCard}>
-                            <Ionicons name="shield-half-outline" size={22} color="#b45309" style={{ marginRight: 10 }} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={s.kycWarningTitle}>Tier 2 Verification Required</Text>
-                                <Text style={s.kycWarningText}>Airtime conversion credits your wallet directly. Please verify your BVN or NIN to proceed.</Text>
-                                <TouchableOpacity onPress={() => router.push('/kyc')} style={s.kycBtn}>
-                                    <Text style={s.kycBtnText}>Verify Identity Now</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Rates Banner */}
+                    {/* Live Payout Rates Widget */}
                     <View style={s.ratesCard}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <Ionicons name="flash-outline" size={16} color="#2563eb" style={{ marginRight: 6 }} />
-                            <Text style={s.ratesTitle}>Live Buyback Payout Rates</Text>
+                        <View style={s.ratesHeader}>
+                            <View style={s.ratesIconBox}>
+                                <Ionicons name="flash-outline" size={16} color="#2563eb" />
+                            </View>
+                            <Text style={s.ratesTitle}>Live Payout Rates (Buyback %)</Text>
                         </View>
                         <View style={s.ratesRow}>
                             {NETWORKS_DATA.map((net) => {
@@ -319,8 +310,8 @@ export default function AirtimeToCashScreen() {
                                 return (
                                     <View key={net.id} style={s.rateItem}>
                                         <Text style={[s.rateNetName, { color: net.color }]}>{net.name}</Text>
-                                        <View style={[s.rateBadge, { backgroundColor: net.color + '15' }]}>
-                                            <Text style={[s.ratePctText, { color: net.color }]}>{pct}% Payout</Text>
+                                        <View style={[s.rateBadge, { backgroundColor: net.color + '20' }]}>
+                                            <Text style={[s.ratePctText, { color: net.color }]}>{pct}%</Text>
                                         </View>
                                     </View>
                                 );
@@ -328,7 +319,7 @@ export default function AirtimeToCashScreen() {
                         </View>
                     </View>
 
-                    {/* Step Wizard Indicator */}
+                    {/* Step Wizard Progress Bar */}
                     <View style={s.wizardIndicatorContainer}>
                         <View style={[s.wizardStepCircle, step >= 1 && s.wizardStepActive]}>
                             <Text style={[s.wizardStepNum, step >= 1 && s.wizardStepNumActive]}>1</Text>
@@ -343,17 +334,21 @@ export default function AirtimeToCashScreen() {
                         </View>
                     </View>
                     <View style={s.wizardLabelsRow}>
-                        <Text style={s.wizardLabelText}>1. Details</Text>
-                        <Text style={s.wizardLabelText}>2. Verify OTP</Text>
-                        <Text style={s.wizardLabelText}>3. Convert</Text>
+                        <Text style={[s.wizardLabelText, step >= 1 && { color: '#0d1b3e', fontWeight: '800' }]}>1. Network & Phone</Text>
+                        <Text style={[s.wizardLabelText, step >= 2 && { color: '#0d1b3e', fontWeight: '800' }]}>2. SMS OTP</Text>
+                        <Text style={[s.wizardLabelText, step >= 3 && { color: '#0d1b3e', fontWeight: '800' }]}>3. Payout PIN</Text>
                     </View>
 
-                    {/* STEP 1: Phone & Network Selection */}
+                    {/* STEP 1: Phone & 5-Column Network Selection */}
                     {step === 1 && (
                         <View style={s.card}>
-                            <Text style={s.cardTitle}>Step 1: Select Network & Phone</Text>
+                            <View style={s.cardHeaderRow}>
+                                <Ionicons name="phone-portrait-outline" size={18} color="#2563eb" style={{ marginRight: 6 }} />
+                                <Text style={s.cardTitle}>Step 1: Network & Phone Number</Text>
+                            </View>
                             
-                            <Text style={s.inputLabel}>Network</Text>
+                            <Text style={s.inputLabel}>Select Network (5 Available)</Text>
+                            {/* 5-Column Chip Row Layout */}
                             <View style={s.networkChipRow}>
                                 {NETWORKS_DATA.map((net) => {
                                     const isSelected = networkId === net.id;
@@ -362,7 +357,7 @@ export default function AirtimeToCashScreen() {
                                             key={net.id}
                                             style={[
                                                 s.networkChip,
-                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '15' }
+                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '15', borderWidth: 2 }
                                             ]}
                                             onPress={() => setNetworkId(net.id)}
                                             activeOpacity={0.8}
@@ -374,9 +369,12 @@ export default function AirtimeToCashScreen() {
                                                     resizeMode="contain"
                                                 />
                                             </View>
-                                            <Text style={[s.networkChipText, isSelected && { color: net.color, fontWeight: '800' }]}>
+                                            <Text style={[s.networkChipText, isSelected && { color: net.color, fontWeight: '800' }]} numberOfLines={1}>
                                                 {net.name}
                                             </Text>
+                                            {isSelected && (
+                                                <View style={[s.chipDot, { backgroundColor: net.color }]} />
+                                            )}
                                         </TouchableOpacity>
                                     );
                                 })}
@@ -395,41 +393,45 @@ export default function AirtimeToCashScreen() {
                                     style={s.textInput}
                                 />
                                 {userPhone && phone !== userPhone && (
-                                    <TouchableOpacity onPress={() => setPhone(userPhone)} style={s.meBtn}>
+                                    <TouchableOpacity onPress={() => setPhone(userPhone)} style={s.meBtn} activeOpacity={0.7}>
                                         <Text style={s.meBtnText}>My Line</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
 
+                            {/* 100% ALWAYS CLICKABLE SEND OTP BUTTON */}
                             <TouchableOpacity
                                 onPress={handleRequestOtp}
-                                disabled={loadingStep1 || !isTier2}
-                                style={[s.primaryBtn, (!isTier2 || loadingStep1) && s.btnDisabled]}
-                                activeOpacity={0.85}
+                                disabled={loadingStep1}
+                                style={s.primaryBtn}
+                                activeOpacity={0.8}
                             >
                                 {loadingStep1 ? (
                                     <ActivityIndicator color="white" size="small" />
                                 ) : (
                                     <>
                                         <Text style={s.primaryBtnText}>Send OTP to Line</Text>
-                                        <Ionicons name="arrow-forward" size={18} color="white" style={{ marginLeft: 6 }} />
+                                        <Ionicons name="arrow-forward-circle" size={20} color="white" style={{ marginLeft: 8 }} />
                                     </>
                                 )}
                             </TouchableOpacity>
                         </View>
                     )}
 
-                    {/* STEP 2: Verify OTP */}
+                    {/* STEP 2: Enter & Verify OTP */}
                     {step === 2 && (
                         <View style={s.card}>
-                            <Text style={s.cardTitle}>Step 2: Verify OTP</Text>
+                            <View style={s.cardHeaderRow}>
+                                <Ionicons name="keypad-outline" size={18} color="#2563eb" style={{ marginRight: 6 }} />
+                                <Text style={s.cardTitle}>Step 2: Enter SMS OTP Code</Text>
+                            </View>
                             <Text style={s.cardSub}>
-                                Enter the {getSelectedNetwork().otpLength}-digit security code sent to {phone}
+                                Enter the {getSelectedNetwork().otpLength}-digit security code sent via SMS to {phone}
                             </Text>
 
-                            <Text style={s.inputLabel}>SMS OTP Code</Text>
+                            <Text style={s.inputLabel}>SMS OTP Security Code</Text>
                             <View style={s.inputContainer}>
-                                <Ionicons name="keypad-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                                <Ionicons name="lock-open-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     value={otp}
                                     onChangeText={setOtp}
@@ -442,21 +444,21 @@ export default function AirtimeToCashScreen() {
                             </View>
 
                             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                                <TouchableOpacity onPress={resetWizard} style={s.secondaryBtn}>
+                                <TouchableOpacity onPress={resetWizard} style={s.secondaryBtn} activeOpacity={0.7}>
                                     <Text style={s.secondaryBtnText}>Back</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleVerifyOtp}
                                     disabled={loadingStep2}
                                     style={[s.primaryBtn, { flex: 2 }]}
-                                    activeOpacity={0.85}
+                                    activeOpacity={0.8}
                                 >
                                     {loadingStep2 ? (
                                         <ActivityIndicator color="white" size="small" />
                                     ) : (
                                         <>
-                                            <Text style={s.primaryBtnText}>Verify OTP</Text>
-                                            <Ionicons name="checkmark-circle-outline" size={18} color="white" style={{ marginLeft: 6 }} />
+                                            <Text style={s.primaryBtnText}>Verify OTP Code</Text>
+                                            <Ionicons name="checkmark-circle" size={20} color="white" style={{ marginLeft: 6 }} />
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -467,11 +469,14 @@ export default function AirtimeToCashScreen() {
                     {/* STEP 3: Amount & Share PIN */}
                     {step === 3 && (
                         <View style={s.card}>
-                            <Text style={s.cardTitle}>Step 3: Finalise Conversion</Text>
+                            <View style={s.cardHeaderRow}>
+                                <Ionicons name="cash-outline" size={18} color="#16a34a" style={{ marginRight: 6 }} />
+                                <Text style={s.cardTitle}>Step 3: Conversion & Payout</Text>
+                            </View>
 
                             {airtimeBalance !== null && (
                                 <View style={s.airtimeBalBox}>
-                                    <Text style={s.airtimeBalLabel}>Available Airtime Balance</Text>
+                                    <Text style={s.airtimeBalLabel}>Available Airtime Balance on Line</Text>
                                     <Text style={s.airtimeBalVal}>₦{airtimeBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                                 </View>
                             )}
@@ -489,7 +494,7 @@ export default function AirtimeToCashScreen() {
                                 />
                             </View>
 
-                            {/* Live Calculation Preview */}
+                            {/* Live Calculation Preview Card */}
                             {parseFloat(amount) > 0 && (
                                 <View style={s.previewCard}>
                                     <View style={s.previewRow}>
@@ -502,7 +507,7 @@ export default function AirtimeToCashScreen() {
                                     </View>
                                     <View style={s.previewDivider} />
                                     <View style={s.previewRow}>
-                                        <Text style={s.previewTotalLabel}>Wallet Credit Payout:</Text>
+                                        <Text style={s.previewTotalLabel}>Wallet Cash Credit:</Text>
                                         <Text style={s.previewTotalVal}>₦{calculatedPayout.toLocaleString()}</Text>
                                     </View>
                                 </View>
@@ -510,7 +515,7 @@ export default function AirtimeToCashScreen() {
 
                             <Text style={s.inputLabel}>4-Digit Share & Sell PIN</Text>
                             <View style={s.inputContainer}>
-                                <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                                <Ionicons name="shield-checkmark-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     value={sharePin}
                                     onChangeText={setSharePin}
@@ -524,21 +529,21 @@ export default function AirtimeToCashScreen() {
                             </View>
 
                             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                                <TouchableOpacity onPress={resetWizard} style={s.secondaryBtn}>
+                                <TouchableOpacity onPress={resetWizard} style={s.secondaryBtn} activeOpacity={0.7}>
                                     <Text style={s.secondaryBtnText}>Restart</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleFinaliseConversion}
                                     disabled={loadingStep3}
                                     style={[s.primaryBtn, { flex: 2, backgroundColor: '#16a34a' }]}
-                                    activeOpacity={0.85}
+                                    activeOpacity={0.8}
                                 >
                                     {loadingStep3 ? (
                                         <ActivityIndicator color="white" size="small" />
                                     ) : (
                                         <>
-                                            <Text style={s.primaryBtnText}>Convert to Wallet Cash</Text>
-                                            <Ionicons name="cash-outline" size={18} color="white" style={{ marginLeft: 6 }} />
+                                            <Text style={s.primaryBtnText}>Credit Wallet Now</Text>
+                                            <Ionicons name="wallet-outline" size={20} color="white" style={{ marginLeft: 6 }} />
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -558,10 +563,15 @@ const s = StyleSheet.create({
     },
     headerContainer: {
         paddingTop: Platform.OS === 'ios' ? 54 : 40,
-        paddingBottom: 20,
+        paddingBottom: 22,
         paddingHorizontal: 16,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
+        shadowColor: '#060d21',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 5,
     },
     headerTop: {
         flexDirection: 'row',
@@ -569,78 +579,74 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
     },
     backBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    refreshBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
         color: '#ffffff',
-        fontSize: 17,
+        fontSize: 18,
         fontWeight: '800',
     },
     balanceBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        marginTop: 3,
+        backgroundColor: 'rgba(245, 166, 35, 0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginTop: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
     },
     headerBalance: {
         color: '#f5a623',
-        fontSize: 11,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     scrollContainer: {
         padding: 16,
     },
-    kycWarningCard: {
-        flexDirection: 'row',
-        backgroundColor: '#fffbeb',
-        borderWidth: 1.5,
-        borderColor: '#fde68a',
-        borderRadius: 16,
-        padding: 14,
-        marginBottom: 16,
-    },
-    kycWarningTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#92400e',
-        marginBottom: 2,
-    },
-    kycWarningText: {
-        fontSize: 11,
-        color: '#78350f',
-        lineHeight: 15,
-        marginBottom: 8,
-    },
-    kycBtn: {
-        backgroundColor: '#d97706',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        alignSelf: 'flex-start',
-    },
-    kycBtnText: {
-        color: '#ffffff',
-        fontSize: 10.5,
-        fontWeight: '800',
-    },
     ratesCard: {
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 12,
+        borderRadius: 18,
+        padding: 14,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
-        marginBottom: 16,
+        marginBottom: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    ratesHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    ratesIconBox: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#eff6ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
     },
     ratesTitle: {
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '800',
         color: '#0d1b3e',
     },
@@ -653,21 +659,23 @@ const s = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         backgroundColor: '#f8fafc',
-        paddingVertical: 6,
-        borderRadius: 10,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     rateNetName: {
         fontSize: 10,
         fontWeight: '800',
-        marginBottom: 2,
+        marginBottom: 3,
     },
     rateBadge: {
-        paddingHorizontal: 4,
+        paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 6,
+        borderRadius: 8,
     },
     ratePctText: {
-        fontSize: 8.5,
+        fontSize: 9,
         fontWeight: '800',
     },
     wizardIndicatorContainer: {
@@ -678,9 +686,9 @@ const s = StyleSheet.create({
         paddingHorizontal: 30,
     },
     wizardStepCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: '#e2e8f0',
         alignItems: 'center',
         justifyContent: 'center',
@@ -689,7 +697,7 @@ const s = StyleSheet.create({
         backgroundColor: '#2563eb',
     },
     wizardStepNum: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '800',
         color: '#64748b',
     },
@@ -698,9 +706,10 @@ const s = StyleSheet.create({
     },
     wizardLine: {
         flex: 1,
-        height: 2,
+        height: 3,
         backgroundColor: '#e2e8f0',
         marginHorizontal: 4,
+        borderRadius: 2,
     },
     wizardLineActive: {
         backgroundColor: '#2563eb',
@@ -708,66 +717,93 @@ const s = StyleSheet.create({
     wizardLabelsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        marginBottom: 16,
+        paddingHorizontal: 10,
+        marginBottom: 18,
     },
     wizardLabelText: {
-        fontSize: 9.5,
-        fontWeight: '700',
-        color: '#64748b',
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#94a3b8',
     },
     card: {
         backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 16,
+        padding: 18,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
-        marginBottom: 16,
+        marginBottom: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    cardHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
     },
     cardTitle: {
-        fontSize: 14,
+        fontSize: 14.5,
         fontWeight: '800',
         color: '#0d1b3e',
-        marginBottom: 4,
     },
     cardSub: {
-        fontSize: 11,
+        fontSize: 11.5,
         color: '#64748b',
         marginBottom: 14,
+        lineHeight: 16,
     },
     inputLabel: {
         fontSize: 11.5,
         fontWeight: '700',
         color: '#334155',
-        marginBottom: 6,
-        marginTop: 10,
+        marginBottom: 8,
+        marginTop: 8,
     },
+    // 5-Column Chip Row Layout
     networkChipRow: {
         flexDirection: 'row',
-        gap: 6,
-        marginBottom: 12,
+        justifyContent: 'space-between',
+        gap: 4,
+        marginBottom: 14,
+        width: '100%',
     },
     networkChip: {
         flex: 1,
-        paddingVertical: 8,
-        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 2,
+        borderRadius: 14,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
         backgroundColor: '#ffffff',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
     },
     networkLogoBox: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         overflow: 'hidden',
-        marginBottom: 3,
+        marginBottom: 4,
+        backgroundColor: '#f8fafc',
     },
     networkChipText: {
         fontSize: 9.5,
         fontWeight: '600',
         color: '#334155',
+        textAlign: 'center',
+    },
+    chipDot: {
+        position: 'absolute',
+        top: -3,
+        right: -3,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#ffffff',
     },
     inputContainer: {
         flexDirection: 'row',
@@ -777,90 +813,92 @@ const s = StyleSheet.create({
         borderColor: '#cbd5e1',
         borderRadius: 14,
         paddingHorizontal: 12,
-        height: 48,
-        marginBottom: 14,
+        height: 50,
+        marginBottom: 16,
     },
     textInput: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 14.5,
         fontWeight: '700',
         color: '#0d1b3e',
     },
     meBtn: {
         backgroundColor: '#e0e7ff',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
     },
     meBtnText: {
         color: '#3730a3',
-        fontSize: 10,
+        fontSize: 10.5,
         fontWeight: '800',
     },
     currencyPrefix: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '800',
         color: '#64748b',
         marginRight: 6,
     },
     primaryBtn: {
         backgroundColor: '#2563eb',
-        borderRadius: 14,
-        height: 48,
+        borderRadius: 16,
+        height: 50,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 6,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     primaryBtnText: {
         color: '#ffffff',
-        fontSize: 13.5,
+        fontSize: 14,
         fontWeight: '800',
     },
     secondaryBtn: {
         backgroundColor: '#f1f5f9',
-        borderRadius: 14,
-        height: 48,
-        paddingHorizontal: 16,
+        borderRadius: 16,
+        height: 50,
+        paddingHorizontal: 18,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 6,
     },
     secondaryBtnText: {
         color: '#475569',
-        fontSize: 12,
+        fontSize: 12.5,
         fontWeight: '700',
-    },
-    btnDisabled: {
-        opacity: 0.5,
     },
     airtimeBalBox: {
         backgroundColor: '#f0fdf4',
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#bbf7d0',
-        borderRadius: 12,
-        padding: 10,
-        marginBottom: 12,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 14,
         alignItems: 'center',
     },
     airtimeBalLabel: {
-        fontSize: 10,
+        fontSize: 10.5,
         color: '#166534',
-        fontWeight: '600',
+        fontWeight: '700',
     },
     airtimeBalVal: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '900',
         color: '#15803d',
         marginTop: 2,
     },
     previewCard: {
         backgroundColor: '#f8fafc',
-        borderRadius: 12,
-        padding: 12,
-        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1.5,
         borderColor: '#e2e8f0',
-        marginBottom: 14,
+        marginBottom: 16,
     },
     previewRow: {
         flexDirection: 'row',
@@ -868,26 +906,26 @@ const s = StyleSheet.create({
         marginBottom: 4,
     },
     previewLabel: {
-        fontSize: 11,
+        fontSize: 11.5,
         color: '#64748b',
     },
     previewVal: {
-        fontSize: 11,
+        fontSize: 11.5,
         fontWeight: '700',
         color: '#0d1b3e',
     },
     previewDivider: {
         height: 1,
         backgroundColor: '#cbd5e1',
-        marginVertical: 6,
+        marginVertical: 8,
     },
     previewTotalLabel: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '800',
         color: '#0d1b3e',
     },
     previewTotalVal: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '900',
         color: '#16a34a',
     },
