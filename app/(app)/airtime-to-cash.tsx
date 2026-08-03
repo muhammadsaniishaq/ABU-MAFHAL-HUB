@@ -98,7 +98,26 @@ export default function AirtimeToCashScreen() {
         }
     };
 
-    // Filter ONLY networks supported by Bilalsadasub Cash API (default MTN & AIRTEL)
+    const detectNetworkFromPhone = (num: string): string | null => {
+        const clean = num.replace(/[^0-9]/g, '');
+        if (clean.length < 4) return null;
+        const prefix = clean.substring(0, 4);
+
+        const mtnPrefixes = ['0803','0806','0813','0816','0810','0814','0903','0906','0703','0706','0913','0916','0702','0704'];
+        const airtelPrefixes = ['0802','0808','0812','0708','0701','0902','0907','0901','0912'];
+
+        if (mtnPrefixes.includes(prefix)) return '1'; // MTN
+        if (airtelPrefixes.includes(prefix)) return '2'; // AIRTEL
+        return null;
+    };
+
+    const handlePhoneChange = (text: string) => {
+        setPhone(text);
+        const autoNet = detectNetworkFromPhone(text);
+        if (autoNet) {
+            setNetworkId(autoNet);
+        }
+    };
     const getAvailableNetworks = () => {
         if (rates.length > 0) {
             const activeList = ALL_NETWORKS.filter(net => rates.some((r: any) => r.plan_id === net.id || (r.network || '').toLowerCase().includes(net.key)));
@@ -410,7 +429,7 @@ export default function AirtimeToCashScreen() {
                                     <Ionicons name="call-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
                                     <TextInput
                                         value={phone}
-                                        onChangeText={setPhone}
+                                        onChangeText={handlePhoneChange}
                                         placeholder="08012345678"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="phone-pad"
@@ -418,7 +437,7 @@ export default function AirtimeToCashScreen() {
                                         style={s.compactTextInput}
                                     />
                                     {userPhone && phone !== userPhone && (
-                                        <TouchableOpacity onPress={() => setPhone(userPhone)} style={s.myLineChip} activeOpacity={0.7}>
+                                        <TouchableOpacity onPress={() => handlePhoneChange(userPhone)} style={s.myLineChip} activeOpacity={0.7}>
                                             <Text style={s.myLineChipText}>My Line</Text>
                                         </TouchableOpacity>
                                     )}
@@ -507,6 +526,17 @@ export default function AirtimeToCashScreen() {
                                     />
                                 </View>
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
+                            </View>
+
+                            {/* Wallet Balance Display Right Above Submit Button */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, marginTop: 14, borderWidth: 1, borderColor: '#cbd5e1' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="wallet" size={18} color="#eab308" style={{ marginRight: 6 }} />
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>Wallet Cash Balance:</Text>
+                                </View>
+                                <Text style={{ fontSize: 13, fontWeight: '900', color: '#0f172a' }}>
+                                    ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
+                                </Text>
                             </View>
 
                             {/* Sleek 100% EXPLICIT Submit Button */}
