@@ -117,7 +117,28 @@ export default function AdminSettings() {
     const [features, setFeatures] = useState<Record<string, boolean>>(
         allKnownFeatures.reduce((acc, key) => ({ ...acc, [key]: true }), {})
     );
-    const [expandedApi, setExpandedApi] = useState<string | null>('payments');
+    const [expandedApi, setExpandedApi] = useState<string | null>('all');
+
+    const isVendorSelected = (vendorKey: string) => {
+        if (!vtuVendor) return vendorKey === 'clubkonnect';
+        if (vtuVendor === 'auto') return true;
+        return vtuVendor.split(',').map(v => v.trim()).includes(vendorKey);
+    };
+
+    const toggleVendorSelect = (vendorKey: string) => {
+        let list = vtuVendor ? vtuVendor.split(',').map(v => v.trim()) : ['clubkonnect'];
+        if (list.includes(vendorKey)) {
+            if (list.length > 1) {
+                list = list.filter(v => v !== vendorKey);
+            } else {
+                Alert.alert("Notice", "You must keep at least 1 API provider active.");
+                return;
+            }
+        } else {
+            list.push(vendorKey);
+        }
+        setVtuVendor(list.join(','));
+    };
 
     // Virtual Accounts & Payment Keys
     const [payvesselKey, setPayvesselKey] = useState('');
@@ -674,15 +695,118 @@ export default function AdminSettings() {
                 {activeTab === 'api' && (
                     <View style={s.section}>
                         
-                        {/* Payments Accordion */}
-                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'payments' ? null : 'payments')} style={[s.accordionHeader, expandedApi === 'payments' && s.accordionHeaderActive]} activeOpacity={0.8}>
+                        {/* VTU & Bills Multi-Provider Setup */}
+                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'all' || expandedApi === 'vtu' ? null : 'vtu')} style={[s.accordionHeader, s.accordionHeaderActive]} activeOpacity={0.8}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="card" size={18} color={expandedApi === 'payments' ? '#fff' : '#0d1b3e'} style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, expandedApi === 'payments' && { color: '#fff' }]}>Payments & Virtual Accounts</Text>
+                                <Ionicons name="phone-portrait" size={18} color="#fff" style={{ marginRight: 8 }} />
+                                <Text style={[s.accordionTitle, { color: '#fff' }]}>⚡ VTU & Data Multi-API Configuration</Text>
                             </View>
-                            <Ionicons name={expandedApi === 'payments' ? "chevron-up" : "chevron-down"} size={18} color={expandedApi === 'payments' ? '#fff' : '#64748b'} />
+                            <Ionicons name={expandedApi === 'all' || expandedApi === 'vtu' ? "chevron-up" : "chevron-down"} size={18} color="#fff" />
                         </TouchableOpacity>
-                        {expandedApi === 'payments' && (
+                        {(expandedApi === 'all' || expandedApi === 'vtu') && (
+                            <View style={s.accordionBody}>
+                                <View style={{ backgroundColor: '#f0f9ff', padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1.5, borderColor: '#bae6fd' }}>
+                                    <Text style={[s.label, { color: '#0369a1', fontWeight: '800', fontSize: 13 }]}>Choose Active APIs (Select 1, 2, or All 3)</Text>
+                                    <Text style={{ fontSize: 11, color: '#0284c7', marginBottom: 12, lineHeight: 16 }}>Select the APIs you want active. If multiple are checked, your app will automatically route and failover between them for 99.9% uptime!</Text>
+                                    
+                                    <View style={{ gap: 8 }}>
+                                        {[
+                                            { id: 'bilalsadasub', name: 'Bilalsadasub API', desc: 'Primary Telecom Provider (Data, Airtime, Cable, Bills)' },
+                                            { id: 'bigi', name: 'Bigi API', desc: 'SME & Gifting Data Provider' },
+                                            { id: 'clubkonnect', name: 'ClubKonnect API', desc: 'Fallback VTU & Bill Payments Provider' }
+                                        ].map((item) => {
+                                            const checked = isVendorSelected(item.id);
+                                            return (
+                                                <TouchableOpacity 
+                                                    key={item.id}
+                                                    onPress={() => toggleVendorSelect(item.id)}
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        backgroundColor: checked ? '#ffffff' : '#f8fafc',
+                                                        borderWidth: 1.5,
+                                                        borderColor: checked ? '#2563eb' : '#cbd5e1',
+                                                        borderRadius: 12,
+                                                        padding: 12
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <View style={{
+                                                        width: 22,
+                                                        height: 22,
+                                                        borderRadius: 6,
+                                                        borderWidth: 2,
+                                                        borderColor: checked ? '#2563eb' : '#94a3b8',
+                                                        backgroundColor: checked ? '#2563eb' : '#ffffff',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        marginRight: 10
+                                                    }}>
+                                                        {checked && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ fontSize: 13, fontWeight: '800', color: checked ? '#1e40af' : '#334155' }}>{item.name}</Text>
+                                                        <Text style={{ fontSize: 10.5, color: '#64748b' }}>{item.desc}</Text>
+                                                    </View>
+                                                    {checked && (
+                                                        <View style={{ backgroundColor: '#dbeafe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#1d4ed8' }}>ENABLED</Text>
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                    
+                                    <TouchableOpacity onPress={handleSaveVtuVendor} style={[s.saveBtn, { marginTop: 14, backgroundColor: '#2563eb' }]} activeOpacity={0.8}>
+                                        {loading ? <ActivityIndicator color="#fff" size="small" /> : (
+                                            <>
+                                                <Ionicons name="checkmark-circle" size={16} color="#fff" style={{ marginRight: 6 }} />
+                                                <Text style={[s.saveBtnText, { fontSize: 13 }]}>Save Active API Selection</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 8, fontWeight: '800' }]}>🔑 Bilalsadasub API Credentials</Text>
+                                <ApiInputRow placeholder="Bilalsadasub API Token (from bilalsadasub.com)" value={bilalToken} onChangeText={setBilalToken} isSecret={true} />
+                                
+                                <View style={s.divider} />
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 8, fontWeight: '800' }]}>🔑 Bigi API Credentials</Text>
+                                <ApiInputRow placeholder="Bigi API Token" value={bigiToken} onChangeText={setBigiToken} isSecret={true} />
+                                <ApiInputRow placeholder="Bigi API PIN" value={bigiPin} onChangeText={setBigiPin} isSecret={true} />
+                            </View>
+                        )}
+
+                        {/* Identity & Verification Accordion */}
+                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'all' || expandedApi === 'identity' ? null : 'identity')} style={[s.accordionHeader, s.accordionHeaderActive]} activeOpacity={0.8}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="finger-print" size={18} color="#fff" style={{ marginRight: 8 }} />
+                                <Text style={[s.accordionTitle, { color: '#fff' }]}>🆔 Identity & Verification Services (AgentHub)</Text>
+                            </View>
+                            <Ionicons name={expandedApi === 'all' || expandedApi === 'identity' ? "chevron-up" : "chevron-down"} size={18} color="#fff" />
+                        </TouchableOpacity>
+                        {(expandedApi === 'all' || expandedApi === 'identity') && (
+                            <View style={s.accordionBody}>
+                                <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 AgentHub API Key (agenthub.ng)</Text>
+                                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Used for NIN Verification, BVN Lookup, and VNIN Slip Generation.</Text>
+                                <ApiInputRow placeholder="AgentHub API Key (Bearer Token)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
+                                
+                                <View style={s.divider} />
+                                <ApiInputRow placeholder="SmileID API Key" value={smileIdKey} onChangeText={setSmileIdKey} isSecret={true} />
+                                <ApiInputRow placeholder="Termii SMS API Key" value={termiiKey} onChangeText={setTermiiKey} isSecret={true} />
+                            </View>
+                        )}
+
+                        {/* Payments Accordion */}
+                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'all' || expandedApi === 'payments' ? null : 'payments')} style={[s.accordionHeader, s.accordionHeaderActive]} activeOpacity={0.8}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="card" size={18} color="#fff" style={{ marginRight: 8 }} />
+                                <Text style={[s.accordionTitle, { color: '#fff' }]}>💳 Payments & Virtual Accounts</Text>
+                            </View>
+                            <Ionicons name={expandedApi === 'all' || expandedApi === 'payments' ? "chevron-up" : "chevron-down"} size={18} color="#fff" />
+                        </TouchableOpacity>
+                        {(expandedApi === 'all' || expandedApi === 'payments') && (
                             <View style={s.accordionBody}>
                                 <ApiInputRow placeholder="Payvessel API Key" value={payvesselKey} onChangeText={setPayvesselKey} isSecret={true} />
                                 <ApiInputRow placeholder="Payvessel API Secret" value={payvesselSecret} onChangeText={setPayvesselSecret} isSecret={true} />
@@ -691,80 +815,6 @@ export default function AdminSettings() {
                                 <ApiInputRow placeholder="Paystack Secret Key" value={paystackKey} onChangeText={setPaystackKey} isSecret={true} />
                                 <ApiInputRow placeholder="Monnify API Key" value={monnifyKey} onChangeText={setMonnifyKey} isSecret={true} />
                                 <ApiInputRow placeholder="Flutterwave Secret Key" value={flutterwaveKey} onChangeText={setFlutterwaveKey} isSecret={true} />
-                            </View>
-                        )}
-
-                        {/* VTU Provider Accordion */}
-                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'vtu' ? null : 'vtu')} style={[s.accordionHeader, expandedApi === 'vtu' && s.accordionHeaderActive]} activeOpacity={0.8}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="phone-portrait" size={18} color={expandedApi === 'vtu' ? '#fff' : '#0d1b3e'} style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, expandedApi === 'vtu' && { color: '#fff' }]}>VTU & Bills Provider Setup</Text>
-                            </View>
-                            <Ionicons name={expandedApi === 'vtu' ? "chevron-up" : "chevron-down"} size={18} color={expandedApi === 'vtu' ? '#fff' : '#64748b'} />
-                        </TouchableOpacity>
-                        {expandedApi === 'vtu' && (
-                            <View style={s.accordionBody}>
-                                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                                    <Text style={[s.label, { color: '#334155' }]}>Select Active VTU Vendor</Text>
-                                    <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 12, lineHeight: 16 }}>Choose the provider that will handle Airtime and Data requests. Make sure the API keys for the chosen provider are set in the API Vault.</Text>
-                                    <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
-                                        <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'clubkonnect' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
-                                            onPress={() => setVtuVendor('clubkonnect')}
-                                        >
-                                            <Text style={[s.typeText, vtuVendor === 'clubkonnect' && { color: '#fff' }]}>ClubKonnect</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'bigi' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
-                                            onPress={() => setVtuVendor('bigi')}
-                                        >
-                                            <Text style={[s.typeText, vtuVendor === 'bigi' && { color: '#fff' }]}>Bigi API</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'bilalsadasub' && s.typeBtnActive, { flex: 1, minWidth: '45%' }]} 
-                                            onPress={() => setVtuVendor('bilalsadasub')}
-                                        >
-                                            <Text style={[s.typeText, vtuVendor === 'bilalsadasub' && { color: '#fff' }]}>Bilalsadasub</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity 
-                                            style={[s.typeBtn, vtuVendor === 'auto' && s.typeBtnActive, { flex: 1, minWidth: '45%', backgroundColor: vtuVendor === 'auto' ? '#10b981' : '#f1f5f9' }]} 
-                                            onPress={() => setVtuVendor('auto')}
-                                        >
-                                            <Text style={[s.typeText, vtuVendor === 'auto' && { color: '#fff' }]}>Auto (Multi-API)</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    
-                                    <TouchableOpacity onPress={handleSaveVtuVendor} style={[s.saveBtn, { marginTop: 16, backgroundColor: '#3b82f6' }]} activeOpacity={0.8}>
-                                        {loading ? <ActivityIndicator color="#fff" size="small" /> : (
-                                            <>
-                                                <Ionicons name="swap-horizontal" size={16} color="#fff" style={{ marginRight: 6 }} />
-                                                <Text style={[s.saveBtnText, { fontSize: 13 }]}>Switch Provider</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={s.divider} />
-                                <Text style={[s.label, { color: '#334155', marginBottom: 8 }]}>Bilalsadasub API Credentials</Text>
-                                <ApiInputRow placeholder="Bilalsadasub API Token" value={bilalToken} onChangeText={setBilalToken} isSecret={true} />
-                            </View>
-                        )}
-
-                        {/* Identity Accordion */}
-                        <TouchableOpacity onPress={() => setExpandedApi(expandedApi === 'identity' ? null : 'identity')} style={[s.accordionHeader, expandedApi === 'identity' && s.accordionHeaderActive]} activeOpacity={0.8}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="finger-print" size={18} color={expandedApi === 'identity' ? '#fff' : '#0d1b3e'} style={{ marginRight: 8 }} />
-                                <Text style={[s.accordionTitle, expandedApi === 'identity' && { color: '#fff' }]}>Identity & SMS</Text>
-                            </View>
-                            <Ionicons name={expandedApi === 'identity' ? "chevron-up" : "chevron-down"} size={18} color={expandedApi === 'identity' ? '#fff' : '#64748b'} />
-                        </TouchableOpacity>
-                        {expandedApi === 'identity' && (
-                            <View style={s.accordionBody}>
-                                <ApiInputRow placeholder="AgentHub API Key (agenthub.ng - NIN/BVN)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
-                                <ApiInputRow placeholder="Legacy Identity Provider Key" value={identityApiKey} onChangeText={setIdentityApiKey} isSecret={true} />
-                                <ApiInputRow placeholder="SmileID API Key" value={smileIdKey} onChangeText={setSmileIdKey} isSecret={true} />
-                                <View style={s.divider} />
-                                <ApiInputRow placeholder="Termii SMS API Key" value={termiiKey} onChangeText={setTermiiKey} isSecret={true} />
                             </View>
                         )}
 

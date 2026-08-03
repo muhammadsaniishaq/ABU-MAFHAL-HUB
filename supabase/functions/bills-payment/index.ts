@@ -204,10 +204,16 @@ Deno.serve(async (req: Request) => {
 
             if (type === 'airtime' || type === 'data') {
                 // Determine vendor execution order with automatic failover
-                let vendorOrder: string[] = ['bilalsadasub', 'bigi', 'clubkonnect'];
-                if (vtuVendor === 'bigi') vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
-                else if (vtuVendor === 'clubkonnect') vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
-                else if (vtuVendor === 'auto') vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                let vendorOrder: string[] = [];
+                if (vtuVendor && vtuVendor.includes(',')) {
+                    vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
+                } else if (vtuVendor === 'bigi') {
+                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                } else if (vtuVendor === 'clubkonnect') {
+                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                } else {
+                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                }
 
                 let lastError: any = null;
                 for (const vendor of vendorOrder) {

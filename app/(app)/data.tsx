@@ -208,29 +208,20 @@ export default function DataScreen() {
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
     
-    // Fetch dynamic networks
+    // Fetch dynamic networks (Merge with base NETWORKS_DATA to ensure VITEL is never removed)
     useEffect(() => {
         const fetchNetworks = async () => {
             try {
                 const response = await fetch('https://www.nellobytesystems.com/APIDatabundleNetworkV2.asp?UserID=CK101269551');
                 const data = await response.json();
                 if (data && data.MOBILE_NETWORK) {
-                    const dynamic = data.MOBILE_NETWORK.map((net: any) => {
-                        const nameLower = net.NETWORK_NAME.toLowerCase();
-                        let localId = 'mtn';
-                        if (nameLower.includes('glo')) localId = 'glo';
-                        if (nameLower.includes('airtel')) localId = 'airtel';
-                        if (nameLower.includes('vitel')) localId = 'vitel';
-                        if (nameLower.includes('mobile') || nameLower.includes('etisalat') || nameLower.includes('t2mobile')) localId = '9mobile';
-
-                        const base = NETWORKS_DATA.find(n => n.id === localId) || NETWORKS_DATA[0];
-                        return {
-                            ...base,
-                            id: localId,
-                            apiId: net.NETWORK_ID,
-                            name: net.NETWORK_NAME === 't2mobile' ? '9mobile' : net.NETWORK_NAME,
-                            discount: net.DISCOUNT
-                        };
+                    // Update discounts/API IDs for matched networks, keeping all 5 NETWORKS_DATA intact
+                    const dynamic = NETWORKS_DATA.map((baseNet) => {
+                        const match = data.MOBILE_NETWORK.find((net: any) => {
+                            const n = (net.NETWORK_NAME || '').toLowerCase();
+                            return n.includes(baseNet.id) || (baseNet.id === '9mobile' && (n.includes('mobile') || n.includes('t2')));
+                        });
+                        return match ? { ...baseNet, apiId: match.NETWORK_ID, discount: match.DISCOUNT } : baseNet;
                     });
                     setNetworksData(dynamic);
                 }
