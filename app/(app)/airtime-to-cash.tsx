@@ -131,7 +131,7 @@ export default function AirtimeToCashScreen() {
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             Alert.alert("OTP Sent", response.data.message || `OTP security code sent to ${phone}`);
         } catch (err: any) {
-            Alert.alert("Error Sending OTP", err.message || "Failed to send OTP. Please check phone number and retry.");
+            Alert.alert("Error Sending OTP", err.message || "Failed to send OTP. Please check phone number.");
         } finally {
             setLoadingOtp(false);
         }
@@ -142,6 +142,12 @@ export default function AirtimeToCashScreen() {
         const net = getSelectedNetwork();
         if (!otp || otp.trim().length < (net.otpLength || 4)) {
             Alert.alert("Validation Error", `Please enter the ${net.otpLength}-digit OTP sent to your phone.`);
+            return;
+        }
+
+        // If user enters OTP before tapping Send OTP, auto-send step 1 first
+        if (!sessionBlob) {
+            await handleSendOtp();
             return;
         }
 
@@ -173,8 +179,9 @@ export default function AirtimeToCashScreen() {
 
             setOtpVerified(true);
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            Alert.alert("OTP Verified", "OTP code verified successfully! You can now complete your conversion.");
         } catch (err: any) {
-            Alert.alert("OTP Verification Failed", err.message || "OTP verification failed. Please restart if session expired.");
+            Alert.alert("OTP Verification Failed", err.message || "OTP verification failed. Please check code or click Send OTP.");
         } finally {
             setLoadingVerify(false);
         }
@@ -259,18 +266,18 @@ export default function AirtimeToCashScreen() {
 
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
                 
-                {/* Curved Navy Header */}
+                {/* Curved Compact Navy Header */}
                 <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={s.headerContainer}>
                     <View style={s.headerTop}>
                         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                            <Ionicons name="arrow-back" size={20} color="white" />
+                            <Ionicons name="arrow-back" size={18} color="white" />
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
                             <Text style={s.headerTitle}>Airtime ➔ Cash</Text>
                             <Text style={s.headerSubtitle}>Convert unwanted airtime to wallet cash</Text>
                         </View>
                         <TouchableOpacity onPress={() => router.push('/wallet')} style={s.walletBtn} activeOpacity={0.7}>
-                            <Ionicons name="wallet-outline" size={18} color="#f5a623" />
+                            <Ionicons name="wallet-outline" size={16} color="#f5a623" />
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
@@ -315,72 +322,79 @@ export default function AirtimeToCashScreen() {
 
                             {/* 2. PHONE NUMBER WITH AIRTIME */}
                             <Text style={s.stepTitle}>2 · PHONE NUMBER WITH AIRTIME</Text>
-                            <View style={s.phoneInputWrapper}>
-                                <Ionicons name="call-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
-                                <TextInput
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    placeholder="08012345678"
-                                    placeholderTextColor="#94a3b8"
-                                    keyboardType="phone-pad"
-                                    maxLength={11}
-                                    style={s.phoneInput}
-                                />
+                            <View style={s.phoneInputBlock}>
+                                <View style={s.compactInputRow}>
+                                    <Ionicons name="call-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
+                                    <TextInput
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        placeholder="08012345678"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="phone-pad"
+                                        maxLength={11}
+                                        style={s.compactTextInput}
+                                    />
+                                    {userPhone && phone !== userPhone && (
+                                        <TouchableOpacity onPress={() => setPhone(userPhone)} style={s.myLineChip} activeOpacity={0.7}>
+                                            <Text style={s.myLineChipText}>My Line</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                {/* Sleek Send OTP Action Button */}
                                 <TouchableOpacity
                                     onPress={handleSendOtp}
                                     disabled={loadingOtp}
-                                    style={[s.sendOtpBtn, loadingOtp && { opacity: 0.6 }]}
+                                    style={[s.sendOtpBtnFull, loadingOtp && { opacity: 0.6 }]}
                                     activeOpacity={0.8}
                                 >
                                     {loadingOtp ? (
                                         <ActivityIndicator color="#ffffff" size="small" />
                                     ) : (
-                                        <Text style={s.sendOtpBtnText}>{otpSent ? 'Resend' : 'Send OTP'}</Text>
+                                        <>
+                                            <Text style={s.sendOtpBtnFullText}>{otpSent ? 'Resend Security OTP' : 'Send OTP to Line'}</Text>
+                                            <Ionicons name="arrow-forward-circle-outline" size={16} color="white" style={{ marginLeft: 6 }} />
+                                        </>
                                     )}
                                 </TouchableOpacity>
                             </View>
                             <Text style={s.helperSubtext}>We send an OTP to this number to confirm the airtime is yours</Text>
 
-                            {/* 3. ENTER THE OTP */}
+                            {/* 3. ENTER THE OTP (ALWAYS 100% CLICKABLE INPUT) */}
                             <Text style={s.stepTitle}>3 · ENTER THE {getSelectedNetwork().otpLength}-DIGIT OTP</Text>
-                            {otpSent ? (
-                                <View style={s.otpBoxActive}>
-                                    <View style={s.phoneInputWrapper}>
-                                        <Ionicons name="keypad-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
-                                        <TextInput
-                                            value={otp}
-                                            onChangeText={setOtp}
-                                            placeholder={`Enter ${getSelectedNetwork().otpLength}-digit code...`}
-                                            placeholderTextColor="#94a3b8"
-                                            keyboardType="number-pad"
-                                            maxLength={getSelectedNetwork().otpLength}
-                                            style={[s.phoneInput, { letterSpacing: 4, fontWeight: '800' }]}
-                                        />
-                                        <TouchableOpacity
-                                            onPress={handleVerifyOtp}
-                                            disabled={loadingVerify}
-                                            style={[s.sendOtpBtn, { backgroundColor: '#16a34a' }]}
-                                            activeOpacity={0.8}
-                                        >
-                                            {loadingVerify ? (
-                                                <ActivityIndicator color="#ffffff" size="small" />
-                                            ) : (
-                                                <Text style={s.sendOtpBtnText}>Verify OTP</Text>
-                                            )}
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ) : (
-                                <View style={s.otpBoxDotted}>
-                                    <Text style={s.otpPlaceholderText}>OTP box will appear once we send the code</Text>
-                                </View>
-                            )}
+                            <View style={s.compactInputRow}>
+                                <Ionicons name="keypad-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
+                                <TextInput
+                                    value={otp}
+                                    onChangeText={setOtp}
+                                    placeholder={`Enter ${getSelectedNetwork().otpLength}-digit code`}
+                                    placeholderTextColor="#94a3b8"
+                                    keyboardType="number-pad"
+                                    maxLength={getSelectedNetwork().otpLength}
+                                    style={[s.compactTextInput, { letterSpacing: 3, fontWeight: '800' }]}
+                                />
+                                <TouchableOpacity
+                                    onPress={handleVerifyOtp}
+                                    disabled={loadingVerify}
+                                    style={[s.verifyBtnInline, otpVerified && { backgroundColor: '#15803d' }]}
+                                    activeOpacity={0.8}
+                                >
+                                    {loadingVerify ? (
+                                        <ActivityIndicator color="#ffffff" size="small" />
+                                    ) : (
+                                        <Text style={s.verifyBtnInlineText}>
+                                            {otpVerified ? 'Verified ✓' : 'Verify OTP'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={s.helperSubtext}>Enter the SMS security code sent to your line</Text>
 
                             {/* 4. CONVERSION DETAILS */}
                             <Text style={s.stepTitle}>4 · CONVERSION DETAILS</Text>
                             <View style={s.inputBlock}>
-                                <Text style={s.inputFieldLabel}>Airtime amount to convert</Text>
-                                <View style={s.amountInputRow}>
+                                <Text style={s.inputFieldLabel}>Airtime amount to convert (₦)</Text>
+                                <View style={s.compactInputRow}>
                                     <Text style={s.nairaPrefix}>₦</Text>
                                     <TextInput
                                         value={amount}
@@ -388,34 +402,35 @@ export default function AirtimeToCashScreen() {
                                         placeholder="0"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="number-pad"
-                                        style={s.amountInput}
+                                        style={[s.compactTextInput, { fontWeight: '800' }]}
                                     />
                                 </View>
                                 <Text style={s.helperSubtext}>How much airtime are you converting?</Text>
                             </View>
 
                             <View style={s.inputBlock}>
-                                <View style={s.pinInputRow}>
-                                    <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                                <Text style={s.inputFieldLabel}>Share & Sell PIN</Text>
+                                <View style={s.compactInputRow}>
+                                    <Ionicons name="lock-closed-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
                                     <TextInput
                                         value={sharePin}
                                         onChangeText={setSharePin}
-                                        placeholder="Share & Sell PIN"
+                                        placeholder="1234"
                                         placeholderTextColor="#94a3b8"
                                         secureTextEntry
                                         keyboardType="number-pad"
                                         maxLength={4}
-                                        style={s.pinInput}
+                                        style={[s.compactTextInput, { letterSpacing: 3 }]}
                                     />
                                 </View>
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
                             </View>
 
-                            {/* Convert Action Button */}
+                            {/* Sleek Convert Action Button */}
                             <TouchableOpacity
                                 onPress={handleConvertAirtime}
-                                disabled={loadingConvert || !otpVerified}
-                                style={[s.actionConvertBtn, (!otpVerified || loadingConvert) && s.actionConvertBtnDisabled]}
+                                disabled={loadingConvert}
+                                style={[s.actionConvertBtn, loadingConvert && { opacity: 0.6 }]}
                                 activeOpacity={0.85}
                             >
                                 {loadingConvert ? (
@@ -438,7 +453,7 @@ export default function AirtimeToCashScreen() {
                                     ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
                                 </Text>
                                 <TouchableOpacity onPress={() => router.push('/wallet')} style={s.addMoneyBtn} activeOpacity={0.8}>
-                                    <Ionicons name="add-circle-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                    <Ionicons name="add-circle-outline" size={14} color="#ffffff" style={{ marginRight: 4 }} />
                                     <Text style={s.addMoneyBtnText}>Add Money</Text>
                                 </TouchableOpacity>
                             </LinearGradient>
@@ -479,7 +494,7 @@ export default function AirtimeToCashScreen() {
 
                             {/* Notice Box */}
                             <View style={s.noticeBox}>
-                                <Ionicons name="information-circle" size={18} color="#d97706" style={{ marginRight: 8, marginTop: 2 }} />
+                                <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginRight: 6, marginTop: 2 }} />
                                 <Text style={s.noticeText}>
                                     We use your network's Share & Sell to pull airtime from your line. Cash lands in your wallet once the transfer settles.
                                 </Text>
@@ -500,11 +515,11 @@ const s = StyleSheet.create({
         backgroundColor: '#f4f6fb',
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'ios' ? 54 : 40,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'ios' ? 48 : 36,
+        paddingBottom: 16,
         paddingHorizontal: 16,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
     },
     headerTop: {
         flexDirection: 'row',
@@ -512,38 +527,38 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
     },
     backBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     walletBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
         color: '#ffffff',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '800',
     },
     headerSubtitle: {
         color: '#94a3b8',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '600',
-        marginTop: 2,
+        marginTop: 1,
     },
     container: {
-        padding: 16,
+        padding: 12,
     },
     layoutWrapper: {
         flexDirection: 'column',
-        gap: 16,
+        gap: 12,
     },
     webLayoutWrapper: {
         flexDirection: 'row',
@@ -554,14 +569,14 @@ const s = StyleSheet.create({
     mainFormPanel: {
         flex: 1,
         backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 20,
+        borderRadius: 16,
+        padding: 14,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 6,
         elevation: 2,
     },
     webMainPanel: {
@@ -570,33 +585,33 @@ const s = StyleSheet.create({
     sideSummaryPanel: {
         flex: 1,
         flexDirection: 'column',
-        gap: 16,
+        gap: 12,
     },
     webSidePanel: {
         flex: 1,
     },
     stepTitle: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
         color: '#475569',
-        letterSpacing: 1,
-        marginTop: 14,
-        marginBottom: 10,
+        letterSpacing: 0.8,
+        marginTop: 10,
+        marginBottom: 6,
         textTransform: 'uppercase',
     },
-    // 5-Column Grid Layout (Fits 5 networks in 1 row)
+    // 5-Column Compact Grid Layout
     network5ColumnGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: 4,
-        marginBottom: 8,
+        gap: 3,
+        marginBottom: 6,
         width: '100%',
     },
     network5Card: {
         flex: 1,
-        paddingVertical: 10,
-        paddingHorizontal: 2,
-        borderRadius: 14,
+        paddingVertical: 8,
+        paddingHorizontal: 1,
+        borderRadius: 12,
         backgroundColor: '#f8fafc',
         borderWidth: 1.5,
         borderColor: '#cbd5e1',
@@ -604,245 +619,218 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     logoCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: '#ffffff',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 4,
+        marginBottom: 3,
     },
     networkLogoImage: {
         width: '100%',
         height: '100%',
     },
     networkCardTitle: {
-        fontSize: 9.5,
+        fontSize: 9,
         fontWeight: '700',
         color: '#334155',
-        marginBottom: 3,
+        marginBottom: 2,
         textAlign: 'center',
     },
     pctBadge: {
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 5,
     },
     pctBadgeText: {
-        fontSize: 8.5,
+        fontSize: 8,
         fontWeight: '800',
     },
-    phoneInputWrapper: {
+    phoneInputBlock: {
+        gap: 6,
+    },
+    compactInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f8fafc',
-        borderRadius: 14,
+        borderRadius: 12,
         borderWidth: 1.5,
         borderColor: '#cbd5e1',
-        paddingHorizontal: 12,
-        height: 50,
+        paddingHorizontal: 10,
+        height: 42,
     },
-    phoneInput: {
+    compactTextInput: {
         flex: 1,
         color: '#0d1b3e',
-        fontSize: 14.5,
+        fontSize: 13.5,
         fontWeight: '700',
     },
-    sendOtpBtn: {
-        backgroundColor: '#2563eb',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 10,
+    myLineChip: {
+        backgroundColor: '#e0e7ff',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
-    sendOtpBtnText: {
+    myLineChipText: {
+        color: '#3730a3',
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+    sendOtpBtnFull: {
+        backgroundColor: '#2563eb',
+        borderRadius: 10,
+        height: 40,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    sendOtpBtnFullText: {
         color: '#ffffff',
-        fontSize: 11.5,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    verifyBtnInline: {
+        backgroundColor: '#2563eb',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    verifyBtnInlineText: {
+        color: '#ffffff',
+        fontSize: 10.5,
         fontWeight: '800',
     },
     helperSubtext: {
-        fontSize: 10.5,
+        fontSize: 9.5,
         color: '#64748b',
-        marginTop: 6,
-    },
-    otpBoxDotted: {
-        backgroundColor: '#f8fafc',
-        borderWidth: 1.5,
-        borderColor: '#cbd5e1',
-        borderStyle: 'dashed',
-        borderRadius: 14,
-        padding: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    otpBoxActive: {
-        marginBottom: 8,
-    },
-    otpPlaceholderText: {
-        color: '#94a3b8',
-        fontSize: 12,
+        marginTop: 4,
     },
     inputBlock: {
-        marginTop: 10,
+        marginTop: 6,
     },
     inputFieldLabel: {
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '700',
         color: '#475569',
-        marginBottom: 6,
-    },
-    amountInputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: '#cbd5e1',
-        paddingHorizontal: 12,
-        height: 50,
+        marginBottom: 4,
     },
     nairaPrefix: {
         color: '#64748b',
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: '800',
-        marginRight: 6,
-    },
-    amountInput: {
-        flex: 1,
-        color: '#0d1b3e',
-        fontSize: 17,
-        fontWeight: '800',
-    },
-    pinInputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: '#cbd5e1',
-        paddingHorizontal: 12,
-        height: 50,
-        marginTop: 6,
-    },
-    pinInput: {
-        flex: 1,
-        color: '#0d1b3e',
-        fontSize: 14.5,
-        fontWeight: '700',
+        marginRight: 4,
     },
     actionConvertBtn: {
         backgroundColor: '#2563eb',
-        borderRadius: 16,
-        height: 52,
+        borderRadius: 14,
+        height: 46,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 22,
+        marginTop: 16,
         shadowColor: '#2563eb',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    actionConvertBtnDisabled: {
-        backgroundColor: '#cbd5e1',
-        shadowOpacity: 0,
-        elevation: 0,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
     },
     actionConvertBtnText: {
         color: '#ffffff',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '800',
     },
     goldenBalanceCard: {
-        borderRadius: 20,
-        padding: 20,
+        borderRadius: 16,
+        padding: 16,
         shadowColor: '#eab308',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
     },
     goldenBalLabel: {
         color: 'rgba(255, 255, 255, 0.85)',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
     goldenBalAmount: {
         color: '#ffffff',
-        fontSize: 26,
+        fontSize: 22,
         fontWeight: '900',
-        marginVertical: 6,
+        marginVertical: 4,
     },
     addMoneyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.22)',
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
         alignSelf: 'flex-start',
     },
     addMoneyBtnText: {
         color: '#ffffff',
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '800',
     },
     summaryCard: {
         backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 18,
+        borderRadius: 16,
+        padding: 14,
         borderWidth: 1.5,
         borderColor: '#e2e8f0',
     },
     summaryCardTitle: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
         color: '#475569',
-        letterSpacing: 1,
-        marginBottom: 14,
+        letterSpacing: 0.8,
+        marginBottom: 10,
     },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     summaryLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#64748b',
     },
     summaryValue: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         color: '#0d1b3e',
     },
     summaryDivider: {
         height: 1,
         backgroundColor: '#cbd5e1',
-        marginVertical: 10,
+        marginVertical: 8,
     },
     youReceiveLabel: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
         color: '#0d1b3e',
     },
     youReceiveValue: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '900',
         color: '#16a34a',
     },
     noticeBox: {
         flexDirection: 'row',
         backgroundColor: '#fffbeb',
-        borderRadius: 16,
-        padding: 14,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1.5,
         borderColor: '#fde68a',
     },
     noticeText: {
         flex: 1,
-        fontSize: 11,
+        fontSize: 10,
         color: '#92400e',
-        lineHeight: 16,
+        lineHeight: 14,
     },
 });
