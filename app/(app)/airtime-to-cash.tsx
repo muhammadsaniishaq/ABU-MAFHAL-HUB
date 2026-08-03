@@ -14,12 +14,11 @@ import { createAppNotification } from '../../services/notificationsHelper';
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web' && width > 768;
 
-const NETWORKS_DATA = [
-    { id: '1', key: 'mtn', name: 'MTN', color: '#FFCC00', defaultRate: 82, otpLength: 6 },
+const ALL_NETWORKS = [
+    { id: '1', key: 'mtn', name: 'MTN', color: '#FFCC00', defaultRate: 80, otpLength: 6 },
     { id: '2', key: 'airtel', name: 'AIRTEL', color: '#FF0000', defaultRate: 80, otpLength: 4 },
     { id: '3', key: 'glo', name: 'GLO', color: '#0F6A37', defaultRate: 80, otpLength: 6 },
     { id: '4', key: '9mobile', name: '9MOBILE', color: '#006B3E', defaultRate: 80, otpLength: 6 },
-    { id: '5', key: 'vitel', name: 'VITEL', color: '#6366F1', defaultRate: 80, otpLength: 6 },
 ];
 
 const NETWORK_LOGOS: Record<string, any> = {
@@ -27,7 +26,6 @@ const NETWORK_LOGOS: Record<string, any> = {
     airtel: require('../../assets/images/airtel.png'),
     glo: require('../../assets/images/glo.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
-    vitel: require('../../assets/images/vitel.png'),
 };
 
 export default function AirtimeToCashScreen() {
@@ -88,11 +86,11 @@ export default function AirtimeToCashScreen() {
                 setWalletBalance(prof.balance || 0);
             }
 
-            // Fetch Live Rates
+            // Fetch Live Rates from Bilalsadasub API
             const { data: resData } = await supabase.functions.invoke('bills-payment', {
                 body: { type: 'cash_rates' }
             });
-            if (resData && resData.data) {
+            if (resData && resData.data && Array.isArray(resData.data)) {
                 setRates(resData.data);
             }
         } catch (e) {
@@ -100,8 +98,19 @@ export default function AirtimeToCashScreen() {
         }
     };
 
+    // Filter ONLY networks supported by Bilalsadasub Cash API (default MTN & AIRTEL)
+    const getAvailableNetworks = () => {
+        if (rates.length > 0) {
+            const activeList = ALL_NETWORKS.filter(net => rates.some((r: any) => r.plan_id === net.id || (r.network || '').toLowerCase().includes(net.key)));
+            return activeList.length > 0 ? activeList : ALL_NETWORKS.slice(0, 2);
+        }
+        return ALL_NETWORKS.slice(0, 2); // Default 2 active networks: MTN & AIRTEL
+    };
+
+    const displayNetworks = getAvailableNetworks();
+
     const getSelectedNetwork = () => {
-        return NETWORKS_DATA.find(n => n.id === networkId) || NETWORKS_DATA[0];
+        return displayNetworks.find(n => n.id === networkId) || displayNetworks[0];
     };
 
     const getBuybackPct = () => {
@@ -165,7 +174,7 @@ export default function AirtimeToCashScreen() {
         }
 
         if (!sessionBlob) {
-            showNotify("OTP Session Missing", "Please tap 'Send OTP to Line' first to receive an SMS security code before verifying.", "error");
+            showNotify("OTP Session Missing", "Please tap 'Send OTP to Line' first to receive an SMS security code.", "error");
             return false;
         }
 
@@ -201,21 +210,31 @@ export default function AirtimeToCashScreen() {
             setOtpVerified(true);
             if (Platform.OS !== 'web') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-            showNotify("OTP Verified ✓", response?.data?.message || "Line verified successfully! Now enter amount & Share PIN below.", "success");
+            showNotify("OTP Verified ✓", response?.data?.message || "Line verified successfully! Now enter airtime amount & Share PIN below.", "success");
             return true;
         } catch (err: any) {
             console.error("[AirtimeToCash] Error in cash_step2:", err);
-            showNotify("OTP Verification Failed", err.message || "Invalid OTP. Please check the code or tap 'Send OTP to Line' again.", "error");
+            showNotify("OTP Verification Failed", err.message || "Invalid OTP code. Please check code or tap Send OTP again.", "error");
             return false;
         } finally {
             setLoadingVerify(false);
         }
     };
 
-    // 3. Finalise Conversion Action
+    // 3. Finalise Conversion Action (100% EXPLICIT AND ACTIVE)
     const handleConvertAirtime = async () => {
-        // Smart fallback: If user hasn't tapped verify yet, auto-verify OTP first!
-        if (!otpVerified) {
+        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        if (!cleanPhone || cleanPhone.length < 11) {
+            showNotify("Validation Error", "Please enter a valid 11-digit phone number.", "error");
+            return;
+        }
+
+        if (!sessionBlob) {
+            showNotify("Missing OTP Step", "Please enter phone number and tap 'Send OTP to Line' first to receive security code.", "error");
+            return;
+        }
+
+        if (!otpVerified && otp.trim().length >= 4) {
             const verifiedOk = await handleVerifyOtp();
             if (!verifiedOk) return;
         }
@@ -227,7 +246,7 @@ export default function AirtimeToCashScreen() {
         }
 
         if (airtimeBalance !== null && numAmount > airtimeBalance) {
-            showNotify("Validation Error", `Amount exceeds your current airtime balance of ₦${airtimeBalance.toLocaleString()}`, "error");
+            showNotify("Validation Error", `Amount exceeds your line's available airtime balance of ₦${airtimeBalance.toLocaleString()}`, "error");
             return;
         }
 
@@ -241,13 +260,13 @@ export default function AirtimeToCashScreen() {
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
         try {
-            console.log(`[AirtimeToCash] Invoking cash_step3 for phone ${phone}, amount ₦${numAmount}`);
+            console.log(`[AirtimeToCash] Invoking cash_step3 for phone ${cleanPhone}, amount ₦${numAmount}`);
             const { data: response, error } = await supabase.functions.invoke('bills-payment', {
                 body: {
                     type: 'cash_step3',
                     providerParams: {
                         network: parseInt(networkId, 10),
-                        phone: phone.trim(),
+                        phone: cleanPhone,
                         amount: numAmount,
                         sharePin: sharePin.trim(),
                         sessionBlob: sessionBlob
@@ -301,7 +320,7 @@ export default function AirtimeToCashScreen() {
 
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
                 
-                {/* Curved Compact Navy Header */}
+                {/* Curved Navy Header with Prominent Wallet Balance */}
                 <LinearGradient colors={['#060d21', '#0d1b3e', '#1e293b']} style={s.headerContainer}>
                     <View style={s.headerTop}>
                         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
@@ -309,11 +328,14 @@ export default function AirtimeToCashScreen() {
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
                             <Text style={s.headerTitle}>Airtime ➔ Cash</Text>
-                            <Text style={s.headerSubtitle}>Convert unwanted airtime to wallet cash</Text>
+                            <Text style={s.headerSubtitle}>Convert airtime directly into wallet cash</Text>
                         </View>
-                        <TouchableOpacity onPress={() => router.push('/wallet')} style={s.walletBtn} activeOpacity={0.7}>
-                            <Ionicons name="wallet-outline" size={16} color="#f5a623" />
-                        </TouchableOpacity>
+                        <View style={s.headerBalanceBadge}>
+                            <Ionicons name="wallet-outline" size={12} color="#f5a623" style={{ marginRight: 4 }} />
+                            <Text style={s.headerBalanceVal}>
+                                ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
+                            </Text>
+                        </View>
                     </View>
                 </LinearGradient>
 
@@ -350,10 +372,10 @@ export default function AirtimeToCashScreen() {
                                 </View>
                             )}
 
-                            {/* 1. CHOOSE NETWORK (5-Column Grid Layout) */}
+                            {/* 1. CHOOSE NETWORK (2 Active Networks: MTN & AIRTEL) */}
                             <Text style={s.stepTitle}>1 · CHOOSE NETWORK</Text>
-                            <View style={s.network5ColumnGrid}>
-                                {NETWORKS_DATA.map((net) => {
+                            <View style={s.network2ColumnGrid}>
+                                {displayNetworks.map((net) => {
                                     const isSelected = networkId === net.id;
                                     const matchRate = rates.find((r: any) => r.plan_id === net.id || (r.network || '').toLowerCase().includes(net.key));
                                     const ratePct = matchRate ? matchRate.buyback_pct : net.defaultRate;
@@ -361,8 +383,8 @@ export default function AirtimeToCashScreen() {
                                         <TouchableOpacity
                                             key={net.id}
                                             style={[
-                                                s.network5Card,
-                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '12', borderWidth: 2 }
+                                                s.network2Card,
+                                                isSelected && { borderColor: net.color, backgroundColor: net.color + '15', borderWidth: 2 }
                                             ]}
                                             onPress={() => setNetworkId(net.id)}
                                             activeOpacity={0.8}
@@ -374,7 +396,7 @@ export default function AirtimeToCashScreen() {
                                                 {net.name}
                                             </Text>
                                             <View style={[s.pctBadge, { backgroundColor: (net.color || '#22c55e') + '20' }]}>
-                                                <Text style={[s.pctBadgeText, { color: net.color || '#22c55e' }]}>{ratePct}%</Text>
+                                                <Text style={[s.pctBadgeText, { color: net.color || '#22c55e' }]}>{ratePct}% Payout</Text>
                                             </View>
                                         </TouchableOpacity>
                                     );
@@ -421,7 +443,7 @@ export default function AirtimeToCashScreen() {
                             </View>
                             <Text style={s.helperSubtext}>We send an OTP to this number to confirm the airtime is yours</Text>
 
-                            {/* 3. ENTER THE OTP (ALWAYS 100% CLICKABLE INPUT) */}
+                            {/* 3. ENTER THE OTP */}
                             <Text style={s.stepTitle}>3 · ENTER THE {getSelectedNetwork().otpLength}-DIGIT OTP</Text>
                             <View style={s.compactInputRow}>
                                 <Ionicons name="keypad-outline" size={16} color="#64748b" style={{ marginRight: 6 }} />
@@ -487,7 +509,7 @@ export default function AirtimeToCashScreen() {
                                 <Text style={s.helperSubtext}>Your airtime-transfer PIN (different from your wallet PIN)</Text>
                             </View>
 
-                            {/* Sleek Convert Action Button */}
+                            {/* Sleek 100% EXPLICIT Submit Button */}
                             <TouchableOpacity
                                 onPress={handleConvertAirtime}
                                 disabled={loadingConvert}
@@ -498,24 +520,27 @@ export default function AirtimeToCashScreen() {
                                     <ActivityIndicator color="#ffffff" size="small" />
                                 ) : (
                                     <Text style={s.actionConvertBtnText}>
-                                        {numAmount > 0 ? `Convert ₦${numAmount.toLocaleString()} to Cash >` : 'Enter An Amount To Continue >'}
+                                        {numAmount > 0 ? `Convert ₦${numAmount.toLocaleString()} to Cash >` : 'Submit Conversion >'}
                                     </Text>
                                 )}
                             </TouchableOpacity>
                         </View>
 
-                        {/* RIGHT SUMMARY SIDE PANEL */}
+                        {/* RIGHT SUMMARY SIDE PANEL WITH GOLDEN WALLET CARD */}
                         <View style={[s.sideSummaryPanel, isWeb && s.webSidePanel]}>
                             
-                            {/* Golden Balance Card */}
+                            {/* Prominent Golden Wallet Balance Card */}
                             <LinearGradient colors={['#eab308', '#ca8a04', '#a16207']} style={s.goldenBalanceCard}>
-                                <Text style={s.goldenBalLabel}>Wallet balance</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={s.goldenBalLabel}>Wallet balance</Text>
+                                    <Ionicons name="wallet-outline" size={20} color="#ffffff" />
+                                </View>
                                 <Text style={s.goldenBalAmount}>
                                     ₦{walletBalance !== null ? walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
                                 </Text>
                                 <TouchableOpacity onPress={() => router.push('/wallet')} style={s.addMoneyBtn} activeOpacity={0.8}>
                                     <Ionicons name="add-circle-outline" size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                                    <Text style={s.addMoneyBtnText}>Add Money</Text>
+                                    <Text style={s.addMoneyBtnText}>+ Add Money</Text>
                                 </TouchableOpacity>
                             </LinearGradient>
 
@@ -595,14 +620,6 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    walletBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     headerTitle: {
         color: '#ffffff',
         fontSize: 16,
@@ -610,9 +627,24 @@ const s = StyleSheet.create({
     },
     headerSubtitle: {
         color: '#94a3b8',
-        fontSize: 10.5,
+        fontSize: 10,
         fontWeight: '600',
         marginTop: 1,
+    },
+    headerBalanceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 166, 35, 0.25)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.4)',
+    },
+    headerBalanceVal: {
+        color: '#f5a623',
+        fontSize: 11,
+        fontWeight: '800',
     },
     container: {
         padding: 12,
@@ -660,19 +692,19 @@ const s = StyleSheet.create({
         marginBottom: 6,
         textTransform: 'uppercase',
     },
-    // 5-Column Compact Grid Layout
-    network5ColumnGrid: {
+    // 2-Column Active Network Grid (MTN & AIRTEL)
+    network2ColumnGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: 3,
+        gap: 8,
         marginBottom: 6,
         width: '100%',
     },
-    network5Card: {
+    network2Card: {
         flex: 1,
-        paddingVertical: 8,
-        paddingHorizontal: 1,
-        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderRadius: 14,
         backgroundColor: '#f8fafc',
         borderWidth: 1.5,
         borderColor: '#cbd5e1',
@@ -680,33 +712,33 @@ const s = StyleSheet.create({
         justifyContent: 'center',
     },
     logoCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         overflow: 'hidden',
         backgroundColor: '#ffffff',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 3,
+        marginBottom: 4,
     },
     networkLogoImage: {
         width: '100%',
         height: '100%',
     },
     networkCardTitle: {
-        fontSize: 9,
-        fontWeight: '700',
+        fontSize: 11,
+        fontWeight: '800',
         color: '#334155',
-        marginBottom: 2,
+        marginBottom: 3,
         textAlign: 'center',
     },
     pctBadge: {
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 5,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
     },
     pctBadgeText: {
-        fontSize: 8,
+        fontSize: 9.5,
         fontWeight: '800',
     },
     phoneInputBlock: {
@@ -785,21 +817,21 @@ const s = StyleSheet.create({
         marginRight: 4,
     },
     actionConvertBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#16a34a',
         borderRadius: 14,
-        height: 46,
+        height: 48,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 16,
-        shadowColor: '#2563eb',
+        marginTop: 18,
+        shadowColor: '#16a34a',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.2,
         shadowRadius: 6,
         elevation: 3,
     },
     actionConvertBtnText: {
         color: '#ffffff',
-        fontSize: 13,
+        fontSize: 13.5,
         fontWeight: '800',
     },
     goldenBalanceCard: {
@@ -807,34 +839,34 @@ const s = StyleSheet.create({
         padding: 16,
         shadowColor: '#eab308',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 3,
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     goldenBalLabel: {
-        color: 'rgba(255, 255, 255, 0.85)',
-        fontSize: 10,
+        color: 'rgba(255, 255, 255, 0.9)',
+        fontSize: 10.5,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
     goldenBalAmount: {
         color: '#ffffff',
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '900',
-        marginVertical: 4,
+        marginVertical: 6,
     },
     addMoneyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.22)',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
         alignSelf: 'flex-start',
     },
     addMoneyBtnText: {
         color: '#ffffff',
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: '800',
     },
     summaryCard: {
