@@ -120,19 +120,9 @@ export const AgentHubIdentityVerifier = {
     }
   },
 
-  /** Verify NIN and generate slip data */
-  validateNIN: async (nin: string, priceId?: string) => {
-    let serviceCode: NINSlipServiceCode = '403';
-    if (priceId === 'nin_premium') serviceCode = '401';
-    else if (priceId === 'nin_standard') serviceCode = '402';
-    else if (priceId === 'nin_regular') serviceCode = '403';
-
-    // Try slip endpoint with service_code first, fallback to standard NIN verification
-    const res = await AgentHubIdentityVerifier.invokeEdge('nin-slip', nin, { service_code: serviceCode, priceId });
-    if (res.isValid && res.data) return res;
-
-    return AgentHubIdentityVerifier.invokeEdge('nin', nin, { priceId });
-  },
+  /** Verify NIN and get full personal data for high-resolution slip generation */
+  validateNIN: async (nin: string, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin', nin, { priceId: priceId || 'nin_regular' }),
 
   /** Lookup NIN by phone number */
   verifyNINWithPhone: async (phone: string, priceId?: string) =>

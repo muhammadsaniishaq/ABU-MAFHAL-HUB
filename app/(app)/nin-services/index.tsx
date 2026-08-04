@@ -6,14 +6,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SERVICES = [
-    { id: 'nin', title: 'Verify by NIN', desc: 'Find details using 11-digit NIN', icon: 'finger-print', bgColor: '#ecfdf5', iconColor: '#059669', route: '/nin-services/verify-nin' },
+    { id: 'nin', title: 'Verify NIN (HD Slips)', desc: 'Premium, Standard & Regular Slips', icon: 'finger-print', bgColor: '#ecfdf5', iconColor: '#059669', route: '/nin-services/verify-nin' },
+    { id: 'bvn', title: 'BVN Verification & Card', desc: 'Verify BVN & print BVN cards', icon: 'card-outline', bgColor: '#f0f9ff', iconColor: '#0284c7', route: '/nin-services/validation' },
     { id: 'phone', title: 'Verify by Phone', desc: 'Find NIN via linked phone', icon: 'call', bgColor: '#eff6ff', iconColor: '#2563EB', route: '/nin-services/verify-phone' },
-    { id: 'demo', title: 'Demographic', desc: 'Find NIN using name & DOB', icon: 'people', bgColor: '#faf5ff', iconColor: '#9333EA', route: '/nin-services/demographic' },
-    { id: 'val', title: 'General Validation', desc: 'Validate NIN details', icon: 'checkmark-circle', bgColor: '#ecfeff', iconColor: '#0891B2', route: '/nin-services/validation' },
+    { id: 'demo', title: 'Demographic Search', desc: 'Find NIN using name & DOB', icon: 'people', bgColor: '#faf5ff', iconColor: '#9333EA', route: '/nin-services/demographic' },
+    { id: 'val', title: 'NIN & VNIN Validation', desc: 'No-record check & record updates', icon: 'checkmark-circle', bgColor: '#ecfeff', iconColor: '#0891B2', route: '/nin-services/validation' },
     { id: 'ipe', title: 'IPE Clearance', desc: 'Pre-Employment Clearance', icon: 'briefcase', bgColor: '#eef2ff', iconColor: '#4F46E5', route: '/nin-services/ipe-clearance' },
-    { id: 'track', title: 'Card Tracking', desc: 'Check Personalization status', icon: 'card', bgColor: '#fff7ed', iconColor: '#EA580C', route: '/nin-services/tracking' },
+    { id: 'track', title: 'NIN Personalization', desc: 'Check status & tracking ID', icon: 'card', bgColor: '#fff7ed', iconColor: '#EA580C', route: '/nin-services/tracking' },
     { id: 'delink', title: 'Delink Phone', desc: 'Remove phone from NIN', icon: 'cut', bgColor: '#fef2f2', iconColor: '#DC2626', route: '/nin-services/delink' },
-    { id: 'history', title: 'NIN History', desc: 'View past verifications & reprints', icon: 'time', bgColor: '#fef9c3', iconColor: '#D97706', route: '/nin-services/history' },
+    { id: 'history', title: 'Print History', desc: 'View past verifications & reprints', icon: 'time', bgColor: '#fef9c3', iconColor: '#D97706', route: '/nin-services/history' },
 ];
 
 export default function NINServicesScreen() {

@@ -1957,8 +1957,8 @@ export default function VerifyNINScreen() {
         }
         const layoutItem = layouts.find(l => l.id === selectedLayout);
         const totalPrice = layoutItem ? layoutItem.price : 0;
-        if ((userBalance || 0) < totalPrice) {
-            return showAlert('Insufficient Balance', `Your wallet balance (₦${(userBalance || 0).toLocaleString()}) is less than the required amount (₦${totalPrice.toLocaleString()}). Please fund your wallet.`, 'error');
+        if (userBalance !== null && userBalance < totalPrice) {
+            return showAlert('Insufficient Balance', `Your wallet balance (₦${userBalance.toLocaleString()}) is less than the required amount (₦${totalPrice.toLocaleString()}). Please fund your wallet.`, 'error');
         }
 
         setLoading(true);
