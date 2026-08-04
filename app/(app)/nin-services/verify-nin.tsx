@@ -1997,7 +1997,8 @@ export default function VerifyNINScreen() {
                 setResult({ status: 'success', data: personData });
                 await saveHistoryItem(personData);
 
-                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function            } else {
+                // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
+            } else {
                 const msg = response.message || 'Unable to verify this NIN. Please check the number and try again.';
                 const lowerMsg = msg.toLowerCase();
                 if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {

@@ -86,14 +86,17 @@ export const AgentHubIdentityVerifier = {
         return { isValid: false, message: 'Invalid response from verification provider' };
       }
 
-      const agentHubStatus = (agentHubResponse.status || '').toLowerCase();
-      if (agentHubStatus === 'success' || agentHubStatus === 'pending') {
+      const rawStatus = agentHubResponse.status;
+      const agentHubStatus = String(rawStatus || '').toLowerCase();
+      const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(agentHubStatus);
+
+      if (isSuccessStatus) {
         // For NIN slip: return pdf_base64 in data
-        if (agentHubResponse.pdf_base64) {
+        if (agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64) {
           return {
             isValid: true,
             message: agentHubResponse.message || 'Slip Generated Successfully',
-            data: { pdf_base64: agentHubResponse.pdf_base64 },
+            data: agentHubResponse.data || { pdf_base64: agentHubResponse.pdf_base64 },
           };
         }
 
