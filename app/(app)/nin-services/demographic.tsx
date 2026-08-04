@@ -19,7 +19,7 @@ export default function DemographicScreen() {
         if (!firstname || !lastname || !dob) return Alert.alert('Error', 'Fill all fields');
         setLoading(true);
         try {
-            const res = await api.identity.verifyDemographic({ firstname, lastname, gender, dob });
+            const res = await api.identity.verifyDemographic({ firstname, lastname, gender, dob }, 'nin_regular');
             setResult(res);
         } catch (e: any) {
             Alert.alert('Request Failed', e.message);

@@ -35,7 +35,7 @@ export default function ValidationScreen() {
     const [nin, setNin] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
-    const [isAgreed, setIsAgreed] = useState(false);
+    const [isAgreed, setIsAgreed] = useState(true);
 
     // Dynamic Prices
     const [statusTypes, setStatusTypes] = useState(DEFAULT_STATUS_TYPES);

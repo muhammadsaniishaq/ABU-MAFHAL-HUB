@@ -60,7 +60,7 @@ export default function VerifyNINScreen() {
     const { reprintId } = useLocalSearchParams();
     const [selectedLayout, setSelectedLayout] = useState('premium');
     const [nin, setNin] = useState('');
-    const [consent, setConsent] = useState(false);
+    const [consent, setConsent] = useState(true);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
@@ -237,6 +237,25 @@ export default function VerifyNINScreen() {
         if (!result || !result.data) return;
         setIsSaving(true);
         try {
+            // If official base64 PDF is returned from AgentHub API, download directly
+            if (result.data.pdf_base64) {
+                if (Platform.OS === 'web') {
+                    const link = document.createElement('a');
+                    link.href = `data:application/pdf;base64,${result.data.pdf_base64}`;
+                    link.download = `nin_slip_${nin}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    return;
+                } else {
+                    const html = `<html><body style="margin:0;padding:0;"><embed width="100%" height="100%" src="data:application/pdf;base64,${result.data.pdf_base64}" type="application/pdf" /></body></html>`;
+                    const { uri: pdfUri } = await Print.printToFileAsync({ html });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                    }
+                    return;
+                }
+            }
             let html = '';
 
             const rawPhoto = result.data.photo || result.data.image || result.data.picture || '';
