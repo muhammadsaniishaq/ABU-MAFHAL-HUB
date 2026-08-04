@@ -224,8 +224,12 @@ serve(async (req: Request) => {
 
       // ── NIN Verification ───────────────────────────────────────────────────
       case 'nin':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = { nin: searchValue };
+        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
+        bodyPayload = {
+          nin: searchValue,
+          slip_type: requestData.slip_type || 'PREMIUM',
+          reference: requestData.reference || `REF-NIN-${Date.now()}`
+        };
         break;
 
       // ── NIN Slip (PDF) ─────────────────────────────────────────────────────
