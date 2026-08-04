@@ -34,10 +34,10 @@ const API_URL = "https://agenthub.ng/api/v1/identity/nin"; // AgentHub (was: idp
 const API_TOKEN = ""; // Token managed server-side via AGENTHUB_API_KEY secret
 
 const DEFAULT_LAYOUTS = [
-    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 200, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
-    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 200, type: 'nonprem', image: require('../../../assets/images/standard.png'), badge: 'Color Card' },
-    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 180, type: 'nonprem', image: require('../../../assets/images/regular.png'), badge: 'B&W Slip' },
-    { id: 'info', db_id: 'nin_info', name: 'Information', price: 200, type: 'nonprem', image: require('../../../assets/images/info.png'), badge: 'Full Sheet' },
+    { id: 'premium', db_id: 'nin_premium', name: 'Premium Card', price: 100, type: 'prem', image: require('../../../assets/images/premium.png'), badge: 'Digital ID' },
+    { id: 'standard', db_id: 'nin_standard', name: 'Standard Card', price: 100, type: 'nonprem', image: require('../../../assets/images/standard.png'), badge: 'Color Card' },
+    { id: 'regular', db_id: 'nin_regular', name: 'Regular Slip', price: 100, type: 'nonprem', image: require('../../../assets/images/regular.png'), badge: 'B&W Slip' },
+    { id: 'info', db_id: 'nin_info', name: 'Information', price: 100, type: 'nonprem', image: require('../../../assets/images/info.png'), badge: 'Full Sheet' },
 ];
 
 const formatDob = (raw: string): string => {

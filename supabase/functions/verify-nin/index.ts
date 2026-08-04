@@ -118,13 +118,15 @@ serve(async (req: Request) => {
       .eq('id', priceId)
       .single()
 
-    if (pricingError || !pricing) {
-      console.error('Pricing lookup error:', pricingError?.message)
-      return jsonOk({ error: 'Failed to retrieve pricing for this service.' })
-    }
+    let FEE_AMOUNT = 100;
+    let description = `Verification: NIN Service`;
 
-    let FEE_AMOUNT = parseFloat(pricing.markup_price?.toString() || '0');
-    let description = `Verification: ${pricing.name}`;
+    if (pricing) {
+      FEE_AMOUNT = parseFloat(pricing.markup_price?.toString() || '100');
+      description = `Verification: ${pricing.name}`;
+    } else {
+      console.warn('Pricing lookup using default 100 Naira fallback:', pricingError?.message);
+    }
 
     // Fetch dynamic pricing for addon if provided
     if (addonPriceId && addonPriceId !== 'val_slip_none') {
