@@ -1932,7 +1932,9 @@ export default function VerifyNINScreen() {
                 setLayouts(prev => prev.map(layout => {
                     const dbPrice = data.find(d => d.id === layout.db_id);
                     if (dbPrice) {
-                        return { ...layout, price: Number(dbPrice.cost_price) + Number(dbPrice.markup_price) };
+                        const total = (Number(dbPrice.cost_price) || 0) + (Number(dbPrice.markup_price) || 0);
+                        const finalPrice = dbPrice.selling_price ? Number(dbPrice.selling_price) : total;
+                        return { ...layout, price: finalPrice > 0 ? finalPrice : layout.price };
                     }
                     return layout;
                 }));

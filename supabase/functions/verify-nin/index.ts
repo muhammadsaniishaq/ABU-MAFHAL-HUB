@@ -104,67 +104,98 @@ serve(async (req: Request) => {
       }
     }
 
-    const priceId = requestData.priceId;
-    if (!priceId) {
-      return jsonOk({ error: 'Missing priceId for verification service.' })
-    }
+    const isStatusCheck = String(searchType).endsWith('-status');
+    let FEE_AMOUNT = 0;
+    let description = `Verification Status Check`;
 
-    const addonPriceId = requestData.addonPriceId;
+    if (!isStatusCheck) {
+      let priceId = requestData.priceId;
+      if (!priceId) {
+        // Fallback map searchType -> default priceId
+        const defaultPriceMap: Record<string, string> = {
+          'nin': 'nin_regular',
+          'nin-slip': 'nin_regular',
+          'nin-slip-v2': 'nin_premium',
+          'nin-validation': 'val_no_record',
+          'nin-personalization': 'nin_personalization',
+          'nin-modification': 'nin_modification_501',
+          'vnin-slip': 'nin_regular',
+          'phone': 'nin_regular',
+          'demographic': 'nin_regular',
+          'bvn': 'bvn_num_advanced',
+          'bvn-phone': 'bvn_phone_advanced',
+          'bvn-card': 'bvn_card',
+          'vnin-to-nibss': 'bvn_vnin_nibss',
+          'bvn-modification': 'bvn_modification',
+          'ipe': 'nin_regular',
+          'val': 'val_no_record'
+        };
+        priceId = defaultPriceMap[searchType] || 'nin_regular';
+      }
 
-    // Fetch dynamic pricing for base price
-    const { data: pricing, error: pricingError } = await supabaseAdmin
-      .from('service_pricing')
-      .select('markup_price, name')
-      .eq('id', priceId)
-      .single()
+      // Fetch dynamic pricing from service_pricing table
+      const { data: pricing, error: pricingError } = await supabaseAdmin
+        .from('service_pricing')
+        .select('cost_price, markup_price, selling_price, name')
+        .eq('id', priceId)
+        .maybeSingle();
 
-    let FEE_AMOUNT = 100;
-    let description = `Verification: NIN Service`;
+      if (pricing) {
+        const cost = parseFloat(pricing.cost_price?.toString() || '0');
+        const markup = parseFloat(pricing.markup_price?.toString() || '0');
+        const selling = pricing.selling_price ? parseFloat(pricing.selling_price.toString()) : 0;
+        FEE_AMOUNT = selling > 0 ? selling : (cost + markup);
+        description = `Verification: ${pricing.name || priceId}`;
+      } else {
+        console.warn(`Pricing record for '${priceId}' not found in service_pricing:`, pricingError?.message);
+        FEE_AMOUNT = 150;
+        description = `Verification: ${priceId}`;
+      }
 
-    if (pricing) {
-      FEE_AMOUNT = parseFloat(pricing.markup_price?.toString() || '100');
-      description = `Verification: ${pricing.name}`;
-    } else {
-      console.warn('Pricing lookup using default 100 Naira fallback:', pricingError?.message);
-    }
-
-    // Fetch dynamic pricing for addon if provided
-    if (addonPriceId && addonPriceId !== 'val_slip_none') {
+      const addonPriceId = requestData.addonPriceId;
+      if (addonPriceId && addonPriceId !== 'val_slip_none') {
         const { data: addonPricing } = await supabaseAdmin
           .from('service_pricing')
-          .select('markup_price, name')
+          .select('cost_price, markup_price, selling_price, name')
           .eq('id', addonPriceId)
-          .single();
-          
+          .maybeSingle();
+
         if (addonPricing) {
-            FEE_AMOUNT += parseFloat(addonPricing.markup_price?.toString() || '0');
-            description += ` + ${addonPricing.name}`;
+          const addonCost = parseFloat(addonPricing.cost_price?.toString() || '0');
+          const addonMarkup = parseFloat(addonPricing.markup_price?.toString() || '0');
+          const addonSelling = addonPricing.selling_price ? parseFloat(addonPricing.selling_price.toString()) : 0;
+          const addonTotal = addonSelling > 0 ? addonSelling : (addonCost + addonMarkup);
+          FEE_AMOUNT += addonTotal;
+          description += ` + ${addonPricing.name || addonPriceId}`;
         }
-    }
-
-    // Secure Atomic Deduction via RPC
-    const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
-      user_id: user.id,
-      amount: FEE_AMOUNT
-    });
-
-    if (deductError) {
-      console.error('Balance deduction error:', deductError.message)
-      if (deductError.message.toLowerCase().includes('insufficient')) {
-         return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT}.` })
       }
-      return jsonOk({ error: 'Failed to deduct wallet balance. Please try again.' })
-    }
 
-    // Record the transaction for the deduction securely on the backend
-    await supabaseAdmin.from('transactions').insert({
-        user_id: user.id,
-        amount: FEE_AMOUNT,
-        type: 'payment',
-        status: 'success',
-        reference: `id_verify_${searchType}_${Date.now()}`,
-        description: description
-    });
+      // Deduct balance only if FEE_AMOUNT > 0
+      if (FEE_AMOUNT > 0) {
+        const { error: deductError } = await supabaseAdmin.rpc('deduct_balance', {
+          user_id: user.id,
+          amount: FEE_AMOUNT
+        });
+
+        if (deductError) {
+          console.error('Balance deduction error:', deductError.message);
+          if (deductError.message.toLowerCase().includes('insufficient')) {
+            return jsonOk({ error: `Insufficient wallet balance. You need ₦${FEE_AMOUNT.toLocaleString()}.` });
+          }
+          return jsonOk({ error: 'Failed to deduct wallet balance. Please try again.' });
+        }
+
+        // Record transaction
+        await supabaseAdmin.from('transactions').insert({
+          user_id: user.id,
+          amount: FEE_AMOUNT,
+          type: 'payment',
+          status: 'success',
+          reference: `id_verify_${searchType}_${Date.now()}`,
+          description: description
+        });
+      }
+    }
 
     // ── Retrieve AgentHub API Key ─────────────────────────────────────────────
     let AGENTHUB_API_KEY = Deno.env.get('AGENTHUB_API_KEY');
