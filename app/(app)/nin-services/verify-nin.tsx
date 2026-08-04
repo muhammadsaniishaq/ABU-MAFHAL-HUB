@@ -125,6 +125,9 @@ export default function VerifyNINScreen() {
             message,
             type
         });
+        if (Platform.OS !== 'web') {
+            Alert.alert(title, message);
+        }
     };
 
     const loadHistory = async () => {
@@ -2481,6 +2484,56 @@ export default function VerifyNINScreen() {
                 )}
 
             </ScrollView>
+
+            {/* Loading Overlay Modal */}
+            <Modal visible={loading} transparent animationType="fade">
+                <View style={styles.loaderOverlay}>
+                    <View style={styles.loaderCard}>
+                        <ActivityIndicator size="large" color="#0284c7" />
+                        <Text style={styles.loaderTitle}>Verifying NIN...</Text>
+                        <Text style={styles.loaderSub}>Fetching official details from NIMC database</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Custom Alert Modal */}
+            <Modal visible={customAlert.visible} transparent animationType="fade">
+                <View style={styles.alertOverlay}>
+                    <View style={styles.alertCard}>
+                        <View style={[
+                            styles.alertIconBg,
+                            customAlert.type === 'success' && styles.alertSuccessIcon,
+                            customAlert.type === 'error' && styles.alertErrorIcon,
+                            customAlert.type === 'warning' && styles.alertWarningIcon,
+                            customAlert.type === 'info' && styles.alertInfoIcon,
+                        ]}>
+                            <Ionicons 
+                                name={
+                                    customAlert.type === 'success' ? 'checkmark-circle' :
+                                    customAlert.type === 'error' ? 'close-circle' :
+                                    customAlert.type === 'warning' ? 'warning' : 'information-circle'
+                                } 
+                                size={32} 
+                                color={
+                                    customAlert.type === 'success' ? '#10b981' :
+                                    customAlert.type === 'error' ? '#ef4444' :
+                                    customAlert.type === 'warning' ? '#f59e0b' : '#3b82f6'
+                                } 
+                            />
+                        </View>
+                        <Text style={styles.alertTitle}>{customAlert.title}</Text>
+                        <Text style={styles.alertMessage}>{customAlert.message}</Text>
+                        <TouchableOpacity 
+                            onPress={() => setCustomAlert(prev => ({ ...prev, visible: false }))} 
+                            style={styles.alertButton}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.alertButtonText}>OK</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
         </View>
     );
 }

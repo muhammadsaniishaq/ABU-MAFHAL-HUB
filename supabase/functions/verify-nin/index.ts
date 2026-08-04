@@ -284,7 +284,15 @@ serve(async (req: Request) => {
             body: JSON.stringify(bodyPayload)
         });
 
-        const responseData = await apiResponse.json();
+        const rawText = await apiResponse.text();
+        let responseData: any = null;
+        try {
+            responseData = JSON.parse(rawText);
+        } catch (_) {
+            console.error('AgentHub API returned non-JSON response:', rawText.substring(0, 200));
+            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid provider response format`);
+            return jsonOk({ error: 'Verification provider returned an unexpected response format. Please try again later.' });
+        }
 
         // ── AgentHub response format ───────────────────────────────────────────
         // Success: { status: true,  message: "...", data: {...} }
