@@ -360,7 +360,8 @@ serve(async (req: Request) => {
             headers: {
                 'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         };
 
@@ -375,9 +376,10 @@ serve(async (req: Request) => {
         try {
             responseData = JSON.parse(rawText);
         } catch (_) {
-            console.error('AgentHub API returned non-JSON response:', rawText.substring(0, 200));
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Invalid provider response format`);
-            return jsonOk({ error: 'Verification provider returned an unexpected response format. Please try again later.' });
+            console.error(`AgentHub API returned non-JSON (HTTP ${apiResponse.status}):`, rawText.substring(0, 500));
+            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider HTTP ${apiResponse.status}`);
+            const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120);
+            return jsonOk({ error: `Verification provider error (HTTP ${apiResponse.status}): ${cleanText || 'Unexpected response format. Please try again.'}` });
         }
 
         // ── AgentHub response format ───────────────────────────────────────────
