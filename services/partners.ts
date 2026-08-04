@@ -52,10 +52,16 @@ export interface IdentityVerifier {
     delinkAndRetrieve?(number: string, phone?: string, priceId?: string): Promise<VerificationResult>;
     retrieveBVN?(number: string, priceId?: string): Promise<VerificationResult>;
     getPersonalization?(number: string, priceId?: string): Promise<VerificationResult>;
-    requestModification?(params: ModificationParams): Promise<VerificationResult>;
+    submitNINValidation?(nin: string, serviceCode?: string, reference?: string, priceId?: string): Promise<VerificationResult>;
+    checkNINValidationStatus?(requestId: string): Promise<VerificationResult>;
+    submitNINPersonalization?(trackingId: string, reference?: string, priceId?: string): Promise<VerificationResult>;
+    checkNINPersonalizationStatus?(requestId: string): Promise<VerificationResult>;
+    generateNINSlipV2?(nin: string, slipType?: 'PREMIUM' | 'STANDARD' | 'REGULAR', priceId?: string): Promise<VerificationResult>;
+    requestModification?(params: ModificationParams, priceId?: string): Promise<VerificationResult>;
     requestDOBModification?(number: string, dob: string): Promise<VerificationResult>;
     attestBirth?(params: BirthAttestationParams): Promise<VerificationResult>;
-    requestBVNModification?(params: BVNModificationParams): Promise<VerificationResult>;
+    linkVNINToNIBSS?(vnin: string, bvn?: string, priceId?: string): Promise<VerificationResult>;
+    requestBVNModification?(params: BVNModificationParams, priceId?: string): Promise<VerificationResult>;
     getTransactionHistory?(params?: HistoryParams): Promise<VerificationResult>;
     getVerificationHistory?(params?: HistoryParams): Promise<VerificationResult>;
 }
@@ -233,6 +239,7 @@ export interface BirthAttestationParams {
 
 export interface BVNModificationParams {
     number: string;
+    service_code?: string;
     firstname?: string;
     lastname?: string;
     middlename?: string;
@@ -260,122 +267,6 @@ export interface DemographicParams {
 export interface AijalonVerificationResult extends VerificationResult {
     rawData?: any;
 }
-
-
-/** Map an AijalonResponse → VerificationResult */
-function mapResult(res: Awaited<ReturnType<typeof AijalonAPI.verifyNIN>>): AijalonVerificationResult {
-    return {
-        isValid: res.success,
-        message: res.message,
-        data: res.data,
-        rawData: res.rawData,
-    };
-}
-
-export const AijalonIdentityVerifier: IdentityVerifier & {
-    // ── Verifications ──
-    verifyPhone(phone: string): Promise<AijalonVerificationResult>;
-    verifyNINWithPhone(phone: string): Promise<AijalonVerificationResult>;
-    verifyDemographic(params: DemographicParams): Promise<AijalonVerificationResult>;
-    getBVNCard(bvn: string): Promise<AijalonVerificationResult>;
-    // ── IPE Clearance ──
-    runIPEClearance(number: string): Promise<AijalonVerificationResult>;
-    // ── Validation ──
-    validateIdentity(number: string, type?: string): Promise<AijalonVerificationResult>;
-    // ── Delink & Recovery ──
-    delinkAndRetrieve(number: string, phone?: string): Promise<AijalonVerificationResult>;
-    retrieveBVN(number: string): Promise<AijalonVerificationResult>;
-    // ── User Details / Modifications ──
-    getPersonalization(number: string): Promise<AijalonVerificationResult>;
-    requestModification(params: ModificationParams): Promise<AijalonVerificationResult>;
-    requestDOBModification(number: string, dob: string): Promise<AijalonVerificationResult>;
-    attestBirth(params: BirthAttestationParams): Promise<AijalonVerificationResult>;
-    requestBVNModification(params: BVNModificationParams): Promise<AijalonVerificationResult>;
-    // ── History ──
-    getTransactionHistory(params?: HistoryParams): Promise<AijalonVerificationResult>;
-    getVerificationHistory(params?: HistoryParams): Promise<AijalonVerificationResult>;
-} = {
-
-    // ── VERIFICATIONS ────────────────────────────────────────────────────────
-
-    /** NIN Verification — POST /api/nin/ */
-    validateNIN: async (nin) => mapResult(await AijalonAPI.verifyNIN({ number: nin })),
-
-    /** NIN With Phone — POST /api/nin-phone/ */
-    verifyNINWithPhone: async (phone) => mapResult(await AijalonAPI.verifyNINWithPhone({ number: phone })),
-
-    /** Phone Verification (alias → nin-phone) — POST /api/phone/ */
-    verifyPhone: async (phone) => {
-        try {
-            const res = await fetch('https://aijalon.ng/api/phone/', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer lv_Aijalon_r63b1dtk84qu1mz31pws59j0oax86c59`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phone }),
-            });
-            const data = await res.json().catch(() => ({}));
-            return { isValid: res.ok, message: data?.message || (res.ok ? 'Phone Verified' : 'Phone Verification Failed'), data, rawData: data };
-        } catch (e: any) {
-            return { isValid: false, message: e.message || 'Network Error' };
-        }
-    },
-
-    /** BVN Verification — POST /api/bvn/ */
-    validateBVN: async (bvn) => mapResult(await AijalonAPI.verifyBVN({ number: bvn })),
-
-    /** NIN Demo Search — POST /api/demo/ */
-    verifyDemographic: async (params) => mapResult(await AijalonAPI.verifyNINDemo({
-        firstname: params.firstname,
-        lastname: params.lastname,
-        gender: params.gender,
-        dob: params.dob,
-    })),
-
-    /** BVN Card — POST /api/bvn-card/ */
-    getBVNCard: async (bvn) => mapResult(await AijalonAPI.getBVNCard({ number: bvn })),
-
-    // ── IPE CLEARANCE ────────────────────────────────────────────────────────
-
-    /** IPE Clearance (Instant) — POST /api/ipe/ */
-    runIPEClearance: async (number) => mapResult(await AijalonAPI.runIPEClearance({ number })),
-
-    // ── VALIDATION ───────────────────────────────────────────────────────────
-
-    /** Validation (Instant) — POST /api/validate/ */
-    validateIdentity: async (number, type) => mapResult(await AijalonAPI.validateIdentity({ number, type })),
-
-    // ── DELINK & RECOVERY ────────────────────────────────────────────────────
-
-    /** Delink & Retrieval — POST /api/delink/ */
-    delinkAndRetrieve: async (number, phone) => mapResult(await AijalonAPI.delinkAndRetrieve({ number, phone })),
-
-    /** BVN Retrieval — POST /api/bvn-retrieval/ */
-    retrieveBVN: async (number) => mapResult(await AijalonAPI.retrieveBVN({ number })),
-
-    // ── USER DETAILS / MODIFICATIONS ─────────────────────────────────────────
-
-    /** Personalization — POST /api/personalize/ */
-    getPersonalization: async (number) => mapResult(await AijalonAPI.getPersonalization({ number })),
-
-    /** Modification — POST /api/modify/ */
-    requestModification: async (params) => mapResult(await AijalonAPI.requestModification(params)),
-
-    /** DOB Modification — POST /api/dob-modify/ */
-    requestDOBModification: async (number, dob) => mapResult(await AijalonAPI.requestDOBModification({ number, dob })),
-
-    /** Birth Attestation — POST /api/birth-attestation/ */
-    attestBirth: async (params) => mapResult(await AijalonAPI.attestBirth(params)),
-
-    /** BVN Modification — POST /api/bvn-modify/ */
-    requestBVNModification: async (params) => mapResult(await AijalonAPI.requestBVNModification(params)),
-
-    // ── HISTORY ──────────────────────────────────────────────────────────────
-
-    /** Transaction History — GET /api/transactions/ */
-    getTransactionHistory: async (params) => mapResult(await AijalonAPI.getTransactionHistory(params)),
-
-    /** Verification History — GET /api/verifications/ */
-    getVerificationHistory: async (params) => mapResult(await AijalonAPI.getVerificationHistory(params)),
-};
 
 export const CoingeckoCryptoExchange: CryptoExchange = {
     getRates: async (ids) => {

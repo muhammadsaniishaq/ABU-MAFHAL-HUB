@@ -174,7 +174,7 @@ export default function TrackingScreen() {
 
         setLoading(true);
         try {
-            const res = await api.identity.getPersonalization(cleanID, selectedSlip);
+            const res = await api.identity.submitNINPersonalization(cleanID, undefined, selectedSlip);
             setResult(res);
             await saveHistoryItem(res);
 

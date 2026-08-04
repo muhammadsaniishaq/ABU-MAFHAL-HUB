@@ -184,11 +184,83 @@ export const AgentHubIdentityVerifier = {
   retrieveBVN: async (phone: string, priceId?: string) =>
     AgentHubIdentityVerifier.invokeEdge('bvn-phone', phone, { priceId }),
 
-  // ── NIN TRACKING / PERSONALIZATION ───────────────────────────────────────
+  /**
+   * Generate a printable NIN Slip V2 PDF (PREMIUM, STANDARD, REGULAR)
+   * @param nin - 11-digit NIN
+   * @param slipType - 'PREMIUM' | 'STANDARD' | 'REGULAR'
+   * @param priceId - Supabase service_pricing ID
+   */
+  generateNINSlipV2: async (nin: string, slipType: 'PREMIUM' | 'STANDARD' | 'REGULAR' = 'PREMIUM', priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-slip-v2', nin, {
+      slip_type: slipType,
+      priceId,
+    }),
 
-  /** Get NIN Tracking/Personalization data */
+  /**
+   * Submit NIN Validation request (queue for issue resolution: 329, 330, 331)
+   */
+  submitNINValidation: async (nin: string, serviceCode: string = '329', reference?: string, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-validation', nin, {
+      service_code: serviceCode,
+      reference,
+      priceId,
+    }),
+
+  /** Check status of a submitted NIN validation request */
+  checkNINValidationStatus: async (requestId: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-validation-status', requestId),
+
+  /**
+   * Submit NIN Personalization request using Tracking ID
+   */
+  submitNINPersonalization: async (trackingId: string, reference?: string, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-personalization', trackingId, {
+      trackingId,
+      reference,
+      priceId,
+    }),
+
+  /** Check status of a submitted NIN personalization request */
+  checkNINPersonalizationStatus: async (requestId: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-personalization-status', requestId),
+
+  /**
+   * Submit NIN Data Modification request
+   * service_code: 501 (Name), 502 (Phone), 503 (Address)
+   */
+  requestModification: async (params: ModificationParams, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('nin-modification', params.number, {
+      service_code: (params as any).service_code || '501',
+      nin: params.number,
+      phone_number: params.phone,
+      new_first_name: params.firstname,
+      new_surname: params.lastname,
+      new_middle_name: params.middlename,
+      full_name: (params as any).full_name,
+      new_phone_number: (params as any).new_phone_number,
+      new_address: (params as any).new_address,
+      priceId,
+    }),
+
+  /** Get NIN Tracking/Personalization data (alias to submitNINPersonalization) */
   getPersonalization: async (number: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('tracking-id', number, { priceId }),
+    AgentHubIdentityVerifier.invokeEdge('nin-personalization', number, { trackingId: number, priceId }),
+
+  /** Link VNIN to NIBSS database via AgentHub */
+  linkVNINToNIBSS: async (vnin: string, bvn?: string, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('vnin-to-nibss', vnin, { vnin, bvn, priceId: priceId || 'bvn_vnin_nibss' }),
+
+  /** Request BVN Modification via AgentHub */
+  requestBVNModification: async (params: BVNModificationParams, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-modification', params.number, {
+      bvn: params.number,
+      service_code: (params as any).service_code || '601',
+      phone_number: params.phone,
+      firstname: params.firstname,
+      lastname: params.lastname,
+      dob: params.dob,
+      priceId: priceId || 'bvn_modification',
+    }),
 
   // ── DELINK & RECOVERY ────────────────────────────────────────────────────
 
@@ -198,17 +270,11 @@ export const AgentHubIdentityVerifier = {
 
   // ── NOT IMPLEMENTED (AgentHub doesn't have direct counterparts yet) ───────
 
-  requestModification: async (_params: ModificationParams) =>
-    ({ isValid: false, message: 'Modification not available via AgentHub yet. Contact support.' }),
-
   requestDOBModification: async (_number: string, _dob: string) =>
     ({ isValid: false, message: 'DOB Modification not available via AgentHub yet.' }),
 
   attestBirth: async (_params: BirthAttestationParams) =>
     ({ isValid: false, message: 'Birth Attestation not available via AgentHub yet.' }),
-
-  requestBVNModification: async (_params: BVNModificationParams) =>
-    ({ isValid: false, message: 'BVN Modification not available via AgentHub yet.' }),
 
   getTransactionHistory: async (_params?: HistoryParams) =>
     ({ isValid: false, message: 'History not available via AgentHub.' }),

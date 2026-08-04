@@ -205,6 +205,63 @@ serve(async (req: Request) => {
         };
         break;
 
+      // ── NIN Slip V2 (PDF) ──────────────────────────────────────────────────
+      case 'nin-slip-v2':
+        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
+        bodyPayload = {
+          nin: searchValue,
+          slip_type: requestData.slip_type || 'PREMIUM',
+          reference: requestData.reference || `REF-${Date.now()}`
+        };
+        break;
+
+      // ── NIN Validation Queue ───────────────────────────────────────────────
+      case 'nin-validation':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation`;
+        bodyPayload = {
+          nin: searchValue,
+          service_code: service_code || requestData.service_code || '329',
+          reference: requestData.reference || `REF-VAL-${Date.now()}`
+        };
+        break;
+
+      // ── Check NIN Validation Status ────────────────────────────────────────
+      case 'nin-validation-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || '')}`;
+        bodyPayload = null; // GET request
+        break;
+
+      // ── NIN Personalization (Tracking ID) ─────────────────────────────────
+      case 'nin-personalization':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization`;
+        bodyPayload = {
+          trackingId: searchValue || requestData.trackingId,
+          reference: requestData.reference
+        };
+        break;
+
+      // ── Check NIN Personalization Status ──────────────────────────────────
+      case 'nin-personalization-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || '')}`;
+        bodyPayload = null; // GET request
+        break;
+
+      // ── NIN Modification ───────────────────────────────────────────────────
+      case 'nin-modification':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-modification`;
+        bodyPayload = {
+          service_code: service_code || requestData.service_code || '501',
+          nin: searchValue || requestData.nin,
+          phone_number: requestData.phone_number,
+          new_first_name: requestData.new_first_name,
+          new_surname: requestData.new_surname,
+          new_middle_name: requestData.new_middle_name,
+          full_name: requestData.full_name,
+          new_phone_number: requestData.new_phone_number,
+          new_address: requestData.new_address
+        };
+        break;
+
       // ── VNIN Slip (PDF) ────────────────────────────────────────────────────
       case 'vnin-slip':
         endpoint = `${AGENTHUB_BASE}/v1/identity/vnin-slip`;
@@ -241,10 +298,34 @@ serve(async (req: Request) => {
         bodyPayload = { bvn: searchValue };
         break;
 
+      // ── VNIN to NIBSS ──────────────────────────────────────────────────────
+      case 'vnin-to-nibss':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`;
+        bodyPayload = {
+          vnin: searchValue || requestData.vnin,
+          bvn: requestData.bvn,
+          reference: requestData.reference || `VNIN-NIBSS-${Date.now()}`
+        };
+        break;
+
+      // ── BVN Modification ───────────────────────────────────────────────────
+      case 'bvn-modification':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-modification`;
+        bodyPayload = {
+          bvn: searchValue || requestData.bvn,
+          service_code: service_code || requestData.service_code || '601',
+          phone_number: requestData.phone_number || requestData.phone,
+          firstname: requestData.firstname,
+          lastname: requestData.lastname,
+          dob: requestData.dob,
+          reference: requestData.reference || `BVN-MOD-${Date.now()}`
+        };
+        break;
+
       // ── NIN Tracking / Personalization ─────────────────────────────────────
       case 'tracking-id':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = { nin: searchValue };
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization`;
+        bodyPayload = { trackingId: searchValue };
         break;
 
       // ── IPE Clearance ──────────────────────────────────────────────────────
@@ -256,8 +337,8 @@ serve(async (req: Request) => {
 
       // ── Identity Validation ────────────────────────────────────────────────
       case 'val':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = { nin: searchValue };
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation`;
+        bodyPayload = { nin: searchValue, service_code: service_code || '329' };
         break;
 
       // ── Delink (no direct AgentHub equivalent, use NIN) ────────────────────
@@ -272,17 +353,22 @@ serve(async (req: Request) => {
     }
 
     try {
-        console.log(`Calling AgentHub API: ${endpoint} with payload:`, bodyPayload);
+        console.log(`Calling AgentHub API: ${endpoint} (Method: ${bodyPayload ? 'POST' : 'GET'}) with payload:`, bodyPayload);
 
-        const apiResponse = await fetch(endpoint, {
-            method: 'POST',
+        const fetchOptions: RequestInit = {
+            method: bodyPayload !== null ? 'POST' : 'GET',
             headers: {
                 'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
-            },
-            body: JSON.stringify(bodyPayload)
-        });
+            }
+        };
+
+        if (bodyPayload !== null) {
+            fetchOptions.body = JSON.stringify(bodyPayload);
+        }
+
+        const apiResponse = await fetch(endpoint, fetchOptions);
 
         const rawText = await apiResponse.text();
         let responseData: any = null;

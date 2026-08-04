@@ -3,8 +3,8 @@ import {
     AirtimeProvider, MockAirtimeProvider, FlutterwaveAirtimeProvider,
     DataProvider, MockDataProvider, FlutterwaveDataProvider,
     IdentityVerifier, MockIdentityVerifier,
-    AijalonIdentityVerifier, DemographicParams,
-    ModificationParams, BirthAttestationParams, BVNModificationParams, HistoryParams,
+    DemographicParams, ModificationParams, BirthAttestationParams,
+    BVNModificationParams, HistoryParams,
     CryptoExchange, CoingeckoCryptoExchange, BinanceCryptoExchange
 } from './partners';
 import { ClubKonnectProvider } from './clubkonnect';
@@ -584,6 +584,10 @@ export const api = {
         // ── Validation ─────────────────────────────────────────────────
         /** Run instant identity/document validation */
         validateIdentity: (number: string, type?: string, priceId?: string, addonPriceId?: string) => identityVerifier.validateIdentity?.(number, type, priceId, addonPriceId),
+        /** Submit NIN Validation request */
+        submitNINValidation: (nin: string, serviceCode?: string, reference?: string, priceId?: string) => identityVerifier.submitNINValidation?.(nin, serviceCode, reference, priceId),
+        /** Check status of NIN Validation request */
+        checkNINValidationStatus: (requestId: string) => identityVerifier.checkNINValidationStatus?.(requestId),
 
         // ── Delink & Recovery ──────────────────────────────────────────
         /** Delink phone from NIN or retrieve linked info */
@@ -591,17 +595,25 @@ export const api = {
         /** Retrieve BVN by phone number or NIN */
         retrieveBVN: (number: string, priceId?: string) => identityVerifier.retrieveBVN?.(number, priceId),
 
-        // ── User Details / Modifications ───────────────────────────────
+        // ── User Details / Modifications / Slips ───────────────────────
         /** Retrieve NIN personalization/enrollment details */
         getPersonalization: (number: string, priceId?: string) => identityVerifier.getPersonalization?.(number, priceId),
+        /** Submit NIN Personalization request using Tracking ID */
+        submitNINPersonalization: (trackingId: string, reference?: string, priceId?: string) => identityVerifier.submitNINPersonalization?.(trackingId, reference, priceId),
+        /** Check status of NIN Personalization request */
+        checkNINPersonalizationStatus: (requestId: string) => identityVerifier.checkNINPersonalizationStatus?.(requestId),
+        /** Generate NIN Slip V2 PDF */
+        generateNINSlipV2: (nin: string, slipType?: 'PREMIUM' | 'STANDARD' | 'REGULAR', priceId?: string) => identityVerifier.generateNINSlipV2?.(nin, slipType, priceId),
         /** Request name or contact modification on NIN */
-        requestModification: (params: ModificationParams) => identityVerifier.requestModification?.(params),
+        requestModification: (params: ModificationParams, priceId?: string) => identityVerifier.requestModification?.(params, priceId),
         /** Request date of birth correction */
         requestDOBModification: (number: string, dob: string) => identityVerifier.requestDOBModification?.(number, dob),
         /** Attest/verify a birth record */
         attestBirth: (params: BirthAttestationParams) => identityVerifier.attestBirth?.(params),
+        /** Link VNIN to NIBSS database */
+        linkVNINToNIBSS: (vnin: string, bvn?: string, priceId?: string) => identityVerifier.linkVNINToNIBSS?.(vnin, bvn, priceId),
         /** Request BVN record modification */
-        requestBVNModification: (params: BVNModificationParams) => identityVerifier.requestBVNModification?.(params),
+        requestBVNModification: (params: BVNModificationParams, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
 
         // ── History ────────────────────────────────────────────────────
         /** Retrieve transaction/billing history */

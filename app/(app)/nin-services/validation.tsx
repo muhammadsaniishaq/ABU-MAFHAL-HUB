@@ -199,7 +199,14 @@ export default function ValidationScreen() {
 
         setLoading(true);
         try {
-            const res = await api.identity.validateIdentity(cleanNin, 'nin', selectedStatus, selectedSlip);
+            // Map UI status IDs to AgentHub service codes
+            const codeMap: Record<string, string> = {
+                'val_no_record': '329',
+                'val_update_record': '330',
+                'val_vnin_validation': '331',
+            };
+            const serviceCode = codeMap[selectedStatus] || '329';
+            const res = await api.identity.submitNINValidation(cleanNin, serviceCode, undefined, selectedStatus);
             setResult(res);
             await saveHistoryItem(res);
 
