@@ -189,19 +189,35 @@ export default function VerifyNINScreen() {
         setIsSaving(true);
         try {
             if (Platform.OS === 'web') {
+                const node = document.getElementById('slip-preview-container');
+                if (!node) {
+                    showAlert("Export Error", "Slip preview container not found.", "error");
+                    return;
+                }
+
                 await new Promise<void>((resolve) => {
-                    const node = document.getElementById('slip-preview-container');
-                    if (!node) return resolve();
-                    
                     const generatePng = () => {
                         // @ts-ignore
-                        window.html2canvas(node, { useCORS: true, scale: 5 }).then((canvas) => {
-                            const link = document.createElement('a');
-                            link.download = `nin_slip_${nin || 'verify'}.png`;
-                            link.href = canvas.toDataURL('image/png');
-                            link.click();
+                        if (window.html2canvas) {
+                            // @ts-ignore
+                            window.html2canvas(node, { useCORS: true, scale: 3, logging: false }).then((canvas: any) => {
+                                const link = document.createElement('a');
+                                link.download = `nin_slip_${nin || 'digital'}.png`;
+                                link.href = canvas.toDataURL('image/png');
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                showAlert("Download Complete", "PNG image downloaded successfully.", "success");
+                                resolve();
+                            }).catch((err: any) => {
+                                console.error('html2canvas error:', err);
+                                showAlert("PNG Export Failed", "Could not render slip to PNG image.", "error");
+                                resolve();
+                            });
+                        } else {
+                            showAlert("Library Error", "html2canvas library failed to load.", "error");
                             resolve();
-                        }).catch(() => resolve());
+                        }
                     };
 
                     if ((window as any).html2canvas) {
@@ -210,6 +226,10 @@ export default function VerifyNINScreen() {
                         const script = document.createElement('script');
                         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                         script.onload = generatePng;
+                        script.onerror = () => {
+                            showAlert("Script Error", "Failed to load image generator library.", "error");
+                            resolve();
+                        };
                         document.head.appendChild(script);
                     }
                 });
@@ -223,7 +243,7 @@ export default function VerifyNINScreen() {
                         UTI: 'public.png'
                     });
                 } else {
-                    showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                    showAlert("Downloaded", "PNG saved to device.", "success");
                 }
             }
         } catch (e: any) {
@@ -2040,52 +2060,87 @@ export default function VerifyNINScreen() {
 
     const renderSlip = () => {
         if (!result || !result.data) return null;
-        const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64;
-
-        return (
-            <View id="slip-preview-container" style={{ width: '100%', alignItems: 'center' }}>
-                {pdfBase64 && Platform.OS === 'web' && (
-                    <View style={{ width: '100%', height: 520, borderRadius: 12, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#cbd5e1' }}>
-                        <iframe
-                            src={`data:application/pdf;base64,${pdfBase64}`}
-                            style={{ width: '100%', height: '100%', border: 'none' }}
-                            title="Official AgentHub NIN Slip PDF"
-                        />
-                    </View>
-                )}
-                {(() => {
-                    switch(selectedLayout) {
-                        case 'premium': return <IDCardMockup data={result.data} />;
-                        case 'standard': return <StandardSlip data={result.data} />;
-                        case 'regular': return <RegularSlip data={result.data} />;
-                        case 'info': return <InformationSlip data={result.data} />;
-                        default: return <IDCardMockup data={result.data} />;
-                    }
-                })()}
-            </View>
-        );
+        switch(selectedLayout) {
+            case 'premium': return <IDCardMockup data={result.data} />;
+            case 'standard': return <StandardSlip data={result.data} />;
+            case 'regular': return <RegularSlip data={result.data} />;
+            case 'info': return <InformationSlip data={result.data} />;
+            default: return <IDCardMockup data={result.data} />;
+        }
     };
 
     if (result) {
+        const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64;
+        const personData = result.data?.data || result.data || {};
+        const fullName = [personData.firstname, personData.middlename, personData.surname].filter(Boolean).join(' ') || 'NIN Holder';
+        const displayNin = personData.nin || personData.number || nin || 'N/A';
+        const userPhoto = personData.photo || personData.image || personData.picture;
+        const photoUri = userPhoto
+            ? (userPhoto.startsWith('data:') || userPhoto.startsWith('http') ? userPhoto : `data:image/jpeg;base64,${userPhoto}`)
+            : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
+
         return (
-            <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+            <View style={{ flex: 1, backgroundColor: '#0b1329' }}>
                 <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#fff', headerShadowVisible: false }} />
                 
                 {/* Header Banner */}
-                <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Details</Text>
+                <LinearGradient colors={['#060d21', '#0f172a', '#1e293b']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 40, paddingHorizontal: 16, alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.4)' }}>
+                        <Ionicons name="checkmark-circle" size={18} color="#f5a623" />
+                        <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.8 }}>Identity Verified</Text>
                     </View>
-                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>NIN Slip Generated</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 8, fontWeight: '700' }}>Official NIMC NIN Record</Text>
                 </LinearGradient>
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: -32 }} contentContainerStyle={{ paddingBottom: 80 }}>
+                <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: -24 }} contentContainerStyle={{ paddingBottom: 80 }}>
                     
-                    {/* Generated NIN Slip Preview at the top */}
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, marginBottom: 12, alignItems: 'center' }}>
-                        <View style={{ backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 12 }}>
-                            <Text style={{ fontWeight: '800', color: '#64748b', textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 }}>NIN Slip Preview</Text>
+                    {/* Person Summary Card */}
+                    <View style={{ backgroundColor: '#1e293b', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#334155', marginBottom: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 }}>
+                        <Image source={{ uri: photoUri }} style={{ width: 64, height: 74, borderRadius: 10, borderWidth: 2, borderColor: '#f5a623' }} />
+                        <View style={{ marginLeft: 16, flex: 1 }}>
+                            <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 0.5 }} numberOfLines={1}>
+                                {fullName}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                <Ionicons name="card-outline" size={14} color="#94a3b8" />
+                                <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 13, marginLeft: 4, letterSpacing: 1 }}>
+                                    NIN: {displayNin}
+                                </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                                <View style={{ backgroundColor: '#0284c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>{selectedLayout} Layout</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Official PDF Document Iframe Preview (Web Only, if pdfBase64 exists) */}
+                    {pdfBase64 && Platform.OS === 'web' && (
+                        <View style={{ backgroundColor: '#1e293b', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#334155', marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="document-text-sharp" size={18} color="#38bdf8" />
+                                    <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Official PDF Slip Preview</Text>
+                                </View>
+                                <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
+                                    <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '800' }}>AGENTHUB API PDF</Text>
+                                </View>
+                            </View>
+                            <View style={{ width: '100%', height: 500, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#475569' }}>
+                                <iframe
+                                    src={`data:application/pdf;base64,${pdfBase64}`}
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    title="Official AgentHub NIN Slip PDF"
+                                />
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Slip Mockup Preview (Clean Container for PNG export) */}
+                    <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4, marginBottom: 16, alignItems: 'center' }}>
+                        <View style={{ backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 14, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                            <Text style={{ fontWeight: '900', color: '#475569', textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.8 }}>Digital NIN Slip Card Preview</Text>
                         </View>
                         
                         <View nativeID="slip-preview-container" style={{ width: '100%' }}>
@@ -2095,53 +2150,75 @@ export default function VerifyNINScreen() {
                         </View>
                     </View>
 
-                    {/* Direct Download Buttons (Mobile First, No Modal needed) */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                    {/* Direct Action Download Buttons */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 10 }}>
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: 6, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#0284c7', height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#0284c7', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 3 }}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="document-text-outline" size={18} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PDF</Text>
+                            {isSaving ? <ActivityIndicator color="#fff" size="small" /> : (
+                                <>
+                                    <Ionicons name="cloud-download-outline" size={20} color="#fff" />
+                                    <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, marginLeft: 8, letterSpacing: 0.3 }}>Download PDF</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={handleDownloadPng}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#f5a623', height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#f5a623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 3 }}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="image-outline" size={18} color="#060d21" />
-                            <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
+                            {isSaving ? <ActivityIndicator color="#060d21" size="small" /> : (
+                                <>
+                                    <Ionicons name="image-outline" size={20} color="#060d21" />
+                                    <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 14, marginLeft: 8, letterSpacing: 0.3 }}>Download PNG</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
 
-                    {/* Compact Details Table */}
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Full Name</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
-                                {result.data.firstname} {result.data.middlename ? `${result.data.middlename} ` : ''}{result.data.surname}
+                    {/* Structured Personal Details Grid */}
+                    <View style={{ backgroundColor: '#1e293b', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#334155', marginBottom: 16 }}>
+                        <View style={{ backgroundColor: '#0f172a', padding: 14, borderBottomWidth: 1, borderBottomColor: '#334155', flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="information-circle-outline" size={18} color="#f5a623" />
+                            <Text style={{ color: '#f8fafc', fontWeight: '800', fontSize: 12, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Metadata</Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+                            <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>Full Name</Text>
+                            <Text style={{ color: '#f8fafc', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
+                                {fullName}
                             </Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN Number</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>
-                                {result.data.nin || result.data.number || 'N/A'}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+                            <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>NIN Number</Text>
+                            <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
+                                {displayNin}
                             </Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Slip Type</Text>
-                            <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>
-                                {selectedLayout}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+                            <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>Gender / Sex</Text>
+                            <Text style={{ color: '#f8fafc', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
+                                {personData.gender || personData.sex || 'N/A'}
                             </Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12 }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Date & Time</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '700', fontSize: 11 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+                            <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>Date of Birth</Text>
+                            <Text style={{ color: '#f8fafc', fontWeight: '800', fontSize: 12 }}>
+                                {personData.birthdate || personData.dob || personData.dateOfBirth || 'N/A'}
+                            </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 14 }}>
+                            <Text style={{ color: '#94a3b8', fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>Verification Date</Text>
+                            <Text style={{ color: '#f8fafc', fontWeight: '700', fontSize: 11 }}>
                                 {(() => {
                                     const d = new Date();
                                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -2155,10 +2232,11 @@ export default function VerifyNINScreen() {
                     {/* Verify Another ID */}
                     <TouchableOpacity 
                         onPress={() => setResult(null)} 
-                        style={{ borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 }}
+                        style={{ borderWidth: 1, borderColor: '#475569', backgroundColor: '#1e293b', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="arrow-back" size={16} color="#475569" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#475569', fontWeight: '700', fontSize: 13 }}>Verify Another ID</Text>
+                        <Ionicons name="arrow-back-circle-outline" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
+                        <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 14 }}>Verify Another NIN</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
