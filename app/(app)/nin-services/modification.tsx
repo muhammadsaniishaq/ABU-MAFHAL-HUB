@@ -60,11 +60,42 @@ export default function NINModificationScreen() {
         type: 'info'
     });
 
-    const activeService = MODIFICATION_SERVICES.find(s => s.id === selectedServiceId) || MODIFICATION_SERVICES[0];
+    // Dynamic Pricing State from Admin NIN Pricing (service_pricing)
+    const [servicesList, setServicesList] = useState(MODIFICATION_SERVICES);
+    const activeService = servicesList.find(s => s.id === selectedServiceId) || servicesList[0];
 
     useEffect(() => {
         fetchWalletBalance();
+        fetchDynamicPrices();
     }, []);
+
+    const fetchDynamicPrices = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('*')
+                .in('id', ['nin_mod_name', 'nin_mod_phone', 'nin_mod_address']);
+
+            if (data && data.length > 0) {
+                setServicesList(prev => prev.map(serv => {
+                    const dbItem = data.find((d: any) => d.id === serv.id);
+                    if (dbItem) {
+                        const cost = parseFloat(dbItem.cost_price?.toString() || '0');
+                        const markup = parseFloat(dbItem.markup_price?.toString() || '0');
+                        const selling = dbItem.selling_price ? parseFloat(dbItem.selling_price.toString()) : (cost + markup);
+                        const finalFee = selling > 0 ? selling : (cost + markup);
+                        return {
+                            ...serv,
+                            fee: finalFee > 0 ? finalFee : serv.fee
+                        };
+                    }
+                    return serv;
+                }));
+            }
+        } catch (e) {
+            console.warn('Failed to load dynamic modification pricing from service_pricing', e);
+        }
+    };
 
     const fetchWalletBalance = async () => {
         try {
@@ -145,6 +176,7 @@ export default function NINModificationScreen() {
 
             const payload: any = {
                 searchType: 'nin_modification',
+                priceId: selectedServiceId,
                 service_id: selectedServiceId,
                 code: activeService.code,
                 nin: cleanNin,
@@ -535,7 +567,7 @@ export default function NINModificationScreen() {
                                 {/* Fee Container matching screenshot */}
                                 <View style={styles.feeCardBox}>
                                     <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13 }}>Modification Fee</Text>
-                                    <Text style={{ color: '#ea580c', fontWeight: '900', fontSize: 20 }}>₦{activeService.fee.toLocaleString('.2f')}</Text>
+                                    <Text style={{ color: '#ea580c', fontWeight: '900', fontSize: 20 }}>₦{(activeService.fee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </View>
 
                                 {/* Primary Submit Button */}
