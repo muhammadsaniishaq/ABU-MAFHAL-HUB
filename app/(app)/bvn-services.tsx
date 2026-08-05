@@ -772,49 +772,23 @@ export default function BVNVerificationScreen() {
             }
 
             if (Platform.OS === 'web') {
-                await new Promise<void>((resolve) => {
-                    const generatePdf = () => {
-                        const container = document.createElement('div');
-                        container.innerHTML = finalHtml;
-                        container.style.position = 'absolute';
-                        container.style.top = '-9999px';
-                        document.body.appendChild(container);
-                        
-                        // @ts-ignore
-                        window.html2pdf().set({
-                            margin: 0,
-                            filename: `bvn_slip.pdf`,
-                            image: { type: 'jpeg', quality: 1.0 },
-                            html2canvas: { scale: 5, useCORS: true },
-                            jsPDF: { unit: 'px', format: [printWidth, printHeight], orientation: printWidth > printHeight ? 'landscape' : 'portrait' }
-                        }).from(container).save().then(() => {
-                            document.body.removeChild(container);
-                            resolve();
-                        }).catch(() => {
-                            document.body.removeChild(container);
-                            resolve();
-                        });
-                    };
-
-                    if ((window as any).html2pdf) {
-                        generatePdf();
-                    } else {
-                        const script = document.createElement('script');
-                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-                        script.onload = generatePdf;
-                        document.head.appendChild(script);
-                    }
-                });
+                const printWin = window.open('', '_blank');
+                if (printWin) {
+                    printWin.document.write(finalHtml);
+                    printWin.document.close();
+                    printWin.focus();
+                    setTimeout(() => {
+                        printWin.print();
+                    }, 500);
+                } else {
+                    showAlert("Popup Blocked", "Please allow popups in your browser to download/print the PDF.", "warning");
+                }
             } else {
                 const { uri: pdfUri } = await Print.printToFileAsync({ html: finalHtml, width: printWidth, height: printHeight });
                 if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(pdfUri, {
-                        mimeType: 'application/pdf',
-                        dialogTitle: 'Download BVN Card (PDF)',
-                        UTI: 'com.adobe.pdf'
-                    });
+                    await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', dialogTitle: 'Download BVN Slip (PDF)', UTI: 'com.adobe.pdf' });
                 } else {
-                    showAlert("Sharing Unavailable", "Sharing is not available on this device.", "warning");
+                    showAlert("Downloaded", `PDF saved to ${pdfUri}`, "success");
                 }
             }
         } catch (e: any) {

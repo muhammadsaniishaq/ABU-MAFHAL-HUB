@@ -136,16 +136,16 @@ serve(async (req: Request) => {
       // Fetch dynamic pricing from service_pricing table
       const { data: pricing, error: pricingError } = await supabaseAdmin
         .from('service_pricing')
-        .select('cost_price, markup_price, selling_price, name')
+        .select('*')
         .eq('id', priceId)
         .maybeSingle();
 
       if (pricing) {
         const cost = parseFloat(pricing.cost_price?.toString() || '0');
         const markup = parseFloat(pricing.markup_price?.toString() || '0');
-        const selling = pricing.selling_price ? parseFloat(pricing.selling_price.toString()) : 0;
+        const selling = pricing.selling_price ? parseFloat(pricing.selling_price.toString()) : (cost + markup);
         FEE_AMOUNT = selling > 0 ? selling : (cost + markup);
-        description = `Verification: ${pricing.name || priceId}`;
+        description = `Verification: ${pricing.name || pricing.service_name || priceId}`;
       } else {
         console.warn(`Pricing record for '${priceId}' not found in service_pricing:`, pricingError?.message);
         FEE_AMOUNT = 150;
@@ -156,17 +156,17 @@ serve(async (req: Request) => {
       if (addonPriceId && addonPriceId !== 'val_slip_none') {
         const { data: addonPricing } = await supabaseAdmin
           .from('service_pricing')
-          .select('cost_price, markup_price, selling_price, name')
+          .select('*')
           .eq('id', addonPriceId)
           .maybeSingle();
 
         if (addonPricing) {
           const addonCost = parseFloat(addonPricing.cost_price?.toString() || '0');
           const addonMarkup = parseFloat(addonPricing.markup_price?.toString() || '0');
-          const addonSelling = addonPricing.selling_price ? parseFloat(addonPricing.selling_price.toString()) : 0;
+          const addonSelling = addonPricing.selling_price ? parseFloat(addonPricing.selling_price.toString()) : (addonCost + addonMarkup);
           const addonTotal = addonSelling > 0 ? addonSelling : (addonCost + addonMarkup);
           FEE_AMOUNT += addonTotal;
-          description += ` + ${addonPricing.name || addonPriceId}`;
+          description += ` + ${addonPricing.name || addonPricing.service_name || addonPriceId}`;
         }
       }
 
