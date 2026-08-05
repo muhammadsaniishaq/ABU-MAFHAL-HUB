@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,7 +45,44 @@ export default function NINHistoryScreen() {
         try {
             const key = getStorageKeyForTab(targetTab);
             const stored = await AsyncStorage.getItem(key);
-            setHistoryList(stored ? JSON.parse(stored) : []);
+            const localList = stored ? JSON.parse(stored) : [];
+
+            // Fetch permanently from database
+            const dbList = await verificationHistory.getAll(targetTab as any);
+            const combinedMap = new Map();
+
+            for (const item of localList) {
+                const fullName = extractFullName(item.data || item.details, item.name || item.holder_name);
+                const target = item.target || item.nin || item.search_number || item.id;
+                if (target) {
+                    combinedMap.set(target, {
+                        ...item,
+                        target,
+                        name: fullName
+                    });
+                }
+            }
+
+            if (dbList && dbList.length > 0) {
+                for (const item of dbList) {
+                    const fullName = extractFullName(item.details, item.holder_name);
+                    const target = item.search_number || item.details?.nin || item.details?.data?.nin || item.id;
+                    combinedMap.set(target, {
+                        id: item.id,
+                        target,
+                        nin: target,
+                        name: fullName,
+                        slip: item.layout || 'standard',
+                        layout: item.layout || 'standard',
+                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                        data: item.details
+                    });
+                }
+            }
+
+            const finalHistory = Array.from(combinedMap.values());
+            setHistoryList(finalHistory);
+            await AsyncStorage.setItem(key, JSON.stringify(finalHistory));
         } catch (e) {
             console.warn('Failed to load history', e);
         } finally {
@@ -70,6 +108,7 @@ export default function NINHistoryScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            await verificationHistory.delete(itemId);
                             const updated = historyList.filter(item => item.id !== itemId);
                             setHistoryList(updated);
                             const key = getStorageKeyForTab(activeTab);

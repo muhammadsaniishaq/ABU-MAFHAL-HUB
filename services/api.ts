@@ -565,13 +565,13 @@ export const api = {
     identity: {
         // ── Verifications ─────────────────────────────────────────────
         /** Verify a National Identification Number */
-        validateNIN: (nin: string, priceId?: string) => identityVerifier.validateNIN(nin, priceId),
+        validateNIN: (nin: string, priceId?: string, slipType?: string) => identityVerifier.validateNIN(nin, priceId, slipType),
         /** Verify BVN via Aijalon /api/bvn/ */
         validateBVN: (bvn: string, priceId?: string) => identityVerifier.validateBVN(bvn, priceId),
         /** Get full BVN card/record details */
         getBVNCard: (bvn: string, priceId?: string) => identityVerifier.getBVNCard?.(bvn, priceId),
         /** Verify NIN by linked phone number */
-        verifyNINWithPhone: (phone: string, priceId?: string) => identityVerifier.verifyNINWithPhone?.(phone, priceId),
+        verifyNINWithPhone: (phone: string, priceId?: string, slipType?: string) => identityVerifier.verifyNINWithPhone?.(phone, priceId, slipType),
         /** Verify phone number via /api/phone/ */
         verifyPhone: (phone: string, priceId?: string) => identityVerifier.verifyPhone(phone, priceId),
         /** Verify identity using demographic data (name, gender, DOB) */

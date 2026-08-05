@@ -124,16 +124,37 @@ export const AgentHubIdentityVerifier = {
   },
 
   /** Verify NIN and get full personal data for high-resolution slip generation */
-  validateNIN: async (nin: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('nin', nin, { priceId: priceId || 'nin_regular' }),
+  validateNIN: async (nin: string, priceId?: string, slipType?: string) => {
+    const defaultSlip = priceId === 'nin_standard' ? 'STANDARD' :
+                        priceId === 'nin_regular' ? 'REGULAR' :
+                        priceId === 'nin_info' ? 'INFO' : 'PREMIUM';
+    return AgentHubIdentityVerifier.invokeEdge('nin', nin, { 
+      priceId: priceId || 'nin_regular',
+      slip_type: (slipType || defaultSlip).toUpperCase()
+    });
+  },
 
   /** Lookup NIN by phone number */
-  verifyNINWithPhone: async (phone: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('phone', phone, { priceId }),
+  verifyNINWithPhone: async (phone: string, priceId?: string, slipType?: string) => {
+    const defaultSlip = priceId === 'nin_standard' ? 'STANDARD' :
+                        priceId === 'nin_regular' ? 'REGULAR' :
+                        priceId === 'nin_info' ? 'INFO' : 'PREMIUM';
+    return AgentHubIdentityVerifier.invokeEdge('phone', phone, { 
+      priceId,
+      slip_type: (slipType || defaultSlip).toUpperCase()
+    });
+  },
 
   /** Lookup NIN by phone number (alias) */
-  verifyPhone: async (phone: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('phone', phone, { priceId }),
+  verifyPhone: async (phone: string, priceId?: string, slipType?: string) => {
+    const defaultSlip = priceId === 'nin_standard' ? 'STANDARD' :
+                        priceId === 'nin_regular' ? 'REGULAR' :
+                        priceId === 'nin_info' ? 'INFO' : 'PREMIUM';
+    return AgentHubIdentityVerifier.invokeEdge('phone', phone, { 
+      priceId,
+      slip_type: (slipType || defaultSlip).toUpperCase()
+    });
+  },
 
   /**
    * Generate a printable NIN Slip PDF (returned as base64)

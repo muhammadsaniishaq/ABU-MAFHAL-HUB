@@ -223,14 +223,22 @@ serve(async (req: Request) => {
     switch (searchType) {
 
       // ── NIN Verification ───────────────────────────────────────────────────
-      case 'nin':
+      case 'nin': {
+        let calculatedSlipType = (requestData.slip_type || requestData.layout || '').toUpperCase();
+        if (!calculatedSlipType) {
+          if (priceId === 'nin_standard') calculatedSlipType = 'STANDARD';
+          else if (priceId === 'nin_regular') calculatedSlipType = 'REGULAR';
+          else if (priceId === 'nin_info') calculatedSlipType = 'INFO';
+          else calculatedSlipType = 'PREMIUM';
+        }
         endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
         bodyPayload = {
           nin: searchValue,
-          slip_type: requestData.slip_type || 'PREMIUM',
+          slip_type: calculatedSlipType,
           reference: requestData.reference || `REF-NIN-${Date.now()}`
         };
         break;
+      }
 
       // ── NIN Slip (PDF) ─────────────────────────────────────────────────────
       // service_code: 401 = Premium, 402 = Standard, 403 = Regular (NIMC layout)
@@ -243,14 +251,22 @@ serve(async (req: Request) => {
         break;
 
       // ── NIN Slip V2 (PDF) ──────────────────────────────────────────────────
-      case 'nin-slip-v2':
+      case 'nin-slip-v2': {
+        let calculatedSlipTypeV2 = (requestData.slip_type || requestData.layout || '').toUpperCase();
+        if (!calculatedSlipTypeV2) {
+          if (priceId === 'nin_standard') calculatedSlipTypeV2 = 'STANDARD';
+          else if (priceId === 'nin_regular') calculatedSlipTypeV2 = 'REGULAR';
+          else if (priceId === 'nin_info') calculatedSlipTypeV2 = 'INFO';
+          else calculatedSlipTypeV2 = 'PREMIUM';
+        }
         endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
         bodyPayload = {
           nin: searchValue,
-          slip_type: requestData.slip_type || 'PREMIUM',
+          slip_type: calculatedSlipTypeV2,
           reference: requestData.reference || `REF-${Date.now()}`
         };
         break;
+      }
 
       // ── NIN Validation Queue ───────────────────────────────────────────────
       case 'nin-validation':

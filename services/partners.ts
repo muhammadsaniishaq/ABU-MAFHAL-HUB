@@ -42,9 +42,9 @@ export interface VerificationResult {
 }
 
 export interface IdentityVerifier {
-    validateNIN(nin: string, priceId?: string): Promise<VerificationResult>;
+    validateNIN(nin: string, priceId?: string, slipType?: string): Promise<VerificationResult>;
     validateBVN(bvn: string, priceId?: string): Promise<VerificationResult>;
-    verifyNINWithPhone?(phone: string, priceId?: string): Promise<VerificationResult>;
+    verifyNINWithPhone?(phone: string, priceId?: string, slipType?: string): Promise<VerificationResult>;
     verifyNINDemo?(params: DemographicParams, priceId?: string): Promise<VerificationResult>;
     getBVNCard?(bvn: string, priceId?: string): Promise<VerificationResult>;
     runIPEClearance?(number: string, priceId?: string, addonPriceId?: string): Promise<VerificationResult>;

@@ -12,6 +12,24 @@ export interface VerificationHistoryItem {
   created_at: string;
 }
 
+export const extractFullName = (details: any, fallbackName?: string): string => {
+  const d = details?.data || details || {};
+  const firstname = d.firstname || d.first_name || '';
+  const middlename = d.middlename || d.middle_name || '';
+  const surname = d.surname || d.last_name || '';
+  
+  const constructed = [firstname, middlename, surname].filter(Boolean).join(' ').trim();
+  if (constructed.length > 0) {
+    return constructed.toUpperCase();
+  }
+
+  if (fallbackName && !['NIN Holder', 'Unknown Name', 'RECORD', 'N/A'].includes(fallbackName)) {
+    return fallbackName.toUpperCase();
+  }
+
+  return 'NIN Holder';
+};
+
 export const verificationHistory = {
   /**
    * Save a verification item permanently to Supabase Database
@@ -29,12 +47,14 @@ export const verificationHistory = {
       if (!authData?.user) return null;
       const userId = authData.user.id;
 
+      const resolvedName = extractFullName(item.details, item.holder_name);
+
       const payload = {
         user_id: userId,
         service_category: item.service_category,
         service_type: item.service_type,
         search_number: item.search_number,
-        holder_name: item.holder_name,
+        holder_name: resolvedName,
         layout: item.layout || 'standard',
         details: item.details,
         created_at: new Date().toISOString(),
@@ -72,7 +92,7 @@ export const verificationHistory = {
   /**
    * Get all verification history for the logged-in user from Database
    */
-  getAll: async (category?: 'nin' | 'bvn') => {
+  getAll: async (category?: 'nin' | 'bvn' | 'ipe' | 'validation' | 'personalization') => {
     try {
       const { data: authData } = await supabase.auth.getUser();
       if (!authData?.user) return [];
@@ -89,29 +109,34 @@ export const verificationHistory = {
       }
 
       const { data, error } = await query;
-      if (!error && data && data.length > 0) return data;
+      let results = (!error && data && data.length > 0) ? data : [];
 
-      // Fallback: query transactions table for history_record
-      const { data: txData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('type', 'history_record')
-        .order('created_at', { ascending: false });
+      // Fallback: query transactions table for history_record if empty
+      if (results.length === 0) {
+        const { data: txData } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('type', 'history_record')
+          .order('created_at', { ascending: false });
 
-      if (txData && txData.length > 0) {
-        return txData.map(tx => {
-          try {
-            const parsed = JSON.parse(tx.description);
-            if (category && parsed.service_category !== category) return null;
-            return { id: tx.id, ...parsed };
-          } catch (_) {
-            return null;
-          }
-        }).filter(Boolean);
+        if (txData && txData.length > 0) {
+          results = txData.map(tx => {
+            try {
+              const parsed = JSON.parse(tx.description);
+              if (category && parsed.service_category !== category) return null;
+              return { id: tx.id, ...parsed };
+            } catch (_) {
+              return null;
+            }
+          }).filter(Boolean);
+        }
       }
 
-      return [];
+      return results.map((item: any) => ({
+        ...item,
+        holder_name: extractFullName(item.details, item.holder_name)
+      }));
     } catch (e) {
       console.error('Failed to fetch verification history from database:', e);
       return [];

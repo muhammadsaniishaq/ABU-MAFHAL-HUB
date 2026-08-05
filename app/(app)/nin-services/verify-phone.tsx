@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -92,35 +93,78 @@ export default function VerifyPhoneScreen() {
 
     const loadHistory = async () => {
         try {
+            const dbList = await verificationHistory.getAll('nin');
             const stored = await AsyncStorage.getItem('recent_nin_verifications');
-            if (stored) {
-                setHistoryList(JSON.parse(stored));
+            const localList = stored ? JSON.parse(stored) : [];
+
+            const combinedMap = new Map();
+
+            for (const item of localList) {
+                const fullName = extractFullName(item.data || item.details, item.name || item.holder_name);
+                const ninNum = item.nin || item.search_number || item.id;
+                if (ninNum) {
+                    combinedMap.set(ninNum, {
+                        ...item,
+                        nin: ninNum,
+                        name: fullName
+                    });
+                }
             }
+
+            if (dbList && dbList.length > 0) {
+                for (const item of dbList) {
+                    const fullName = extractFullName(item.details, item.holder_name);
+                    const ninNum = item.search_number || item.details?.nin || item.details?.data?.nin || item.id;
+                    combinedMap.set(ninNum, {
+                        id: item.id,
+                        nin: ninNum,
+                        name: fullName,
+                        layout: item.layout || 'standard',
+                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                        data: item.details
+                    });
+                }
+            }
+
+            const finalHistory = Array.from(combinedMap.values());
+            setHistoryList(finalHistory);
+            await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(finalHistory));
         } catch (e) {
             console.warn('Failed to load history', e);
         }
     };
 
-        const saveHistoryItem = async (verifiedData: any) => {
+    const saveHistoryItem = async (verifiedData: any) => {
         try {
-            const name = `${verifiedData.firstname || ''} ${verifiedData.surname || ''}`.trim() || 'Unknown Name';
+            const d = verifiedData?.data || verifiedData || {};
+            const fullName = extractFullName(d);
+            const ninNum = d.nin || d.number || 'N/A';
+
             const newItem = {
                 id: `verify_${Date.now()}`,
-                nin: verifiedData.nin || 'N/A',
-                name,
+                nin: ninNum,
+                name: fullName,
                 layout: selectedLayout,
-                date: (() => {
-                    const d = new Date();
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    const pad = (n: number) => n.toString().padStart(2, '0');
-                    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                })(),
-                data: verifiedData
+                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                data: d
             };
-            
-            const updated = [newItem, ...historyList.filter(item => item.nin !== newItem.nin)].slice(0, 500);
+
+            const stored = await AsyncStorage.getItem('recent_nin_verifications');
+            const localList = stored ? JSON.parse(stored) : [];
+            const updated = [newItem, ...localList.filter((item: any) => item.nin !== ninNum)].slice(0, 500);
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
+
+            await verificationHistory.save({
+                service_category: 'nin',
+                service_type: 'nin_verify_phone',
+                search_number: ninNum,
+                holder_name: fullName,
+                layout: selectedLayout,
+                details: d,
+            });
+
+            await loadHistory();
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
@@ -128,6 +172,7 @@ export default function VerifyPhoneScreen() {
 
     const deleteHistoryItem = async (itemId: string) => {
         try {
+            await verificationHistory.delete(itemId);
             const updated = historyList.filter(item => item.id !== itemId);
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
@@ -196,7 +241,7 @@ export default function VerifyPhoneScreen() {
 
         setLoading(true);
         try {
-            const response = await api.identity.verifyNINWithPhone(cleanPhone, layoutItem?.db_id);
+            const response = await api.identity.verifyNINWithPhone(cleanPhone, layoutItem?.db_id, selectedLayout.toUpperCase());
             
             if (response.isValid && response.data) {
                 let personData = response.data?.data ?? response.data;
@@ -231,9 +276,101 @@ export default function VerifyPhoneScreen() {
         }
     };
 
+    const convertPdfBase64ToPng = async (pdfBase64: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const runConversion = async () => {
+                try {
+                    const pdfjsLib = (window as any).pdfjsLib;
+                    if (!pdfjsLib) return reject(new Error("pdf.js library not loaded"));
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    const binaryString = atob(pdfBase64);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    const loadingTask = pdfjsLib.getDocument({ data: bytes });
+                    const pdf = await loadingTask.promise;
+                    const numPages = pdf.numPages;
+
+                    const pages: { canvas: HTMLCanvasElement; width: number; height: number }[] = [];
+                    let totalHeight = 0;
+                    let maxWidth = 0;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 3.0 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            pages.push({ canvas, width: viewport.width, height: viewport.height });
+                            totalHeight += viewport.height + (i > 1 ? 20 : 0);
+                            maxWidth = Math.max(maxWidth, viewport.width);
+                        }
+                    }
+
+                    if (pages.length === 0) return reject(new Error("No pages rendered"));
+
+                    const mergedCanvas = document.createElement('canvas');
+                    mergedCanvas.width = maxWidth;
+                    mergedCanvas.height = totalHeight;
+                    const mergedCtx = mergedCanvas.getContext('2d');
+                    if (!mergedCtx) return reject(new Error("Canvas context creation failed"));
+
+                    mergedCtx.fillStyle = '#ffffff';
+                    mergedCtx.fillRect(0, 0, maxWidth, totalHeight);
+
+                    let currentY = 0;
+                    for (let i = 0; i < pages.length; i++) {
+                        const { canvas, width, height } = pages[i];
+                        const x = Math.floor((maxWidth - width) / 2);
+                        mergedCtx.drawImage(canvas, x, currentY);
+                        currentY += height + 20;
+                    }
+
+                    resolve(mergedCanvas.toDataURL('image/png'));
+                } catch (err) {
+                    reject(err);
+                }
+            };
+
+            if ((window as any).pdfjsLib) {
+                runConversion();
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                script.onload = () => runConversion();
+                script.onerror = (e) => reject(e);
+                document.head.appendChild(script);
+            }
+        });
+    };
+
     const handleDownloadPng = async () => {
         setIsSaving(true);
         try {
+            const pdfBase64 = result?.data?.pdf_base64 || result?.pdf_base64 || result?.data?.data?.pdf_base64;
+            if (pdfBase64 && Platform.OS === 'web') {
+                try {
+                    const pngDataUrl = await convertPdfBase64ToPng(pdfBase64);
+                    const link = document.createElement('a');
+                    link.download = `nin_slip_phone_${phone || 'verify'}.png`;
+                    link.href = pngDataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showAlert("Download Complete", "Official NIN Slip PNG downloaded successfully.", "success");
+                    return;
+                } catch (err: any) {
+                    console.warn("PDF to PNG conversion failed, falling back to html2canvas:", err);
+                }
+            }
+
             if (Platform.OS === 'web') {
                 await new Promise<void>((resolve) => {
                     const node = document.getElementById('slip-preview-container');
@@ -840,50 +977,83 @@ export default function VerifyPhoneScreen() {
     });
 
     if (result) {
+        const personData = result.data?.data || result.data || {};
+        const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64;
+        const pdfBlobUrl = Platform.OS === 'web' && pdfBase64 ? (() => {
+            try {
+                const binary = atob(pdfBase64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                const blob = new Blob([bytes], { type: 'application/pdf' });
+                return URL.createObjectURL(blob);
+            } catch (e) {
+                return null;
+            }
+        })() : null;
+
         return (
             <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
                 <Stack.Screen options={{ 
                     title: 'Verification Details', 
-                    headerStyle: { backgroundColor: '#060d21' }, 
-                    headerTintColor: '#fff', 
+                    headerStyle: { backgroundColor: '#ffffff' }, 
+                    headerTintColor: '#0f172a', 
                     headerShadowVisible: false,
                     headerRight: () => (
                         <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ marginRight: 8 }}>
-                            <Ionicons name="time-outline" size={22} color="#fff" />
+                            <Ionicons name="time-outline" size={22} color="#0f172a" />
                         </TouchableOpacity>
                     )
                 }} />
                 
                 {/* Header Banner */}
-                <LinearGradient colors={['#060d21', '#121F42']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 48, paddingHorizontal: 16, alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="shield-checkmark" size={16} color="#f5a623" />
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Details</Text>
+                <LinearGradient colors={['#ffffff', '#f1f5f9']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 16, paddingBottom: 20, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: '#86efac' }}>
+                        <Ionicons name="shield-checkmark" size={16} color="#16a34a" />
+                        <Text style={{ color: '#15803d', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Details</Text>
                     </View>
-                    <Text style={{ color: '#94a3b8', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>NIN Slip Generated</Text>
+                    <Text style={{ color: '#64748b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 6, fontWeight: '700' }}>NIN Record Retreived</Text>
                 </LinearGradient>
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: -32 }} contentContainerStyle={{ paddingBottom: 80 }}>
+                <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: 14 }} contentContainerStyle={{ paddingBottom: 60 }}>
                     
                     {/* Generated NIN Slip Preview at the top */}
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, marginBottom: 12, alignItems: 'center' }}>
-                        <View style={{ backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 12 }}>
-                            <Text style={{ fontWeight: '800', color: '#64748b', textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 }}>NIN Slip Preview</Text>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="document-text-sharp" size={18} color="#0284c7" />
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    Official NIN {selectedLayout.toUpperCase()} Preview
+                                </Text>
+                            </View>
+                            <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, borderWidth: 1, borderColor: '#bae6fd' }}>
+                                <Text style={{ color: '#0284c7', fontSize: 9, fontWeight: '800' }}>VERIFIED RECORD</Text>
+                            </View>
                         </View>
                         
-                        <View nativeID="slip-preview-container" style={{ width: '100%' }}>
-                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%' }}>
-                                {renderSlip()}
-                            </ViewShot>
-                        </View>
+                        {pdfBlobUrl ? (
+                            <View style={{ width: '100%', height: 480, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}>
+                                <iframe
+                                    src={pdfBlobUrl}
+                                    style={{ width: '100%', height: '100%', border: 'none' }}
+                                    title="Official NIN Slip PDF"
+                                />
+                            </View>
+                        ) : (
+                            <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', alignItems: 'center' }}>
+                                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
+                                    {renderSlip()}
+                                </ViewShot>
+                            </View>
+                        )}
                     </View>
 
                     {/* Direct Download Buttons */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 10 }}>
                         <TouchableOpacity 
                             onPress={handleDownloadPdf}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginRight: 6, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#0284c7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
+                            activeOpacity={0.8}
                         >
                             <Ionicons name="document-text-outline" size={18} color="#fff" />
                             <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PDF</Text>
@@ -892,56 +1062,61 @@ export default function VerifyPhoneScreen() {
                         <TouchableOpacity 
                             onPress={handleDownloadPng}
                             disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#f5a623', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginLeft: 6, elevation: 1 }}
+                            style={{ flex: 1, backgroundColor: '#059669', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#059669', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
+                            activeOpacity={0.8}
                         >
-                            <Ionicons name="image-outline" size={18} color="#060d21" />
-                            <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
+                            <Ionicons name="image-outline" size={18} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Compact Details Table */}
-                    <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9', marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Full Name</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
-                                {result.data.firstname} {result.data.middlename ? result.data.middlename + ' ' : ''}{result.data.surname}
-                            </Text>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, padding: 14 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                            <Ionicons name="list-circle" size={20} color="#0284c7" />
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Profile Details</Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN Number</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>
-                                {result.data.nin || result.data.number || 'N/A'}
-                            </Text>
-                        </View>
+                        <View style={{ gap: 10 }}>
+                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Full Name</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>
+                                    {[personData.firstname, personData.middlename, personData.surname].filter(Boolean).join(' ') || 'N/A'}
+                                </Text>
+                            </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Slip Type</Text>
-                            <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>
-                                {selectedLayout}
-                            </Text>
-                        </View>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>NIN Number</Text>
+                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 13, marginTop: 2 }}>
+                                        {personData.nin || personData.number || 'N/A'}
+                                    </Text>
+                                </View>
+                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Slip Type</Text>
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>
+                                        {selectedLayout}
+                                    </Text>
+                                </View>
+                            </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12 }}>
-                            <Text style={{ color: '#94a3b8', fontWeight: '800', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Date & Time</Text>
-                            <Text style={{ color: '#1e293b', fontWeight: '700', fontSize: 11 }}>
-                                {(() => {
-                                    const d = new Date();
-                                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                    const pad = (n: number) => n.toString().padStart(2, '0');
-                                    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                                })()}
-                            </Text>
+                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Verification Time</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 12, marginTop: 2 }}>
+                                    {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                            </View>
                         </View>
                     </View>
 
                     {/* Back to Lookup Button */}
                     <TouchableOpacity 
                         onPress={() => setResult(null)} 
-                        style={{ height: 48, borderRadius: 12, backgroundColor: '#060d21', alignItems: 'center', justifyContent: 'center', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 }}
+                        style={{ borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
                         activeOpacity={0.8}
                     >
-                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>VERIFY ANOTHER IDENTITY</Text>
+                        <Ionicons name="arrow-back-circle-outline" size={18} color="#475569" style={{ marginRight: 8 }} />
+                        <Text style={{ color: '#334155', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>VERIFY ANOTHER IDENTITY</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
@@ -952,16 +1127,16 @@ export default function VerifyPhoneScreen() {
         <View style={styles.container}>
             <Stack.Screen options={{ 
                 title: 'Verify by Phone', 
-                headerStyle: { backgroundColor: '#060d21' }, 
-                headerTintColor: '#fff', 
+                headerStyle: { backgroundColor: '#ffffff' }, 
+                headerTintColor: '#0f172a', 
                 headerShadowVisible: false,
                 headerRight: () => (
                     <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ marginRight: 8 }}>
-                        <Ionicons name="time-outline" size={22} color="#fff" />
+                        <Ionicons name="time-outline" size={22} color="#0f172a" />
                     </TouchableOpacity>
                 )
             }} />
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
 
             {/* Premium Loader Modal */}
             {loading && (
@@ -1018,8 +1193,8 @@ export default function VerifyPhoneScreen() {
                 </View>
             </Modal>
 
-            <LinearGradient colors={['#060d21', '#0B163A']} style={[styles.headerGradient, { paddingTop: insets.top > 0 ? insets.top + 10 : 24 }]}>
-                <Text style={styles.headerTitle}>Verify by Phone</Text>
+            <LinearGradient colors={['#ffffff', '#f1f5f9']} style={[styles.headerGradient, { paddingTop: insets.top > 0 ? insets.top + 10 : 24, borderBottomWidth: 1, borderColor: '#e2e8f0' }]}>
+                <Text style={[styles.headerTitle, { color: '#0f172a' }]}>Verify by Phone</Text>
             </LinearGradient>
 
             <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: 12 }} contentContainerStyle={styles.scrollContent}>
