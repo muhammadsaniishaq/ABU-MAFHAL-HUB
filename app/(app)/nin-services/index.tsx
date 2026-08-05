@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SERVICES = [
     { id: 'nin', title: 'Verify NIN (HD Slips)', desc: 'Premium, Standard & Regular Slips', icon: 'finger-print', bgColor: '#ecfdf5', iconColor: '#059669', route: '/nin-services/verify-nin' },
+    { id: 'mod', title: 'NIN Modifications', desc: 'Change Name, Phone, Address', icon: 'create', bgColor: '#fffbeb', iconColor: '#d97706', route: '/nin-services/modification' },
     { id: 'bvn', title: 'BVN Verification & Card', desc: 'Verify BVN & print BVN cards', icon: 'card-outline', bgColor: '#f0f9ff', iconColor: '#0284c7', route: '/nin-services/validation' },
     { id: 'phone', title: 'Verify by Phone', desc: 'Find NIN via linked phone', icon: 'call', bgColor: '#eff6ff', iconColor: '#2563EB', route: '/nin-services/verify-phone' },
     { id: 'demo', title: 'Demographic Search', desc: 'Find NIN using name & DOB', icon: 'people', bgColor: '#faf5ff', iconColor: '#9333EA', route: '/nin-services/demographic' },
