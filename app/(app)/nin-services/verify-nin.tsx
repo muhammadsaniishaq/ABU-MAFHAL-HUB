@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
+import { verificationHistory } from '../../../services/verificationHistory';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -129,9 +130,21 @@ export default function VerifyNINScreen() {
             Alert.alert(title, message);
         }
     };
-
     const loadHistory = async () => {
         try {
+            const dbList = await verificationHistory.getAll('nin');
+            if (dbList && dbList.length > 0) {
+                const formatted = dbList.map((item: any) => ({
+                    id: item.id,
+                    nin: item.search_number || item.details?.nin || 'N/A',
+                    name: item.holder_name || 'NIN Holder',
+                    layout: item.layout || 'standard',
+                    date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                    data: item.details
+                }));
+                setHistoryList(formatted);
+                return;
+            }
             const stored = await AsyncStorage.getItem('recent_nin_verifications');
             if (stored) {
                 setHistoryList(JSON.parse(stored));
@@ -143,33 +156,19 @@ export default function VerifyNINScreen() {
 
     const saveHistoryItem = async (verifiedData: any) => {
         try {
-            const name = `${verifiedData.firstname || ''} ${verifiedData.surname || ''}`.trim() || 'Unknown Name';
-            
-            // Remove huge base64 images so AsyncStorage never crashes/clears
-            const dataToSave = { ...verifiedData };
-            delete dataToSave.photo;
-            delete dataToSave.signature;
+            const name = `${verifiedData.firstname || verifiedData.first_name || ''} ${verifiedData.surname || verifiedData.last_name || ''}`.trim() || 'NIN Holder';
+            const ninNum = verifiedData.nin || verifiedData.number || nin || 'N/A';
 
-            const newItem = {
-                id: `verify_${Date.now()}`,
-                nin: verifiedData.nin || nin || 'N/A',
-                name,
+            await verificationHistory.save({
+                service_category: 'nin',
+                service_type: 'nin_verify',
+                search_number: ninNum,
+                holder_name: name,
                 layout: selectedLayout,
-                date: (() => {
-                    const d = new Date();
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    const pad = (n: number) => n.toString().padStart(2, '0');
-                    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                })(),
-                data: dataToSave
-            };
-            
-            const stored = await AsyncStorage.getItem('recent_nin_verifications');
-            const historyList = stored ? JSON.parse(stored) : [];
-            const updated = [newItem, ...historyList.filter((item: any) => item.nin !== newItem.nin)].slice(0, 5000);
-            
-            setHistoryList(updated);
-            await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
+                details: verifiedData,
+            });
+
+            await loadHistory();
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
@@ -177,6 +176,7 @@ export default function VerifyNINScreen() {
 
     const deleteHistoryItem = async (itemId: string) => {
         try {
+            await verificationHistory.delete(itemId);
             const updated = historyList.filter(item => item.id !== itemId);
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_nin_verifications', JSON.stringify(updated));
@@ -2614,56 +2614,6 @@ export default function VerifyNINScreen() {
                 )}
 
             </ScrollView>
-
-            {/* Loading Overlay Modal */}
-            <Modal visible={loading} transparent animationType="fade">
-                <View style={styles.loaderOverlay}>
-                    <View style={styles.loaderCard}>
-                        <ActivityIndicator size="large" color="#0284c7" />
-                        <Text style={styles.loaderTitle}>Verifying NIN...</Text>
-                        <Text style={styles.loaderSub}>Fetching official details from NIMC database</Text>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* Custom Alert Modal */}
-            <Modal visible={customAlert.visible} transparent animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertCard}>
-                        <View style={[
-                            styles.alertIconBg,
-                            customAlert.type === 'success' && styles.alertSuccessIcon,
-                            customAlert.type === 'error' && styles.alertErrorIcon,
-                            customAlert.type === 'warning' && styles.alertWarningIcon,
-                            customAlert.type === 'info' && styles.alertInfoIcon,
-                        ]}>
-                            <Ionicons 
-                                name={
-                                    customAlert.type === 'success' ? 'checkmark-circle' :
-                                    customAlert.type === 'error' ? 'close-circle' :
-                                    customAlert.type === 'warning' ? 'warning' : 'information-circle'
-                                } 
-                                size={32} 
-                                color={
-                                    customAlert.type === 'success' ? '#10b981' :
-                                    customAlert.type === 'error' ? '#ef4444' :
-                                    customAlert.type === 'warning' ? '#f59e0b' : '#3b82f6'
-                                } 
-                            />
-                        </View>
-                        <Text style={styles.alertTitle}>{customAlert.title}</Text>
-                        <Text style={styles.alertMessage}>{customAlert.message}</Text>
-                        <TouchableOpacity 
-                            onPress={() => setCustomAlert(prev => ({ ...prev, visible: false }))} 
-                            style={styles.alertButton}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.alertButtonText}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
         </View>
     );
 }

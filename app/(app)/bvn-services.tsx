@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import { api } from '../../services/api';
+import { verificationHistory } from '../../services/verificationHistory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAppNotification } from '../../services/notificationsHelper';
 import DynamicBanners from '../../components/DynamicBanners';
@@ -236,7 +237,23 @@ export default function BVNVerificationScreen() {
         const cleanVal = inputValue.trim();
         if (searchType === 'vnin_nibss') {
             const targetVnin = vninValue.trim() || cleanVal;
-            if (targetVnin.length < 11) {
+    const saveHistoryItem = async (data: any) => {
+        try {
+            const fullName = [data.lastName || data.last_name, data.firstName || data.first_name, data.middleName || data.middle_name].filter(Boolean).join(' ') || 'BVN Holder';
+            const bvnNum = data.number || data.bvn || inputValue || 'N/A';
+            await verificationHistory.save({
+                service_category: 'bvn',
+                service_type: searchType,
+                search_number: bvnNum,
+                holder_name: fullName,
+                details: data
+            });
+        } catch (e) {
+            console.warn('Failed to save BVN history to DB', e);
+        }
+    };
+
+    if (targetVnin.length < 11) {
                 return showAlert('Invalid Input', 'Please enter a valid 11 or 16-digit VNIN number.', 'warning');
             }
         } else if (searchType === 'modification') {
