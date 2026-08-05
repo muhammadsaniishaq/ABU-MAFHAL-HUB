@@ -828,7 +828,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: '#060d21',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     viewHistoryBtn: {
         backgroundColor: '#f8fafc',
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         alignSelf: 'flex-start',
         marginTop: 8,
     },
@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(6, 13, 33, 0.8)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         padding: 14,
     },
     termsModalCard: {
@@ -894,7 +894,7 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         backgroundColor: 'rgba(245, 166, 35, 0.12)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(245, 166, 35, 0.3)',
     },
@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     termsScroll: {
         flex: 1,
@@ -936,7 +936,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: '#060d21',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginTop: 1,
     },
     termNumBadgeText: {
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
         height: 44,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         paddingHorizontal: 14,
     },
     termsAgreeBtnText: {
