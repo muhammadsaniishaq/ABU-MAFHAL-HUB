@@ -1016,13 +1016,13 @@ export default function VerifyPhoneScreen() {
 
                 <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: 14 }} contentContainerStyle={{ paddingBottom: 60 }}>
                     
-                    {/* Generated NIN Slip Preview at the top */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    {/* Official Card Preview Section (Mobile First, Centered) */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, width: '100%', maxWidth: 440, alignSelf: 'center', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="document-text-sharp" size={18} color="#0284c7" />
+                                <Ionicons name="card-outline" size={18} color="#0284c7" />
                                 <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    Official NIN {selectedLayout.toUpperCase()} Preview
+                                    NIN {selectedLayout.toUpperCase()} Card Preview
                                 </Text>
                             </View>
                             <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, borderWidth: 1, borderColor: '#bae6fd' }}>
@@ -1030,21 +1030,11 @@ export default function VerifyPhoneScreen() {
                             </View>
                         </View>
                         
-                        {pdfBlobUrl ? (
-                            <View style={{ width: '100%', height: 480, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff' }}>
-                                <iframe
-                                    src={pdfBlobUrl}
-                                    style={{ width: '100%', height: '100%', border: 'none' }}
-                                    title="Official NIN Slip PDF"
-                                />
-                            </View>
-                        ) : (
-                            <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', alignItems: 'center' }}>
-                                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
-                                    {renderSlip()}
-                                </ViewShot>
-                            </View>
-                        )}
+                        <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden' }}>
+                                {renderSlip()}
+                            </ViewShot>
+                        </View>
                     </View>
 
                     {/* Direct Download Buttons */}
