@@ -252,13 +252,13 @@ export default function NINModificationScreen() {
             await fetchWalletBalance();
 
             // Save into persistent history
-            await verificationHistory.saveItem({
-                nin: cleanNin,
-                firstname: firstName || 'NIN Holder',
-                surname: surname || '',
-                slip_type: `MOD: ${currentServiceInfo.name}`,
-                amount: currentServiceInfo.price,
-                ref: refCode
+            await verificationHistory.save({
+                service_category: 'nin',
+                service_type: `MOD: ${currentServiceInfo.name}`,
+                search_number: cleanNin,
+                holder_name: [firstName, surname].filter(Boolean).join(' ') || 'NIN Holder',
+                layout: currentServiceInfo.name,
+                details: { ref: refCode, amount: currentServiceInfo.price }
             });
 
             loadHistory();
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
         borderColor: '#e2e8f0',
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         shadowColor: '#64748b',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
