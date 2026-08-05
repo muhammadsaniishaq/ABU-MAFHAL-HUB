@@ -427,23 +427,19 @@ serve(async (req: Request) => {
         // Note: AgentHub uses boolean status (not string like IDPro)
 
         if (responseData.status === true) {
-            // For any PDF slip (nin-slip, vnin-slip, etc.), return pdf_base64 directly
-            if (responseData.pdf_base64) {
-                return jsonOk({
-                    data: {
-                        status: 'success',
-                        message: responseData.message || 'Slip Generated Successfully',
-                        pdf_base64: responseData.pdf_base64,
-                    }
-                });
+            const innerData = responseData.data ?? responseData;
+            const pdfBase64 = responseData.pdf_base64 || innerData?.pdf_base64 || responseData.data?.pdf_base64;
+
+            if (pdfBase64 && typeof innerData === 'object') {
+                innerData.pdf_base64 = pdfBase64;
             }
 
-            // Standard identity response — wrap in consistent structure
             return jsonOk({
                 data: {
                     status: 'success',
                     message: responseData.message || 'Verification Successful',
-                    data: responseData.data ?? responseData,
+                    data: innerData,
+                    pdf_base64: pdfBase64
                 }
             });
         }

@@ -237,21 +237,34 @@ export default function VerifyNINScreen() {
         if (!result || !result.data) return;
         setIsSaving(true);
         try {
-            // If official base64 PDF is returned from AgentHub API, download directly
-            if (result.data.pdf_base64) {
+            const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64;
+            if (pdfBase64) {
                 if (Platform.OS === 'web') {
+                    const byteCharacters = atob(pdfBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
                     const link = document.createElement('a');
-                    link.href = `data:application/pdf;base64,${result.data.pdf_base64}`;
-                    link.download = `nin_slip_${nin}.pdf`;
+                    link.href = blobUrl;
+                    link.download = `nin_slip_${nin || 'official'}.pdf`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                    showAlert("Download Complete", "Official NIN Slip PDF downloaded.", "success");
                     return;
                 } else {
-                    const html = `<html><body style="margin:0;padding:0;"><embed width="100%" height="100%" src="data:application/pdf;base64,${result.data.pdf_base64}" type="application/pdf" /></body></html>`;
-                    const { uri: pdfUri } = await Print.printToFileAsync({ html });
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}nin_slip_${nin || 'official'}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, pdfBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
                     if (await Sharing.isAvailableAsync()) {
-                        await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official NIN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                    } else {
+                        showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
                     }
                     return;
                 }
@@ -2027,13 +2040,30 @@ export default function VerifyNINScreen() {
 
     const renderSlip = () => {
         if (!result || !result.data) return null;
-        switch(selectedLayout) {
-            case 'premium': return <IDCardMockup data={result.data} />;
-            case 'standard': return <StandardSlip data={result.data} />;
-            case 'regular': return <RegularSlip data={result.data} />;
-            case 'info': return <InformationSlip data={result.data} />;
-            default: return <IDCardMockup data={result.data} />;
-        }
+        const pdfBase64 = result.data?.pdf_base64 || result.pdf_base64 || result.data?.data?.pdf_base64;
+
+        return (
+            <View id="slip-preview-container" style={{ width: '100%', alignItems: 'center' }}>
+                {pdfBase64 && Platform.OS === 'web' && (
+                    <View style={{ width: '100%', height: 520, borderRadius: 12, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#cbd5e1' }}>
+                        <iframe
+                            src={`data:application/pdf;base64,${pdfBase64}`}
+                            style={{ width: '100%', height: '100%', border: 'none' }}
+                            title="Official AgentHub NIN Slip PDF"
+                        />
+                    </View>
+                )}
+                {(() => {
+                    switch(selectedLayout) {
+                        case 'premium': return <IDCardMockup data={result.data} />;
+                        case 'standard': return <StandardSlip data={result.data} />;
+                        case 'regular': return <RegularSlip data={result.data} />;
+                        case 'info': return <InformationSlip data={result.data} />;
+                        default: return <IDCardMockup data={result.data} />;
+                    }
+                })()}
+            </View>
+        );
     };
 
     if (result) {
