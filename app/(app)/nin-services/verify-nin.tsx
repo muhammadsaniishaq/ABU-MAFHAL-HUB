@@ -2219,7 +2219,7 @@ switch(selectedLayout) {
 
         return (
             <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#c2410c' }, headerTintColor: '#ffffff', headerShadowVisible: false }} />
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#060d21' }, headerTintColor: '#f5a623', headerShadowVisible: false }} />
 
                 {/* Offscreen Hidden ViewShot for PDF & PNG download rendering */}
                 <View style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}>
@@ -2237,9 +2237,9 @@ switch(selectedLayout) {
                     animationType="fade"
                     onRequestClose={() => setIsDownloadModalOpen(false)}
                 >
-                    <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(6, 13, 33, 0.75)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                         <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
+                            <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
                             <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 4, marginBottom: 20 }}>Choose a format</Text>
 
                             <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 20 }}>
@@ -2248,11 +2248,11 @@ switch(selectedLayout) {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPdf();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="document-text-outline" size={32} color="#c2410c" />
-                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
+                                    <Ionicons name="document-text-outline" size={32} color="#d97706" />
+                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity 
@@ -2260,11 +2260,11 @@ switch(selectedLayout) {
                                         setIsDownloadModalOpen(false);
                                         handleDownloadPng();
                                     }}
-                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    style={{ flex: 1, backgroundColor: '#fffbeb', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fde68a' }}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="copy-outline" size={32} color="#c2410c" />
-                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
+                                    <Ionicons name="copy-outline" size={32} color="#d97706" />
+                                    <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -2276,18 +2276,18 @@ switch(selectedLayout) {
                 </Modal>
 
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    {/* Header Gradient Banner */}
-                    <LinearGradient colors={['#ea580c', '#c2410c']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
+                    {/* Header Gradient Banner (Navy & Gold Brand) */}
+                    <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="shield-checkmark-outline" size={16} color="#ffffff" />
+                            <Ionicons name="shield-checkmark-outline" size={16} color="#f5a623" />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginLeft: 6 }}>Verification Details</Text>
                         </View>
-                        <Text style={{ color: '#ffedd5', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
+                        <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
                             {selectedLayout.toUpperCase()} • NIN
                         </Text>
                     </LinearGradient>
 
-                    {/* Centered User Photo and Avatar with NIMC Badge */}
+                    {/* Centered User Photo and Avatar with Checkmark Badge */}
                     <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
                         <View style={{ position: 'relative' }}>
                             <Image source={{ uri: photoUri }} style={{ width: 92, height: 104, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#f1f5f9' }} />
@@ -2296,7 +2296,7 @@ switch(selectedLayout) {
                             </View>
                         </View>
 
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
+                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
                             {fullName}
                         </Text>
 
@@ -2305,16 +2305,16 @@ switch(selectedLayout) {
                             <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>Verified</Text>
                         </View>
 
-                        {/* Summary Details Card Container (Mobile First Card) */}
+                        {/* Summary Details Card Container */}
                         <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                                 <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT ID</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
+                                <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                                 <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
+                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
@@ -2326,7 +2326,7 @@ switch(selectedLayout) {
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                                 <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>SLIP</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
+                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
@@ -2335,10 +2335,10 @@ switch(selectedLayout) {
                             </View>
                         </View>
 
-                        {/* Primary Download Slip Button */}
+                        {/* Primary Download Slip Button (Gold Brand Theme) */}
                         <TouchableOpacity 
                             onPress={() => setIsDownloadModalOpen(true)}
-                            style={{ backgroundColor: '#c2410c', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#c2410c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 }}
+                            style={{ backgroundColor: '#d97706', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#d97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
                             activeOpacity={0.8}
                         >
                             {isSaving ? <ActivityIndicator color="#ffffff" size="small" /> : (
@@ -2355,8 +2355,8 @@ switch(selectedLayout) {
                             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 4 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="chevron-back" size={16} color="#c2410c" style={{ marginRight: 2 }} />
-                            <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
+                            <Ionicons name="chevron-back" size={16} color="#d97706" style={{ marginRight: 2 }} />
+                            <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
