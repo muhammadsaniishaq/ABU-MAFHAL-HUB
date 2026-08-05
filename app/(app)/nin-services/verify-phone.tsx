@@ -61,6 +61,7 @@ export default function VerifyPhoneScreen() {
     const [result, setResult] = useState<any>(null);
     const [layouts, setLayouts] = useState(DEFAULT_LAYOUTS);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const viewShotRef = useRef<any>(null);
 
     // Premium States
@@ -979,135 +980,164 @@ export default function VerifyPhoneScreen() {
     if (result) {
         const personData = result.data?.data || result.data || {};
         const pdfBase64 = personData.pdf_base64 || result.pdf_base64 || result.data?.pdf_base64;
-        const pdfBlobUrl = Platform.OS === 'web' && pdfBase64 ? (() => {
-            try {
-                const binary = atob(pdfBase64);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                const blob = new Blob([bytes], { type: 'application/pdf' });
-                return URL.createObjectURL(blob);
-            } catch (e) {
-                return null;
-            }
-        })() : null;
+        
+        const fullName = [personData.firstname || personData.first_name, personData.middlename || personData.middle_name, personData.surname || personData.last_name].filter(Boolean).join(' ') || 'NIN Holder';
+        const displayNin = personData.nin || personData.number || 'N/A';
+        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
+        const formattedDate = (() => {
+            const d = new Date();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        })();
+
+        const userPhoto = personData.photo || personData.image || personData.picture;
+        const photoUri = userPhoto
+            ? (userPhoto.startsWith('data:') || userPhoto.startsWith('http') ? userPhoto : `data:image/jpeg;base64,${userPhoto}`)
+            : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
 
         return (
             <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-                <Stack.Screen options={{ 
-                    title: 'Verification Details', 
-                    headerStyle: { backgroundColor: '#ffffff' }, 
-                    headerTintColor: '#0f172a', 
-                    headerShadowVisible: false,
-                    headerRight: () => (
-                        <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ marginRight: 8 }}>
-                            <Ionicons name="time-outline" size={22} color="#0f172a" />
-                        </TouchableOpacity>
-                    )
-                }} />
-                
-                {/* Header Banner */}
-                <LinearGradient colors={['#ffffff', '#f1f5f9']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 16, paddingBottom: 20, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: '#86efac' }}>
-                        <Ionicons name="shield-checkmark" size={16} color="#16a34a" />
-                        <Text style={{ color: '#15803d', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Details</Text>
-                    </View>
-                    <Text style={{ color: '#64748b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginTop: 6, fontWeight: '700' }}>NIN Record Retreived</Text>
-                </LinearGradient>
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#c2410c' }, headerTintColor: '#ffffff', headerShadowVisible: false }} />
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: 14 }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    
-                    {/* Official Card Preview Section (Mobile First, Centered) */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, width: '100%', maxWidth: 440, alignSelf: 'center', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="card-outline" size={18} color="#0284c7" />
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    NIN {selectedLayout.toUpperCase()} Card Preview
-                                </Text>
+                {/* Offscreen Hidden ViewShot for PDF & PNG download rendering */}
+                <View style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}>
+                    <View nativeID="slip-preview-container" style={{ width: 420, backgroundColor: '#ffffff' }}>
+                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
+                            {renderSlip()}
+                        </ViewShot>
+                    </View>
+                </View>
+
+                {/* Format Choice Modal matching user screenshot */}
+                <Modal
+                    transparent
+                    visible={isDownloadModalOpen}
+                    animationType="fade"
+                    onRequestClose={() => setIsDownloadModalOpen(false)}
+                >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
+                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 4, marginBottom: 20 }}>Choose a format</Text>
+
+                            <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 20 }}>
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setIsDownloadModalOpen(false);
+                                        handleDownloadPdf();
+                                    }}
+                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="document-text-outline" size={32} color="#c2410c" />
+                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setIsDownloadModalOpen(false);
+                                        handleDownloadPng();
+                                    }}
+                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="copy-outline" size={32} color="#c2410c" />
+                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
+                                </TouchableOpacity>
                             </View>
-                            <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, borderWidth: 1, borderColor: '#bae6fd' }}>
-                                <Text style={{ color: '#0284c7', fontSize: 9, fontWeight: '800' }}>VERIFIED RECORD</Text>
+
+                            <TouchableOpacity onPress={() => setIsDownloadModalOpen(false)} style={{ paddingVertical: 6 }}>
+                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
+                    {/* Header Gradient Banner */}
+                    <LinearGradient colors={['#ea580c', '#c2410c']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="shield-checkmark-outline" size={16} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginLeft: 6 }}>Verification Details</Text>
+                        </View>
+                        <Text style={{ color: '#ffedd5', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
+                            {selectedLayout.toUpperCase()} • NIN
+                        </Text>
+                    </LinearGradient>
+
+                    {/* Centered User Photo and Avatar with NIMC Badge */}
+                    <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
+                        <View style={{ position: 'relative' }}>
+                            <Image source={{ uri: photoUri }} style={{ width: 92, height: 104, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#f1f5f9' }} />
+                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 }}>
+                                <Ionicons name="checkmark-circle-sharp" size={20} color="#16a34a" />
                             </View>
                         </View>
-                        
-                        <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
-                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden' }}>
-                                {renderSlip()}
-                            </ViewShot>
-                        </View>
-                    </View>
 
-                    {/* Direct Download Buttons */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 10 }}>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
+                            {fullName}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 8 }}>
+                            <Ionicons name="checkmark" size={14} color="#16a34a" />
+                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>Verified</Text>
+                        </View>
+
+                        {/* Summary Details Card Container (Mobile First Card) */}
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT ID</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT TYPE</Text>
+                                <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 }}>
+                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11 }}>NIN</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>SLIP</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATE & TIME</Text>
+                                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
+                            </View>
+                        </View>
+
+                        {/* Primary Download Slip Button */}
                         <TouchableOpacity 
-                            onPress={handleDownloadPdf}
-                            disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#0284c7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
+                            onPress={() => setIsDownloadModalOpen(true)}
+                            style={{ backgroundColor: '#c2410c', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#c2410c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="document-text-outline" size={18} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PDF</Text>
+                            {isSaving ? <ActivityIndicator color="#ffffff" size="small" /> : (
+                                <>
+                                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Download Slip</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
 
+                        {/* Back Link */}
                         <TouchableOpacity 
-                            onPress={handleDownloadPng}
-                            disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#059669', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#059669', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
+                            onPress={() => setResult(null)} 
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 4 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="image-outline" size={18} color="#ffffff" />
-                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 13, marginLeft: 6 }}>Download PNG</Text>
+                            <Ionicons name="chevron-back" size={16} color="#c2410c" style={{ marginRight: 2 }} />
+                            <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
                         </TouchableOpacity>
                     </View>
-
-                    {/* Compact Details Table */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, padding: 14 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Ionicons name="list-circle" size={20} color="#0284c7" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Profile Details</Text>
-                        </View>
-
-                        <View style={{ gap: 10 }}>
-                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Full Name</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>
-                                    {[personData.firstname, personData.middlename, personData.surname].filter(Boolean).join(' ') || 'N/A'}
-                                </Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>NIN Number</Text>
-                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 13, marginTop: 2 }}>
-                                        {personData.nin || personData.number || 'N/A'}
-                                    </Text>
-                                </View>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Slip Type</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>
-                                        {selectedLayout}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Verification Time</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 12, marginTop: 2 }}>
-                                    {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Back to Lookup Button */}
-                    <TouchableOpacity 
-                        onPress={() => setResult(null)} 
-                        style={{ borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="arrow-back-circle-outline" size={18} color="#475569" style={{ marginRight: 8 }} />
-                        <Text style={{ color: '#334155', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>VERIFY ANOTHER IDENTITY</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );

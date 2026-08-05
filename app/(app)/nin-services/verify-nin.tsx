@@ -2204,184 +2204,161 @@ switch(selectedLayout) {
         
         const fullName = [personData.firstname || personData.first_name, personData.middlename || personData.middle_name, personData.surname || personData.last_name].filter(Boolean).join(' ') || 'NIN Holder';
         const displayNin = personData.nin || personData.number || nin || 'N/A';
-        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || 'N/A';
-        const phone = personData.telephoneNo || personData.telephoneno || personData.phone || personData.phoneNumber || personData.mobile || 'N/A';
-        const residenceState = personData.residence_state || personData.residenceState || personData.state || 'N/A';
-        const residenceLga = personData.residence_lga || personData.residenceLga || personData.lga || 'N/A';
-        const address = [personData.residence_address || personData.address || personData.residence, residenceLga, residenceState].filter(b => b && b !== 'N/A').join(', ') || 'N/A';
-        const dob = personData.birthdate || personData.dob || personData.dateOfBirth || 'N/A';
-        const gender = personData.gender || personData.sex || 'N/A';
-        const maritalStatus = personData.maritalStatus || personData.marital_status || 'N/A';
-        const occupation = personData.employmentStatus || personData.occupation || personData.profession || 'N/A';
+        const trackingId = personData.trackingId || personData.tracking_id || personData.ref || '105829-40LQTYW4PVJY';
+        const formattedDate = (() => {
+            const d = new Date();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        })();
 
         const userPhoto = personData.photo || personData.image || personData.picture;
         const photoUri = userPhoto
             ? (userPhoto.startsWith('data:') || userPhoto.startsWith('http') ? userPhoto : `data:image/jpeg;base64,${userPhoto}`)
             : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRL363G0d9u3u5YQ&s';
 
-        const pdfBlobUrl = Platform.OS === 'web' && pdfBase64 ? (() => {
-            try {
-                const binary = atob(pdfBase64);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                const blob = new Blob([bytes], { type: 'application/pdf' });
-                return URL.createObjectURL(blob);
-            } catch (e) {
-                return null;
-            }
-        })() : null;
-
         return (
             <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a', headerShadowVisible: false }} />
-                
-                <LinearGradient colors={['#ffffff', '#f1f5f9']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 16, paddingBottom: 20, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: '#86efac' }}>
-                        <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-                        <Text style={{ color: '#15803d', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.8 }}>Identity Verified</Text>
-                    </View>
-                    <Text style={{ color: '#64748b', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 8, fontWeight: '700' }}>Official NIMC NIN Record</Text>
-                </LinearGradient>
+                <Stack.Screen options={{ title: 'Verification Details', headerStyle: { backgroundColor: '#c2410c' }, headerTintColor: '#ffffff', headerShadowVisible: false }} />
 
-                <ScrollView style={{ flex: 1, paddingHorizontal: 14, marginTop: 14 }} contentContainerStyle={{ paddingBottom: 60 }}>
-                    
-                    {/* User Header Profile Card */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
-                        <Image source={{ uri: photoUri }} style={{ width: 68, height: 78, borderRadius: 12, borderWidth: 2, borderColor: '#059669', backgroundColor: '#f1f5f9' }} />
-                        <View style={{ marginLeft: 16, flex: 1 }}>
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 17, textTransform: 'uppercase', letterSpacing: 0.3 }} numberOfLines={1}>
-                                {fullName}
-                            </Text>
-                            
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                                <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' }}>
-                                    <Text style={{ color: '#047857', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>
-                                        NIN: {displayNin}
-                                    </Text>
+                {/* Offscreen Hidden ViewShot for PDF & PNG download rendering */}
+                <View style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}>
+                    <View nativeID="slip-preview-container" style={{ width: 420, backgroundColor: '#ffffff' }}>
+                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff' }}>
+                            {renderSlip()}
+                        </ViewShot>
+                    </View>
+                </View>
+
+                {/* Format Choice Modal matching user screenshot */}
+                <Modal
+                    transparent
+                    visible={isDownloadModalOpen}
+                    animationType="fade"
+                    onRequestClose={() => setIsDownloadModalOpen(false)}
+                >
+                    <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
+                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Download slip as</Text>
+                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 4, marginBottom: 20 }}>Choose a format</Text>
+
+                            <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 20 }}>
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setIsDownloadModalOpen(false);
+                                        handleDownloadPdf();
+                                    }}
+                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="document-text-outline" size={32} color="#c2410c" />
+                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>PDF</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setIsDownloadModalOpen(false);
+                                        handleDownloadPng();
+                                    }}
+                                    style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffedd5' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="copy-outline" size={32} color="#c2410c" />
+                                    <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 13, marginTop: 8 }}>Image</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity onPress={() => setIsDownloadModalOpen(false)} style={{ paddingVertical: 6 }}>
+                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
+                    {/* Header Gradient Banner */}
+                    <LinearGradient colors={['#ea580c', '#c2410c']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Ionicons name="shield-checkmark-outline" size={16} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14, marginLeft: 6 }}>Verification Details</Text>
+                        </View>
+                        <Text style={{ color: '#ffedd5', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
+                            {selectedLayout.toUpperCase()} • NIN
+                        </Text>
+                    </LinearGradient>
+
+                    {/* Centered User Photo and Avatar with NIMC Badge */}
+                    <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
+                        <View style={{ position: 'relative' }}>
+                            <Image source={{ uri: photoUri }} style={{ width: 92, height: 104, borderRadius: 18, borderWidth: 4, borderColor: '#ffffff', backgroundColor: '#f1f5f9' }} />
+                            <View style={{ position: 'absolute', bottom: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 }}>
+                                <Ionicons name="checkmark-circle-sharp" size={20} color="#16a34a" />
+                            </View>
+                        </View>
+
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center', letterSpacing: 0.3 }}>
+                            {fullName}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: '#86efac', marginTop: 8 }}>
+                            <Ionicons name="checkmark" size={14} color="#16a34a" />
+                            <Text style={{ color: '#15803d', fontWeight: '800', fontSize: 12, marginLeft: 4 }}>Verified</Text>
+                        </View>
+
+                        {/* Summary Details Card Container (Mobile First Card) */}
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT ID</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12 }}>{trackingId}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{displayNin}</Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REPORT TYPE</Text>
+                                <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 }}>
+                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11 }}>NIN</Text>
                                 </View>
                             </View>
 
-                            {trackingId !== 'N/A' && (
-                                <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 6 }}>
-                                    Tracking ID: <Text style={{ color: '#0f172a', fontWeight: '700' }}>{trackingId}</Text>
-                                </Text>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* Official Card Preview Section (Mobile First, Centered) */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, width: '100%', maxWidth: 440, alignSelf: 'center', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="card-outline" size={18} color="#059669" />
-                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, marginLeft: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    NIN {selectedLayout.toUpperCase()} Card Preview
-                                </Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>SLIP</Text>
+                                <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>{selectedLayout}</Text>
                             </View>
-                            <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, borderWidth: 1, borderColor: '#a7f3d0' }}>
-                                <Text style={{ color: '#047857', fontSize: 9, fontWeight: '800' }}>VERIFIED RECORD</Text>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATE & TIME</Text>
+                                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{formattedDate}</Text>
                             </View>
                         </View>
 
-                        <View nativeID="slip-preview-container" style={{ width: '100%', backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
-                            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden' }}>
-                                {renderSlip()}
-                            </ViewShot>
-                        </View>
-                    </View>
-
-                    {/* Action Buttons */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 10 }}>
+                        {/* Primary Download Slip Button */}
                         <TouchableOpacity 
-                            onPress={handleDownloadPdf}
-                            disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#0284c7', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#0284c7', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
-                            activeOpacity={0.8}
-                        >
-                            {isSaving ? <ActivityIndicator color="#fff" size="small" /> : (
-                                <>
-                                    <Ionicons name="cloud-download-outline" size={18} color="#fff" />
-                                    <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 8, letterSpacing: 0.3 }}>Download PDF</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={handleDownloadPng}
-                            disabled={isSaving}
-                            style={{ flex: 1, backgroundColor: '#059669', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#059669', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 }}
+                            onPress={() => setIsDownloadModalOpen(true)}
+                            style={{ backgroundColor: '#c2410c', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#c2410c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 }}
                             activeOpacity={0.8}
                         >
                             {isSaving ? <ActivityIndicator color="#ffffff" size="small" /> : (
                                 <>
-                                    <Ionicons name="image-outline" size={18} color="#ffffff" />
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13, marginLeft: 8, letterSpacing: 0.3 }}>Download PNG</Text>
+                                    <Ionicons name="download-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Download Slip</Text>
                                 </>
                             )}
                         </TouchableOpacity>
+
+                        {/* Back Link */}
+                        <TouchableOpacity 
+                            onPress={() => setResult(null)} 
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, marginTop: 4 }}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="chevron-back" size={16} color="#c2410c" style={{ marginRight: 2 }} />
+                            <Text style={{ color: '#c2410c', fontWeight: '800', fontSize: 14 }}>Back to Slip List</Text>
+                        </TouchableOpacity>
                     </View>
-
-                    {/* Verification Profile Details Table */}
-                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16, padding: 14 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                            <Ionicons name="list-circle" size={20} color="#059669" />
-                            <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Verification Profile Details</Text>
-                        </View>
-
-                        <View style={{ gap: 10 }}>
-                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Full Name</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>{fullName}</Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>NIN Number</Text>
-                                    <Text style={{ color: '#047857', fontWeight: '900', fontSize: 13, marginTop: 2 }}>{displayNin}</Text>
-                                </View>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Tracking ID</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginTop: 2 }}>{trackingId}</Text>
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Date of Birth</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginTop: 2 }}>{dob}</Text>
-                                </View>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Gender / Sex</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>{gender}</Text>
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Phone Number</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginTop: 2 }}>{phone}</Text>
-                                </View>
-                                <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                    <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Marital Status</Text>
-                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginTop: 2 }}>{maritalStatus}</Text>
-                                </View>
-                            </View>
-
-                            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' }}>Residential Address</Text>
-                                <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 12, marginTop: 2 }}>{address}</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity 
-                        onPress={() => setResult(null)} 
-                        style={{ borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="arrow-back-circle-outline" size={18} color="#475569" style={{ marginRight: 8 }} />
-                        <Text style={{ color: '#334155', fontWeight: '800', fontSize: 14 }}>Verify Another NIN</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );
