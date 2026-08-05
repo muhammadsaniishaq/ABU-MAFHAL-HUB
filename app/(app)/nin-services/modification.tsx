@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
         height: 64,
         borderRadius: 32,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginBottom: 16,
     },
     alertTitle: {
@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         width: '100%',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     alertButtonText: {
         color: '#ffffff',
