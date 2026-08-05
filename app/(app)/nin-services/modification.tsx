@@ -1,95 +1,53 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Image, Modal, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../services/supabase';
 import { verificationHistory } from '../../../services/verificationHistory';
 import * as Clipboard from 'expo-clipboard';
-import ViewShot from 'react-native-view-shot';
 
-const MODIFICATION_TYPES = [
-    { 
-        id: 'nin_mod_name', 
-        code: '501', 
-        name: 'Change of Name', 
-        desc: 'Correct or update First Name, Surname or Middle Name', 
-        price: 5500, 
-        icon: 'person', 
-        bgColor: '#eff6ff', 
-        iconColor: '#2563eb' 
-    },
-    { 
-        id: 'nin_mod_phone', 
-        code: '502', 
-        name: 'Change of Phone', 
-        desc: 'Link a new phone number to registered NIN', 
-        price: 5500, 
-        icon: 'call', 
-        bgColor: '#ecfdf5', 
-        iconColor: '#059669' 
-    },
-    { 
-        id: 'nin_mod_address', 
-        code: '503', 
-        name: 'Change of Address', 
-        desc: 'Update residential address, State and LGA', 
-        price: 5500, 
-        icon: 'location', 
-        bgColor: '#fef3c7', 
-        iconColor: '#d97706' 
-    },
-    { 
-        id: 'pers_status', 
-        code: '504', 
-        name: 'Personalization', 
-        desc: 'Update marital status, gender or occupation', 
-        price: 150, 
-        icon: 'create', 
-        bgColor: '#faf5ff', 
-        iconColor: '#9333ea' 
-    }
+const MODIFICATION_SERVICES = [
+    { id: 'nin_mod_name', name: 'Change of Name', code: '501', fee: 6000 },
+    { id: 'nin_mod_phone', name: 'Change of Phone Number', code: '502', fee: 6000 },
+    { id: 'nin_mod_address', name: 'Change of Address', code: '503', fee: 6000 },
 ];
 
 export default function NINModificationScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const viewShotRef = useRef<any>(null);
 
-    // Form States
-    const [selectedService, setSelectedService] = useState('nin_mod_name');
-    const [nin, setNin] = useState('');
+    // Tab State
+    const [selectedServiceId, setSelectedServiceId] = useState('nin_mod_name');
+    
+    // Terms Modal State
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+
+    // Form Inputs
+    const [targetNin, setTargetNin] = useState('');
+    const [currentPhone, setCurrentPhone] = useState('');
+    const [currentFullName, setCurrentFullName] = useState('');
+    
+    // Name Change Fields
+    const [newFirstName, setNewFirstName] = useState('');
+    const [newSurname, setNewSurname] = useState('');
+    const [newMiddleName, setNewMiddleName] = useState('');
+
+    // Phone Change Fields
+    const [newPhoneToLink, setNewPhoneToLink] = useState('');
+
+    // Address Change Fields
+    const [newAddress, setNewAddress] = useState('');
+
+    // Common Processing States
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [userBalance, setUserBalance] = useState<number | null>(null);
-    const [historyList, setHistoryList] = useState<any[]>([]);
 
-    // Specific Modification Inputs
-    // 1. Name Change
-    const [firstName, setFirstName] = useState('');
-    const [middleName, setMiddleName] = useState('');
-    const [surname, setSurname] = useState('');
-    const [reasonForChange, setReasonForChange] = useState('Spelling Correction');
-
-    // 2. Phone Change
-    const [newPhone, setNewPhone] = useState('');
-    const [oldPhone, setOldPhone] = useState('');
-
-    // 3. Address Change
-    const [residenceState, setResidenceState] = useState('');
-    const [residenceLga, setResidenceLga] = useState('');
-    const [residenceAddress, setResidenceAddress] = useState('');
-
-    // 4. Personalization
-    const [personalField, setPersonalField] = useState('Marital Status');
-    const [personalValue, setPersonalValue] = useState('');
-
-    // Modal format choice for downloading receipt
-    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-
-    // Custom Smooth Alert State
+    // Custom Alert State
     const [customAlert, setCustomAlert] = useState<{
         visible: boolean;
         title: string;
@@ -102,20 +60,10 @@ export default function NINModificationScreen() {
         type: 'info'
     });
 
-    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-        setCustomAlert({
-            visible: true,
-            title,
-            message,
-            type
-        });
-    };
-
-    const currentServiceInfo = MODIFICATION_TYPES.find(m => m.id === selectedService) || MODIFICATION_TYPES[0];
+    const activeService = MODIFICATION_SERVICES.find(s => s.id === selectedServiceId) || MODIFICATION_SERVICES[0];
 
     useEffect(() => {
         fetchWalletBalance();
-        loadHistory();
     }, []);
 
     const fetchWalletBalance = async () => {
@@ -132,96 +80,90 @@ export default function NINModificationScreen() {
         }
     };
 
-    const loadHistory = async () => {
-        try {
-            const all = await verificationHistory.getAll();
-            const mods = all.filter((item: any) => 
-                (item.slip_type || item.type || '').toLowerCase().includes('mod') ||
-                (item.slip || '').toLowerCase().includes('mod')
-            );
-            setHistoryList(mods);
-        } catch (e) {
-            console.warn('Failed to load modification history', e);
-        }
+    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+        setCustomAlert({
+            visible: true,
+            title,
+            message,
+            type
+        });
     };
 
-    const handlePasteNin = async () => {
+    const handlePaste = async (setter: (val: string) => void) => {
         try {
             const text = await Clipboard.getStringAsync();
-            if (text) {
-                const cleaned = text.replace(/[^0-9]/g, '').slice(0, 11);
-                setNin(cleaned);
-            }
+            if (text) setter(text.trim());
         } catch (e) {
-            console.warn('Failed to paste Clipboard text', e);
+            console.warn('Clipboard paste error', e);
         }
     };
 
-    const handleProcessModification = async () => {
-        const cleanNin = nin.trim();
-        if (!cleanNin || cleanNin.length !== 11) {
-            showAlert('Invalid NIN Number', 'Please enter a valid 11-digit National Identification Number.', 'warning');
+    const handleFormSubmit = () => {
+        if (!termsAccepted) {
+            setShowTermsModal(true);
             return;
         }
 
-        // Validate specific inputs
-        if (selectedService === 'nin_mod_name') {
-            if (!firstName.trim() || !surname.trim()) {
-                showAlert('Missing Name Fields', 'Please enter both the new First Name and Surname.', 'warning');
+        processSubmission();
+    };
+
+    const processSubmission = async () => {
+        const cleanNin = targetNin.trim();
+        if (!cleanNin || cleanNin.length !== 11) {
+            showAlert('Invalid NIN Number', 'Please enter a valid 11-digit Target NIN Number.', 'warning');
+            return;
+        }
+
+        // Validate active form
+        if (selectedServiceId === 'nin_mod_name') {
+            if (!newFirstName.trim() || !newSurname.trim()) {
+                showAlert('Missing Required Name Fields', 'Please enter both the New First Name and New Surname.', 'warning');
                 return;
             }
-        } else if (selectedService === 'nin_mod_phone') {
-            if (!newPhone.trim() || newPhone.trim().length < 10) {
-                showAlert('Invalid Phone Number', 'Please enter a valid new phone number (11 digits).', 'warning');
+        } else if (selectedServiceId === 'nin_mod_phone') {
+            if (!newPhoneToLink.trim() || newPhoneToLink.trim().length < 10) {
+                showAlert('Invalid New Phone Number', 'Please enter a valid new phone number to link.', 'warning');
                 return;
             }
-        } else if (selectedService === 'nin_mod_address') {
-            if (!residenceAddress.trim() || !residenceState.trim()) {
-                showAlert('Missing Address', 'Please provide the new Residential Address and State.', 'warning');
-                return;
-            }
-        } else if (selectedService === 'pers_status') {
-            if (!personalValue.trim()) {
-                showAlert('Missing Information', `Please enter the new value for ${personalField}.`, 'warning');
+        } else if (selectedServiceId === 'nin_mod_address') {
+            if (!newAddress.trim()) {
+                showAlert('Missing New Address', 'Please enter the complete new residential address.', 'warning');
                 return;
             }
         }
 
         // Balance Check
-        if (userBalance !== null && userBalance < currentServiceInfo.price) {
-            showAlert('Insufficient Balance', `Your wallet balance (₦${userBalance.toLocaleString()}) is below the required ₦${currentServiceInfo.price.toLocaleString()} for this service. Please fund your wallet.`, 'error');
+        if (userBalance !== null && userBalance < activeService.fee) {
+            showAlert('Insufficient Wallet Balance', `Your current balance (₦${userBalance.toLocaleString()}) is below the ₦${activeService.fee.toLocaleString()} modification fee. Please fund your wallet.`, 'error');
             return;
         }
 
         setLoading(true);
 
         try {
-            const refCode = `MOD-${currentServiceInfo.code}-${Math.floor(100000 + Math.random() * 900000)}`;
+            const refCode = `MOD-${activeService.code}-${Math.floor(100000 + Math.random() * 900000)}`;
 
             const payload: any = {
                 searchType: 'nin_modification',
-                service_id: selectedService,
-                code: currentServiceInfo.code,
+                service_id: selectedServiceId,
+                code: activeService.code,
                 nin: cleanNin,
-                amount: currentServiceInfo.price,
+                amount: activeService.fee,
                 reference: refCode
             };
 
-            if (selectedService === 'nin_mod_name') {
-                payload.first_name = firstName.trim();
-                payload.middle_name = middleName.trim();
-                payload.last_name = surname.trim();
-                payload.reason = reasonForChange;
-            } else if (selectedService === 'nin_mod_phone') {
-                payload.new_phone = newPhone.trim();
-                payload.old_phone = oldPhone.trim();
-            } else if (selectedService === 'nin_mod_address') {
-                payload.address = residenceAddress.trim();
-                payload.state = residenceState.trim();
-                payload.lga = residenceLga.trim();
-            } else if (selectedService === 'pers_status') {
-                payload.field = personalField;
-                payload.value = personalValue.trim();
+            if (selectedServiceId === 'nin_mod_name') {
+                payload.first_name = newFirstName.trim();
+                payload.last_name = newSurname.trim();
+                payload.middle_name = newMiddleName.trim();
+                payload.current_phone = currentPhone.trim();
+            } else if (selectedServiceId === 'nin_mod_phone') {
+                payload.current_full_name = currentFullName.trim();
+                payload.new_phone = newPhoneToLink.trim();
+            } else if (selectedServiceId === 'nin_mod_address') {
+                payload.current_full_name = currentFullName.trim();
+                payload.current_phone = currentPhone.trim();
+                payload.new_address = newAddress.trim();
             }
 
             const { data, error } = await supabase.functions.invoke('verify-nin', {
@@ -229,39 +171,35 @@ export default function NINModificationScreen() {
             });
 
             if (error) {
-                throw new Error(error.message || 'Failed to submit NIN modification request.');
+                throw new Error(error.message || 'Failed to submit modification request.');
             }
 
             const responseData = data?.data || data || {};
-            
+
             const resObj = {
                 id: refCode,
                 reference: refCode,
                 nin: cleanNin,
-                serviceName: currentServiceInfo.name,
-                code: currentServiceInfo.code,
-                amount: currentServiceInfo.price,
+                serviceName: activeService.name,
+                code: activeService.code,
+                amount: activeService.fee,
                 status: 'Processing',
-                message: 'Your NIN modification request has been submitted successfully to NIMC portal for verification and approval.',
-                data: payload,
-                raw: responseData,
+                message: 'Your NIN modification request has been submitted successfully. Our admin team will process and update your NIMC record.',
                 date: new Date().toISOString()
             };
 
             setResult(resObj);
             await fetchWalletBalance();
 
-            // Save into persistent history
+            // Save persistent history
             await verificationHistory.save({
                 service_category: 'nin',
-                service_type: `MOD: ${currentServiceInfo.name}`,
+                service_type: `MOD: ${activeService.name}`,
                 search_number: cleanNin,
-                holder_name: [firstName, surname].filter(Boolean).join(' ') || 'NIN Holder',
-                layout: currentServiceInfo.name,
-                details: { ref: refCode, amount: currentServiceInfo.price }
+                holder_name: currentFullName.trim() || newFirstName.trim() || 'NIN Holder',
+                layout: activeService.name,
+                details: { ref: refCode, amount: activeService.fee }
             });
-
-            loadHistory();
         } catch (e: any) {
             showAlert('Submission Error', e.message || 'An error occurred while submitting your NIN modification request. Please try again.', 'error');
         } finally {
@@ -272,7 +210,7 @@ export default function NINModificationScreen() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ 
-                title: 'NIN Modifications', 
+                title: 'NIN Modification', 
                 headerStyle: { backgroundColor: '#060d21' }, 
                 headerTintColor: '#f5a623', 
                 headerShadowVisible: false,
@@ -284,9 +222,71 @@ export default function NINModificationScreen() {
             }} />
             <StatusBar style="light" />
 
+            {/* Terms of Agreement Modal matching Screenshot 1 */}
+            <Modal transparent visible={showTermsModal} animationType="fade" onRequestClose={() => setShowTermsModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.termsModalCard}>
+                        <View style={styles.termsHeaderRow}>
+                            <View style={styles.warningIconBg}>
+                                <Ionicons name="warning-outline" size={22} color="#ea580c" />
+                            </View>
+                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                <Text style={styles.termsTitle}>Terms of Agreement</Text>
+                                <Text style={styles.termsSubtitle}>Please read and agree before proceeding.</Text>
+                            </View>
+                        </View>
+
+                        <ScrollView style={styles.termsScroll} contentContainerStyle={{ paddingRight: 4, paddingBottom: 16 }}>
+                            <Text style={styles.termHeading}>1. Authorization to Act on Your Behalf</Text>
+                            <Text style={styles.termBody}>
+                                I, the user, authorize AgentHub and its trusted agents to access and use my personal data, including my NIN, to process the modification requested. I understand that AgentHub is an independent agent and is not affiliated with NIMC.
+                            </Text>
+
+                            <Text style={styles.termHeading}>2. Your Voluntary Consent</Text>
+                            <Text style={styles.termBody}>
+                                NIMC recommends that NIN modifications be done personally. By agreeing, I confirm that due to technical difficulty, illiteracy, or convenience, I voluntarily authorize AgentHub to perform this modification on my behalf. This applies whether I am the NIN owner or an agent acting with the full consent of the owner.
+                            </Text>
+
+                            <View style={styles.highlightTermBox}>
+                                <Text style={[styles.termHeading, { color: '#9a3412' }]}>3. Service Fees & No-Refund Policy</Text>
+                                <Text style={[styles.termBody, { color: '#9a3412' }]}>
+                                    I agree to pay the non-refundable service fee. I understand that wallet funds are non-withdrawable. If a service fails due to an Admin or provider error (as specified in our auto-refund logic), the fee will be credited to my wallet, but it cannot be withdrawn. A ₦0 charge for wrong submissions will be deducted from any refund.
+                                </Text>
+                            </View>
+
+                            <Text style={styles.termHeading}>4. Your Responsibilities</Text>
+                            <Text style={styles.termBody}>
+                                • I confirm all information I provide (like "New First Name" or "New Address") is 100% correct.{'\n'}
+                                • I will not submit the same request on another platform while it is PROCESSING here. Doing so will forfeit my payment.{'\n'}
+                                • If submitting for someone else, I confirm I have the NIN owner's full legal authorization.
+                            </Text>
+
+                            <Text style={styles.termHeading}>5. Provider Delays & Service Terms</Text>
+                            <Text style={styles.termBody}>
+                                • <Text style={{ fontWeight: '800' }}>Bank/SIM Updates:</Text> I understand that modifications reflect immediately on the NIMC portal, but banks and SIM providers may take a long time to sync. If I need this for an urgent bank transaction, I will not proceed.{'\n'}
+                                • <Text style={{ fontWeight: '800' }}>NIMC Delays:</Text> If NIMC's network is down, I agree to wait patiently and will not submit duplicate requests.{'\n'}
+                                • <Text style={{ fontWeight: '800' }}>Alias Emails:</Text> I understand that this platform uses secure, platform-owned "alias emails" to process all modifications.
+                            </Text>
+                        </ScrollView>
+
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setTermsAccepted(true);
+                                setShowTermsModal(false);
+                                processSubmission();
+                            }} 
+                            style={styles.termsAgreeBtn} 
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.termsAgreeBtnText}>I have read, understood, and agreed to all terms</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Custom Alert Modal */}
             <Modal transparent visible={customAlert.visible} animationType="fade" onRequestClose={() => setCustomAlert(prev => ({ ...prev, visible: false }))}>
-                <View style={styles.alertOverlay}>
+                <View style={styles.modalOverlay}>
                     <View style={styles.alertCard}>
                         <View style={[styles.alertIconCircle, { backgroundColor: customAlert.type === 'error' ? '#fef2f2' : customAlert.type === 'warning' ? '#fffbeb' : '#ecfdf5' }]}>
                             <Ionicons 
@@ -305,24 +305,22 @@ export default function NINModificationScreen() {
             </Modal>
 
             {result ? (
-                /* Modification Receipt / Confirmation Result View */
+                /* Submission Confirmation View */
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
                     <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 12 : 24, paddingBottom: 54, paddingHorizontal: 16, alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons name="shield-checkmark" size={18} color="#f5a623" />
-                            <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15, marginLeft: 6 }}>Modification Submitted</Text>
-                        </View>
+                        <Ionicons name="shield-checkmark" size={20} color="#f5a623" />
+                        <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 16, marginTop: 4 }}>Modification Submitted</Text>
                         <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 }}>
-                            {result.serviceName} • CODE {result.code}
+                            {result.serviceName}
                         </Text>
                     </LinearGradient>
 
                     <View style={{ alignItems: 'center', marginTop: -42, paddingHorizontal: 16 }}>
-                        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 3, borderColor: '#34d399' }}>
-                            <Ionicons name="checkmark-done-circle" size={54} color="#059669" />
+                        <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 3, borderColor: '#10b981' }}>
+                            <Ionicons name="checkmark-done" size={48} color="#059669" />
                         </View>
 
-                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12, textAlign: 'center' }}>
+                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18, textTransform: 'uppercase', marginTop: 12 }}>
                             Request Processing
                         </Text>
                         <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
@@ -330,39 +328,38 @@ export default function NINModificationScreen() {
                         </Text>
 
                         {/* Summary Details Card Container */}
-                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 440, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
+                        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', maxWidth: 460, marginTop: 20, overflow: 'hidden', shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>REFERENCE</Text>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>REFERENCE</Text>
                                 <Text style={{ color: '#060d21', fontWeight: '800', fontSize: 12 }}>{result.reference}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>NIN NUMBER</Text>
-                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 }}>{result.nin}</Text>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>TARGET NIN</Text>
+                                <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13 }}>{result.nin}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>MODIFICATION TYPE</Text>
-                                <View style={{ backgroundColor: '#e0f2fe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 }}>
-                                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 11 }}>{result.serviceName}</Text>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>MODIFICATION TYPE</Text>
+                                <View style={{ backgroundColor: '#fff7ed', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99, borderWidth: 1, borderColor: '#ffedd5' }}>
+                                    <Text style={{ color: '#ea580c', fontWeight: '900', fontSize: 11 }}>{result.serviceName}</Text>
                                 </View>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>FEE PAID</Text>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>FEE PAID</Text>
                                 <Text style={{ color: '#059669', fontWeight: '900', fontSize: 13 }}>₦{result.amount.toLocaleString()}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
-                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>DATE & TIME</Text>
+                                <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>DATE & TIME</Text>
                                 <Text style={{ color: '#475569', fontWeight: '700', fontSize: 12 }}>{new Date(result.date).toLocaleString()}</Text>
                             </View>
                         </View>
 
-                        {/* Back Link */}
                         <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ backgroundColor: '#d97706', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 440, marginTop: 20, shadowColor: '#d97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
+                            style={{ backgroundColor: '#ea580c', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 460, marginTop: 20, shadowColor: '#ea580c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
                             activeOpacity={0.8}
                         >
                             <Ionicons name="add-circle-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
@@ -371,16 +368,16 @@ export default function NINModificationScreen() {
                     </View>
                 </ScrollView>
             ) : (
-                /* Main Modification Input Form */
+                /* Main Form View matching Screenshots 2, 3, 4 */
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }}>
                         
                         {/* Header Banner */}
-                        <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 16, paddingBottom: 24, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}>
+                        <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 8 : 16, paddingBottom: 20, paddingHorizontal: 16 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Ionicons name="create" size={22} color="#f5a623" />
-                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18, marginLeft: 8 }}>NIN Modifications</Text>
+                                    <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 18, marginLeft: 8 }}>NIN Modification</Text>
                                 </View>
                                 {userBalance !== null && (
                                     <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)' }}>
@@ -388,188 +385,208 @@ export default function NINModificationScreen() {
                                     </View>
                                 )}
                             </View>
-                            <Text style={{ color: '#cbd5e1', fontSize: 12, fontWeight: '500', marginTop: 6 }}>
-                                Official NIMC Update Portal: Change Name, Phone Number, Address & Personal Details.
-                            </Text>
                         </LinearGradient>
 
-                        <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+                        <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
                             
-                            {/* Service Selection Grid Cards */}
-                            <Text style={styles.sectionTitle}>Select Modification Type</Text>
-                            <View style={{ gap: 10, marginBottom: 16 }}>
-                                {MODIFICATION_TYPES.map((mod) => {
-                                    const isSelected = selectedService === mod.id;
+                            {/* Selector Header Bar matching screenshots */}
+                            <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginBottom: 10 }}>
+                                What would you like to modify?
+                            </Text>
+
+                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                                {MODIFICATION_SERVICES.map((serv) => {
+                                    const isSel = selectedServiceId === serv.id;
                                     return (
                                         <TouchableOpacity
-                                            key={mod.id}
-                                            onPress={() => setSelectedService(mod.id)}
+                                            key={serv.id}
+                                            onPress={() => setSelectedServiceId(serv.id)}
                                             style={[
-                                                styles.modCard,
-                                                isSelected && styles.modCardSelected
+                                                styles.selectorTab,
+                                                isSel && styles.selectorTabActive
                                             ]}
                                             activeOpacity={0.8}
                                         >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                                <View style={[styles.modIconBox, { backgroundColor: mod.bgColor }]}>
-                                                    <Ionicons name={mod.icon as any} size={22} color={mod.iconColor} />
-                                                </View>
-                                                <View style={{ marginLeft: 12, flex: 1 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 14 }}>{mod.name}</Text>
-                                                        <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 14 }}>₦{mod.price.toLocaleString()}</Text>
-                                                    </View>
-                                                    <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '500' }}>{mod.desc}</Text>
-                                                </View>
-                                            </View>
-                                            {isSelected && (
-                                                <View style={{ marginLeft: 10 }}>
-                                                    <Ionicons name="checkmark-circle" size={22} color="#d97706" />
-                                                </View>
+                                            <Text style={[styles.selectorTabText, isSel && styles.selectorTabTextActive]} numberOfLines={1}>
+                                                {serv.name}
+                                            </Text>
+                                            {isSel && (
+                                                <Ionicons name="checkmark-circle" size={14} color="#ea580c" style={{ marginLeft: 4 }} />
                                             )}
                                         </TouchableOpacity>
                                     );
                                 })}
                             </View>
 
-                            {/* Form Input Fields Card */}
-                            <View style={styles.formCard}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
-                                    <Ionicons name="document-text" size={18} color="#d97706" />
-                                    <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 13, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                        {currentServiceInfo.name} Details
-                                    </Text>
-                                </View>
-
-                                {/* NIN Input */}
-                                <Text style={styles.inputLabel}>NIN Number (11 Digits) *</Text>
-                                <View style={styles.inputBox}>
-                                    <Ionicons name="card-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                            {/* Main Form Container Card */}
+                            <View style={styles.mainFormCard}>
+                                
+                                {/* Target NIN */}
+                                <Text style={styles.fieldLabel}>Target NIN</Text>
+                                <View style={styles.fieldInputBox}>
                                     <TextInput 
-                                        style={styles.textInput}
-                                        placeholder="Enter 11-digit NIN"
+                                        style={styles.fieldTextInput}
+                                        placeholder="11-digit NIN"
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="number-pad"
                                         maxLength={11}
-                                        value={nin}
-                                        onChangeText={setNin}
+                                        value={targetNin}
+                                        onChangeText={setTargetNin}
                                     />
-                                    <TouchableOpacity onPress={handlePasteNin} style={styles.pasteBtn}>
-                                        <Text style={styles.pasteBtnText}>PASTE</Text>
+                                    <TouchableOpacity onPress={() => handlePaste(setTargetNin)} style={styles.pasteTag}>
+                                        <Text style={styles.pasteTagText}>PASTE</Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Dynamic Modification Specific Form Inputs */}
-                                {selectedService === 'nin_mod_name' && (
+                                {/* Dynamic Form Fields per Selected Tab */}
+
+                                {/* TAB 1: Change of Name */}
+                                {selectedServiceId === 'nin_mod_name' && (
                                     <>
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>New First Name *</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder="Enter New First Name" placeholderTextColor="#94a3b8" value={firstName} onChangeText={setFirstName} />
+                                        <Text style={styles.fieldLabel}>Current Phone Number linked to NIN</Text>
+                                        <View style={styles.fieldInputBox}>
+                                            <TextInput 
+                                                style={styles.fieldTextInput} 
+                                                placeholder="08012345678" 
+                                                placeholderTextColor="#94a3b8" 
+                                                keyboardType="number-pad"
+                                                maxLength={11}
+                                                value={currentPhone} 
+                                                onChangeText={setCurrentPhone} 
+                                            />
                                         </View>
 
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>New Middle Name (Optional)</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder="Enter New Middle Name" placeholderTextColor="#94a3b8" value={middleName} onChangeText={setMiddleName} />
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.fieldLabel}>New First Name</Text>
+                                                <View style={styles.fieldInputBox}>
+                                                    <TextInput style={styles.fieldTextInput} placeholder="Enter new first name" placeholderTextColor="#94a3b8" value={newFirstName} onChangeText={setNewFirstName} />
+                                                </View>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.fieldLabel}>New Surname</Text>
+                                                <View style={styles.fieldInputBox}>
+                                                    <TextInput style={styles.fieldTextInput} placeholder="Enter new surname" placeholderTextColor="#94a3b8" value={newSurname} onChangeText={setNewSurname} />
+                                                </View>
+                                            </View>
                                         </View>
 
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>New Surname *</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder="Enter New Surname" placeholderTextColor="#94a3b8" value={surname} onChangeText={setSurname} />
-                                        </View>
-
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Reason for Modification</Text>
-                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                                            {['Spelling Correction', 'Marriage', 'Court Order', 'Title Change'].map((r) => (
-                                                <TouchableOpacity 
-                                                    key={r}
-                                                    onPress={() => setReasonForChange(r)}
-                                                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: reasonForChange === r ? '#d97706' : '#cbd5e1', backgroundColor: reasonForChange === r ? '#fffbeb' : '#ffffff' }}
-                                                >
-                                                    <Text style={{ color: reasonForChange === r ? '#d97706' : '#475569', fontWeight: '800', fontSize: 11 }}>{r}</Text>
-                                                </TouchableOpacity>
-                                            ))}
+                                        <Text style={styles.fieldLabel}>New Middle Name (Optional)</Text>
+                                        <View style={styles.fieldInputBox}>
+                                            <TextInput style={styles.fieldTextInput} placeholder="Enter new middle name" placeholderTextColor="#94a3b8" value={newMiddleName} onChangeText={setNewMiddleName} />
                                         </View>
                                     </>
                                 )}
 
-                                {selectedService === 'nin_mod_phone' && (
+                                {/* TAB 2: Change of Phone Number */}
+                                {selectedServiceId === 'nin_mod_phone' && (
                                     <>
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>New Phone Number *</Text>
-                                        <View style={styles.inputBox}>
-                                            <Ionicons name="call-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
-                                            <TextInput style={styles.textInput} placeholder="Enter 11-digit New Phone Number" placeholderTextColor="#94a3b8" keyboardType="number-pad" maxLength={11} value={newPhone} onChangeText={setNewPhone} />
+                                        <Text style={styles.fieldLabel}>Current Full Name on NIN</Text>
+                                        <View style={styles.fieldInputBox}>
+                                            <TextInput 
+                                                style={styles.fieldTextInput} 
+                                                placeholder="First Last" 
+                                                placeholderTextColor="#94a3b8" 
+                                                value={currentFullName} 
+                                                onChangeText={setCurrentFullName} 
+                                            />
                                         </View>
 
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Old Registered Phone Number (Optional)</Text>
-                                        <View style={styles.inputBox}>
-                                            <Ionicons name="phone-portrait-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
-                                            <TextInput style={styles.textInput} placeholder="Enter Old Phone Number if known" placeholderTextColor="#94a3b8" keyboardType="number-pad" maxLength={11} value={oldPhone} onChangeText={setOldPhone} />
+                                        <Text style={styles.fieldLabel}>New Phone Number to Link</Text>
+                                        <View style={styles.fieldInputBox}>
+                                            <TextInput 
+                                                style={styles.fieldTextInput} 
+                                                placeholder="08012345678" 
+                                                placeholderTextColor="#94a3b8" 
+                                                keyboardType="number-pad"
+                                                maxLength={11}
+                                                value={newPhoneToLink} 
+                                                onChangeText={setNewPhoneToLink} 
+                                            />
                                         </View>
                                     </>
                                 )}
 
-                                {selectedService === 'nin_mod_address' && (
+                                {/* TAB 3: Change of Address */}
+                                {selectedServiceId === 'nin_mod_address' && (
                                     <>
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>State of Residence *</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder="e.g. Lagos, Kano, FCT" placeholderTextColor="#94a3b8" value={residenceState} onChangeText={setResidenceState} />
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.fieldLabel}>Current Full Name</Text>
+                                                <View style={styles.fieldInputBox}>
+                                                    <TextInput style={styles.fieldTextInput} placeholder="First Last" placeholderTextColor="#94a3b8" value={currentFullName} onChangeText={setCurrentFullName} />
+                                                </View>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.fieldLabel}>Current Phone Number</Text>
+                                                <View style={styles.fieldInputBox}>
+                                                    <TextInput style={styles.fieldTextInput} placeholder="08012345678" placeholderTextColor="#94a3b8" keyboardType="number-pad" maxLength={11} value={currentPhone} onChangeText={setCurrentPhone} />
+                                                </View>
+                                            </View>
                                         </View>
 
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>LGA of Residence *</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder="e.g. Ikeja, Municipal" placeholderTextColor="#94a3b8" value={residenceLga} onChangeText={setResidenceLga} />
-                                        </View>
-
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Full Street Address *</Text>
-                                        <View style={[styles.inputBox, { height: 74, alignItems: 'flex-start', paddingTop: 10 }]}>
-                                            <TextInput style={[styles.textInput, { textAlignVertical: 'top' }]} placeholder="Enter new complete residential address" placeholderTextColor="#94a3b8" multiline numberOfLines={3} value={residenceAddress} onChangeText={setResidenceAddress} />
+                                        <Text style={styles.fieldLabel}>New Address</Text>
+                                        <View style={[styles.fieldInputBox, { height: 72, alignItems: 'flex-start', paddingTop: 10 }]}>
+                                            <TextInput style={[styles.fieldTextInput, { textAlignVertical: 'top' }]} placeholder="Enter full new residential address" placeholderTextColor="#94a3b8" multiline numberOfLines={3} value={newAddress} onChangeText={setNewAddress} />
                                         </View>
                                     </>
                                 )}
 
-                                {selectedService === 'pers_status' && (
-                                    <>
-                                        <Text style={[styles.inputLabel, { marginTop: 12 }]}>Field to Personalize / Update</Text>
-                                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, marginBottom: 12 }}>
-                                            {['Marital Status', 'Gender', 'Occupation'].map((f) => (
-                                                <TouchableOpacity 
-                                                    key={f}
-                                                    onPress={() => setPersonalField(f)}
-                                                    style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: personalField === f ? '#d97706' : '#cbd5e1', backgroundColor: personalField === f ? '#fffbeb' : '#ffffff' }}
-                                                >
-                                                    <Text style={{ color: personalField === f ? '#d97706' : '#475569', fontWeight: '800', fontSize: 11 }}>{f}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
+                                {/* Fee Container matching screenshot */}
+                                <View style={styles.feeCardBox}>
+                                    <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13 }}>Modification Fee</Text>
+                                    <Text style={{ color: '#ea580c', fontWeight: '900', fontSize: 20 }}>₦{activeService.fee.toLocaleString('.2f')}</Text>
+                                </View>
 
-                                        <Text style={styles.inputLabel}>New Value *</Text>
-                                        <View style={styles.inputBox}>
-                                            <TextInput style={styles.textInput} placeholder={`Enter new ${personalField}`} placeholderTextColor="#94a3b8" value={personalValue} onChangeText={setPersonalValue} />
-                                        </View>
-                                    </>
-                                )}
+                                {/* Primary Submit Button */}
+                                <TouchableOpacity 
+                                    onPress={handleFormSubmit}
+                                    disabled={loading}
+                                    style={styles.submitBtn}
+                                    activeOpacity={0.8}
+                                >
+                                    {loading ? <ActivityIndicator color="#ffffff" size="small" /> : (
+                                        <Text style={styles.submitBtnText}>Submit Modification Request</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
 
-                                {/* Price Summary & Proceed Button */}
-                                <View style={{ marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <View>
-                                        <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Service Charge</Text>
-                                        <Text style={{ color: '#060d21', fontWeight: '900', fontSize: 18 }}>₦{currentServiceInfo.price.toLocaleString()}</Text>
+                            {/* Track Your Status Card matching screenshot */}
+                            <View style={styles.sideInfoCard}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <View style={styles.trackIconCircle}>
+                                        <Ionicons name="time-outline" size={20} color="#ea580c" />
                                     </View>
-
-                                    <TouchableOpacity 
-                                        onPress={handleProcessModification}
-                                        disabled={loading}
-                                        style={{ backgroundColor: '#d97706', height: 48, paddingHorizontal: 24, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#d97706', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 }}
-                                        activeOpacity={0.8}
-                                    >
-                                        {loading ? <ActivityIndicator color="#ffffff" size="small" /> : (
-                                            <>
-                                                <Ionicons name="send" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                                <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>Submit Update</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
+                                    <View style={{ marginLeft: 12, flex: 1 }}>
+                                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Track Your Status</Text>
+                                        <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '500', marginTop: 4, lineHeight: 16 }}>
+                                            Modifications are processed by our admin team manually. Please check your history log to track progress and view feedback.
+                                        </Text>
+                                        
+                                        <TouchableOpacity 
+                                            onPress={() => router.push('/nin-services/history')} 
+                                            style={styles.viewHistoryBtn}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.viewHistoryBtnText}>View History</Text>
+                                            <Ionicons name="arrow-forward" size={14} color="#334155" style={{ marginLeft: 4 }} />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
+                            </View>
+
+                            {/* Important Reminder Card matching screenshot */}
+                            <View style={styles.reminderCard}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <Ionicons name="alert-circle-outline" size={18} color="#ef4444" />
+                                    <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 13, marginLeft: 6 }}>Important Reminder</Text>
+                                </View>
+                                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', lineHeight: 17, marginBottom: 4 }}>
+                                    • Ensure you have legal authorization before submitting records on behalf of others.
+                                </Text>
+                                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', lineHeight: 17 }}>
+                                    • If your request fails due to an invalid submission, You will have to resubmit the application.
+                                </Text>
                             </View>
 
                         </View>
@@ -585,97 +602,246 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8fafc',
     },
-    sectionTitle: {
-        color: '#060d21',
-        fontWeight: '900',
-        fontSize: 14,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: 10,
-    },
-    modCard: {
+    selectorTab: {
+        flex: 1,
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#64748b',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-    },
-    modCardSelected: {
-        borderColor: '#d97706',
-        backgroundColor: '#fffbeb',
-        borderWidth: 2,
-    },
-    modIconBox: {
-        width: 44,
-        height: 44,
         borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        borderWidth: 1.5,
+        borderColor: '#e2e8f0',
         alignItems: 'center',
         justifyContent: 'center',
+        flexDirection: 'row',
     },
-    formCard: {
+    selectorTabActive: {
+        borderColor: '#ea580c',
+        backgroundColor: '#fff7ed',
+    },
+    selectorTabText: {
+        color: '#475569',
+        fontWeight: '700',
+        fontSize: 11,
+    },
+    selectorTabTextActive: {
+        color: '#ea580c',
+        fontWeight: '900',
+    },
+    mainFormCard: {
         backgroundColor: '#ffffff',
         borderRadius: 16,
         padding: 16,
         borderWidth: 1,
         borderColor: '#e2e8f0',
-        marginTop: 6,
-        marginBottom: 20,
+        marginBottom: 14,
         shadowColor: '#64748b',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
         elevation: 1,
     },
-    inputLabel: {
+    fieldLabel: {
         color: '#334155',
         fontWeight: '800',
         fontSize: 12,
         marginBottom: 6,
+        marginTop: 10,
     },
-    inputBox: {
-        backgroundColor: '#f8fafc',
-        borderRadius: 12,
+    fieldInputBox: {
+        backgroundColor: '#ffffff',
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#cbd5e1',
-        height: 48,
+        borderColor: '#e2e8f0',
+        height: 46,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
     },
-    textInput: {
+    fieldTextInput: {
         flex: 1,
         color: '#0f172a',
         fontWeight: '700',
+        fontSize: 13,
+    },
+    pasteTag: {
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+    },
+    pasteTagText: {
+        color: '#475569',
+        fontWeight: '800',
+        fontSize: 9,
+    },
+    feeCardBox: {
+        backgroundColor: '#fff7ed',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ffedd5',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 16,
+        marginBottom: 16,
+    },
+    submitBtn: {
+        backgroundColor: '#ea580c',
+        height: 48,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#ea580c',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    submitBtnText: {
+        color: '#ffffff',
+        fontWeight: '900',
         fontSize: 14,
     },
-    pasteBtn: {
-        backgroundColor: '#e2e8f0',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
+    sideInfoCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        marginBottom: 12,
     },
-    pasteBtnText: {
+    trackIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#fff7ed',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    viewHistoryBtn: {
+        backgroundColor: '#f8fafc',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-start',
+        marginTop: 10,
+    },
+    viewHistoryBtnText: {
         color: '#334155',
-        fontWeight: '900',
-        fontSize: 10,
+        fontWeight: '800',
+        fontSize: 12,
+    },
+    reminderCard: {
+        backgroundColor: '#fef2f2',
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        marginBottom: 20,
     },
 
-    // Custom Alert Modal Styles
-    alertOverlay: {
+    // Terms Modal Styles
+    modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(6, 13, 33, 0.75)',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: 16,
     },
+    termsModalCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 24,
+        padding: 20,
+        width: '100%',
+        maxWidth: 480,
+        maxHeight: '85%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    termsHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    warningIconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#fff7ed',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#ffedd5',
+    },
+    termsTitle: {
+        color: '#0f172a',
+        fontWeight: '900',
+        fontSize: 17,
+    },
+    termsSubtitle: {
+        color: '#64748b',
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    termsScroll: {
+        marginTop: 14,
+        marginBottom: 14,
+    },
+    termHeading: {
+        color: '#0f172a',
+        fontWeight: '900',
+        fontSize: 12,
+        marginTop: 10,
+        marginBottom: 4,
+    },
+    termBody: {
+        color: '#475569',
+        fontSize: 11.5,
+        fontWeight: '500',
+        lineHeight: 17,
+    },
+    highlightTermBox: {
+        backgroundColor: '#fff7ed',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#ffedd5',
+        marginTop: 10,
+        marginBottom: 4,
+    },
+    termsAgreeBtn: {
+        backgroundColor: '#ea580c',
+        height: 48,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#ea580c',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    termsAgreeBtnText: {
+        color: '#ffffff',
+        fontWeight: '900',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+
+    // Custom Alert Modal Styles
     alertCard: {
         backgroundColor: '#ffffff',
         borderRadius: 24,
@@ -694,7 +860,7 @@ const styles = StyleSheet.create({
         height: 64,
         borderRadius: 32,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         marginBottom: 16,
     },
     alertTitle: {
@@ -718,7 +884,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     alertButtonText: {
         color: '#ffffff',
