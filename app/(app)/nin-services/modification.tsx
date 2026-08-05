@@ -22,8 +22,8 @@ export default function NINModificationScreen() {
     // Tab State
     const [selectedServiceId, setSelectedServiceId] = useState('nin_mod_name');
     
-    // Terms Modal State
-    const [showTermsModal, setShowTermsModal] = useState(false);
+    // Terms Modal State — Pop up immediately when entering the page!
+    const [showTermsModal, setShowTermsModal] = useState(true);
     const [termsAccepted, setTermsAccepted] = useState(false);
 
     // Form Inputs
@@ -206,8 +206,6 @@ export default function NINModificationScreen() {
                 throw new Error(error.message || 'Failed to submit modification request.');
             }
 
-            const responseData = data?.data || data || {};
-
             const resObj = {
                 id: refCode,
                 reference: refCode,
@@ -247,71 +245,124 @@ export default function NINModificationScreen() {
                 headerTintColor: '#f5a623', 
                 headerShadowVisible: false,
                 headerRight: () => (
-                    <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ marginRight: 8 }}>
-                        <Ionicons name="time-outline" size={22} color="#f5a623" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <TouchableOpacity onPress={() => setShowTermsModal(true)} style={{ padding: 4 }}>
+                            <Ionicons name="document-text-outline" size={22} color="#f5a623" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ padding: 4, marginRight: 4 }}>
+                            <Ionicons name="time-outline" size={22} color="#f5a623" />
+                        </TouchableOpacity>
+                    </View>
                 )
             }} />
             <StatusBar style="light" />
 
-            {/* Terms of Agreement Modal matching Screenshot 1 */}
+            {/* Terms of Agreement Modal - Brand Navy & Gold Ultra-Modern Design */}
             <Modal transparent visible={showTermsModal} animationType="fade" onRequestClose={() => setShowTermsModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.termsModalCard}>
-                        <View style={styles.termsHeaderRow}>
+                        
+                        {/* Premium Header Banner */}
+                        <LinearGradient colors={['#060d21', '#0f1b3d']} style={styles.termsHeaderGradient}>
                             <View style={styles.warningIconBg}>
-                                <Ionicons name="warning-outline" size={22} color="#ea580c" />
+                                <Ionicons name="warning" size={24} color="#f5a623" />
                             </View>
-                            <View style={{ marginLeft: 12, flex: 1 }}>
+                            <View style={{ marginLeft: 14, flex: 1 }}>
                                 <Text style={styles.termsTitle}>Terms of Agreement</Text>
                                 <Text style={styles.termsSubtitle}>Please read and agree before proceeding.</Text>
                             </View>
-                        </View>
+                            <TouchableOpacity onPress={() => setShowTermsModal(false)} style={styles.closeModalBtn}>
+                                <Ionicons name="close" size={20} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </LinearGradient>
 
-                        <ScrollView style={styles.termsScroll} contentContainerStyle={{ paddingRight: 4, paddingBottom: 16 }}>
-                            <Text style={styles.termHeading}>1. Authorization to Act on Your Behalf</Text>
-                            <Text style={styles.termBody}>
-                                I, the user, authorize AgentHub and its trusted agents to access and use my personal data, including my NIN, to process the modification requested. I understand that AgentHub is an independent agent and is not affiliated with NIMC.
-                            </Text>
+                        <ScrollView style={styles.termsScroll} contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+                            
+                            {/* Clause 1 */}
+                            <View style={styles.termSectionCard}>
+                                <View style={styles.termNumBadge}>
+                                    <Text style={styles.termNumBadgeText}>1</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.termHeading}>Authorization to Act on Your Behalf</Text>
+                                    <Text style={styles.termBody}>
+                                        I, the user, authorize AgentHub and its trusted agents to access and use my personal data, including my NIN, to process the modification requested. I understand that AgentHub is an independent agent and is not affiliated with NIMC.
+                                    </Text>
+                                </View>
+                            </View>
 
-                            <Text style={styles.termHeading}>2. Your Voluntary Consent</Text>
-                            <Text style={styles.termBody}>
-                                NIMC recommends that NIN modifications be done personally. By agreeing, I confirm that due to technical difficulty, illiteracy, or convenience, I voluntarily authorize AgentHub to perform this modification on my behalf. This applies whether I am the NIN owner or an agent acting with the full consent of the owner.
-                            </Text>
+                            {/* Clause 2 */}
+                            <View style={styles.termSectionCard}>
+                                <View style={styles.termNumBadge}>
+                                    <Text style={styles.termNumBadgeText}>2</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.termHeading}>Your Voluntary Consent</Text>
+                                    <Text style={styles.termBody}>
+                                        NIMC recommends that NIN modifications be done personally. By agreeing, I confirm that due to technical difficulty, illiteracy, or convenience, I voluntarily authorize AgentHub to perform this modification on my behalf. This applies whether I am the NIN owner or an agent acting with the full consent of the owner.
+                                    </Text>
+                                </View>
+                            </View>
 
+                            {/* Clause 3 - Highlighted Gold Box matching screenshot */}
                             <View style={styles.highlightTermBox}>
-                                <Text style={[styles.termHeading, { color: '#9a3412' }]}>3. Service Fees & No-Refund Policy</Text>
-                                <Text style={[styles.termBody, { color: '#9a3412' }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                    <Ionicons name="alert-circle" size={18} color="#d97706" style={{ marginRight: 6 }} />
+                                    <Text style={[styles.termHeading, { color: '#92400e', marginTop: 0 }]}>3. Service Fees & No-Refund Policy</Text>
+                                </View>
+                                <Text style={[styles.termBody, { color: '#92400e', lineHeight: 18 }]}>
                                     I agree to pay the non-refundable service fee. I understand that wallet funds are non-withdrawable. If a service fails due to an Admin or provider error (as specified in our auto-refund logic), the fee will be credited to my wallet, but it cannot be withdrawn. A ₦0 charge for wrong submissions will be deducted from any refund.
                                 </Text>
                             </View>
 
-                            <Text style={styles.termHeading}>4. Your Responsibilities</Text>
-                            <Text style={styles.termBody}>
-                                • I confirm all information I provide (like "New First Name" or "New Address") is 100% correct.{'\n'}
-                                • I will not submit the same request on another platform while it is PROCESSING here. Doing so will forfeit my payment.{'\n'}
-                                • If submitting for someone else, I confirm I have the NIN owner's full legal authorization.
-                            </Text>
+                            {/* Clause 4 */}
+                            <View style={styles.termSectionCard}>
+                                <View style={styles.termNumBadge}>
+                                    <Text style={styles.termNumBadgeText}>4</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.termHeading}>Your Responsibilities</Text>
+                                    <Text style={styles.termBody}>
+                                        • I confirm all information I provide (like "New First Name" or "New Address") is 100% correct.{'\n'}
+                                        • I will not submit the same request on another platform while it is PROCESSING here. Doing so will forfeit my payment.{'\n'}
+                                        • If submitting for someone else, I confirm I have the NIN owner's full legal authorization.
+                                    </Text>
+                                </View>
+                            </View>
 
-                            <Text style={styles.termHeading}>5. Provider Delays & Service Terms</Text>
-                            <Text style={styles.termBody}>
-                                • <Text style={{ fontWeight: '800' }}>Bank/SIM Updates:</Text> I understand that modifications reflect immediately on the NIMC portal, but banks and SIM providers may take a long time to sync. If I need this for an urgent bank transaction, I will not proceed.{'\n'}
-                                • <Text style={{ fontWeight: '800' }}>NIMC Delays:</Text> If NIMC's network is down, I agree to wait patiently and will not submit duplicate requests.{'\n'}
-                                • <Text style={{ fontWeight: '800' }}>Alias Emails:</Text> I understand that this platform uses secure, platform-owned "alias emails" to process all modifications.
-                            </Text>
+                            {/* Clause 5 */}
+                            <View style={styles.termSectionCard}>
+                                <View style={styles.termNumBadge}>
+                                    <Text style={styles.termNumBadgeText}>5</Text>
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.termHeading}>Provider Delays & Service Terms</Text>
+                                    <Text style={styles.termBody}>
+                                        • <Text style={{ fontWeight: '800', color: '#060d21' }}>Bank/SIM Updates:</Text> I understand that modifications reflect immediately on the NIMC portal, but banks and SIM providers may take a long time to sync. If I need this for an urgent bank transaction, I will not proceed.{'\n'}
+                                        • <Text style={{ fontWeight: '800', color: '#060d21' }}>NIMC Delays:</Text> If NIMC's network is down, I agree to wait patiently and will not submit duplicate requests.{'\n'}
+                                        • <Text style={{ fontWeight: '800', color: '#060d21' }}>Alias Emails:</Text> I understand that this platform uses secure, platform-owned "alias emails" to process all modifications.
+                                    </Text>
+                                </View>
+                            </View>
+
                         </ScrollView>
 
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setTermsAccepted(true);
-                                setShowTermsModal(false);
-                                processSubmission();
-                            }} 
-                            style={styles.termsAgreeBtn} 
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.termsAgreeBtnText}>I have read, understood, and agreed to all terms</Text>
-                        </TouchableOpacity>
+                        {/* Action Footer */}
+                        <View style={styles.termsFooterBox}>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setTermsAccepted(true);
+                                    setShowTermsModal(false);
+                                }} 
+                                style={styles.termsAgreeBtn} 
+                                activeOpacity={0.85}
+                            >
+                                <LinearGradient colors={['#f5a623', '#d97706']} style={styles.termsAgreeBtnGradient}>
+                                    <Ionicons name="checkmark-circle" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                                    <Text style={styles.termsAgreeBtnText}>I have read, understood, and agreed to all terms</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -380,7 +431,7 @@ export default function NINModificationScreen() {
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
                                 <Text style={{ color: '#64748b', fontWeight: '800', fontSize: 11, textTransform: 'uppercase' }}>FEE PAID</Text>
-                                <Text style={{ color: '#059669', fontWeight: '900', fontSize: 13 }}>₦{result.amount.toLocaleString()}</Text>
+                                <Text style={{ color: '#059669', fontWeight: '900', fontSize: 13 }}>₦{(result.amount || 0).toLocaleString()}</Text>
                             </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
@@ -391,10 +442,10 @@ export default function NINModificationScreen() {
 
                         <TouchableOpacity 
                             onPress={() => setResult(null)} 
-                            style={{ backgroundColor: '#ea580c', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 460, marginTop: 20, shadowColor: '#ea580c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
+                            style={{ backgroundColor: '#060d21', height: 50, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', maxWidth: 460, marginTop: 20, shadowColor: '#060d21', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="add-circle-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                            <Ionicons name="add-circle-outline" size={20} color="#f5a623" style={{ marginRight: 8 }} />
                             <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 15 }}>Submit Another Modification</Text>
                         </TouchableOpacity>
                     </View>
@@ -421,13 +472,28 @@ export default function NINModificationScreen() {
 
                         <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
                             
-                            {/* Selector Header Bar matching screenshots */}
-                            <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginBottom: 10 }}>
+                            {/* Terms Badge Bar */}
+                            <TouchableOpacity 
+                                onPress={() => setShowTermsModal(true)} 
+                                style={styles.termsBannerBox}
+                                activeOpacity={0.8}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                    <Ionicons name="shield-checkmark" size={18} color="#d97706" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#78350f', fontWeight: '800', fontSize: 12 }}>
+                                        {termsAccepted ? 'Terms Accepted ✓' : 'Terms of Agreement Required'}
+                                    </Text>
+                                </View>
+                                <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 11 }}>Review Terms →</Text>
+                            </TouchableOpacity>
+
+                            {/* Selector Header Bar */}
+                            <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13, marginBottom: 10, marginTop: 4 }}>
                                 What would you like to modify?
                             </Text>
 
                             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                                {MODIFICATION_SERVICES.map((serv) => {
+                                {servicesList.map((serv) => {
                                     const isSel = selectedServiceId === serv.id;
                                     return (
                                         <TouchableOpacity
@@ -443,7 +509,7 @@ export default function NINModificationScreen() {
                                                 {serv.name}
                                             </Text>
                                             {isSel && (
-                                                <Ionicons name="checkmark-circle" size={14} color="#ea580c" style={{ marginLeft: 4 }} />
+                                                <Ionicons name="checkmark-circle" size={14} color="#f5a623" style={{ marginLeft: 4 }} />
                                             )}
                                         </TouchableOpacity>
                                     );
@@ -564,10 +630,10 @@ export default function NINModificationScreen() {
                                     </>
                                 )}
 
-                                {/* Fee Container matching screenshot */}
+                                {/* Fee Container */}
                                 <View style={styles.feeCardBox}>
                                     <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 13 }}>Modification Fee</Text>
-                                    <Text style={{ color: '#ea580c', fontWeight: '900', fontSize: 20 }}>₦{(activeService.fee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 20 }}>₦{(activeService.fee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </View>
 
                                 {/* Primary Submit Button */}
@@ -583,11 +649,11 @@ export default function NINModificationScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Track Your Status Card matching screenshot */}
+                            {/* Track Your Status Card */}
                             <View style={styles.sideInfoCard}>
                                 <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                                     <View style={styles.trackIconCircle}>
-                                        <Ionicons name="time-outline" size={20} color="#ea580c" />
+                                        <Ionicons name="time-outline" size={20} color="#f5a623" />
                                     </View>
                                     <View style={{ marginLeft: 12, flex: 1 }}>
                                         <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 14 }}>Track Your Status</Text>
@@ -601,13 +667,13 @@ export default function NINModificationScreen() {
                                             activeOpacity={0.8}
                                         >
                                             <Text style={styles.viewHistoryBtnText}>View History</Text>
-                                            <Ionicons name="arrow-forward" size={14} color="#334155" style={{ marginLeft: 4 }} />
+                                            <Ionicons name="arrow-forward" size={14} color="#060d21" style={{ marginLeft: 4 }} />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
                             </View>
 
-                            {/* Important Reminder Card matching screenshot */}
+                            {/* Important Reminder Card */}
                             <View style={styles.reminderCard}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                     <Ionicons name="alert-circle-outline" size={18} color="#ef4444" />
@@ -634,6 +700,18 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8fafc',
     },
+    termsBannerBox: {
+        backgroundColor: '#fffbeb',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#fde68a',
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
     selectorTab: {
         flex: 1,
         backgroundColor: '#ffffff',
@@ -647,8 +725,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     selectorTabActive: {
-        borderColor: '#ea580c',
-        backgroundColor: '#fff7ed',
+        borderColor: '#060d21',
+        backgroundColor: '#060d21',
     },
     selectorTabText: {
         color: '#475569',
@@ -656,7 +734,7 @@ const styles = StyleSheet.create({
         fontSize: 11,
     },
     selectorTabTextActive: {
-        color: '#ea580c',
+        color: '#f5a623',
         fontWeight: '900',
     },
     mainFormCard: {
@@ -683,7 +761,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: '#cbd5e1',
         height: 46,
         flexDirection: 'row',
         alignItems: 'center',
@@ -707,10 +785,10 @@ const styles = StyleSheet.create({
         fontSize: 9,
     },
     feeCardBox: {
-        backgroundColor: '#fff7ed',
+        backgroundColor: '#fffbeb',
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#ffedd5',
+        borderColor: '#fde68a',
         paddingVertical: 14,
         paddingHorizontal: 16,
         flexDirection: 'row',
@@ -720,19 +798,19 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     submitBtn: {
-        backgroundColor: '#ea580c',
+        backgroundColor: '#060d21',
         height: 48,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#ea580c',
+        shadowColor: '#060d21',
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.25,
         shadowRadius: 6,
         elevation: 3,
     },
     submitBtnText: {
-        color: '#ffffff',
+        color: '#f5a623',
         fontWeight: '900',
         fontSize: 14,
     },
@@ -748,7 +826,7 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#fff7ed',
+        backgroundColor: '#060d21',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -756,7 +834,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8fafc',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
+        borderColor: '#cbd5e1',
         paddingVertical: 8,
         paddingHorizontal: 14,
         flexDirection: 'row',
@@ -766,7 +844,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     viewHistoryBtnText: {
-        color: '#334155',
+        color: '#060d21',
         fontWeight: '800',
         fontSize: 12,
     },
@@ -779,10 +857,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
 
-    // Terms Modal Styles
+    // Ultra-Modern Navy & Gold Terms Modal Styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(6, 13, 33, 0.75)',
+        backgroundColor: 'rgba(6, 13, 33, 0.85)',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 16,
@@ -790,81 +868,123 @@ const styles = StyleSheet.create({
     termsModalCard: {
         backgroundColor: '#ffffff',
         borderRadius: 24,
-        padding: 20,
         width: '100%',
-        maxWidth: 480,
-        maxHeight: '85%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 10,
+        maxWidth: 520,
+        maxHeight: '88%',
+        overflow: 'hidden',
+        shadowColor: '#060d21',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.4,
+        shadowRadius: 24,
+        elevation: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
     },
-    termsHeaderRow: {
+    termsHeaderGradient: {
+        paddingVertical: 18,
+        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: 'rgba(245, 166, 35, 0.2)',
     },
     warningIconBg: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#fff7ed',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(245, 166, 35, 0.15)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#ffedd5',
+        borderColor: 'rgba(245, 166, 35, 0.4)',
     },
     termsTitle: {
-        color: '#0f172a',
+        color: '#ffffff',
         fontWeight: '900',
-        fontSize: 17,
+        fontSize: 18,
+        letterSpacing: 0.2,
     },
     termsSubtitle: {
-        color: '#64748b',
-        fontSize: 11,
-        fontWeight: '600',
+        color: '#f5a623',
+        fontSize: 11.5,
+        fontWeight: '700',
         marginTop: 2,
     },
+    closeModalBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     termsScroll: {
-        marginTop: 14,
-        marginBottom: 14,
+        flex: 1,
+    },
+    termSectionCard: {
+        flexDirection: 'row',
+        marginBottom: 16,
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    termNumBadge: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#060d21',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    termNumBadgeText: {
+        color: '#f5a623',
+        fontWeight: '900',
+        fontSize: 11,
     },
     termHeading: {
-        color: '#0f172a',
+        color: '#060d21',
         fontWeight: '900',
-        fontSize: 12,
-        marginTop: 10,
+        fontSize: 13,
         marginBottom: 4,
     },
     termBody: {
         color: '#475569',
         fontSize: 11.5,
         fontWeight: '500',
-        lineHeight: 17,
+        lineHeight: 17.5,
     },
     highlightTermBox: {
-        backgroundColor: '#fff7ed',
-        borderRadius: 12,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: '#ffedd5',
-        marginTop: 10,
-        marginBottom: 4,
+        backgroundColor: '#fffbeb',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1.5,
+        borderColor: '#fde68a',
+        marginBottom: 16,
+    },
+    termsFooterBox: {
+        padding: 16,
+        backgroundColor: '#ffffff',
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
     },
     termsAgreeBtn: {
-        backgroundColor: '#ea580c',
-        height: 48,
         borderRadius: 14,
+        overflow: 'hidden',
+        shadowColor: '#d97706',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    termsAgreeBtnGradient: {
+        height: 50,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#ea580c',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 3,
+        paddingHorizontal: 16,
     },
     termsAgreeBtnText: {
         color: '#ffffff',
@@ -919,7 +1039,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     alertButtonText: {
-        color: '#ffffff',
+        color: '#f5a623',
         fontWeight: '900',
         fontSize: 14,
     },
