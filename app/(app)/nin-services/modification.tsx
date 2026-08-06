@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
         height: 52,
         borderRadius: 26,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginBottom: 12,
     },
     alertTitle: {
@@ -1036,7 +1036,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         width: '100%',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     alertButtonText: {
         color: '#f5a623',
