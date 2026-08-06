@@ -93,27 +93,35 @@ export default function LiquidityVaultScreen() {
     const fetchProviderBalances = async () => {
         setRefreshing(true);
         try {
-            // 1. Fetch system secrets from Supabase DB directly for 100% Vercel compatibility
-            const { data: secretsData } = await supabase.from('system_secrets').select('*');
             const secrets: Record<string, string> = {};
-            if (secretsData) {
-                secretsData.forEach(s => {
-                    if (s.value) secrets[s.key] = s.value.trim();
+
+            // 1. Read app_settings
+            const { data: settingsData } = await supabase.from('app_settings').select('*');
+            if (settingsData) {
+                settingsData.forEach(s => {
+                    if (s.value) secrets[s.key.toUpperCase()] = s.value.trim();
                 });
             }
 
-            const agentHubKey = secrets['AGENTHUB_API_KEY'] || '';
-            const bilalToken = secrets['BILALSADASUB_TOKEN'] || '';
-            const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || '';
-            const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || '';
-            const idProKey = secrets['IDPRO_API_KEY'] || '';
-            const payBesselKey = secrets['PAYBESSEL_API_KEY'] || '';
-            const nineBoostKey = secrets['NINEBOOST_API_KEY'] || '';
-            const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || '';
-            const bigiToken = secrets['BIGI_API_TOKEN'] || '';
-            const termiiKey = secrets['TERMII_API_KEY'] || '';
-            const monnifyApiKey = secrets['MONNIFY_API_KEY'] || '';
-            const monnifySecret = secrets['MONNIFY_SECRET_KEY'] || '';
+            // 2. Read system_secrets
+            const { data: secretsData } = await supabase.from('system_secrets').select('*');
+            if (secretsData) {
+                secretsData.forEach(s => {
+                    if (s.value) secrets[s.key.toUpperCase()] = s.value.trim();
+                });
+            }
+
+            const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || '';
+            const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || '';
+            const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || '';
+            const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || '';
+            const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || '';
+            const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || '';
+            const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || '';
+            const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || '';
+            const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || '';
+            const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || '';
+            const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || '';
 
             const list: ProviderWallet[] = [];
 
@@ -515,14 +523,20 @@ export default function LiquidityVaultScreen() {
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
             
-            const { error } = await supabase.from('system_secrets').upsert({
+            // Save to system_secrets
+            await supabase.from('system_secrets').upsert({
                 key: secretKey,
                 value: tokenValue.trim(),
                 description: `Updated secret for ${selectedTokenProvider?.name}`,
                 updated_at: new Date().toISOString()
             });
 
-            if (error) throw error;
+            // Save to app_settings as backup
+            await supabase.from('app_settings').upsert({
+                key: secretKey,
+                value: tokenValue.trim(),
+                updated_at: new Date().toISOString()
+            });
 
             Alert.alert("Success 🎉", `Saved ${secretKey} to Vault successfully!`);
             setSelectedTokenProvider(null);

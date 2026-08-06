@@ -30,28 +30,44 @@ export default function APIVaultScreen() {
 
     const fetchApiVaultData = async () => {
         try {
-            // Fetch vtu_vendor setting
-            const { data: settings } = await supabase.from('app_settings').select('*').eq('key', 'vtu_vendor').maybeSingle();
+            // 1. Fetch vtu_vendor setting
+            const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
-                setVtuVendor(settings.value || 'bilalsadasub,bigi,clubkonnect');
+                settings.forEach((s) => {
+                    const k = s.key.toUpperCase();
+                    if (k === 'VTU_VENDOR') setVtuVendor(s.value);
+                    if (k === 'AGENTHUB_API_KEY' || k === 'AGENTHUB_KEY') setAgentHubApiKey(s.value);
+                    if (k === 'BILALSADASUB_TOKEN' || k === 'BILAL_TOKEN') setBilalToken(s.value);
+                    if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
+                    if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
+                    if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
+                    if (k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
+                    if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
+                    if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
+                    if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
+                    if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
+                    if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
+                });
             }
 
-            // Fetch all system secrets
+            // 2. Fetch all system secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
                 secrets.forEach((s) => {
-                    if (s.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(s.value);
-                    if (s.key === 'BILALSADASUB_TOKEN') setBilalToken(s.value);
-                    if (s.key === 'PAYSTACK_SECRET_KEY') setPaystackSecret(s.value);
-                    if (s.key === 'CLUBKONNECT_API_KEY') setClubkonnectApiKey(s.value);
-                    if (s.key === 'IDPRO_API_KEY') setIdProApiKey(s.value);
-                    if (s.key === 'PAYBESSEL_API_KEY') setPayBesselApiKey(s.value);
-                    if (s.key === 'NINEBOOST_API_KEY') setNineBoostApiKey(s.value);
-                    if (s.key === 'NOWPAYMENTS_API_KEY') setNowPaymentsApiKey(s.value);
-                    if (s.key === 'BIGI_API_TOKEN') setBigiToken(s.value);
-                    if (s.key === 'BIGI_API_PIN') setBigiPin(s.value);
-                    if (s.key === 'TERMII_API_KEY') setTermiiApiKey(s.value);
-                    if (s.key === 'MONNIFY_API_KEY') setMonnifyApiKey(s.value);
+                    const k = s.key.toUpperCase();
+                    if (k === 'AGENTHUB_API_KEY' || k === 'AGENTHUB_KEY') setAgentHubApiKey(s.value);
+                    if (k === 'BILALSADASUB_TOKEN' || k === 'BILAL_TOKEN') setBilalToken(s.value);
+                    if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
+                    if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
+                    if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
+                    if (k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
+                    if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
+                    if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
+                    if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
+                    if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
+                    if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
                 });
             }
         } catch (e: any) {
@@ -110,10 +126,18 @@ export default function APIVaultScreen() {
 
             for (const sec of secretsToSave) {
                 if (sec.value && sec.value.trim() !== '') {
+                    // Save to system_secrets table
                     await supabase.from('system_secrets').upsert({
                         key: sec.key,
                         value: sec.value.trim(),
                         description: sec.description,
+                        updated_at: new Date().toISOString()
+                    });
+
+                    // Save to app_settings table as backup
+                    await supabase.from('app_settings').upsert({
+                        key: sec.key,
+                        value: sec.value.trim(),
                         updated_at: new Date().toISOString()
                     });
                 }
