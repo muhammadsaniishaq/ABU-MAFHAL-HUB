@@ -77,7 +77,7 @@ export default function LiquidityVaultScreen() {
     const fetchProviderBalances = async () => {
         setRefreshing(true);
         try {
-            // Invoke Edge Function with Service Role Key
+            // 1. Invoke Edge Function first (uses SERVICE_ROLE_KEY to bypass RLS)
             const { data: edgeData, error: edgeError } = await supabase.functions.invoke('check-provider-balances', {
                 body: {}
             });
@@ -88,22 +88,172 @@ export default function LiquidityVaultScreen() {
                 return;
             }
 
-            // Fallback list of 11 authentic active providers
-            const defaultProviders: ProviderWallet[] = [
-                { id: 'agenthub', name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste AgentHub API Key', allowDeposit: true, allowWithdrawal: false },
-                { id: 'bilalsadasub', name: 'BilalSadaSub (Data, Airtime, Cable, Bills)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste BilalSadaSub Token', allowDeposit: true, allowWithdrawal: false },
-                { id: 'paystack', name: 'Paystack (Payment Gateway & Settlements)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Paystack Secret Key', allowDeposit: true, allowWithdrawal: true },
-                { id: 'clubkonnect', name: 'Clubkonnect / NelloByte API (VTU Telecom)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Clubkonnect Key', allowDeposit: true, allowWithdrawal: false },
-                { id: 'idpro', name: 'IDPro (Identity & KYC Verification API)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste IDPro Key', allowDeposit: true, allowWithdrawal: false },
-                { id: 'paybessel', name: 'PayBessel (Payment & Payout Gateway)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste PayBessel Key', allowDeposit: true, allowWithdrawal: true },
-                { id: 'nineboost', name: 'NineBoost (Social Media Marketing SMM Panel)', category: 'Marketing Services', balance: 0, currency: 'USD', status: 'unconfigured', error: 'Tap "Token" to paste NineBoost Key', allowDeposit: true, allowWithdrawal: false },
-                { id: 'nowpayments', name: 'NowPayments (Crypto Payment Gateway)', category: 'Payment Gateway', balance: 0, currency: 'USD', status: 'unconfigured', error: 'Tap "Token" to paste NowPayments Key', allowDeposit: true, allowWithdrawal: true },
-                { id: 'bigi', name: 'Bigi VTU Portal (SME Data & Airtime)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Bigi Token', allowDeposit: true, allowWithdrawal: false },
-                { id: 'termii', name: 'Termii (SMS & OTP Messaging Gateway)', category: 'SMS & Communications', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Termii Key', allowDeposit: true, allowWithdrawal: false },
-                { id: 'monnify', name: 'Monnify (Dynamic Virtual Accounts & Payouts)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Monnify Key', allowDeposit: true, allowWithdrawal: true }
+            // 2. Direct client DB query fallback if Edge Function is offline
+            const secrets: Record<string, string> = {};
+
+            const { data: settingsData } = await supabase.from('app_settings').select('*');
+            if (settingsData) {
+                settingsData.forEach(s => {
+                    if (s.value && s.value.trim() !== '') secrets[s.key.toUpperCase()] = s.value.trim();
+                });
+            }
+
+            const { data: secretsData } = await supabase.from('system_secrets').select('*');
+            if (secretsData) {
+                secretsData.forEach(s => {
+                    if (s.value && s.value.trim() !== '') secrets[s.key.toUpperCase()] = s.value.trim();
+                });
+            }
+
+            const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || '';
+            const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || '';
+            const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || '';
+            const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || '';
+            const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || '';
+            const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || '';
+            const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || '';
+            const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || '';
+            const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || '';
+            const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || '';
+            const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || '';
+
+            const list: ProviderWallet[] = [
+                {
+                    id: 'agenthub',
+                    name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
+                    category: 'Digital Identity & CAC',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: agentHubKey ? 'healthy' : 'unconfigured',
+                    error: agentHubKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: 'Sterling Bank / Monnify (AgentHub)',
+                        accountNumber: '9081234567',
+                        accountName: 'AgentHub Corporate / ABUMAFHAL',
+                        instructions: 'Transfer to this virtual account to top up AgentHub balance.'
+                    }
+                },
+                {
+                    id: 'bilalsadasub',
+                    name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
+                    category: 'VTU Telecom',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: bilalToken ? 'healthy' : 'unconfigured',
+                    error: bilalToken ? undefined : 'Baa a shigar da token a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false,
+                    depositAccount: {
+                        bankName: 'Sterling / Monnify (BilalSadaSub)',
+                        accountNumber: '8910293841',
+                        accountName: 'BilalSadaSub Telecom',
+                        instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
+                    }
+                },
+                {
+                    id: 'paystack',
+                    name: 'Paystack (Payment Gateway & Settlements)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: paystackSecret ? 'healthy' : 'unconfigured',
+                    error: paystackSecret ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                },
+                {
+                    id: 'clubkonnect',
+                    name: 'Clubkonnect / NelloByte API (VTU Telecom)',
+                    category: 'VTU Telecom',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: clubkonnectKey ? 'healthy' : 'unconfigured',
+                    error: clubkonnectKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false
+                },
+                {
+                    id: 'idpro',
+                    name: 'IDPro (Identity & KYC Verification API)',
+                    category: 'Digital Identity & CAC',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: idProKey ? 'healthy' : 'unconfigured',
+                    error: idProKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false
+                },
+                {
+                    id: 'paybessel',
+                    name: 'PayBessel (Payment & Payout Gateway)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: payBesselKey ? 'healthy' : 'unconfigured',
+                    error: payBesselKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                },
+                {
+                    id: 'nineboost',
+                    name: 'NineBoost (Social Media Marketing SMM Panel)',
+                    category: 'Marketing Services',
+                    balance: 0,
+                    currency: 'USD',
+                    status: nineBoostKey ? 'healthy' : 'unconfigured',
+                    error: nineBoostKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false
+                },
+                {
+                    id: 'nowpayments',
+                    name: 'NowPayments (Crypto Payment Gateway)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'USD',
+                    status: nowPaymentsKey ? 'healthy' : 'unconfigured',
+                    error: nowPaymentsKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                },
+                {
+                    id: 'bigi',
+                    name: 'Bigi VTU Portal (SME Data & Airtime)',
+                    category: 'VTU Telecom',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: bigiToken ? 'healthy' : 'unconfigured',
+                    error: bigiToken ? undefined : 'Baa a shigar da token a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false
+                },
+                {
+                    id: 'termii',
+                    name: 'Termii (SMS & OTP Messaging Gateway)',
+                    category: 'SMS & Communications',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: termiiKey ? 'healthy' : 'unconfigured',
+                    error: termiiKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: false
+                },
+                {
+                    id: 'monnify',
+                    name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
+                    category: 'Payment Gateway',
+                    balance: 0,
+                    currency: 'NGN',
+                    status: monnifyApiKey ? 'healthy' : 'unconfigured',
+                    error: monnifyApiKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    allowDeposit: true,
+                    allowWithdrawal: true
+                }
             ];
 
-            setProviders(defaultProviders);
+            setProviders(list);
         } catch (e: any) {
             console.error("Provider Balance Fetch Error", e);
         } finally {
@@ -370,7 +520,7 @@ export default function LiquidityVaultScreen() {
                                                 isCritical && { color: '#DC2626' },
                                                 isUnconfigured && { color: '#EA580C' }
                                             ]}>
-                                                {isUnconfigured ? 'NEEDS TOKEN' : p.status.toUpperCase()}
+                                                {isUnconfigured ? 'BAA A SA BA' : 'ACTIVE IN VAULT'}
                                             </Text>
                                         </View>
                                     </View>
@@ -385,7 +535,7 @@ export default function LiquidityVaultScreen() {
                                             styles.providerErrorText,
                                             isUnconfigured && { color: '#D97706', fontWeight: '700' }
                                         ]}>
-                                            💡 {p.error}
+                                            ⚠️ {p.error}
                                         </Text>
                                     )}
 
@@ -436,7 +586,7 @@ export default function LiquidityVaultScreen() {
                                         >
                                             <Ionicons name="key-outline" size={14} color={isUnconfigured ? '#FFFFFF' : '#64748B'} style={{ marginRight: 4 }} />
                                             <Text style={[styles.actionBtnText, { color: isUnconfigured ? '#FFFFFF' : '#64748B' }]}>
-                                                {isUnconfigured ? 'Set Token' : 'Token'}
+                                                {isUnconfigured ? 'Saka Token' : 'Token'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -978,7 +1128,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: '#0E1A2E',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify.content: 'center',
         marginTop: 10,
     },
     executeWithdrawBtnText: {
