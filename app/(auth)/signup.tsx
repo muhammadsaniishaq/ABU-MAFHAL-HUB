@@ -482,22 +482,34 @@ export default function SignupScreen() {
                                     />
                                 </View>
 
-                                {/* Terms Checkbox */}
-                                <TouchableOpacity 
-                                    onPress={() => setAcceptTerms(!acceptTerms)}
-                                    style={styles.termsRow}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[
-                                        styles.checkboxBox, 
-                                        acceptTerms && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
-                                    ]}>
-                                        {acceptTerms && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
-                                    </View>
-                                    <Text style={[styles.termsText, { color: theme.textSecondary }]}>
-                                        I accept ABUMAFHAL's <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Terms</Text> & <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Privacy Policy</Text>.
-                                    </Text>
-                                </TouchableOpacity>
+                                {/* Terms & Privacy Acceptance Row */}
+                                <View style={styles.termsRow}>
+                                    <TouchableOpacity 
+                                        onPress={() => setAcceptTerms(!acceptTerms)}
+                                        style={styles.checkboxTouch}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={[
+                                            styles.checkboxBox, 
+                                            acceptTerms && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
+                                        ]}>
+                                            {acceptTerms && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
+                                        </View>
+                                        <Text style={[styles.termsText, { color: theme.textSecondary }]}>
+                                            I agree to
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7}>
+                                        <Text style={[styles.termsLink, { color: theme.accentTeal }]}> Terms</Text>
+                                    </TouchableOpacity>
+
+                                    <Text style={[styles.termsText, { color: theme.textSecondary }]}> & </Text>
+
+                                    <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7}>
+                                        <Text style={[styles.termsLink, { color: theme.accentTeal }]}>Privacy Policy</Text>
+                                    </TouchableOpacity>
+                                </View>
 
                                 {/* Primary Button */}
                                 <TouchableOpacity 
@@ -721,10 +733,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 6,
         marginBottom: 10,
+        flexWrap: 'wrap',
+    },
+    checkboxTouch: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     checkboxBox: {
-        width: 15,
-        height: 15,
+        width: 16,
+        height: 16,
         borderRadius: 4,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
@@ -733,10 +750,13 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     termsText: {
-        flex: 1,
-        fontSize: 10,
+        fontSize: 10.5,
         fontWeight: '500',
-        lineHeight: 14,
+    },
+    termsLink: {
+        fontSize: 10.5,
+        fontWeight: '800',
+        textDecorationLine: 'underline',
     },
     primaryBtn: {
         borderRadius: 10,
