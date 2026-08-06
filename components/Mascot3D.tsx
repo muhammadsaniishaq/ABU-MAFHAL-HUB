@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Easing, StyleSheet, Platform, Text } from 'react-native';
+import { View, Animated, Easing, StyleSheet } from 'react-native';
 import Svg, { 
     G, Circle, Rect, Path, Defs, LinearGradient as SvgGradient, 
-    Stop, Filter, FeDropShadow, FeGaussianBlur 
+    Stop, Ellipse 
 } from 'react-native-svg';
 
 interface Mascot3DProps {
@@ -11,27 +11,27 @@ interface Mascot3DProps {
     isDarkMode?: boolean;
 }
 
-export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = false }: Mascot3DProps) {
+export default function Mascot3D({ size = 110, mode = 'waving', isDarkMode = false }: Mascot3DProps) {
     // Animation Values
     const floatAnim = useRef(new Animated.Value(0)).current;
     const breathAnim = useRef(new Animated.Value(1)).current;
     const waveAnim = useRef(new Animated.Value(0)).current;
     const blinkAnim = useRef(new Animated.Value(1)).current;
-    const glowAnim = useRef(new Animated.Value(0.6)).current;
+    const orbSpinAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         // Continuous Floating Animation (Sine wave vertical movement)
         const floatLoop = Animated.loop(
             Animated.sequence([
                 Animated.timing(floatAnim, {
-                    toValue: -12,
-                    duration: 2000,
+                    toValue: -9,
+                    duration: 1800,
                     easing: Easing.inOut(Easing.quad),
                     useNativeDriver: true,
                 }),
                 Animated.timing(floatAnim, {
                     toValue: 0,
-                    duration: 2000,
+                    duration: 1800,
                     easing: Easing.inOut(Easing.quad),
                     useNativeDriver: true,
                 }),
@@ -42,44 +42,44 @@ export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = fal
         const breathLoop = Animated.loop(
             Animated.sequence([
                 Animated.timing(breathAnim, {
-                    toValue: 1.04,
-                    duration: 2200,
+                    toValue: 1.05,
+                    duration: 2000,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
                 Animated.timing(breathAnim, {
-                    toValue: 0.98,
-                    duration: 2200,
+                    toValue: 0.96,
+                    duration: 2000,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
             ])
         );
 
-        // Hand Waving Animation
+        // Hand Waving Animation (Game Cartoon Style)
         const waveLoop = Animated.loop(
             Animated.sequence([
                 Animated.timing(waveAnim, {
                     toValue: 1,
-                    duration: 600,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(waveAnim, {
-                    toValue: 0,
-                    duration: 600,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(waveAnim, {
-                    toValue: 0.8,
                     duration: 500,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
                 Animated.timing(waveAnim, {
+                    toValue: -0.3,
+                    duration: 500,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(waveAnim, {
+                    toValue: 0.8,
+                    duration: 400,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(waveAnim, {
                     toValue: 0,
-                    duration: 700,
+                    duration: 600,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
@@ -89,18 +89,7 @@ export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = fal
         // Eye Blinking Loop
         const blinkLoop = Animated.loop(
             Animated.sequence([
-                Animated.delay(3200),
-                Animated.timing(blinkAnim, {
-                    toValue: 0.1,
-                    duration: 120,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(blinkAnim, {
-                    toValue: 1,
-                    duration: 140,
-                    useNativeDriver: true,
-                }),
-                Animated.delay(100),
+                Animated.delay(2800),
                 Animated.timing(blinkAnim, {
                     toValue: 0.1,
                     duration: 100,
@@ -111,68 +100,77 @@ export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = fal
                     duration: 120,
                     useNativeDriver: true,
                 }),
+                Animated.delay(120),
+                Animated.timing(blinkAnim, {
+                    toValue: 0.1,
+                    duration: 90,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(blinkAnim, {
+                    toValue: 1,
+                    duration: 110,
+                    useNativeDriver: true,
+                }),
             ])
         );
 
-        // Pulsing Neon Visor Glow Loop
-        const glowLoop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(glowAnim, {
-                    toValue: 1,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(glowAnim, {
-                    toValue: 0.5,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-            ])
+        // Game Orb Orbit Rotation Loop
+        const orbLoop = Animated.loop(
+            Animated.timing(orbSpinAnim, {
+                toValue: 1,
+                duration: 4000,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            })
         );
 
         floatLoop.start();
         breathLoop.start();
         waveLoop.start();
         blinkLoop.start();
-        glowLoop.start();
+        orbLoop.start();
 
         return () => {
             floatLoop.stop();
             breathLoop.stop();
             waveLoop.stop();
             blinkLoop.stop();
-            glowLoop.stop();
+            orbLoop.stop();
         };
     }, []);
 
-    // Interpolate wave rotation
-    const waveRotate = waveAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '25deg'],
-    });
-
     // Interpolate shadow scale (shrinks when floating higher)
     const shadowScale = floatAnim.interpolate({
-        inputRange: [-12, 0],
-        outputRange: [0.75, 1],
+        inputRange: [-9, 0],
+        outputRange: [0.7, 1],
     });
 
     const shadowOpacity = floatAnim.interpolate({
-        inputRange: [-12, 0],
-        outputRange: [0.2, 0.45],
+        inputRange: [-9, 0],
+        outputRange: [0.2, 0.5],
     });
 
-    const scale = size / 200;
+    const waveRotate = waveAnim.interpolate({
+        inputRange: [-0.3, 1],
+        outputRange: ['-10deg', '30deg'],
+    });
+
+    const orbRotate = orbSpinAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+    });
+
+    const scale = size / 160;
 
     return (
-        <View style={[styles.container, { width: size, height: size + 20 }]}>
-            {/* Animated Shadow underneath Mascot */}
+        <View style={[styles.container, { width: size, height: size + 14 }]}>
+            {/* Dynamic 3D Floating Game Shadow */}
             <Animated.View 
                 style={[
                     styles.shadow, 
                     { 
-                        width: size * 0.6, 
-                        height: 12 * scale,
+                        width: size * 0.65, 
+                        height: 10 * scale,
                         transform: [{ scaleX: shadowScale }],
                         opacity: shadowOpacity,
                         backgroundColor: isDarkMode ? '#08E4C7' : '#0E1A2E',
@@ -180,7 +178,7 @@ export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = fal
                 ]} 
             />
 
-            {/* 3D Floating & Breathing Mascot Canvas */}
+            {/* 3D Game Cartoon Robot Body Levitation Container */}
             <Animated.View
                 style={[
                     styles.mascotWrapper,
@@ -192,109 +190,113 @@ export default function Mascot3D({ size = 160, mode = 'waving', isDarkMode = fal
                     },
                 ]}
             >
-                <Svg width={size} height={size} viewBox="0 0 200 200" fill="none">
+                <Svg width={size} height={size} viewBox="0 0 160 160" fill="none">
                     <Defs>
-                        {/* Metallic Head & Body Gradients */}
-                        <SvgGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#1E293B" />
-                            <Stop offset="50%" stopColor="#0E1A2E" />
+                        {/* 3D Sphere Head Gradient */}
+                        <SvgGradient id="head3dGrad" x1="20%" y1="10%" x2="80%" y2="90%">
+                            <Stop offset="0%" stopColor="#334155" />
+                            <Stop offset="30%" stopColor="#1E293B" />
+                            <Stop offset="75%" stopColor="#0E1A2E" />
                             <Stop offset="100%" stopColor="#060D1A" />
                         </SvgGradient>
 
-                        <SvgGradient id="headGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <Stop offset="0%" stopColor="#1E293B" />
-                            <Stop offset="60%" stopColor="#0E1A2E" />
-                            <Stop offset="100%" stopColor="#091322" />
-                        </SvgGradient>
-
-                        {/* Visor Cyan Neon Gradient */}
-                        <SvgGradient id="visorGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        {/* Visor Glass Neon Gradient */}
+                        <SvgGradient id="visor3dGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <Stop offset="0%" stopColor="#08E4C7" />
                             <Stop offset="50%" stopColor="#02C39A" />
-                            <Stop offset="100%" stopColor="#00A896" />
+                            <Stop offset="100%" stopColor="#0077B6" />
                         </SvgGradient>
 
-                        {/* Gold Badge Gradient */}
-                        <SvgGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#FDE047" />
-                            <Stop offset="50%" stopColor="#D9A73A" />
+                        {/* 3D Gold Accent Gradient */}
+                        <SvgGradient id="gold3dGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <Stop offset="0%" stopColor="#FEF08A" />
+                            <Stop offset="40%" stopColor="#F59E0B" />
                             <Stop offset="100%" stopColor="#B45309" />
                         </SvgGradient>
 
-                        {/* Ear Highlight Metallic */}
-                        <SvgGradient id="earGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <Stop offset="0%" stopColor="#D9A73A" />
-                            <Stop offset="100%" stopColor="#08E4C7" />
+                        {/* Ear Metallic Cup */}
+                        <SvgGradient id="metalCupGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <Stop offset="0%" stopColor="#94A3B8" />
+                            <Stop offset="50%" stopColor="#475569" />
+                            <Stop offset="100%" stopColor="#0F172A" />
+                        </SvgGradient>
+
+                        {/* Chest Power Core Orb */}
+                        <SvgGradient id="coreOrbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <Stop offset="0%" stopColor="#FFFFFF" />
+                            <Stop offset="40%" stopColor="#08E4C7" />
+                            <Stop offset="100%" stopColor="#0F766E" />
                         </SvgGradient>
                     </Defs>
 
-                    {/* Floating Tech Orbs/Sparkles background */}
-                    <Circle cx="30" cy="50" r="4" fill="#08E4C7" opacity="0.6" />
-                    <Circle cx="170" cy="40" r="5" fill="#D9A73A" opacity="0.7" />
-                    <Circle cx="160" cy="140" r="3.5" fill="#08E4C7" opacity="0.5" />
+                    {/* Floating Game Particles */}
+                    <Circle cx="20" cy="35" r="3.5" fill="#08E4C7" opacity="0.8" />
+                    <Circle cx="140" cy="25" r="4" fill="#F59E0B" opacity="0.9" />
+                    <Circle cx="135" cy="115" r="3" fill="#08E4C7" opacity="0.7" />
 
-                    {/* Antennas / Futuristic Headphones */}
-                    <G id="headphones">
-                        {/* Left Ear Cup */}
-                        <Rect x="22" y="70" width="14" height="28" rx="7" fill="url(#earGradient)" />
-                        <Circle cx="29" cy="84" r="4" fill="#08E4C7" />
-                        
-                        {/* Right Ear Cup */}
-                        <Rect x="164" y="70" width="14" height="28" rx="7" fill="url(#earGradient)" />
-                        <Circle cx="171" cy="84" r="4" fill="#08E4C7" />
+                    {/* Game Halo Ring Above Head */}
+                    <Ellipse cx="80" cy="18" rx="34" ry="7" fill="none" stroke="url(#gold3dGrad)" strokeWidth="3" opacity="0.9" />
 
-                        {/* Top Headband */}
-                        <Path d="M 32 75 A 68 68 0 0 1 168 75" stroke="url(#goldGradient)" strokeWidth="6" strokeLinecap="round" fill="none" />
+                    {/* Antenna Crown */}
+                    <Path d="M 80 18 L 80 32" stroke="url(#gold3dGrad)" strokeWidth="4" strokeLinecap="round" />
+                    <Circle cx="80" cy="14" r="5" fill="#08E4C7" />
+
+                    {/* Headphones / Side Boosters */}
+                    <G id="earBoosters">
+                        <Rect x="16" y="52" width="12" height="24" rx="6" fill="url(#metalCupGrad)" />
+                        <Circle cx="22" cy="64" r="3.5" fill="#08E4C7" />
+
+                        <Rect x="132" y="52" width="12" height="24" rx="6" fill="url(#metalCupGrad)" />
+                        <Circle cx="138" cy="64" r="3.5" fill="#08E4C7" />
                     </G>
 
-                    {/* Cute Futuristic 3D Head */}
-                    <Rect x="34" y="42" width="132" height="96" rx="42" fill="url(#headGradient)" stroke="#08E4C7" strokeWidth="2.5" />
+                    {/* 3D Round Cartoon Robot Head */}
+                    <Rect x="26" y="30" width="108" height="82" rx="41" fill="url(#head3dGrad)" stroke="#08E4C7" strokeWidth="2" />
                     
-                    {/* Head 3D Specular Highlight */}
-                    <Path d="M 54 50 Q 100 44 146 50" stroke="rgba(255, 255, 255, 0.35)" strokeWidth="3" strokeLinecap="round" fill="none" />
+                    {/* Head 3D Light Specular Highlight Arc */}
+                    <Path d="M 44 38 Q 80 33 116 38" stroke="rgba(255, 255, 255, 0.4)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
 
-                    {/* Visor Screen */}
-                    <Rect x="48" y="58" width="104" height="62" rx="24" fill="#030712" stroke="#08E4C7" strokeWidth="1.5" />
+                    {/* Visor Screen Box */}
+                    <Rect x="38" y="44" width="84" height="52" rx="20" fill="#030712" stroke="#08E4C7" strokeWidth="1.2" />
 
-                    {/* Visor Glass Reflection */}
-                    <Path d="M 54 64 L 140 64 A 18 18 0 0 1 146 80 L 60 80 Z" fill="rgba(8, 228, 199, 0.12)" />
+                    {/* Visor 3D Light Sheen */}
+                    <Path d="M 44 48 L 114 48 Q 118 60 114 62 L 48 62 Z" fill="rgba(8, 228, 199, 0.14)" />
 
-                    {/* Eyes - Left & Right */}
-                    <G id="eyes">
-                        {/* Left Eye */}
-                        <Circle cx="78" cy="88" r="13" fill="url(#visorGradient)" />
-                        <Circle cx="81" cy="85" r="4.5" fill="#FFFFFF" />
-                        <Circle cx="75" cy="91" r="2" fill="#FFFFFF" opacity="0.8" />
+                    {/* Game Character Glowing Eyes */}
+                    <G id="eyes3d">
+                        {/* Left Pupil */}
+                        <Circle cx="62" cy="68" r="10" fill="url(#visor3dGrad)" />
+                        <Circle cx="64" cy="65" r="3.5" fill="#FFFFFF" />
+                        <Circle cx="59" cy="71" r="1.5" fill="#FFFFFF" opacity="0.8" />
 
-                        {/* Right Eye */}
-                        <Circle cx="122" cy="88" r="13" fill="url(#visorGradient)" />
-                        <Circle cx="125" cy="85" r="4.5" fill="#FFFFFF" />
-                        <Circle cx="119" cy="91" r="2" fill="#FFFFFF" opacity="0.8" />
+                        {/* Right Pupil */}
+                        <Circle cx="98" cy="68" r="10" fill="url(#visor3dGrad)" />
+                        <Circle cx="100" cy="65" r="3.5" fill="#FFFFFF" />
+                        <Circle cx="95" cy="71" r="1.5" fill="#FFFFFF" opacity="0.8" />
                     </G>
 
-                    {/* Happy Cute Mouth Curve */}
-                    <Path d="M 92 104 Q 100 112 108 104" stroke="#08E4C7" strokeWidth="3" strokeLinecap="round" fill="none" />
+                    {/* Cute Game Smile Line */}
+                    <Path d="M 73 82 Q 80 88 87 82" stroke="#08E4C7" strokeWidth="2.5" strokeLinecap="round" fill="none" />
 
-                    {/* Cheeks Glow */}
-                    <Circle cx="64" cy="98" r="6" fill="#F43F5E" opacity="0.35" />
-                    <Circle cx="136" cy="98" r="6" fill="#F43F5E" opacity="0.35" />
+                    {/* Game Blush Cheek Glow */}
+                    <Circle cx="51" cy="76" r="4.5" fill="#F43F5E" opacity="0.35" />
+                    <Circle cx="109" cy="76" r="4.5" fill="#F43F5E" opacity="0.35" />
 
-                    {/* Robot Body */}
-                    <Rect x="58" y="132" width="84" height="54" rx="24" fill="url(#bodyGradient)" stroke="#D9A73A" strokeWidth="2" />
-                    
-                    {/* ABUMAFHAL Gold Crest Shield Badge on Chest */}
-                    <Circle cx="100" cy="156" r="14" fill="url(#goldGradient)" />
-                    <Path d="M 94 156 L 100 149 L 106 156 L 100 163 Z" fill="#0E1A2E" />
-                    <Circle cx="100" cy="156" r="3" fill="#08E4C7" />
+                    {/* 3D Robot Body */}
+                    <Rect x="46" y="108" width="68" height="42" rx="20" fill="url(#head3dGrad)" stroke="url(#gold3dGrad)" strokeWidth="1.8" />
 
-                    {/* Left Arm (Resting) */}
-                    <Rect x="36" y="138" width="18" height="34" rx="9" fill="url(#bodyGradient)" stroke="#08E4C7" strokeWidth="1.5" />
-                    <Circle cx="45" cy="172" r="6" fill="url(#goldGradient)" />
+                    {/* Glowing Chest Game Energy Core */}
+                    <Circle cx="80" cy="128" r="11" fill="url(#coreOrbGrad)" stroke="#FFFFFF" strokeWidth="1" />
+                    <Path d="M 76 128 L 80 123 L 84 128 L 80 133 Z" fill="#0E1A2E" />
 
-                    {/* Right Arm (Waving) */}
-                    <G transform="translate(146, 148) rotate(-25)">
-                        <Rect x="0" y="0" width="18" height="34" rx="9" fill="url(#bodyGradient)" stroke="#08E4C7" strokeWidth="1.5" />
-                        <Circle cx="9" cy="34" r="6" fill="url(#goldGradient)" />
+                    {/* Left Arm */}
+                    <Rect x="28" y="112" width="14" height="26" rx="7" fill="url(#head3dGrad)" stroke="#08E4C7" strokeWidth="1.2" />
+                    <Circle cx="35" cy="138" r="5" fill="url(#gold3dGrad)" />
+
+                    {/* Right Arm (Animated Wave) */}
+                    <G transform="translate(116, 120) rotate(-20)">
+                        <Rect x="0" y="0" width="14" height="26" rx="7" fill="url(#head3dGrad)" stroke="#08E4C7" strokeWidth="1.2" />
+                        <Circle cx="7" cy="26" r="5" fill="url(#gold3dGrad)" />
                     </G>
                 </Svg>
             </Animated.View>

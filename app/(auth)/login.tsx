@@ -96,7 +96,6 @@ export default function LoginScreen() {
             });
 
             if (result.success) {
-                // Retrieve stored session token or saved credentials
                 const savedId = await AsyncStorage.getItem('saved_user_identifier');
                 const savedPass = await AsyncStorage.getItem('saved_user_pass_secure');
 
@@ -145,7 +144,6 @@ export default function LoginScreen() {
             }
 
             if (data.user) {
-                // Save credentials if Remember Me is checked
                 if (rememberMe) {
                     await AsyncStorage.setItem('saved_user_identifier', cleanIdent);
                     await AsyncStorage.setItem('saved_user_pass_secure', userPass);
@@ -159,7 +157,6 @@ export default function LoginScreen() {
                     return;
                 }
 
-                // Log IP & Security Notification
                 let ip = "Unknown IP";
                 try {
                     const res = await fetch('https://api.ipify.org?format=json');
@@ -174,7 +171,6 @@ export default function LoginScreen() {
                     data: { priority: 'high', type: 'security', ip }
                 });
 
-                // Role Check
                 const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
                 const userEmail = data.user.email ? data.user.email.toLowerCase().trim() : '';
                 const isAdminEmail = userEmail && (KNOWN_ADMIN_EMAILS.includes(userEmail) || userEmail.includes('admin'));
@@ -221,7 +217,6 @@ export default function LoginScreen() {
         }
     };
 
-    // Social Provider Handler
     const handleSocialAuth = async (provider: 'google' | 'apple' | 'facebook' | 'twitter' | 'github') => {
         if (socialLoading) return;
         setSocialLoading(provider);
@@ -271,7 +266,6 @@ export default function LoginScreen() {
         }
     };
 
-    // Password Reset Submission
     const handleForgotPasswordSubmit = async () => {
         if (!resetEmail.trim() || !resetEmail.includes('@')) {
             Alert.alert('Invalid Email', 'Please enter a valid email address.');
@@ -303,15 +297,16 @@ export default function LoginScreen() {
 
             <SafeAreaView style={{ flex: 1 }}>
                 <KeyboardAvoidingView 
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
                 >
                     <ScrollView
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
+                        bounces={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Top Control Bar: Brand Logo & Dark/Light Toggle */}
+                        {/* Compact Top Control Bar */}
                         <View style={styles.topControlRow}>
                             <View style={styles.brandRow}>
                                 <Image
@@ -319,7 +314,7 @@ export default function LoginScreen() {
                                     style={styles.logoImage}
                                     resizeMode="contain"
                                 />
-                                <View style={{ marginLeft: 8 }}>
+                                <View style={{ marginLeft: 6 }}>
                                     <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
                                     <Text style={[styles.brandTagline, { color: theme.gold }]}>FINTECH & DIGITAL HUB</Text>
                                 </View>
@@ -330,16 +325,16 @@ export default function LoginScreen() {
                                 style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name={isDark ? "sunny" : "moon"} size={16} color={isDark ? "#FDE047" : "#0E1A2E"} />
+                                <Ionicons name={isDark ? "sunny" : "moon"} size={14} color={isDark ? "#FDE047" : "#0E1A2E"} />
                             </TouchableOpacity>
                         </View>
 
-                        {/* Main Container Card (Centered for Mobile & Desktop) */}
+                        {/* Centered Single-Screen Locked Card */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* 3D Animated Hero Mascot */}
+                            {/* Compact 3D Game Cartoon Mascot */}
                             <View style={styles.mascotContainer}>
-                                <Mascot3D size={150} mode="waving" isDarkMode={isDark} />
+                                <Mascot3D size={95} mode="waving" isDarkMode={isDark} />
                             </View>
 
                             {/* Welcome Headline */}
@@ -348,7 +343,7 @@ export default function LoginScreen() {
                                     Welcome Back <Text style={{ color: theme.gold }}>!</Text>
                                 </Text>
                                 <Text style={[styles.welcomeSubText, { color: theme.textSecondary }]}>
-                                    Sign in to access your wallet, identity, and digital services.
+                                    Sign in to access your wallet, identity, and services.
                                 </Text>
                             </View>
 
@@ -359,9 +354,9 @@ export default function LoginScreen() {
                                     style={[styles.loginTypeTab, loginType === 'email' && [styles.loginTypeTabActive, { backgroundColor: theme.primaryNavy }]]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="mail-outline" size={14} color={loginType === 'email' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 5 }} />
+                                    <Ionicons name="mail-outline" size={13} color={loginType === 'email' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 4 }} />
                                     <Text style={[styles.loginTypeText, loginType === 'email' ? { color: '#FFFFFF', fontWeight: '800' } : { color: theme.textMuted }]}>
-                                        Email Address
+                                        Email
                                     </Text>
                                 </TouchableOpacity>
 
@@ -370,14 +365,14 @@ export default function LoginScreen() {
                                     style={[styles.loginTypeTab, loginType === 'phone' && [styles.loginTypeTabActive, { backgroundColor: theme.primaryNavy }]]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="call-outline" size={14} color={loginType === 'phone' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 5 }} />
+                                    <Ionicons name="call-outline" size={13} color={loginType === 'phone' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 4 }} />
                                     <Text style={[styles.loginTypeText, loginType === 'phone' ? { color: '#FFFFFF', fontWeight: '800' } : { color: theme.textMuted }]}>
-                                        Phone Number
+                                        Phone
                                     </Text>
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Input Form Fields */}
+                            {/* Form Input Fields */}
                             <View style={styles.formContainer}>
                                 
                                 {/* Identifier Input */}
@@ -390,9 +385,9 @@ export default function LoginScreen() {
                                 ]}>
                                     <Ionicons 
                                         name={loginType === 'email' ? "mail" : "call"} 
-                                        size={18} 
+                                        size={16} 
                                         color={focusedInput === 'identifier' ? theme.accentTeal : theme.textMuted} 
-                                        style={{ marginRight: 8 }} 
+                                        style={{ marginRight: 6 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
@@ -408,16 +403,16 @@ export default function LoginScreen() {
                                 </View>
 
                                 {/* Password Input */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Password</Text>
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 8 }]}>Password</Text>
                                 <View style={[
                                     styles.inputFieldBox, 
                                     { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
                                 ]}>
                                     <Ionicons 
                                         name="lock-closed" 
-                                        size={18} 
+                                        size={16} 
                                         color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} 
-                                        style={{ marginRight: 8 }} 
+                                        style={{ marginRight: 6 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
@@ -429,12 +424,12 @@ export default function LoginScreen() {
                                         onFocus={() => setFocusedInput('password')}
                                         onBlur={() => setFocusedInput(null)}
                                     />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color={theme.textMuted} />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 2 }}>
+                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={16} color={theme.textMuted} />
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Options Row: Remember Me & Forgot Password */}
+                                {/* Options Row */}
                                 <View style={styles.optionsRow}>
                                     <TouchableOpacity 
                                         onPress={() => setRememberMe(!rememberMe)} 
@@ -445,7 +440,7 @@ export default function LoginScreen() {
                                             styles.checkboxBox, 
                                             rememberMe && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
                                         ]}>
-                                            {rememberMe && <Ionicons name="checkmark" size={12} color="#0E1A2E" />}
+                                            {rememberMe && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
                                         </View>
                                         <Text style={[styles.checkboxLabel, { color: theme.textSecondary }]}>Remember Me</Text>
                                     </TouchableOpacity>
@@ -471,20 +466,20 @@ export default function LoginScreen() {
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Sign In to Account</Text>
-                                                <Ionicons name="arrow-forward" size={18} color="#08E4C7" style={{ marginLeft: 8 }} />
+                                                <Ionicons name="arrow-forward" size={16} color="#08E4C7" style={{ marginLeft: 6 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
                                 </TouchableOpacity>
 
-                                {/* Biometrics Quick Authentication */}
+                                {/* Quick Biometrics Button */}
                                 {biometricAvailable && (
                                     <TouchableOpacity 
                                         onPress={handleBiometricAuth}
                                         style={[styles.biometricBtn, { backgroundColor: isDark ? 'rgba(8, 228, 199, 0.1)' : '#EFF6FF', borderColor: theme.accentTeal }]}
                                         activeOpacity={0.8}
                                     >
-                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={20} color={theme.accentTeal} style={{ marginRight: 8 }} />
+                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={16} color={theme.accentTeal} style={{ marginRight: 6 }} />
                                         <Text style={[styles.biometricBtnText, { color: theme.textPrimary }]}>
                                             Quick Sign In with {biometricType}
                                         </Text>
@@ -500,85 +495,25 @@ export default function LoginScreen() {
 
                                 {/* Social Provider Buttons Grid */}
                                 <View style={styles.socialGrid}>
-                                    {/* Google */}
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('google')} 
-                                        disabled={!!socialLoading}
-                                        style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : (
-                                            <Ionicons name="logo-google" size={18} color="#EA4335" />
-                                        )}
+                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={15} color="#EA4335" />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
                                     </TouchableOpacity>
 
-                                    {/* Apple (iOS / Web) */}
                                     {(Platform.OS === 'ios' || Platform.OS === 'web') && (
-                                        <TouchableOpacity 
-                                            onPress={() => handleSocialAuth('apple')} 
-                                            disabled={!!socialLoading}
-                                            style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                            activeOpacity={0.8}
-                                        >
-                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : (
-                                                <Ionicons name="logo-apple" size={18} color={theme.textPrimary} />
-                                            )}
+                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={15} color={theme.textPrimary} />}
                                             <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
                                         </TouchableOpacity>
                                     )}
 
-                                    {/* Facebook */}
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('facebook')} 
-                                        disabled={!!socialLoading}
-                                        style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        {socialLoading === 'facebook' ? <ActivityIndicator size="small" color="#1877F2" /> : (
-                                            <Ionicons name="logo-facebook" size={18} color="#1877F2" />
-                                        )}
-                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Facebook</Text>
-                                    </TouchableOpacity>
-
-                                    {/* X (Twitter) */}
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('twitter')} 
-                                        disabled={!!socialLoading}
-                                        style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        {socialLoading === 'twitter' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : (
-                                            <Ionicons name="logo-twitter" size={18} color="#1DA1F2" />
-                                        )}
-                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>X</Text>
-                                    </TouchableOpacity>
-
-                                    {/* GitHub */}
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('github')} 
-                                        disabled={!!socialLoading}
-                                        style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : (
-                                            <Ionicons name="logo-github" size={18} color={theme.textPrimary} />
-                                        )}
+                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={15} color={theme.textPrimary} />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
-                                    </TouchableOpacity>
-
-                                    {/* Web3 Wallet Option */}
-                                    <TouchableOpacity 
-                                        onPress={() => setShowWalletModal(true)} 
-                                        style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Ionicons name="wallet-outline" size={18} color={theme.gold} />
-                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Wallet</Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Footer Link to Sign Up */}
+                                {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Don't have an account?</Text>
                                     <TouchableOpacity onPress={() => router.push('/(auth)/signup')} activeOpacity={0.8}>
@@ -597,15 +532,15 @@ export default function LoginScreen() {
             <Modal transparent visible={showForgotModal} animationType="slide" onRequestClose={() => setShowForgotModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF', borderColor: theme.borderPrimary }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Reset Password</Text>
                             <TouchableOpacity onPress={() => setShowForgotModal(false)}>
-                                <Ionicons name="close-circle" size={24} color={theme.textMuted} />
+                                <Ionicons name="close-circle" size={22} color={theme.textMuted} />
                             </TouchableOpacity>
                         </View>
 
                         <Text style={[styles.modalSubText, { color: theme.textSecondary }]}>
-                            Enter your email address below and we will send you instructions to reset your password.
+                            Enter your email address below to receive password reset instructions.
                         </Text>
 
                         <TextInput 
@@ -625,38 +560,8 @@ export default function LoginScreen() {
                             activeOpacity={0.8}
                         >
                             {resetLoading ? <ActivityIndicator color="#08E4C7" size="small" /> : (
-                                <Text style={{ color: '#08E4C7', fontWeight: '800', fontSize: 13 }}>Send Reset Email</Text>
+                                <Text style={{ color: '#08E4C7', fontWeight: '800', fontSize: 12 }}>Send Reset Email</Text>
                             )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            {/* Web3 Wallet Connect Modal */}
-            <Modal transparent visible={showWalletModal} animationType="fade" onRequestClose={() => setShowWalletModal(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF', borderColor: theme.borderPrimary }]}>
-                        <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                            <Ionicons name="wallet" size={40} color={theme.gold} />
-                            <Text style={[styles.modalTitle, { color: theme.textPrimary, marginTop: 8 }]}>Web3 Wallet Connect</Text>
-                            <Text style={[styles.modalSubText, { color: theme.textSecondary, textAlign: 'center', marginTop: 4 }]}>
-                                Direct Web3 Wallet Authentication (MetaMask, Phantom, WalletConnect) is enabled for verified ABUMAFHAL crypto portal users.
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setShowWalletModal(false);
-                                Alert.alert('Web3 Portal', 'Wallet auth session initiated. Please confirm in your Web3 wallet app.');
-                            }}
-                            style={[styles.modalSubmitBtn, { backgroundColor: theme.gold }]}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={{ color: '#0E1A2E', fontWeight: '800', fontSize: 13 }}>Connect Active Wallet</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => setShowWalletModal(false)} style={{ marginTop: 10, alignSelf: 'center' }}>
-                            <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '600' }}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -671,80 +576,81 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 40,
+        paddingHorizontal: 14,
+        paddingTop: 2,
+        paddingBottom: 10,
     },
     topControlRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 6,
     },
     brandRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     logoImage: {
-        width: 32,
-        height: 32,
+        width: 26,
+        height: 26,
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 15,
+        fontSize: 14,
         letterSpacing: 0.5,
     },
     brandTagline: {
         fontWeight: '700',
-        fontSize: 8.5,
+        fontSize: 7.5,
         letterSpacing: 0.8,
     },
     themeToggleBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },
     cardWrapper: {
         width: '100%',
-        marginTop: 4,
+        marginTop: 0,
     },
     desktopCardWrapper: {
-        maxWidth: 440,
+        maxWidth: 420,
         alignSelf: 'center',
-        marginTop: 20,
+        marginTop: 6,
     },
     mascotContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 4,
+        marginVertical: 0,
     },
     headlineBox: {
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 10,
     },
     welcomeTitle: {
         fontWeight: '900',
-        fontSize: 24,
+        fontSize: 20,
         textAlign: 'center',
     },
     welcomeSubText: {
-        fontSize: 12,
+        fontSize: 10.5,
         fontWeight: '500',
         textAlign: 'center',
-        marginTop: 4,
-        lineHeight: 17,
+        marginTop: 2,
+        lineHeight: 14,
     },
     loginTypeContainer: {
         flexDirection: 'row',
-        borderRadius: 12,
-        padding: 3,
-        marginBottom: 16,
+        borderRadius: 10,
+        padding: 2,
+        marginBottom: 10,
     },
     loginTypeTab: {
         flex: 1,
-        height: 36,
-        borderRadius: 10,
+        height: 30,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
@@ -752,12 +658,12 @@ const styles = StyleSheet.create({
     loginTypeTabActive: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.12,
         shadowRadius: 2,
-        elevation: 2,
+        elevation: 1,
     },
     loginTypeText: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '600',
     },
     formContainer: {
@@ -765,176 +671,175 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontWeight: '700',
-        fontSize: 11.5,
-        marginBottom: 6,
+        fontSize: 10.5,
+        marginBottom: 4,
     },
     inputFieldBox: {
-        height: 44,
-        borderRadius: 12,
+        height: 38,
+        borderRadius: 10,
         borderWidth: 1,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '600',
     },
     optionsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 12,
-        marginBottom: 16,
+        marginTop: 8,
+        marginBottom: 10,
     },
     checkboxRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     checkboxBox: {
-        width: 18,
-        height: 18,
-        borderRadius: 5,
+        width: 15,
+        height: 15,
+        borderRadius: 4,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 6,
+        marginRight: 5,
     },
     checkboxLabel: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '600',
     },
     forgotLink: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '700',
     },
     primaryLoginBtn: {
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: 'hidden',
         shadowColor: '#0E1A2E',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 4,
-        marginBottom: 10,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 4,
+        elevation: 3,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 46,
+        height: 40,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     primaryBtnText: {
         color: '#FFFFFF',
         fontWeight: '800',
-        fontSize: 13.5,
+        fontSize: 12.5,
     },
     biometricBtn: {
-        height: 42,
-        borderRadius: 12,
+        height: 34,
+        borderRadius: 10,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
+        justify: 'center',
+        marginBottom: 10,
     },
     biometricBtnText: {
         fontWeight: '700',
-        fontSize: 12,
+        fontSize: 11,
     },
     dividerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 12,
+        marginVertical: 8,
     },
     dividerLine: {
         flex: 1,
         height: 1,
     },
     dividerText: {
-        fontSize: 9.5,
+        fontSize: 8.5,
         fontWeight: '800',
         letterSpacing: 0.8,
-        marginHorizontal: 10,
+        marginHorizontal: 8,
     },
     socialGrid: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
+        gap: 6,
         justifyContent: 'space-between',
-        marginBottom: 20,
+        marginBottom: 12,
     },
     socialTile: {
-        width: '31%',
-        height: 40,
-        borderRadius: 10,
+        flex: 1,
+        height: 34,
+        borderRadius: 8,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     socialTileText: {
         fontWeight: '700',
-        fontSize: 11,
-        marginLeft: 5,
+        fontSize: 10.5,
+        marginLeft: 4,
     },
     footerLinkRow: {
         flexDirection: 'row',
-        justifyContent: 'center',
+        justify: 'center',
         alignItems: 'center',
-        marginTop: 4,
+        marginTop: 2,
     },
     footerText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '500',
     },
     signupLinkText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(6, 13, 30, 0.75)',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
+        justify: 'center',
+        padding: 14,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 380,
-        borderRadius: 20,
-        padding: 20,
+        maxWidth: 360,
+        borderRadius: 18,
+        padding: 16,
         borderWidth: 1,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowRadius: 12,
+        elevation: 6,
     },
     modalTitle: {
         fontWeight: '800',
-        fontSize: 16,
+        fontSize: 15,
     },
     modalSubText: {
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '500',
-        lineHeight: 16,
-        marginBottom: 14,
+        lineHeight: 15,
+        marginBottom: 12,
     },
     modalInput: {
-        height: 44,
-        borderRadius: 10,
+        height: 38,
+        borderRadius: 8,
         borderWidth: 1,
-        paddingHorizontal: 12,
-        fontSize: 13,
+        paddingHorizontal: 10,
+        fontSize: 12,
         fontWeight: '600',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     modalSubmitBtn: {
-        height: 42,
-        borderRadius: 10,
+        height: 38,
+        borderRadius: 8,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
 });

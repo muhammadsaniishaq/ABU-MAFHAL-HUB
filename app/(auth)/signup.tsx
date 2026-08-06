@@ -125,31 +125,6 @@ export default function SignupScreen() {
         return () => clearTimeout(timer);
     }, [email]);
 
-    // Real-time Phone Check
-    useEffect(() => {
-        const checkPhone = async () => {
-            const cleanPhone = phone.trim();
-            if (cleanPhone.length < 10) {
-                setPhoneAvailable(null);
-                return;
-            }
-            setCheckingPhone(true);
-            try {
-                const { data, error } = await supabase.functions.invoke('check-availability', {
-                    body: { field: 'phone', value: cleanPhone }
-                });
-                if (error) throw error;
-                setPhoneAvailable(data.available);
-            } catch (error) {
-                console.log('Phone check error', error);
-            } finally {
-                setCheckingPhone(false);
-            }
-        };
-        const timer = setTimeout(checkPhone, 600);
-        return () => clearTimeout(timer);
-    }, [phone]);
-
     // Password Strength Logic
     const getPasswordStrength = () => {
         let score = 0;
@@ -184,12 +159,12 @@ export default function SignupScreen() {
         }
 
         if (usernameAvailable === false) {
-            Alert.alert('Username Taken', 'The username you selected is already in use. Please choose another username.');
+            Alert.alert('Username Taken', 'The username you selected is already in use.');
             return;
         }
 
         if (emailAvailable === false) {
-            Alert.alert('Email In Use', 'An account already exists with this email address. Please log in instead.');
+            Alert.alert('Email In Use', 'An account already exists with this email address.');
             return;
         }
 
@@ -226,7 +201,7 @@ export default function SignupScreen() {
                     } else {
                         router.replace('/(auth)/pin-setup');
                     }
-                }, 1800);
+                }, 1600);
             }
         } catch (error: any) {
             Alert.alert('Registration Error', error.message || 'An error occurred during account creation.');
@@ -292,19 +267,20 @@ export default function SignupScreen() {
 
             <SafeAreaView style={{ flex: 1 }}>
                 <KeyboardAvoidingView 
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
                 >
                     <ScrollView
                         ref={scrollViewRef}
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
+                        bounces={false}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Top Control Bar */}
                         <View style={styles.topControlRow}>
                             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
-                                <Ionicons name="arrow-back" size={20} color={theme.textPrimary} />
+                                <Ionicons name="arrow-back" size={18} color={theme.textPrimary} />
                             </TouchableOpacity>
 
                             <View style={styles.brandRow}>
@@ -321,16 +297,16 @@ export default function SignupScreen() {
                                 style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name={isDark ? "sunny" : "moon"} size={16} color={isDark ? "#FDE047" : "#0E1A2E"} />
+                                <Ionicons name={isDark ? "sunny" : "moon"} size={14} color={isDark ? "#FDE047" : "#0E1A2E"} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Centered Form Card Wrapper */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* 3D Animated Hero Mascot */}
+                            {/* Compact 3D Game Cartoon Mascot */}
                             <View style={styles.mascotContainer}>
-                                <Mascot3D size={140} mode="waving" isDarkMode={isDark} />
+                                <Mascot3D size={85} mode="waving" isDarkMode={isDark} />
                             </View>
 
                             {/* Headline */}
@@ -338,94 +314,58 @@ export default function SignupScreen() {
                                 <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>
                                     Create Account <Text style={{ color: theme.gold }}>.</Text>
                                 </Text>
-                                <Text style={[styles.welcomeSubText, { color: theme.textSecondary }]}>
-                                    Join ABUMAFHAL to start managing payments & identity.
-                                </Text>
                             </View>
 
-                            {/* Form Inputs */}
+                            {/* Form Inputs Grid */}
                             <View style={styles.formContainer}>
 
-                                {/* 1. Full Name */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Full Legal Name</Text>
-                                <View style={[
-                                    styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'fullName' ? theme.borderFocus : theme.borderPrimary }
-                                ]}>
-                                    <Ionicons name="person-outline" size={18} color={focusedInput === 'fullName' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
-                                    <TextInput 
-                                        style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="e.g. Sani Muhammad Abubakar"
-                                        placeholderTextColor={theme.textMuted}
-                                        value={fullName}
-                                        onChangeText={setFullName}
-                                        onFocus={() => setFocusedInput('fullName')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                </View>
-
-                                {/* 2. Username (with Real-time Check & Suggestions) */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
-                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Username</Text>
-                                    {checkingUsername ? (
-                                        <ActivityIndicator size="small" color={theme.accentTeal} />
-                                    ) : usernameAvailable === true ? (
-                                        <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '800' }}>✓ Available</Text>
-                                    ) : usernameAvailable === false ? (
-                                        <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '800' }}>✕ Username Taken</Text>
-                                    ) : null}
-                                </View>
-
-                                <View style={[
-                                    styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: usernameAvailable === false ? '#EF4444' : focusedInput === 'username' ? theme.borderFocus : theme.borderPrimary }
-                                ]}>
-                                    <Ionicons name="at-outline" size={18} color={focusedInput === 'username' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
-                                    <TextInput 
-                                        style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="e.g. abumafhal"
-                                        placeholderTextColor={theme.textMuted}
-                                        autoCapitalize="none"
-                                        value={username}
-                                        onChangeText={setUsername}
-                                        onFocus={() => setFocusedInput('username')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                </View>
-
-                                {/* Username Suggestion Pills */}
-                                {usernameSuggestions.length > 0 && (
-                                    <View style={styles.suggestionsRow}>
-                                        <Text style={[styles.suggestionLabel, { color: theme.textMuted }]}>Suggestions:</Text>
-                                        {usernameSuggestions.map((sug, idx) => (
-                                            <TouchableOpacity 
-                                                key={idx} 
-                                                onPress={() => setUsername(sug)}
-                                                style={[styles.suggestionPill, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
-                                            >
-                                                <Text style={[styles.suggestionPillText, { color: theme.accentTeal }]}>@{sug}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                {/* Full Name & Username Side-by-Side */}
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Full Name</Text>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: focusedInput === 'fullName' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="Sani Abubakar"
+                                                placeholderTextColor={theme.textMuted}
+                                                value={fullName}
+                                                onChangeText={setFullName}
+                                                onFocus={() => setFocusedInput('fullName')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </View>
                                     </View>
-                                )}
 
-                                {/* 3. Email Address (with Real-time Check) */}
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
-                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Email Address</Text>
-                                    {checkingEmail ? (
-                                        <ActivityIndicator size="small" color={theme.accentTeal} />
-                                    ) : emailAvailable === true ? (
-                                        <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '800' }}>✓ Valid</Text>
-                                    ) : emailAvailable === false ? (
-                                        <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '800' }}>✕ Email Exists</Text>
-                                    ) : null}
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Username</Text>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: usernameAvailable === false ? '#EF4444' : focusedInput === 'username' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="abumafhal"
+                                                placeholderTextColor={theme.textMuted}
+                                                autoCapitalize="none"
+                                                value={username}
+                                                onChangeText={setUsername}
+                                                onFocus={() => setFocusedInput('username')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </View>
+                                    </View>
                                 </View>
 
+                                {/* Email Address */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Email Address</Text>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: emailAvailable === false ? '#EF4444' : focusedInput === 'email' ? theme.borderFocus : theme.borderPrimary }
+                                    { backgroundColor: theme.bgInput, borderColor: emailAvailable === false ? '#EF4444' : focusedInput === 'email' ? theme.borderFocus : theme.borderPrimary, marginBottom: 6 }
                                 ]}>
-                                    <Ionicons name="mail-outline" size={18} color={focusedInput === 'email' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <Ionicons name="mail-outline" size={15} color={focusedInput === 'email' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
                                         placeholder="name@example.com"
@@ -439,27 +379,22 @@ export default function SignupScreen() {
                                     />
                                 </View>
 
-                                {/* 4. Country & Phone Number Row */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Country & Phone Number</Text>
-                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                    
-                                    {/* Country Selector Button */}
+                                {/* Country & Phone Row */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Phone Number</Text>
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
                                     <TouchableOpacity 
                                         onPress={() => setShowCountryModal(true)}
                                         style={[styles.countryBtn, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
                                         activeOpacity={0.8}
                                     >
-                                        <Text style={{ fontSize: 16, marginRight: 4 }}>{selectedCountry.flag}</Text>
-                                        <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 11 }}>{selectedCountry.dialCode}</Text>
-                                        <Ionicons name="chevron-down" size={12} color={theme.textMuted} style={{ marginLeft: 3 }} />
+                                        <Text style={{ fontSize: 14, marginRight: 2 }}>{selectedCountry.flag}</Text>
+                                        <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 10.5 }}>{selectedCountry.dialCode}</Text>
                                     </TouchableOpacity>
 
-                                    {/* Phone Input */}
                                     <View style={[
                                         styles.inputFieldBox, 
-                                        { flex: 1, backgroundColor: theme.bgInput, borderColor: phoneAvailable === false ? '#EF4444' : focusedInput === 'phone' ? theme.borderFocus : theme.borderPrimary }
+                                        { flex: 1, backgroundColor: theme.bgInput, borderColor: focusedInput === 'phone' ? theme.borderFocus : theme.borderPrimary }
                                     ]}>
-                                        <Ionicons name="call-outline" size={18} color={focusedInput === 'phone' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
                                         <TextInput 
                                             style={[styles.textInput, { color: theme.textPrimary }]}
                                             placeholder="8012345678"
@@ -473,73 +408,65 @@ export default function SignupScreen() {
                                     </View>
                                 </View>
 
-                                {/* 5. Password & Strength Meter */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Password</Text>
-                                <View style={[
-                                    styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
-                                ]}>
-                                    <Ionicons name="lock-closed-outline" size={18} color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
-                                    <TextInput 
-                                        style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="At least 8 characters"
-                                        placeholderTextColor={theme.textMuted}
-                                        secureTextEntry={!showPassword}
-                                        value={password}
-                                        onChangeText={setPassword}
-                                        onFocus={() => setFocusedInput('password')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color={theme.textMuted} />
-                                    </TouchableOpacity>
+                                {/* Password & Confirm Password Side-by-Side */}
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Password</Text>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="••••••••"
+                                                placeholderTextColor={theme.textMuted}
+                                                secureTextEntry={!showPassword}
+                                                value={password}
+                                                onChangeText={setPassword}
+                                                onFocus={() => setFocusedInput('password')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Confirm Pass</Text>
+                                        <View style={[
+                                            styles.inputFieldBox, 
+                                            { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
+                                        ]}>
+                                            <TextInput 
+                                                style={[styles.textInput, { color: theme.textPrimary }]}
+                                                placeholder="••••••••"
+                                                placeholderTextColor={theme.textMuted}
+                                                secureTextEntry={!showConfirmPassword}
+                                                value={confirmPassword}
+                                                onChangeText={setConfirmPassword}
+                                                onFocus={() => setFocusedInput('confirmPassword')}
+                                                onBlur={() => setFocusedInput(null)}
+                                            />
+                                        </View>
+                                    </View>
                                 </View>
 
-                                {/* Password Strength Meter Bar */}
+                                {/* Password Strength Bar */}
                                 {password.length > 0 && (
-                                    <View style={{ marginTop: 6 }}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted }}>Password Strength</Text>
-                                            <Text style={{ fontSize: 10, fontWeight: '800', color: strength.color }}>{strength.label}</Text>
-                                        </View>
+                                    <View style={{ marginBottom: 6 }}>
                                         <View style={[styles.strengthBgTrack, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}>
                                             <View style={[styles.strengthFillTrack, { width: `${strength.percent * 100}%`, backgroundColor: strength.color }]} />
                                         </View>
                                     </View>
                                 )}
 
-                                {/* 6. Confirm Password */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Confirm Password</Text>
+                                {/* Referral Code (Optional) */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Referral Code (Optional)</Text>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'referralCode' ? theme.borderFocus : theme.borderPrimary, marginBottom: 8 }
                                 ]}>
-                                    <Ionicons name="shield-checkmark-outline" size={18} color={focusedInput === 'confirmPassword' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="Repeat password"
-                                        placeholderTextColor={theme.textMuted}
-                                        secureTextEntry={!showConfirmPassword}
-                                        value={confirmPassword}
-                                        onChangeText={setConfirmPassword}
-                                        onFocus={() => setFocusedInput('confirmPassword')}
-                                        onBlur={() => setFocusedInput(null)}
-                                    />
-                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={{ padding: 4 }}>
-                                        <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={18} color={theme.textMuted} />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* 7. Referral Code (Optional) */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Referral Code (Optional)</Text>
-                                <View style={[
-                                    styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'referralCode' ? theme.borderFocus : theme.borderPrimary }
-                                ]}>
-                                    <Ionicons name="gift-outline" size={18} color={focusedInput === 'referralCode' ? theme.gold : theme.textMuted} style={{ marginRight: 8 }} />
-                                    <TextInput 
-                                        style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="e.g. ABUMAF123"
+                                        placeholder="ABUMAF123"
                                         placeholderTextColor={theme.textMuted}
                                         autoCapitalize="characters"
                                         value={referralCode}
@@ -549,7 +476,7 @@ export default function SignupScreen() {
                                     />
                                 </View>
 
-                                {/* Accept Terms Checkbox */}
+                                {/* Terms Checkbox */}
                                 <TouchableOpacity 
                                     onPress={() => setAcceptTerms(!acceptTerms)}
                                     style={styles.termsRow}
@@ -559,14 +486,14 @@ export default function SignupScreen() {
                                         styles.checkboxBox, 
                                         acceptTerms && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
                                     ]}>
-                                        {acceptTerms && <Ionicons name="checkmark" size={12} color="#0E1A2E" />}
+                                        {acceptTerms && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
                                     </View>
                                     <Text style={[styles.termsText, { color: theme.textSecondary }]}>
-                                        I agree to ABUMAFHAL's <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Terms of Service</Text> and <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Privacy Policy</Text>.
+                                        I accept ABUMAFHAL's <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Terms</Text> & <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Privacy Policy</Text>.
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* Primary Create Account Button */}
+                                {/* Primary Button */}
                                 <TouchableOpacity 
                                     onPress={handleSignup}
                                     disabled={loading}
@@ -582,34 +509,28 @@ export default function SignupScreen() {
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Create My Account</Text>
-                                                <Ionicons name="checkmark-circle" size={18} color="#08E4C7" style={{ marginLeft: 8 }} />
+                                                <Ionicons name="checkmark-circle" size={16} color="#08E4C7" style={{ marginLeft: 6 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
                                 </TouchableOpacity>
 
-                                {/* Social Provider Row */}
-                                <View style={styles.dividerRow}>
-                                    <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
-                                    <Text style={[styles.dividerText, { color: theme.textMuted }]}>OR SIGN UP WITH</Text>
-                                    <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
-                                </View>
-
+                                {/* Social Sign Up Grid */}
                                 <View style={styles.socialGrid}>
                                     <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={18} color="#EA4335" />}
+                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={14} color="#EA4335" />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
                                     </TouchableOpacity>
 
                                     {(Platform.OS === 'ios' || Platform.OS === 'web') && (
                                         <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={18} color={theme.textPrimary} />}
+                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={14} color={theme.textPrimary} />}
                                             <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
                                         </TouchableOpacity>
                                     )}
 
                                     <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={18} color={theme.textPrimary} />}
+                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={14} color={theme.textPrimary} />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -633,10 +554,10 @@ export default function SignupScreen() {
             <Modal transparent visible={showCountryModal} animationType="fade" onRequestClose={() => setShowCountryModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF', borderColor: theme.borderPrimary }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Select Country</Text>
                             <TouchableOpacity onPress={() => setShowCountryModal(false)}>
-                                <Ionicons name="close-circle" size={24} color={theme.textMuted} />
+                                <Ionicons name="close-circle" size={22} color={theme.textMuted} />
                             </TouchableOpacity>
                         </View>
 
@@ -654,27 +575,27 @@ export default function SignupScreen() {
                                 ]}
                                 activeOpacity={0.8}
                             >
-                                <Text style={{ fontSize: 20, marginRight: 10 }}>{c.flag}</Text>
-                                <Text style={{ flex: 1, color: theme.textPrimary, fontWeight: '700', fontSize: 13 }}>{c.name}</Text>
-                                <Text style={{ color: theme.accentTeal, fontWeight: '800', fontSize: 12 }}>{c.dialCode}</Text>
+                                <Text style={{ fontSize: 18, marginRight: 8 }}>{c.flag}</Text>
+                                <Text style={{ flex: 1, color: theme.textPrimary, fontWeight: '700', fontSize: 12 }}>{c.name}</Text>
+                                <Text style={{ color: theme.accentTeal, fontWeight: '800', fontSize: 11 }}>{c.dialCode}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
             </Modal>
 
-            {/* Registration Success Celebration Modal */}
+            {/* Success Celebration Modal */}
             <Modal transparent visible={showSuccessModal} animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.successCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF' }]}>
                         <View style={styles.successIconCircle}>
-                            <Ionicons name="checkmark-done" size={40} color="#08E4C7" />
+                            <Ionicons name="checkmark-done" size={36} color="#08E4C7" />
                         </View>
                         <Text style={[styles.successTitle, { color: theme.textPrimary }]}>Welcome to ABUMAFHAL 🎉</Text>
                         <Text style={[styles.successSubText, { color: theme.textSecondary }]}>
-                            Your account has been created successfully! Preparing your personalized fintech portal...
+                            Account created successfully! Redirecting...
                         </Text>
-                        <ActivityIndicator size="small" color="#08E4C7" style={{ marginTop: 12 }} />
+                        <ActivityIndicator size="small" color="#08E4C7" style={{ marginTop: 10 }} />
                     </View>
                 </View>
             </Modal>
@@ -688,19 +609,20 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 40,
+        paddingHorizontal: 14,
+        paddingTop: 2,
+        paddingBottom: 10,
     },
     topControlRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 6,
     },
     backBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -709,104 +631,77 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logoImage: {
-        width: 28,
-        height: 28,
-        marginRight: 6,
+        width: 24,
+        height: 24,
+        marginRight: 5,
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 15,
+        fontSize: 14,
         letterSpacing: 0.5,
     },
     themeToggleBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },
     cardWrapper: {
         width: '100%',
-        marginTop: 4,
+        marginTop: 0,
     },
     desktopCardWrapper: {
-        maxWidth: 440,
+        maxWidth: 420,
         alignSelf: 'center',
-        marginTop: 14,
+        marginTop: 4,
     },
     mascotContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 2,
+        marginVertical: 0,
     },
     headlineBox: {
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 6,
     },
     welcomeTitle: {
         fontWeight: '900',
-        fontSize: 22,
+        fontSize: 18,
         textAlign: 'center',
-    },
-    welcomeSubText: {
-        fontSize: 11.5,
-        fontWeight: '500',
-        textAlign: 'center',
-        marginTop: 4,
-        lineHeight: 16,
     },
     formContainer: {
         width: '100%',
     },
     inputLabel: {
         fontWeight: '700',
-        fontSize: 11.5,
-        marginBottom: 6,
+        fontSize: 10,
+        marginBottom: 3,
     },
     inputFieldBox: {
-        height: 44,
-        borderRadius: 12,
+        height: 36,
+        borderRadius: 8,
         borderWidth: 1,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         flexDirection: 'row',
         alignItems: 'center',
     },
     textInput: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 11.5,
         fontWeight: '600',
-    },
-    suggestionsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 6,
-        marginTop: 6,
-    },
-    suggestionLabel: {
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    suggestionPill: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 99,
-    },
-    suggestionPillText: {
-        fontSize: 10.5,
-        fontWeight: '700',
     },
     countryBtn: {
-        height: 44,
-        borderRadius: 12,
+        height: 36,
+        borderRadius: 8,
         borderWidth: 1,
-        paddingHorizontal: 10,
+        paddingHorizontal: 8,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     strengthBgTrack: {
-        height: 5,
+        height: 4,
         borderRadius: 99,
         width: '100%',
         overflow: 'hidden',
@@ -818,153 +713,138 @@ const styles = StyleSheet.create({
     termsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 14,
-        marginBottom: 16,
+        marginTop: 6,
+        marginBottom: 10,
     },
     checkboxBox: {
-        width: 18,
-        height: 18,
-        borderRadius: 5,
+        width: 15,
+        height: 15,
+        borderRadius: 4,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
+        justify: 'center',
+        marginRight: 6,
     },
     termsText: {
         flex: 1,
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '500',
-        lineHeight: 15,
+        lineHeight: 14,
     },
     primaryBtn: {
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: 'hidden',
         shadowColor: '#0E1A2E',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 4,
-        marginBottom: 14,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 4,
+        elevation: 3,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 46,
+        height: 38,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     primaryBtnText: {
         color: '#FFFFFF',
         fontWeight: '800',
-        fontSize: 13.5,
-    },
-    dividerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 10,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-    },
-    dividerText: {
-        fontSize: 9.5,
-        fontWeight: '800',
-        letterSpacing: 0.8,
-        marginHorizontal: 10,
+        fontSize: 12.5,
     },
     socialGrid: {
         flexDirection: 'row',
-        gap: 8,
-        justifyContent: 'space-between',
-        marginBottom: 16,
+        gap: 6,
+        justify: 'space-between',
+        marginBottom: 10,
     },
     socialTile: {
         flex: 1,
-        height: 40,
-        borderRadius: 10,
+        height: 34,
+        borderRadius: 8,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     socialTileText: {
         fontWeight: '700',
-        fontSize: 11,
-        marginLeft: 5,
+        fontSize: 10.5,
+        marginLeft: 4,
     },
     footerLinkRow: {
         flexDirection: 'row',
-        justifyContent: 'center',
+        justify: 'center',
         alignItems: 'center',
-        marginTop: 4,
+        marginTop: 2,
     },
     footerText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '500',
     },
     signupLinkText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(6, 13, 30, 0.75)',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
+        justify: 'center',
+        padding: 14,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 380,
-        borderRadius: 20,
-        padding: 20,
+        maxWidth: 360,
+        borderRadius: 18,
+        padding: 16,
         borderWidth: 1,
     },
     modalTitle: {
         fontWeight: '800',
-        fontSize: 16,
+        fontSize: 15,
     },
     countryOptionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
         borderBottomWidth: 1,
-        paddingHorizontal: 8,
-        borderRadius: 8,
+        paddingHorizontal: 6,
+        borderRadius: 6,
     },
     successCard: {
         width: '100%',
-        maxWidth: 340,
-        borderRadius: 24,
-        padding: 24,
+        maxWidth: 320,
+        borderRadius: 20,
+        padding: 20,
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowRadius: 12,
+        elevation: 6,
     },
     successIconCircle: {
-        width: 68,
-        height: 68,
-        borderRadius: 34,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: 'rgba(8, 228, 199, 0.15)',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 14,
+        justify: 'center',
+        marginBottom: 12,
         borderWidth: 2,
         borderColor: '#08E4C7',
     },
     successTitle: {
         fontWeight: '900',
-        fontSize: 17,
+        fontSize: 16,
         textAlign: 'center',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     successSubText: {
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '500',
         textAlign: 'center',
-        lineHeight: 17,
+        lineHeight: 16,
     },
 });
