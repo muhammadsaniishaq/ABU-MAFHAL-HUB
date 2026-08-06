@@ -1128,7 +1128,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: '#0E1A2E',
         alignItems: 'center',
-        justify.content: 'center',
+        justifyContent: 'center',
         marginTop: 10,
     },
     executeWithdrawBtnText: {
