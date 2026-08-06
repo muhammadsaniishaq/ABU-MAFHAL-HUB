@@ -41,22 +41,6 @@ const NIGERIAN_BANKS = [
     { name: 'Wema Bank (ALAT)', code: '035' },
 ];
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    const startTime = Date.now();
-    try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
-        const latency = Date.now() - startTime;
-        clearTimeout(id);
-        return { response, latency };
-    } catch (error: any) {
-        clearTimeout(id);
-        const latency = Date.now() - startTime;
-        throw { error, latency };
-    }
-}
-
 export default function LiquidityVaultScreen() {
     const router = useRouter();
     const { width } = useWindowDimensions();
@@ -93,7 +77,7 @@ export default function LiquidityVaultScreen() {
     const fetchProviderBalances = async () => {
         setRefreshing(true);
         try {
-            // 1. Try invoking Edge Function first (uses SERVICE_ROLE_KEY to bypass RLS)
+            // Invoke Edge Function with Service Role Key
             const { data: edgeData, error: edgeError } = await supabase.functions.invoke('check-provider-balances', {
                 body: {}
             });
@@ -104,329 +88,22 @@ export default function LiquidityVaultScreen() {
                 return;
             }
 
-            // 2. Direct DB fallback if Edge Function is un-deployed
-            const secrets: Record<string, string> = {};
+            // Fallback list of 11 authentic active providers
+            const defaultProviders: ProviderWallet[] = [
+                { id: 'agenthub', name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste AgentHub API Key', allowDeposit: true, allowWithdrawal: false },
+                { id: 'bilalsadasub', name: 'BilalSadaSub (Data, Airtime, Cable, Bills)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste BilalSadaSub Token', allowDeposit: true, allowWithdrawal: false },
+                { id: 'paystack', name: 'Paystack (Payment Gateway & Settlements)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Paystack Secret Key', allowDeposit: true, allowWithdrawal: true },
+                { id: 'clubkonnect', name: 'Clubkonnect / NelloByte API (VTU Telecom)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Clubkonnect Key', allowDeposit: true, allowWithdrawal: false },
+                { id: 'idpro', name: 'IDPro (Identity & KYC Verification API)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste IDPro Key', allowDeposit: true, allowWithdrawal: false },
+                { id: 'paybessel', name: 'PayBessel (Payment & Payout Gateway)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste PayBessel Key', allowDeposit: true, allowWithdrawal: true },
+                { id: 'nineboost', name: 'NineBoost (Social Media Marketing SMM Panel)', category: 'Marketing Services', balance: 0, currency: 'USD', status: 'unconfigured', error: 'Tap "Token" to paste NineBoost Key', allowDeposit: true, allowWithdrawal: false },
+                { id: 'nowpayments', name: 'NowPayments (Crypto Payment Gateway)', category: 'Payment Gateway', balance: 0, currency: 'USD', status: 'unconfigured', error: 'Tap "Token" to paste NowPayments Key', allowDeposit: true, allowWithdrawal: true },
+                { id: 'bigi', name: 'Bigi VTU Portal (SME Data & Airtime)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Bigi Token', allowDeposit: true, allowWithdrawal: false },
+                { id: 'termii', name: 'Termii (SMS & OTP Messaging Gateway)', category: 'SMS & Communications', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Termii Key', allowDeposit: true, allowWithdrawal: false },
+                { id: 'monnify', name: 'Monnify (Dynamic Virtual Accounts & Payouts)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Tap "Token" to paste Monnify Key', allowDeposit: true, allowWithdrawal: true }
+            ];
 
-            const { data: settingsData } = await supabase.from('app_settings').select('*');
-            if (settingsData) {
-                settingsData.forEach(s => {
-                    if (s.value && s.key) secrets[s.key.toUpperCase()] = s.value.trim();
-                });
-            }
-
-            const { data: secretsData } = await supabase.from('system_secrets').select('*');
-            if (secretsData) {
-                secretsData.forEach(s => {
-                    if (s.value && s.key) secrets[s.key.toUpperCase()] = s.value.trim();
-                });
-            }
-
-            const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || '';
-            const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || '';
-            const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || '';
-            const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || '';
-            const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || '';
-            const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || '';
-            const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || '';
-            const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || '';
-            const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || '';
-            const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || '';
-            const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || '';
-
-            const list: ProviderWallet[] = [];
-
-            // 1. AgentHub
-            if (agentHubKey) {
-                try {
-                    const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
-                        headers: { 'Authorization': `Bearer ${agentHubKey}`, 'Accept': 'application/json' }
-                    });
-                    const data = await response.json();
-                    const balance = Number(data?.balance ?? data?.data?.balance ?? data?.user?.balance ?? 0);
-                    list.push({
-                        id: 'agenthub',
-                        name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-                        category: 'Digital Identity & CAC',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: 'NGN',
-                        latencyMs: latency,
-                        status: balance > 5000 ? 'healthy' : balance > 1000 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: false,
-                        depositAccount: {
-                            bankName: 'Sterling Bank / Monnify (AgentHub)',
-                            accountNumber: '9081234567',
-                            accountName: 'AgentHub Corporate / ABUMAFHAL',
-                            instructions: 'Transfer to this virtual account to top up AgentHub balance.'
-                        }
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'agenthub',
-                        name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-                        category: 'Digital Identity & CAC',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'Connection timeout or invalid key',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'agenthub',
-                    name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-                    category: 'Digital Identity & CAC',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'Key missing in API Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                });
-            }
-
-            // 2. BilalSadaSub
-            if (bilalToken) {
-                try {
-                    const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
-                        headers: { 'Authorization': `Token ${bilalToken}`, 'Accept': 'application/json' }
-                    });
-                    const data = await response.json();
-                    const balance = Number(data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? 0);
-                    list.push({
-                        id: 'bilalsadasub',
-                        name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
-                        category: 'VTU Telecom',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: 'NGN',
-                        latencyMs: latency,
-                        status: balance > 10000 ? 'healthy' : balance > 2000 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: false,
-                        depositAccount: {
-                            bankName: 'Sterling / Monnify (BilalSadaSub)',
-                            accountNumber: '8910293841',
-                            accountName: 'BilalSadaSub Telecom',
-                            instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
-                        }
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'bilalsadasub',
-                        name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
-                        category: 'VTU Telecom',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'Connection timeout or invalid token',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'bilalsadasub',
-                    name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
-                    category: 'VTU Telecom',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'Token missing in API Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                });
-            }
-
-            // 3. Paystack
-            if (paystackSecret && paystackSecret.startsWith('sk_')) {
-                try {
-                    const { response, latency } = await fetchWithTimeout('https://api.paystack.co/balance', {
-                        headers: { 'Authorization': `Bearer ${paystackSecret}`, 'Accept': 'application/json' }
-                    });
-                    const data = await response.json();
-                    const balanceItem = data?.data?.find((b: any) => b.currency === 'NGN') || data?.data?.[0];
-                    const balance = Number((balanceItem?.balance || 0) / 100);
-                    list.push({
-                        id: 'paystack',
-                        name: 'Paystack (Payment Gateway & Settlements)',
-                        category: 'Payment Gateway',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: 'NGN',
-                        latencyMs: latency,
-                        status: balance > 50000 ? 'healthy' : balance > 5000 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: true
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'paystack',
-                        name: 'Paystack (Payment Gateway & Settlements)',
-                        category: 'Payment Gateway',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'API query error',
-                        allowDeposit: true,
-                        allowWithdrawal: true
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'paystack',
-                    name: 'Paystack (Payment Gateway & Settlements)',
-                    category: 'Payment Gateway',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'Secret Key missing in API Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: true
-                });
-            }
-
-            // 4. Clubkonnect
-            list.push({
-                id: 'clubkonnect',
-                name: 'Clubkonnect / NelloByte API (VTU Telecom)',
-                category: 'VTU Telecom',
-                balance: 0,
-                currency: 'NGN',
-                status: clubkonnectKey ? 'healthy' : 'unconfigured',
-                error: clubkonnectKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: false
-            });
-
-            // 5. IDPro API
-            list.push({
-                id: 'idpro',
-                name: 'IDPro (Identity & KYC Verification API)',
-                category: 'Digital Identity & CAC',
-                balance: 0,
-                currency: 'NGN',
-                status: idProKey ? 'healthy' : 'unconfigured',
-                error: idProKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: false
-            });
-
-            // 6. PayBessel
-            list.push({
-                id: 'paybessel',
-                name: 'PayBessel (Payment & Payout Gateway)',
-                category: 'Payment Gateway',
-                balance: 0,
-                currency: 'NGN',
-                status: payBesselKey ? 'healthy' : 'unconfigured',
-                error: payBesselKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: true
-            });
-
-            // 7. NineBoost
-            list.push({
-                id: 'nineboost',
-                name: 'NineBoost (Social Media Marketing SMM Panel)',
-                category: 'Marketing Services',
-                balance: 0,
-                currency: 'USD',
-                status: nineBoostKey ? 'healthy' : 'unconfigured',
-                error: nineBoostKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: false
-            });
-
-            // 8. NowPayments
-            list.push({
-                id: 'nowpayments',
-                name: 'NowPayments (Crypto Payment Gateway)',
-                category: 'Payment Gateway',
-                balance: 0,
-                currency: 'USD',
-                status: nowPaymentsKey ? 'healthy' : 'unconfigured',
-                error: nowPaymentsKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: true
-            });
-
-            // 9. Bigi VTU
-            if (bigiToken) {
-                try {
-                    const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
-                        headers: { 'Authorization': `Token ${bigiToken}`, 'Accept': 'application/json' }
-                    });
-                    const data = await response.json();
-                    const balance = Number(data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? 0);
-                    list.push({
-                        id: 'bigi',
-                        name: 'Bigi VTU Portal (SME Data & Airtime)',
-                        category: 'VTU Telecom',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: 'NGN',
-                        latencyMs: latency,
-                        status: balance > 8000 ? 'healthy' : balance > 1500 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'bigi',
-                        name: 'Bigi VTU Portal (SME Data & Airtime)',
-                        category: 'VTU Telecom',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'API query timeout',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'bigi',
-                    name: 'Bigi VTU Portal (SME Data & Airtime)',
-                    category: 'VTU Telecom',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'Token missing in API Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                });
-            }
-
-            // 10. Termii
-            list.push({
-                id: 'termii',
-                name: 'Termii (SMS & OTP Messaging Gateway)',
-                category: 'SMS & Communications',
-                balance: 0,
-                currency: 'NGN',
-                status: termiiKey ? 'healthy' : 'unconfigured',
-                error: termiiKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: false
-            });
-
-            // 11. Monnify
-            list.push({
-                id: 'monnify',
-                name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
-                category: 'Payment Gateway',
-                balance: 0,
-                currency: 'NGN',
-                status: monnifyApiKey ? 'healthy' : 'unconfigured',
-                error: monnifyApiKey ? undefined : 'API Key missing in Vault',
-                allowDeposit: true,
-                allowWithdrawal: true
-            });
-
-            const total = list.filter(p => p.currency === 'NGN').reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
-            setTotalBalance(total);
-            setProviders(list);
-
+            setProviders(defaultProviders);
         } catch (e: any) {
             console.error("Provider Balance Fetch Error", e);
         } finally {
@@ -478,6 +155,15 @@ export default function LiquidityVaultScreen() {
                 key: secretKey,
                 value: tokenValue.trim(),
                 updated_at: new Date().toISOString()
+            });
+
+            // Invoke server refresh with custom key payload
+            await supabase.functions.invoke('check-provider-balances', {
+                body: {
+                    customKeys: {
+                        [secretKey]: tokenValue.trim()
+                    }
+                }
             });
 
             Alert.alert("Success 🎉", `Saved ${secretKey} to Vault successfully!`);
@@ -654,6 +340,7 @@ export default function LiquidityVaultScreen() {
                             const isHealthy = p.status === 'healthy';
                             const isLow = p.status === 'low';
                             const isCritical = p.status === 'critical';
+                            const isUnconfigured = p.status === 'unconfigured';
 
                             return (
                                 <View key={p.id} style={styles.providerCard}>
@@ -673,17 +360,17 @@ export default function LiquidityVaultScreen() {
                                             styles.statusPill,
                                             isHealthy && { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
                                             isLow && { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
-                                            (isCritical || p.status === 'error') && { backgroundColor: '#FEF2F2', borderColor: '#EF4444' },
-                                            p.status === 'unconfigured' && { backgroundColor: '#F8FAFC', borderColor: '#94A3B8' }
+                                            isCritical && { backgroundColor: '#FEF2F2', borderColor: '#EF4444' },
+                                            isUnconfigured && { backgroundColor: '#FFF7ED', borderColor: '#F97316' }
                                         ]}>
                                             <Text style={[
                                                 styles.statusPillText,
                                                 isHealthy && { color: '#059669' },
                                                 isLow && { color: '#D97706' },
-                                                (isCritical || p.status === 'error') && { color: '#DC2626' },
-                                                p.status === 'unconfigured' && { color: '#64748B' }
+                                                isCritical && { color: '#DC2626' },
+                                                isUnconfigured && { color: '#EA580C' }
                                             ]}>
-                                                {p.status.toUpperCase()}
+                                                {isUnconfigured ? 'NEEDS TOKEN' : p.status.toUpperCase()}
                                             </Text>
                                         </View>
                                     </View>
@@ -694,7 +381,12 @@ export default function LiquidityVaultScreen() {
                                     </Text>
 
                                     {p.error && (
-                                        <Text style={styles.providerErrorText}>⚠️ {p.error}</Text>
+                                        <Text style={[
+                                            styles.providerErrorText,
+                                            isUnconfigured && { color: '#D97706', fontWeight: '700' }
+                                        ]}>
+                                            💡 {p.error}
+                                        </Text>
                                     )}
 
                                     {/* Action Buttons Row: Deposit, Withdrawal & Edit Token */}
@@ -739,11 +431,13 @@ export default function LiquidityVaultScreen() {
                                                 };
                                                 setTokenKeyName(secretMap[p.id] || 'GENERIC_API_KEY');
                                             }}
-                                            style={[styles.actionBtn, styles.tokenBtn]}
+                                            style={[styles.actionBtn, styles.tokenBtn, isUnconfigured && styles.tokenBtnHighlight]}
                                             activeOpacity={0.8}
                                         >
-                                            <Ionicons name="key-outline" size={14} color="#64748B" style={{ marginRight: 4 }} />
-                                            <Text style={[styles.actionBtnText, { color: '#64748B' }]}>Token</Text>
+                                            <Ionicons name="key-outline" size={14} color={isUnconfigured ? '#FFFFFF' : '#64748B'} style={{ marginRight: 4 }} />
+                                            <Text style={[styles.actionBtnText, { color: isUnconfigured ? '#FFFFFF' : '#64748B' }]}>
+                                                {isUnconfigured ? 'Set Token' : 'Token'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1126,7 +820,7 @@ const styles = StyleSheet.create({
         marginVertical: 6,
     },
     providerErrorText: {
-        color: '#DC2626',
+        color: '#64748B',
         fontSize: 11,
         fontWeight: '600',
         marginBottom: 8,
@@ -1156,7 +850,12 @@ const styles = StyleSheet.create({
     tokenBtn: {
         backgroundColor: '#F1F5F9',
         borderColor: '#CBD5E1',
-        maxWidth: 70,
+        maxWidth: 80,
+    },
+    tokenBtnHighlight: {
+        backgroundColor: '#F97316',
+        borderColor: '#EA580C',
+        maxWidth: 95,
     },
     actionBtnText: {
         fontSize: 11,
