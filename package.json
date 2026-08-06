@@ -33,7 +33,6 @@
     "expo-crypto": "~15.0.9",
     "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",
-    "expo-face-detector": "^13.0.2",
     "expo-file-system": "~19.0.23",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
@@ -78,6 +77,10 @@
     "lightningcss": "^1.32.0",
     "supabase": "^2.72.8",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   },
   "private": true
 }
