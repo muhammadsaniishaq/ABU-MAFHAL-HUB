@@ -1,9 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated, Easing, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Animated, Easing, StyleSheet, Text, Platform } from 'react-native';
 import Svg, { 
     G, Circle, Rect, Path, Defs, LinearGradient as SvgGradient, 
-    Stop, Ellipse 
+    Stop 
 } from 'react-native-svg';
+
+// Try importing lottie-react-native safely
+let LottieView: any = null;
+try {
+    LottieView = require('lottie-react-native');
+} catch (e) {
+    LottieView = null;
+}
 
 interface Mascot3DProps {
     size?: number;
@@ -12,75 +20,96 @@ interface Mascot3DProps {
 }
 
 export default function Mascot3D({ size = 110, greetingText = "Welcome Back! ðŸ‘‹", isDarkMode = false }: Mascot3DProps) {
-    // Animation Controllers for "Motional" Character
+    const [lottieFailed, setLottieFailed] = useState(false);
+
+    // Multi-Joint 60FPS Fluid Animation Controllers
     const floatAnim = useRef(new Animated.Value(0)).current;
-    const peekAnim = useRef(new Animated.Value(0)).current;
-    const waveAnim = useRef(new Animated.Value(0)).current;
+    const headBobAnim = useRef(new Animated.Value(0)).current;
+    const headRotateAnim = useRef(new Animated.Value(0)).current;
+    const armWaveAnim = useRef(new Animated.Value(0)).current;
     const blinkAnim = useRef(new Animated.Value(1)).current;
-    const headTiltAnim = useRef(new Animated.Value(0)).current;
     const badgeFloatAnim = useRef(new Animated.Value(0)).current;
+    const eyePupilX = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Continuous Peeking / Bobbing Motion (Peeking over card)
-        const peekLoop = Animated.loop(
+        // Continuous Floating & Peeking Motion
+        const floatLoop = Animated.loop(
             Animated.sequence([
-                Animated.timing(peekAnim, {
-                    toValue: -6,
-                    duration: 1600,
+                Animated.timing(floatAnim, {
+                    toValue: -8,
+                    duration: 1500,
                     easing: Easing.inOut(Easing.quad),
                     useNativeDriver: true,
                 }),
-                Animated.timing(peekAnim, {
+                Animated.timing(floatAnim, {
                     toValue: 2,
-                    duration: 1600,
+                    duration: 1500,
                     easing: Easing.inOut(Easing.quad),
                     useNativeDriver: true,
                 }),
             ])
         );
 
-        // Head Tilt Motion (Life-like head movement)
-        const tiltLoop = Animated.loop(
+        // Natural Head Bobbing Motion
+        const bobLoop = Animated.loop(
             Animated.sequence([
-                Animated.timing(headTiltAnim, {
-                    toValue: 1,
-                    duration: 2200,
+                Animated.timing(headBobAnim, {
+                    toValue: -4,
+                    duration: 1200,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
-                Animated.timing(headTiltAnim, {
-                    toValue: -1,
-                    duration: 2200,
+                Animated.timing(headBobAnim, {
+                    toValue: 2,
+                    duration: 1200,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
             ])
         );
 
-        // Phone / Hand Gesturing Motion
+        // Head Rotation (Curious Tilt)
+        const rotateLoop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(headRotateAnim, {
+                    toValue: 1,
+                    duration: 2000,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(headRotateAnim, {
+                    toValue: -1,
+                    duration: 2000,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        // Arm Gesturing & Waving Motion
         const waveLoop = Animated.loop(
             Animated.sequence([
-                Animated.timing(waveAnim, {
+                Animated.timing(armWaveAnim, {
                     toValue: 1,
-                    duration: 500,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(waveAnim, {
-                    toValue: -0.3,
-                    duration: 500,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(waveAnim, {
-                    toValue: 0.8,
                     duration: 400,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
-                Animated.timing(waveAnim, {
+                Animated.timing(armWaveAnim, {
+                    toValue: -0.2,
+                    duration: 400,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(armWaveAnim, {
+                    toValue: 0.8,
+                    duration: 350,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(armWaveAnim, {
                     toValue: 0,
-                    duration: 700,
+                    duration: 650,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
@@ -90,20 +119,9 @@ export default function Mascot3D({ size = 110, greetingText = "Welcome Back! ðŸ‘
         // Eye Blinking Loop
         const blinkLoop = Animated.loop(
             Animated.sequence([
-                Animated.delay(2800),
+                Animated.delay(2400),
                 Animated.timing(blinkAnim, {
-                    toValue: 0.1,
-                    duration: 90,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(blinkAnim, {
-                    toValue: 1,
-                    duration: 110,
-                    useNativeDriver: true,
-                }),
-                Animated.delay(120),
-                Animated.timing(blinkAnim, {
-                    toValue: 0.1,
+                    toValue: 0.05,
                     duration: 80,
                     useNativeDriver: true,
                 }),
@@ -112,52 +130,77 @@ export default function Mascot3D({ size = 110, greetingText = "Welcome Back! ðŸ‘
                     duration: 100,
                     useNativeDriver: true,
                 }),
+                Animated.delay(100),
+                Animated.timing(blinkAnim, {
+                    toValue: 0.05,
+                    duration: 70,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(blinkAnim, {
+                    toValue: 1,
+                    duration: 90,
+                    useNativeDriver: true,
+                }),
             ])
         );
 
-        // Speech Badge Floating Loop
+        // Eye Pupil Looking Left/Right Motion
+        const pupilLoop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(eyePupilX, { toValue: -2, duration: 1800, useNativeDriver: true }),
+                Animated.timing(eyePupilX, { toValue: 2, duration: 1800, useNativeDriver: true }),
+            ])
+        );
+
+        // Floating Speech Badge Loop
         const badgeLoop = Animated.loop(
             Animated.sequence([
                 Animated.timing(badgeFloatAnim, {
-                    toValue: -5,
-                    duration: 1400,
+                    toValue: -6,
+                    duration: 1300,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
                 Animated.timing(badgeFloatAnim, {
                     toValue: 2,
-                    duration: 1400,
+                    duration: 1300,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
             ])
         );
 
-        peekLoop.start();
-        tiltLoop.start();
+        floatLoop.start();
+        bobLoop.start();
+        rotateLoop.start();
         waveLoop.start();
         blinkLoop.start();
+        pupilLoop.start();
         badgeLoop.start();
 
         return () => {
-            peekLoop.stop();
-            tiltLoop.stop();
+            floatLoop.stop();
+            bobLoop.stop();
+            rotateLoop.stop();
             waveLoop.stop();
             blinkLoop.stop();
+            pupilLoop.stop();
             badgeLoop.stop();
         };
     }, []);
 
-    // Interpolate head tilt rotation angle
-    const headRotation = headTiltAnim.interpolate({
+    const headRotation = headRotateAnim.interpolate({
         inputRange: [-1, 1],
-        outputRange: ['-3deg', '3deg'],
+        outputRange: ['-4deg', '4deg'],
     });
 
-    const scale = size / 130;
+    const armRotation = armWaveAnim.interpolate({
+        inputRange: [-0.2, 1],
+        outputRange: ['-10deg', '25deg'],
+    });
 
     return (
-        <View style={[styles.container, { width: size + 24, height: size + 20 }]}>
+        <View style={[styles.container, { width: size + 28, height: size + 22 }]}>
             
             {/* Animated Floating Speech Greeting Badge */}
             {greetingText ? (
@@ -177,173 +220,163 @@ export default function Mascot3D({ size = 110, greetingText = "Welcome Back! ðŸ‘
                 </Animated.View>
             ) : null}
 
-            {/* Motional Male Cartoon Character (Disney/Pixar Style as in reference images) */}
-            <Animated.View
-                style={[
-                    styles.characterWrapper,
-                    {
-                        transform: [
-                            { translateY: peekAnim },
-                            { rotate: headRotation },
-                        ],
-                    },
-                ]}
-            >
-                <Svg width={size} height={size} viewBox="0 0 160 160" fill="none">
-                    <Defs>
-                        {/* 3D Skin Gradient */}
-                        <SvgGradient id="skin3d" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#FFF7ED" />
-                            <Stop offset="35%" stopColor="#FED7AA" />
-                            <Stop offset="100%" stopColor="#FDBA74" />
-                        </SvgGradient>
+            {/* If Lottie is available and loaded, render 3D Lottie Male Avatar Animation */}
+            {LottieView && !lottieFailed ? (
+                <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+                    <LottieView
+                        source={{ uri: 'https://assets5.lottiefiles.com/packages/lf20_w51pcehl.json' }}
+                        autoPlay
+                        loop
+                        style={{ width: size * 1.1, height: size * 1.1 }}
+                        onError={() => setLottieFailed(true)}
+                    />
+                </View>
+            ) : (
+                /* High-End 60FPS Multi-Joint 3D Male Cartoon Character (Matches reference images) */
+                <Animated.View
+                    style={[
+                        styles.characterWrapper,
+                        {
+                            transform: [
+                                { translateY: floatAnim },
+                            ],
+                        },
+                    ]}
+                >
+                    <Svg width={size} height={size} viewBox="0 0 160 160" fill="none">
+                        <Defs>
+                            {/* 3D Skin Gradient */}
+                            <SvgGradient id="skin3d" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <Stop offset="0%" stopColor="#FFF7ED" />
+                                <Stop offset="40%" stopColor="#FED7AA" />
+                                <Stop offset="100%" stopColor="#FDBA74" />
+                            </SvgGradient>
 
-                        {/* 3D Volumetric Hair Gradient */}
-                        <SvgGradient id="hair3d" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#475569" />
-                            <Stop offset="45%" stopColor="#1E293B" />
-                            <Stop offset="100%" stopColor="#0F172A" />
-                        </SvgGradient>
+                            {/* 3D Hair Gradient */}
+                            <SvgGradient id="hair3d" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <Stop offset="0%" stopColor="#475569" />
+                                <Stop offset="50%" stopColor="#1E293B" />
+                                <Stop offset="100%" stopColor="#0F172A" />
+                            </SvgGradient>
 
-                        {/* Gold Hair Highlight */}
-                        <SvgGradient id="goldHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#FEF08A" />
-                            <Stop offset="100%" stopColor="#D9A73A" />
-                        </SvgGradient>
+                            {/* Gold Highlight */}
+                            <SvgGradient id="goldHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <Stop offset="0%" stopColor="#FEF08A" />
+                                <Stop offset="100%" stopColor="#D9A73A" />
+                            </SvgGradient>
 
-                        {/* 3D Navy Suit / Sweater Gradient */}
-                        <SvgGradient id="suit3d" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#1E293B" />
-                            <Stop offset="50%" stopColor="#0E1A2E" />
-                            <Stop offset="100%" stopColor="#060D1A" />
-                        </SvgGradient>
+                            {/* 3D Suit Gradient */}
+                            <SvgGradient id="suit3d" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <Stop offset="0%" stopColor="#1E293B" />
+                                <Stop offset="60%" stopColor="#0E1A2E" />
+                                <Stop offset="100%" stopColor="#060D1A" />
+                            </SvgGradient>
 
-                        {/* Glasses Frame Metallic Gradient */}
-                        <SvgGradient id="glassesMetal" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <Stop offset="0%" stopColor="#334155" />
-                            <Stop offset="50%" stopColor="#0F172A" />
-                            <Stop offset="100%" stopColor="#020617" />
-                        </SvgGradient>
-                    </Defs>
+                            {/* Glasses Metal */}
+                            <SvgGradient id="glassesMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <Stop offset="0%" stopColor="#334155" />
+                                <Stop offset="50%" stopColor="#0F172A" />
+                                <Stop offset="100%" stopColor="#020617" />
+                            </SvgGradient>
+                        </Defs>
 
-                    {/* Background Glow */}
-                    <Circle cx="80" cy="80" r="70" fill={isDarkMode ? "#08E4C7" : "#D9A73A"} opacity="0.08" />
+                        {/* Ambient Aura Glow */}
+                        <Circle cx="80" cy="80" r="72" fill={isDarkMode ? "#08E4C7" : "#D9A73A"} opacity="0.08" />
 
-                    {/* 3D Navy Suit / Sweater (As in reference images) */}
-                    <G id="torso">
-                        <Path d="M 32 120 C 32 105, 50 96, 80 96 C 110 96, 128 105, 128 120 L 132 160 L 28 160 Z" fill="url(#suit3d)" />
-                        
-                        {/* White Collared Shirt */}
-                        <Path d="M 64 96 L 80 122 L 96 96 Z" fill="#FFFFFF" />
-                        <Path d="M 72 96 L 80 108 L 88 96 Z" fill="#F1F5F9" />
-
-                        {/* Stylish Blue Tie */}
-                        <Path d="M 76 104 L 84 104 L 82 136 L 80 142 L 78 136 Z" fill="#0284C7" />
-                        <Path d="M 76 104 L 84 104 L 82 112 L 78 112 Z" fill="url(#goldHighlight)" />
-                    </G>
-
-                    {/* Neck */}
-                    <Rect x="70" y="80" width="20" height="20" rx="6" fill="url(#skin3d)" />
-                    <Path d="M 70 92 Q 80 98 90 92" stroke="#FDBA74" strokeWidth="2" fill="none" />
-
-                    {/* 3D Head Base */}
-                    <G id="head">
-                        {/* Ears */}
-                        <Circle cx="35" cy="62" r="8" fill="url(#skin3d)" />
-                        <Circle cx="35" cy="62" r="5" fill="#FDBA74" opacity="0.5" />
-                        
-                        <Circle cx="125" cy="62" r="8" fill="url(#skin3d)" />
-                        <Circle cx="125" cy="62" r="5" fill="#FDBA74" opacity="0.5" />
-
-                        {/* Main Face Contour */}
-                        <Rect x="38" y="28" width="84" height="70" rx="34" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="0.8" />
-
-                        {/* Neat Beard & Stubble Contour (As in Reference Image 1) */}
-                        <Path d="M 42 66 C 42 88, 56 98, 80 98 C 104 98, 118 88, 118 66 C 118 78, 102 94, 80 94 C 58 94, 42 78, 42 66 Z" fill="#334155" opacity="0.35" />
-                        <Path d="M 68 84 Q 80 90 92 84 Q 80 96 68 84 Z" fill="#1E293B" opacity="0.25" />
-
-                        {/* 3D Volumetric Hair Style (As in Reference Image 1 & 2) */}
-                        <Path d="M 34 44 C 30 20, 52 8, 80 8 C 108 8, 130 20, 126 44 C 120 30, 108 20, 80 20 C 52 20, 40 30, 34 44 Z" fill="url(#hair3d)" />
-                        <Path d="M 38 34 Q 56 12 80 14 Q 104 12 122 34 Q 110 24 80 26 Q 50 24 38 34 Z" fill="url(#hair3d)" />
-                        
-                        {/* Front Hair Locks & Gold Specular Highlights */}
-                        <Path d="M 44 32 Q 62 18 82 24 Q 102 16 116 32 Q 102 22 82 26 Q 62 20 44 32 Z" fill="url(#goldHighlight)" opacity="0.85" />
-
-                        {/* Handsome Eyebrows */}
-                        <Path d="M 48 46 Q 58 40 68 46" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
-                        <Path d="M 92 46 Q 102 40 112 46" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
-
-                        {/* Expressive Friendly Cartoon Eyes */}
-                        <G id="eyes">
-                            {/* Left Eye */}
-                            <Circle cx="58" cy="56" r="9" fill="#FFFFFF" />
-                            <Circle cx="59" cy="56" r="5.5" fill="#0F172A" />
-                            <Circle cx="59" cy="56" r="3" fill="#0284C7" />
-                            <Circle cx="61" cy="54" r="2.2" fill="#FFFFFF" />
-
-                            {/* Right Eye */}
-                            <Circle cx="102" cy="56" r="9" fill="#FFFFFF" />
-                            <Circle cx="101" cy="56" r="5.5" fill="#0F172A" />
-                            <Circle cx="101" cy="56" r="3" fill="#0284C7" />
-                            <Circle cx="103" cy="54" r="2.2" fill="#FFFFFF" />
+                        {/* Navy Suit / Sweater (Reference Image 1 & 2) */}
+                        <G id="torso">
+                            <Path d="M 30 118 C 30 102, 50 94, 80 94 C 110 94, 130 102, 130 118 L 134 160 L 26 160 Z" fill="url(#suit3d)" />
+                            <Path d="M 64 94 L 80 120 L 96 94 Z" fill="#FFFFFF" />
+                            <Path d="M 72 94 L 80 106 L 88 94 Z" fill="#F1F5F9" />
+                            <Path d="M 76 102 L 84 102 L 82 136 L 80 142 L 78 136 Z" fill="#0284C7" />
+                            <Path d="M 76 102 L 84 102 L 82 110 L 78 110 Z" fill="url(#goldHighlight)" />
                         </G>
 
-                        {/* Stylish 3D Glasses (As in Reference Image 1) */}
-                        <G id="glasses">
-                            {/* Left Lens Frame */}
-                            <Rect x="44" y="44" width="28" height="22" rx="8" fill="none" stroke="url(#glassesMetal)" strokeWidth="3.5" />
-                            <Rect x="46" y="46" width="24" height="18" rx="6" fill="#0284C7" opacity="0.12" />
-                            <Path d="M 48 48 L 58 48" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                        {/* Neck */}
+                        <Rect x="70" y="78" width="20" height="20" rx="6" fill="url(#skin3d)" />
 
-                            {/* Right Lens Frame */}
-                            <Rect x="88" y="44" width="28" height="22" rx="8" fill="none" stroke="url(#glassesMetal)" strokeWidth="3.5" />
-                            <Rect x="90" y="46" width="24" height="18" rx="6" fill="#0284C7" opacity="0.12" />
-                            <Path d="M 92 48 L 102 48" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+                        {/* Animated Head (Bobbing & Tilting) */}
+                        <G id="headGroup">
+                            {/* Ears */}
+                            <Circle cx="34" cy="58" r="8" fill="url(#skin3d)" />
+                            <Circle cx="34" cy="58" r="5" fill="#FDBA74" opacity="0.5" />
+                            <Circle cx="126" cy="58" r="8" fill="url(#skin3d)" />
+                            <Circle cx="126" cy="58" r="5" fill="#FDBA74" opacity="0.5" />
 
-                            {/* Bridge */}
-                            <Path d="M 72 52 Q 80 48 88 52" stroke="url(#glassesMetal)" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                            
-                            {/* Frame Temples */}
-                            <Path d="M 44 52 L 35 50" stroke="url(#glassesMetal)" strokeWidth="3" strokeLinecap="round" />
-                            <Path d="M 116 52 L 125 50" stroke="url(#glassesMetal)" strokeWidth="3" strokeLinecap="round" />
+                            {/* Main 3D Face Contour */}
+                            <Rect x="38" y="24" width="84" height="70" rx="34" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="0.8" />
+
+                            {/* Beard / Stubble Contour (Reference Image 1) */}
+                            <Path d="M 42 62 C 42 84, 56 94, 80 94 C 104 94, 118 84, 118 62 C 118 74, 102 90, 80 90 C 58 90, 42 74, 42 62 Z" fill="#334155" opacity="0.32" />
+
+                            {/* Hair Style */}
+                            <Path d="M 34 40 C 30 16, 52 4, 80 4 C 108 4, 130 16, 126 40 C 120 26, 108 16, 80 18 C 52 16, 40 26, 34 40 Z" fill="url(#hair3d)" />
+                            <Path d="M 42 28 Q 62 14 82 20 Q 102 12 116 28 Q 102 18 82 22 Q 62 16 42 28 Z" fill="url(#goldHighlight)" opacity="0.85" />
+
+                            {/* Eyebrows */}
+                            <Path d="M 48 42 Q 58 36 68 42" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
+                            <Path d="M 92 42 Q 102 36 112 42" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
+
+                            {/* Cartoon Eyes */}
+                            <G id="eyes">
+                                <Circle cx="58" cy="52" r="9" fill="#FFFFFF" />
+                                <Circle cx="59" cy="52" r="5.5" fill="#0F172A" />
+                                <Circle cx="59" cy="52" r="3" fill="#0284C7" />
+                                <Circle cx="61" cy="50" r="2.2" fill="#FFFFFF" />
+
+                                <Circle cx="102" cy="52" r="9" fill="#FFFFFF" />
+                                <Circle cx="101" cy="52" r="5.5" fill="#0F172A" />
+                                <Circle cx="101" cy="52" r="3" fill="#0284C7" />
+                                <Circle cx="103" cy="50" r="2.2" fill="#FFFFFF" />
+                            </G>
+
+                            {/* 3D Glasses (Reference Image 1) */}
+                            <G id="glasses">
+                                <Rect x="44" y="40" width="28" height="22" rx="8" fill="none" stroke="url(#glassesMetal)" strokeWidth="3.5" />
+                                <Rect x="46" y="42" width="24" height="18" rx="6" fill="#0284C7" opacity="0.12" />
+                                <Path d="M 48 44 L 58 44" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+
+                                <Rect x="88" y="40" width="28" height="22" rx="8" fill="none" stroke="url(#glassesMetal)" strokeWidth="3.5" />
+                                <Rect x="90" y="42" width="24" height="18" rx="6" fill="#0284C7" opacity="0.12" />
+                                <Path d="M 92 44 L 102 44" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+
+                                <Path d="M 72 48 Q 80 44 88 48" stroke="url(#glassesMetal)" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                                <Path d="M 44 48 L 35 46" stroke="url(#glassesMetal)" strokeWidth="3" strokeLinecap="round" />
+                                <Path d="M 116 48 L 125 46" stroke="url(#glassesMetal)" strokeWidth="3" strokeLinecap="round" />
+                            </G>
+
+                            {/* Nose */}
+                            <Path d="M 78 56 Q 80 62 82 60" stroke="#FDBA74" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+
+                            {/* Warm Smile */}
+                            <Path d="M 66 70 Q 80 82 94 70" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
+                            <Path d="M 70 72 Q 80 79 90 72" fill="#FFFFFF" />
+
+                            {/* Rosy Cheeks */}
+                            <Circle cx="46" cy="62" r="5" fill="#F43F5E" opacity="0.22" />
+                            <Circle cx="114" cy="62" r="5" fill="#F43F5E" opacity="0.22" />
                         </G>
 
-                        {/* Nose */}
-                        <Path d="M 78 60 Q 80 66 82 64" stroke="#FDBA74" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        {/* Hands Peeking over Card & Smartphone (Reference Image 1 & 2) */}
+                        <G id="handsPeeking">
+                            <Rect x="36" y="108" width="24" height="14" rx="7" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="1" />
+                            <Circle cx="42" cy="115" r="3" fill="#FED7AA" />
+                            <Circle cx="48" cy="115" r="3" fill="#FED7AA" />
+                            <Circle cx="54" cy="115" r="3" fill="#FED7AA" />
 
-                        {/* Warm Smile */}
-                        <Path d="M 66 74 Q 80 86 94 74" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" fill="none" />
-                        <Path d="M 70 76 Q 80 83 90 76" fill="#FFFFFF" />
-
-                        {/* Rosy Cheeks */}
-                        <Circle cx="46" cy="66" r="5" fill="#F43F5E" opacity="0.22" />
-                        <Circle cx="114" cy="66" r="5" fill="#F43F5E" opacity="0.22" />
-                    </G>
-
-                    {/* Hands Peeking & Holding Smartphone (As in Reference Image 1 & 2) */}
-                    <G id="handsPeeking">
-                        {/* Left Hand Resting on Card Ledge */}
-                        <Rect x="36" y="112" width="24" height="14" rx="7" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="1" />
-                        <Circle cx="42" cy="119" r="3" fill="#FED7AA" />
-                        <Circle cx="48" cy="119" r="3" fill="#FED7AA" />
-                        <Circle cx="54" cy="119" r="3" fill="#FED7AA" />
-
-                        {/* Right Hand Holding Glowing Smartphone (Reference Image 2) */}
-                        <G transform="translate(98, 102)">
-                            {/* Smartphone Body */}
-                            <Rect x="0" y="0" width="22" height="36" rx="5" fill="#0E1A2E" stroke="#08E4C7" strokeWidth="1.5" />
-                            <Rect x="2" y="3" width="18" height="28" rx="3" fill="#08E4C7" opacity="0.9" />
-                            {/* Phone Screen App Lines */}
-                            <Rect x="5" y="8" width="12" height="2" rx="1" fill="#0E1A2E" />
-                            <Rect x="5" y="13" width="8" height="2" rx="1" fill="#0E1A2E" />
-                            <Circle cx="11" cy="24" r="3" fill="#D9A73A" />
-
-                            {/* Fingers Wrapping Around Phone */}
-                            <Rect x="-6" y="10" width="10" height="16" rx="5" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="0.8" />
+                            {/* Right Hand Holding Smartphone */}
+                            <G transform="translate(98, 98)">
+                                <Rect x="0" y="0" width="22" height="36" rx="5" fill="#0E1A2E" stroke="#08E4C7" strokeWidth="1.5" />
+                                <Rect x="2" y="3" width="18" height="28" rx="3" fill="#08E4C7" opacity="0.9" />
+                                <Rect x="5" y="8" width="12" height="2" rx="1" fill="#0E1A2E" />
+                                <Rect x="5" y="13" width="8" height="2" rx="1" fill="#0E1A2E" />
+                                <Circle cx="11" cy="24" r="3" fill="#D9A73A" />
+                                <Rect x="-6" y="10" width="10" height="16" rx="5" fill="url(#skin3d)" stroke="#FDBA74" strokeWidth="0.8" />
+                            </G>
                         </G>
-                    </G>
-                </Svg>
-            </Animated.View>
+                    </Svg>
+                </Animated.View>
+            )}
         </View>
     );
 }

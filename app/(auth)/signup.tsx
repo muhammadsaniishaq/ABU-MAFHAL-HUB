@@ -292,6 +292,12 @@ export default function SignupScreen() {
                                 <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
                             </View>
 
+                            {/* Security Badge Pill */}
+                            <View style={[styles.securityPill, { backgroundColor: isDark ? 'rgba(8, 228, 199, 0.12)' : 'rgba(14, 26, 46, 0.06)' }]}>
+                                <Ionicons name="shield-checkmark" size={11} color="#08E4C7" style={{ marginRight: 3 }} />
+                                <Text style={[styles.securityPillText, { color: isDark ? '#08E4C7' : '#0E1A2E' }]}>256-Bit SSL</Text>
+                            </View>
+
                             <TouchableOpacity 
                                 onPress={toggleTheme} 
                                 style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
@@ -846,5 +852,17 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         textAlign: 'center',
         lineHeight: 16,
+    },
+    securityPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 99,
+    },
+    securityPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
 });

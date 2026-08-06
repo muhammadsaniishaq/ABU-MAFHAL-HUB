@@ -306,7 +306,7 @@ export default function LoginScreen() {
                         bounces={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Compact Top Control Bar */}
+                        {/* Top Control Bar with Brand & Security Badge */}
                         <View style={styles.topControlRow}>
                             <View style={styles.brandRow}>
                                 <Image
@@ -318,6 +318,12 @@ export default function LoginScreen() {
                                     <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
                                     <Text style={[styles.brandTagline, { color: theme.gold }]}>FINTECH & DIGITAL HUB</Text>
                                 </View>
+                            </View>
+
+                            {/* Security Badge Pill */}
+                            <View style={[styles.securityPill, { backgroundColor: isDark ? 'rgba(8, 228, 199, 0.12)' : 'rgba(14, 26, 46, 0.06)' }]}>
+                                <Ionicons name="shield-checkmark" size={11} color="#08E4C7" style={{ marginRight: 3 }} />
+                                <Text style={[styles.securityPillText, { color: isDark ? '#08E4C7' : '#0E1A2E' }]}>256-Bit SSL</Text>
                             </View>
 
                             <TouchableOpacity 
@@ -841,5 +847,17 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    securityPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 99,
+    },
+    securityPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.3,
     },
 });
