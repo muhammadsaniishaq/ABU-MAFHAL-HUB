@@ -50,6 +50,7 @@ export default function LiquidityVaultScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [totalBalance, setTotalBalance] = useState(0);
     const [providers, setProviders] = useState<ProviderWallet[]>([]);
+    const [vaultSecrets, setVaultSecrets] = useState<Record<string, string>>({});
     const [activeFilter, setActiveFilter] = useState<string>('All');
 
     // Modal States
@@ -85,37 +86,42 @@ export default function LiquidityVaultScreen() {
             if (!edgeError && edgeData?.success && edgeData?.providers && edgeData.providers.length > 0) {
                 setTotalBalance(edgeData.totalBalance || 0);
                 setProviders(edgeData.providers);
+                if (edgeData.secrets) {
+                    setVaultSecrets(edgeData.secrets);
+                }
                 return;
             }
 
-            // 2. Direct client DB query fallback if Edge Function is offline
-            const secrets: Record<string, string> = {};
+            // 2. Direct client DB query fallback
+            const secretsMap: Record<string, string> = {};
 
             const { data: settingsData } = await supabase.from('app_settings').select('*');
             if (settingsData) {
                 settingsData.forEach(s => {
-                    if (s.value && s.value.trim() !== '') secrets[s.key.toUpperCase()] = s.value.trim();
+                    if (s.value && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
                 });
             }
 
             const { data: secretsData } = await supabase.from('system_secrets').select('*');
             if (secretsData) {
                 secretsData.forEach(s => {
-                    if (s.value && s.value.trim() !== '') secrets[s.key.toUpperCase()] = s.value.trim();
+                    if (s.value && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
                 });
             }
 
-            const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || '';
-            const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || '';
-            const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || '';
-            const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || '';
-            const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || '';
-            const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || '';
-            const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || '';
-            const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || '';
-            const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || '';
-            const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || '';
-            const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || '';
+            setVaultSecrets(secretsMap);
+
+            const agentHubKey = secretsMap['AGENTHUB_API_KEY'] || secretsMap['AGENTHUB_KEY'] || '';
+            const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || '';
+            const paystackSecret = secretsMap['PAYSTACK_SECRET_KEY'] || secretsMap['PAYSTACK_KEY'] || '';
+            const clubkonnectKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || '';
+            const idProKey = secretsMap['IDPRO_API_KEY'] || secretsMap['IDPRO_KEY'] || '';
+            const payBesselKey = secretsMap['PAYBESSEL_API_KEY'] || secretsMap['PAYBESSEL_KEY'] || secretsMap['PAYBESSEL_SECRET_KEY'] || '';
+            const nineBoostKey = secretsMap['NINEBOOST_API_KEY'] || secretsMap['NINEBOOST_KEY'] || secretsMap['NINEBOOST_TOKEN'] || '';
+            const nowPaymentsKey = secretsMap['NOWPAYMENTS_API_KEY'] || secretsMap['NOWPAYMENTS_KEY'] || '';
+            const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || '';
+            const termiiKey = secretsMap['TERMII_API_KEY'] || secretsMap['TERMII_KEY'] || '';
+            const monnifyApiKey = secretsMap['MONNIFY_API_KEY'] || secretsMap['MONNIFY_KEY'] || '';
 
             const list: ProviderWallet[] = [
                 {
@@ -125,7 +131,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: agentHubKey ? 'healthy' : 'unconfigured',
-                    error: agentHubKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: agentHubKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false,
                     depositAccount: {
@@ -142,7 +148,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: bilalToken ? 'healthy' : 'unconfigured',
-                    error: bilalToken ? undefined : 'Baa a shigar da token a Admin API Vault ba',
+                    error: bilalToken ? undefined : 'Token not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false,
                     depositAccount: {
@@ -159,7 +165,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: paystackSecret ? 'healthy' : 'unconfigured',
-                    error: paystackSecret ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: paystackSecret ? undefined : 'Secret Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
                 },
@@ -170,7 +176,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: clubkonnectKey ? 'healthy' : 'unconfigured',
-                    error: clubkonnectKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: clubkonnectKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
                 },
@@ -181,7 +187,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: idProKey ? 'healthy' : 'unconfigured',
-                    error: idProKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: idProKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
                 },
@@ -192,7 +198,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: payBesselKey ? 'healthy' : 'unconfigured',
-                    error: payBesselKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: payBesselKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
                 },
@@ -203,7 +209,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'USD',
                     status: nineBoostKey ? 'healthy' : 'unconfigured',
-                    error: nineBoostKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: nineBoostKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
                 },
@@ -214,7 +220,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'USD',
                     status: nowPaymentsKey ? 'healthy' : 'unconfigured',
-                    error: nowPaymentsKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: nowPaymentsKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
                 },
@@ -225,7 +231,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: bigiToken ? 'healthy' : 'unconfigured',
-                    error: bigiToken ? undefined : 'Baa a shigar da token a Admin API Vault ba',
+                    error: bigiToken ? undefined : 'Token not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
                 },
@@ -236,7 +242,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: termiiKey ? 'healthy' : 'unconfigured',
-                    error: termiiKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: termiiKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
                 },
@@ -247,7 +253,7 @@ export default function LiquidityVaultScreen() {
                     balance: 0,
                     currency: 'NGN',
                     status: monnifyApiKey ? 'healthy' : 'unconfigured',
-                    error: monnifyApiKey ? undefined : 'Baa a shigar da key a Admin API Vault ba',
+                    error: monnifyApiKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
                 }
@@ -266,6 +272,29 @@ export default function LiquidityVaultScreen() {
         Clipboard.setString(text);
         setCopiedText(true);
         setTimeout(() => setCopiedText(false), 2000);
+    };
+
+    const handleOpenTokenModal = (p: ProviderWallet) => {
+        setSelectedTokenProvider(p);
+        const secretMap: Record<string, string> = {
+            agenthub: 'AGENTHUB_API_KEY',
+            bilalsadasub: 'BILALSADASUB_TOKEN',
+            paystack: 'PAYSTACK_SECRET_KEY',
+            clubkonnect: 'CLUBKONNECT_API_KEY',
+            idpro: 'IDPRO_API_KEY',
+            paybessel: 'PAYBESSEL_API_KEY',
+            nineboost: 'NINEBOOST_API_KEY',
+            nowpayments: 'NOWPAYMENTS_API_KEY',
+            bigi: 'BIGI_API_TOKEN',
+            termii: 'TERMII_API_KEY',
+            monnify: 'MONNIFY_API_KEY'
+        };
+        const keyName = secretMap[p.id] || 'GENERIC_API_KEY';
+        setTokenKeyName(keyName);
+
+        // Pre-fill existing secret value from vaultSecrets map
+        const existingVal = vaultSecrets[keyName] || vaultSecrets[keyName.replace('_API_KEY', '_KEY').replace('_TOKEN', '_KEY')] || '';
+        setTokenValue(existingVal);
     };
 
     const handleSaveVaultToken = async () => {
@@ -306,6 +335,9 @@ export default function LiquidityVaultScreen() {
                 value: tokenValue.trim(),
                 updated_at: new Date().toISOString()
             });
+
+            // Update local vaultSecrets state immediately
+            setVaultSecrets(prev => ({ ...prev, [secretKey]: tokenValue.trim() }));
 
             // Invoke server refresh with custom key payload
             await supabase.functions.invoke('check-provider-balances', {
@@ -430,7 +462,7 @@ export default function LiquidityVaultScreen() {
                         <View style={styles.statBadge}>
                             <Ionicons name="checkmark-circle" size={12} color="#10B981" />
                             <Text style={styles.statBadgeText}>
-                                {providers.filter(p => p.status === 'healthy').length} Healthy APIs
+                                {providers.filter(p => p.status === 'healthy').length} Configured Vendors
                             </Text>
                         </View>
 
@@ -444,7 +476,7 @@ export default function LiquidityVaultScreen() {
                         <View style={styles.statBadge}>
                             <Ionicons name="key" size={12} color="#D9A73A" />
                             <Text style={styles.statBadgeText}>
-                                {providers.length} Active Vendors
+                                {providers.length} Active APIs
                             </Text>
                         </View>
                     </View>
@@ -520,7 +552,7 @@ export default function LiquidityVaultScreen() {
                                                 isCritical && { color: '#DC2626' },
                                                 isUnconfigured && { color: '#EA580C' }
                                             ]}>
-                                                {isUnconfigured ? 'BAA A SA BA' : 'ACTIVE IN VAULT'}
+                                                {isUnconfigured ? 'NOT CONFIGURED' : 'HEALTHY'}
                                             </Text>
                                         </View>
                                     </View>
@@ -535,7 +567,7 @@ export default function LiquidityVaultScreen() {
                                             styles.providerErrorText,
                                             isUnconfigured && { color: '#D97706', fontWeight: '700' }
                                         ]}>
-                                            ⚠️ {p.error}
+                                            💡 {p.error}
                                         </Text>
                                     )}
 
@@ -564,29 +596,13 @@ export default function LiquidityVaultScreen() {
                                         )}
 
                                         <TouchableOpacity 
-                                            onPress={() => {
-                                                setSelectedTokenProvider(p);
-                                                const secretMap: Record<string, string> = {
-                                                    agenthub: 'AGENTHUB_API_KEY',
-                                                    bilalsadasub: 'BILALSADASUB_TOKEN',
-                                                    paystack: 'PAYSTACK_SECRET_KEY',
-                                                    clubkonnect: 'CLUBKONNECT_API_KEY',
-                                                    idpro: 'IDPRO_API_KEY',
-                                                    paybessel: 'PAYBESSEL_API_KEY',
-                                                    nineboost: 'NINEBOOST_API_KEY',
-                                                    nowpayments: 'NOWPAYMENTS_API_KEY',
-                                                    bigi: 'BIGI_API_TOKEN',
-                                                    termii: 'TERMII_API_KEY',
-                                                    monnify: 'MONNIFY_API_KEY'
-                                                };
-                                                setTokenKeyName(secretMap[p.id] || 'GENERIC_API_KEY');
-                                            }}
+                                            onPress={() => handleOpenTokenModal(p)}
                                             style={[styles.actionBtn, styles.tokenBtn, isUnconfigured && styles.tokenBtnHighlight]}
                                             activeOpacity={0.8}
                                         >
                                             <Ionicons name="key-outline" size={14} color={isUnconfigured ? '#FFFFFF' : '#64748B'} style={{ marginRight: 4 }} />
                                             <Text style={[styles.actionBtnText, { color: isUnconfigured ? '#FFFFFF' : '#64748B' }]}>
-                                                {isUnconfigured ? 'Saka Token' : 'Token'}
+                                                {isUnconfigured ? 'Set Token' : 'Token'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -673,7 +689,7 @@ export default function LiquidityVaultScreen() {
                         </View>
 
                         <Text style={styles.modalSubText}>
-                            Directly update or save the API token for this vendor in Vault.
+                            Directly view, update or save the secret API key for this vendor in Vault.
                         </Text>
 
                         <Text style={styles.inputLabel}>Secret Key Name</Text>

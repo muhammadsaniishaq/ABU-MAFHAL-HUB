@@ -80,14 +80,14 @@ serve(async (req: Request) => {
       }
     })
 
-    // Resolve individual keys from Admin API Vault
+    // Resolve individual keys from Admin API Vault case-insensitively
     const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || Deno.env.get('AGENTHUB_API_KEY') || ''
-    const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
+    const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || secrets['BILALSADASUB_API_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
     const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
     const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
-    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
-    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
+    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || secrets['PAYBESSEL_SECRET_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
+    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || Deno.env.get('NINEBOOST_API_KEY') || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
@@ -96,10 +96,9 @@ serve(async (req: Request) => {
     const providerBalances: any[] = []
 
     // 1. AgentHub (Identity, NIN, BVN, CAC)
-    if (agentHubKey) {
+    if (agentHubKey && agentHubKey.trim() !== '') {
       let balance = 0
       let latencyMs = 180
-      let fetched = false
       try {
         const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
           headers: { 'Authorization': `Bearer ${agentHubKey}`, 'Accept': 'application/json' }
@@ -108,7 +107,6 @@ serve(async (req: Request) => {
         if (data && (data.balance !== undefined || data?.data?.balance !== undefined || data?.user?.balance !== undefined)) {
           balance = Number(data?.balance ?? data?.data?.balance ?? data?.user?.balance ?? 0)
           latencyMs = latency
-          fetched = true
         }
       } catch (e) {}
 
@@ -138,14 +136,14 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
     }
 
     // 2. BilalSadaSub (Data, Airtime, VTU)
-    if (bilalToken) {
+    if (bilalToken && bilalToken.trim() !== '') {
       let balance = 0
       let latencyMs = 210
       try {
@@ -185,7 +183,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da token a Admin API Vault ba',
+        error: 'Token not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -225,7 +223,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'Secret Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: true
       })
@@ -233,13 +231,24 @@ serve(async (req: Request) => {
 
     // 4. Clubkonnect
     if (clubkonnectKey && clubkonnectKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 140
+      try {
+        const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=ABUMAFHAL&APIKey=${clubkonnectKey}`)
+        const data = await response.json()
+        if (data && (data?.balance !== undefined || data?.user?.balance !== undefined)) {
+          balance = Number(data?.balance || data?.user?.balance || 0)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
       providerBalances.push({
         id: 'clubkonnect',
         name: 'Clubkonnect / NelloByte API (VTU Telecom)',
         category: 'VTU Telecom',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
-        latencyMs: 140,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
@@ -253,7 +262,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -261,13 +270,26 @@ serve(async (req: Request) => {
 
     // 5. IDPro API
     if (idProKey && idProKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 160
+      try {
+        const { response, latency } = await fetchWithTimeout('https://idpro.ng/api/balance', {
+          headers: { 'Authorization': `Bearer ${idProKey}` }
+        })
+        const data = await response.json()
+        if (data && data?.balance !== undefined) {
+          balance = Number(data.balance)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
       providerBalances.push({
         id: 'idpro',
         name: 'IDPro (Identity & KYC Verification API)',
         category: 'Digital Identity & CAC',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
-        latencyMs: 160,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
@@ -281,21 +303,34 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
     }
 
-    // 6. PayBessel
+    // 6. PayBessel (Payment & Payout Gateway)
     if (payBesselKey && payBesselKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 170
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.paybessel.com/v1/wallet/balance', {
+          headers: { 'Authorization': `Bearer ${payBesselKey}` }
+        })
+        const data = await response.json()
+        if (data && (data?.balance !== undefined || data?.data?.balance !== undefined)) {
+          balance = Number(data?.balance ?? data?.data?.balance ?? 0)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
       providerBalances.push({
         id: 'paybessel',
         name: 'PayBessel (Payment & Payout Gateway)',
         category: 'Payment Gateway',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
-        latencyMs: 170,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
@@ -309,21 +344,32 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: true
       })
     }
 
-    // 7. NineBoost
+    // 7. NineBoost (Social Media Marketing SMM Panel)
     if (nineBoostKey && nineBoostKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 190
+      try {
+        const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey}&action=balance`)
+        const data = await response.json()
+        if (data && data?.balance !== undefined) {
+          balance = Number(data.balance)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
       providerBalances.push({
         id: 'nineboost',
         name: 'NineBoost (Social Media Marketing SMM Panel)',
         category: 'Marketing Services',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'USD',
-        latencyMs: 190,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
@@ -337,7 +383,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'USD',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -345,13 +391,26 @@ serve(async (req: Request) => {
 
     // 8. NowPayments
     if (nowPaymentsKey && nowPaymentsKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 200
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.nowpayments.io/v1/balance', {
+          headers: { 'x-api-key': nowPaymentsKey }
+        })
+        const data = await response.json()
+        if (data && data?.balance !== undefined) {
+          balance = Number(data.balance)
+          latencyMs = latency
+        }
+      } catch (e) {}
+
       providerBalances.push({
         id: 'nowpayments',
         name: 'NowPayments (Crypto Payment Gateway)',
         category: 'Payment Gateway',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'USD',
-        latencyMs: 200,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
@@ -365,7 +424,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'USD',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: true
       })
@@ -406,7 +465,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da token a Admin API Vault ba',
+        error: 'Token not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -443,7 +502,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -471,7 +530,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Baa a shigar da key a Admin API Vault ba',
+        error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: true
       })
@@ -485,6 +544,7 @@ serve(async (req: Request) => {
     return jsonOk({
       success: true,
       timestamp: new Date().toISOString(),
+      secrets: secrets,
       totalBalance: totalAggregatedBalance,
       providers: providerBalances
     })
