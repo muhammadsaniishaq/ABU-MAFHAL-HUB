@@ -5,12 +5,14 @@ import Svg, {
     Stop 
 } from 'react-native-svg';
 
-// Try importing lottie-react-native safely
+// Try importing lottie-react-native safely on native platforms only
 let LottieView: any = null;
-try {
-    LottieView = require('lottie-react-native');
-} catch (e) {
-    LottieView = null;
+if (Platform.OS !== 'web') {
+    try {
+        LottieView = require('lottie-react-native');
+    } catch (e) {
+        LottieView = null;
+    }
 }
 
 interface Mascot3DProps {
