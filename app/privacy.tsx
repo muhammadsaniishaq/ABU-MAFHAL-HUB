@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: 'rgba(8, 228, 199, 0.12)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginRight: 10,
     },
     accordionTitle: {
