@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     strengthBgTrack: {
         height: 4,
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: '#94A3B8',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginRight: 6,
     },
     termsText: {
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
     primaryBtnGradient: {
         height: 38,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#FFFFFF',
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
     socialGrid: {
         flexDirection: 'row',
         gap: 6,
-        justify: 'space-between',
+        justifyContent: 'space-between',
         marginBottom: 10,
     },
     socialTile: {
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
@@ -774,7 +774,7 @@ const styles = StyleSheet.create({
     },
     footerLinkRow: {
         flexDirection: 'row',
-        justify: 'center',
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 2,
     },
@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(6, 13, 30, 0.75)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         padding: 14,
     },
     modalCard: {
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         backgroundColor: 'rgba(8, 228, 199, 0.15)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginBottom: 12,
         borderWidth: 2,
         borderColor: '#08E4C7',

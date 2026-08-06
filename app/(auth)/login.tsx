@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
     primaryBtnGradient: {
         height: 40,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#FFFFFF',
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         marginBottom: 10,
     },
     biometricBtnText: {
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     },
     footerLinkRow: {
         flexDirection: 'row',
-        justify: 'center',
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 2,
     },
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(6, 13, 30, 0.75)',
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
         padding: 14,
     },
     modalCard: {
@@ -840,6 +840,6 @@ const styles = StyleSheet.create({
         height: 38,
         borderRadius: 8,
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
 });
