@@ -1,27 +1,58 @@
-import { View, Text, StyleSheet, useWindowDimensions, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Image, ScrollView, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+    View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, 
+    Platform, Image, ScrollView, ActivityIndicator, StyleSheet, 
+    useWindowDimensions, Alert, Modal 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+
+import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAuthTheme } from '../../hooks/useAuthTheme';
+import Mascot3D from '../../components/Mascot3D';
 
-const { width, height } = Dimensions.get('window');
+WebBrowser.maybeCompleteAuthSession();
 
-export default function Signup() {
+const COUNTRIES = [
+    { code: 'NG', name: 'Nigeria', flag: '🇳🇬', dialCode: '+234' },
+    { code: 'GH', name: 'Ghana', flag: '🇬🇭', dialCode: '+233' },
+    { code: 'KE', name: 'Kenya', flag: '🇰🇪', dialCode: '+254' },
+    { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', dialCode: '+44' },
+    { code: 'US', name: 'United States', flag: '🇺🇸', dialCode: '+1' },
+];
+
+export default function SignupScreen() {
+    const { width } = useWindowDimensions();
+    const isTabletOrDesktop = width >= 768;
+    const router = useRouter();
+    const { settings } = useAppSettings();
+    const { isDark, toggleTheme, theme } = useAuthTheme();
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // Form Field States
     const [fullName, setFullName] = useState('');
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
+    const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [referralCode, setReferralCode] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [loadingGoogle, setLoadingGoogle] = useState(false);
+    const [acceptTerms, setAcceptTerms] = useState(false);
 
-    // Validation States
+    // Visibility & UI States
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showCountryModal, setShowCountryModal] = useState(false);
+    const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+    // Real-Time Availability Validation States
     const [checkingUsername, setCheckingUsername] = useState(false);
     const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
     const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
@@ -32,13 +63,16 @@ export default function Signup() {
     const [checkingPhone, setCheckingPhone] = useState(false);
     const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
 
-    const router = useRouter();
-    const { settings, loading: settingsLoading } = useAppSettings();
+    // Processing & Success States
+    const [loading, setLoading] = useState(false);
+    const [socialLoading, setSocialLoading] = useState<string | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Real-time Username Check
     useEffect(() => {
         const checkUsername = async () => {
-            if (username.length < 3) {
+            const cleanUser = username.trim();
+            if (cleanUser.length < 3) {
                 setUsernameAvailable(null);
                 setUsernameSuggestions([]);
                 return;
@@ -46,11 +80,9 @@ export default function Signup() {
             setCheckingUsername(true);
             try {
                 const { data, error } = await supabase.functions.invoke('check-availability', {
-                    body: { field: 'username', value: username }
+                    body: { field: 'username', value: cleanUser }
                 });
-
                 if (error) throw error;
-
                 if (data.available) {
                     setUsernameAvailable(true);
                     setUsernameSuggestions([]);
@@ -60,7 +92,6 @@ export default function Signup() {
                 }
             } catch (error) {
                 console.log('Username check error', error);
-                // Fallback or ignore error
             } finally {
                 setCheckingUsername(false);
             }
@@ -72,14 +103,15 @@ export default function Signup() {
     // Real-time Email Check
     useEffect(() => {
         const checkEmail = async () => {
-            if (!email.includes('@')) {
+            const cleanEmail = email.trim();
+            if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
                 setEmailAvailable(null);
                 return;
             }
             setCheckingEmail(true);
             try {
                 const { data, error } = await supabase.functions.invoke('check-availability', {
-                    body: { field: 'email', value: email }
+                    body: { field: 'email', value: cleanEmail }
                 });
                 if (error) throw error;
                 setEmailAvailable(data.available);
@@ -96,14 +128,15 @@ export default function Signup() {
     // Real-time Phone Check
     useEffect(() => {
         const checkPhone = async () => {
-            if (phone.length < 10) {
+            const cleanPhone = phone.trim();
+            if (cleanPhone.length < 10) {
                 setPhoneAvailable(null);
                 return;
             }
             setCheckingPhone(true);
             try {
                 const { data, error } = await supabase.functions.invoke('check-availability', {
-                    body: { field: 'phone', value: phone }
+                    body: { field: 'phone', value: cleanPhone }
                 });
                 if (error) throw error;
                 setPhoneAvailable(data.available);
@@ -117,904 +150,821 @@ export default function Signup() {
         return () => clearTimeout(timer);
     }, [phone]);
 
-    const handleGoogleLogin = async () => {
-        if (loadingGoogle) return;
-        setLoadingGoogle(true);
-        console.log('Google login clicked');
-        try {
-            const redirectTo = Platform.OS === 'web' ? window.location.origin : undefined;
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo
-                }
-            });
-            if (error) throw error;
-        } catch (error: any) {
-            console.error('Google Auth Error:', error);
-            if (Platform.OS === 'web') {
-                alert('Google Login Error: ' + (error.message || 'Something went wrong'));
-            } else {
-                Alert.alert('Google Login Error', error.message || 'Something went wrong');
-            }
-        } finally {
-            setLoadingGoogle(false);
-        }
+    // Password Strength Logic
+    const getPasswordStrength = () => {
+        let score = 0;
+        if (password.length >= 8) score += 1;
+        if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
+        if (/[0-9]/.test(password)) score += 1;
+        if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+        if (score === 0) return { score: 0, label: 'Weak', color: '#EF4444', percent: 0.15 };
+        if (score === 1 || score === 2) return { score: 2, label: 'Fair', color: '#F59E0B', percent: 0.45 };
+        if (score === 3) return { score: 3, label: 'Good', color: '#10B981', percent: 0.75 };
+        return { score: 4, label: 'Strong', color: '#08E4C7', percent: 1.0 };
     };
 
+    const strength = getPasswordStrength();
+
+    // Signup Handler
     const handleSignup = async () => {
-        if (!fullName || !username || !email || !phone || !password) {
-            Alert.alert('Error', 'Please fill in all required fields');
+        if (!fullName.trim() || !username.trim() || !email.trim() || !phone.trim() || !password) {
+            Alert.alert('Missing Fields', 'Please fill in all required fields.');
             return;
         }
 
-        if (usernameAvailable === false || emailAvailable === false || phoneAvailable === false) {
-            Alert.alert('Error', 'Please resolve the availability errors before proceeding.');
+        if (password !== confirmPassword) {
+            Alert.alert('Password Mismatch', 'Password and Confirm Password do not match.');
+            return;
+        }
+
+        if (!acceptTerms) {
+            Alert.alert('Terms Required', 'Please accept the Terms of Service & Privacy Policy to proceed.');
+            return;
+        }
+
+        if (usernameAvailable === false) {
+            Alert.alert('Username Taken', 'The username you selected is already in use. Please choose another username.');
+            return;
+        }
+
+        if (emailAvailable === false) {
+            Alert.alert('Email In Use', 'An account already exists with this email address. Please log in instead.');
             return;
         }
 
         setLoading(true);
+
         try {
+            const cleanPhone = selectedCountry.dialCode + phone.replace(/^0+/, '').trim();
+
             const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
+                email: email.trim(),
+                password: password,
                 options: {
                     data: {
-                        full_name: fullName,
-                        username: username,
-                        phone: phone,
-                        referral_code: referralCode,
+                        full_name: fullName.trim(),
+                        username: username.trim().toLowerCase(),
+                        phone: cleanPhone,
+                        referral_code: referralCode.trim() || null,
+                        country: selectedCountry.name,
                     }
                 }
             });
 
             if (error) throw error;
 
-            Alert.alert('Success', 'Account created! Please check your email to verify.');
-            router.replace('/(auth)/login');
+            if (data.user) {
+                setShowSuccessModal(true);
+                setTimeout(() => {
+                    setShowSuccessModal(false);
+                    if (settings?.require_email_verif && !data.user?.email_confirmed_at) {
+                        router.push({
+                            pathname: '/(auth)/otp',
+                            params: { email: email.trim(), type: 'signup' }
+                        });
+                    } else {
+                        router.replace('/(auth)/pin-setup');
+                    }
+                }, 1800);
+            }
         } catch (error: any) {
-            Alert.alert('Signup Error', error.message || 'Something went wrong');
+            Alert.alert('Registration Error', error.message || 'An error occurred during account creation.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Layout Constants
-    const { width, height } = useWindowDimensions();
-    const isSmall = width < 800;
-    const isVerySmall = width < 600;
-    const isShort = height < 760;
+    // Social Provider Handler
+    const handleSocialAuth = async (provider: 'google' | 'apple' | 'facebook' | 'twitter' | 'github') => {
+        if (socialLoading) return;
+        setSocialLoading(provider);
+        try {
+            if (Platform.OS === 'web') {
+                const redirectToUrl = window.location.origin;
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider: provider as any,
+                    options: { redirectTo: redirectToUrl }
+                });
+                if (error) throw error;
+            } else {
+                const redirectToUrl = Linking.createURL('/(auth)/login');
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: provider as any,
+                    options: {
+                        redirectTo: redirectToUrl,
+                        skipBrowserRedirect: true,
+                    }
+                });
+                if (error) throw error;
+                if (data?.url) {
+                    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectToUrl);
+                    if (result.type === 'success' && result.url) {
+                        const normalizedUrl = result.url.replace('#', '?');
+                        const parsed = Linking.parse(normalizedUrl);
+                        const { code, access_token, refresh_token } = parsed.queryParams || {};
+                        const codeStr = Array.isArray(code) ? code[0] : code;
+                        const accessTokenStr = Array.isArray(access_token) ? access_token[0] : access_token;
+                        const refreshTokenStr = Array.isArray(refresh_token) ? refresh_token[0] : refresh_token;
 
-    // Dynamic sizes and spaces to lock viewport without scroll
-    const scale = isVerySmall ? 0.8 : isSmall ? 0.9 : 1;
-
-    const podiumHeight = (isShort ? 320 : 450) * scale;
-    const podiumWidth = podiumHeight * 0.85;
-
-    const bodyGap = 12 * scale;
-
-    // Responsive margins and paddings
-    const spacing = {
-        topNavMargin: 20 * scale,
-        bodyMargin: 20 * scale,
-        featuresMargin: 16 * scale,
-        featuresPadding: 12 * scale,
-        partnersMargin: 16 * scale,
-        partnersPadding: 12 * scale,
-        containerPaddingTop: 12 * scale,
-        containerPaddingBottom: 16 * scale,
-        cardPaddingTop: 20 * scale,
-        cardPaddingBottom: 20 * scale,
-        cardPaddingHorizontal: 32 * scale,
-        inputMargin: 10 * scale,
-        orMargin: 10 * scale,
-        copyrightMarginTop: 12 * scale,
+                        if (codeStr) {
+                            await supabase.auth.exchangeCodeForSession(codeStr);
+                        } else if (accessTokenStr && refreshTokenStr) {
+                            await supabase.auth.setSession({
+                                access_token: accessTokenStr,
+                                refresh_token: refreshTokenStr,
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (error: any) {
+            Alert.alert(`${provider.toUpperCase()} Auth Error`, error.message || 'Failed to authenticate.');
+        } finally {
+            setSocialLoading(null);
+        }
     };
 
     return (
-        <View style={s.container}>
+        <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="dark" />
-            
+            <StatusBar style={isDark ? "light" : "dark"} />
+
             <SafeAreaView style={{ flex: 1 }}>
-                <KeyboardAvoidingView
+                <KeyboardAvoidingView 
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                 >
-                    <ScrollView 
-                        contentContainerStyle={[
-                            s.scrollContainer, 
-                            { 
-                                paddingHorizontal: 20 * scale,
-                                paddingTop: spacing.containerPaddingTop, 
-                                paddingBottom: spacing.containerPaddingBottom 
-                            }
-                        ]} 
+                    <ScrollView
+                        ref={scrollViewRef}
+                        contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
-                        scrollEnabled={true}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* TOP BRAND NAVIGATION ROW */}
-                        <View style={[s.topNav, { marginBottom: spacing.topNavMargin }]}>
-                            <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                <View style={s.brandLogoRow}>
-                                    <Image 
-                                        source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
-                                        style={s.brandLogo}
-                                        resizeMode="contain"
-                                    />
-                                    <View style={{ marginLeft: 8 }}>
-                                        <Text style={s.brandText}>MAFHAL</Text>
-                                        <Text style={s.brandSubtext}>SUB</Text>
-                                    </View>
-                                </View>
-                                <Text style={s.oneSubTextLeft}>One Sub. Endless Possibilities.</Text>
+                        {/* Top Control Bar */}
+                        <View style={styles.topControlRow}>
+                            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
+                                <Ionicons name="arrow-back" size={20} color={theme.textPrimary} />
+                            </TouchableOpacity>
+
+                            <View style={styles.brandRow}>
+                                <Image
+                                    source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
+                                    style={styles.logoImage}
+                                    resizeMode="contain"
+                                />
+                                <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
                             </View>
 
                             <TouchableOpacity 
-                                onPress={() => {
-                                    if (router.canGoBack()) {
-                                        router.back();
-                                    } else {
-                                        router.replace('/(auth)/login');
-                                    }
-                                }}
-                                style={s.langSelector}
+                                onPress={toggleTheme} 
+                                style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
+                                activeOpacity={0.8}
                             >
-                                <Ionicons name="arrow-back" size={14} color="#0f172a" style={{ marginRight: 6 }} />
-                                <Text style={s.langText}>Back</Text>
+                                <Ionicons name={isDark ? "sunny" : "moon"} size={16} color={isDark ? "#FDE047" : "#0E1A2E"} />
                             </TouchableOpacity>
                         </View>
 
-                        {/* RESPONSIVE BODY SECTION */}
-                        <View style={[
-                            isSmall ? s.bodyColumn : s.bodyRow, 
-                            { marginBottom: spacing.bodyMargin, gap: isSmall ? 0 : bodyGap }
-                        ]}>
+                        {/* Centered Form Card Wrapper */}
+                        <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* LEFT SIDE: HERO PRESENTATION */}
-                            {!isSmall && (
-                                <View style={s.heroLeft}>
-                                    <View style={s.welcomeTextContainer}>
-                                        <Text style={[s.welcomeMain, { fontSize: 36 * scale }]}>Create</Text>
-                                        <Text style={[s.welcomeHighlight, { fontSize: 36 * scale }]}>Account</Text>
-                                        <View style={[s.yellowUnderline, { width: 56 * scale, marginTop: 4 * scale }]} />
+                            {/* 3D Animated Hero Mascot */}
+                            <View style={styles.mascotContainer}>
+                                <Mascot3D size={140} mode="waving" isDarkMode={isDark} />
+                            </View>
+
+                            {/* Headline */}
+                            <View style={styles.headlineBox}>
+                                <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>
+                                    Create Account <Text style={{ color: theme.gold }}>.</Text>
+                                </Text>
+                                <Text style={[styles.welcomeSubText, { color: theme.textSecondary }]}>
+                                    Join ABUMAFHAL to start managing payments & identity.
+                                </Text>
+                            </View>
+
+                            {/* Form Inputs */}
+                            <View style={styles.formContainer}>
+
+                                {/* 1. Full Name */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Full Legal Name</Text>
+                                <View style={[
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'fullName' ? theme.borderFocus : theme.borderPrimary }
+                                ]}>
+                                    <Ionicons name="person-outline" size={18} color={focusedInput === 'fullName' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="e.g. Sani Muhammad Abubakar"
+                                        placeholderTextColor={theme.textMuted}
+                                        value={fullName}
+                                        onChangeText={setFullName}
+                                        onFocus={() => setFocusedInput('fullName')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                </View>
+
+                                {/* 2. Username (with Real-time Check & Suggestions) */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Username</Text>
+                                    {checkingUsername ? (
+                                        <ActivityIndicator size="small" color={theme.accentTeal} />
+                                    ) : usernameAvailable === true ? (
+                                        <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '800' }}>✓ Available</Text>
+                                    ) : usernameAvailable === false ? (
+                                        <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '800' }}>✕ Username Taken</Text>
+                                    ) : null}
+                                </View>
+
+                                <View style={[
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: usernameAvailable === false ? '#EF4444' : focusedInput === 'username' ? theme.borderFocus : theme.borderPrimary }
+                                ]}>
+                                    <Ionicons name="at-outline" size={18} color={focusedInput === 'username' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="e.g. abumafhal"
+                                        placeholderTextColor={theme.textMuted}
+                                        autoCapitalize="none"
+                                        value={username}
+                                        onChangeText={setUsername}
+                                        onFocus={() => setFocusedInput('username')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                </View>
+
+                                {/* Username Suggestion Pills */}
+                                {usernameSuggestions.length > 0 && (
+                                    <View style={styles.suggestionsRow}>
+                                        <Text style={[styles.suggestionLabel, { color: theme.textMuted }]}>Suggestions:</Text>
+                                        {usernameSuggestions.map((sug, idx) => (
+                                            <TouchableOpacity 
+                                                key={idx} 
+                                                onPress={() => setUsername(sug)}
+                                                style={[styles.suggestionPill, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
+                                            >
+                                                <Text style={[styles.suggestionPillText, { color: theme.accentTeal }]}>@{sug}</Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
+                                )}
 
-                                    <Text style={[s.heroSubtext, { fontSize: 13 * scale, marginTop: 12 * scale, marginBottom: 12 * scale }]}>
-                                        Join the future of finance today.
-                                    </Text>
+                                {/* 3. Email Address (with Real-time Check) */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Email Address</Text>
+                                    {checkingEmail ? (
+                                        <ActivityIndicator size="small" color={theme.accentTeal} />
+                                    ) : emailAvailable === true ? (
+                                        <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '800' }}>✓ Valid</Text>
+                                    ) : emailAvailable === false ? (
+                                        <Text style={{ color: '#EF4444', fontSize: 10, fontWeight: '800' }}>✕ Email Exists</Text>
+                                    ) : null}
+                                </View>
 
-                                    <View style={s.podiumWrapper}>
-                                        <Image
-                                            source={require('../../assets/images/ceo.jpg')}
-                                            style={s.podiumImage}
-                                            resizeMode="cover"
-                                        />
-                                        <LinearGradient
-                                            colors={['rgba(248, 250, 252, 0)', 'rgba(248, 250, 252, 0.8)', 'rgba(248, 250, 252, 1)']}
-                                            style={s.bottomBlur}
-                                            pointerEvents="none"
+                                <View style={[
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: emailAvailable === false ? '#EF4444' : focusedInput === 'email' ? theme.borderFocus : theme.borderPrimary }
+                                ]}>
+                                    <Ionicons name="mail-outline" size={18} color={focusedInput === 'email' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="name@example.com"
+                                        placeholderTextColor={theme.textMuted}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        onFocus={() => setFocusedInput('email')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                </View>
+
+                                {/* 4. Country & Phone Number Row */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Country & Phone Number</Text>
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    
+                                    {/* Country Selector Button */}
+                                    <TouchableOpacity 
+                                        onPress={() => setShowCountryModal(true)}
+                                        style={[styles.countryBtn, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={{ fontSize: 16, marginRight: 4 }}>{selectedCountry.flag}</Text>
+                                        <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 11 }}>{selectedCountry.dialCode}</Text>
+                                        <Ionicons name="chevron-down" size={12} color={theme.textMuted} style={{ marginLeft: 3 }} />
+                                    </TouchableOpacity>
+
+                                    {/* Phone Input */}
+                                    <View style={[
+                                        styles.inputFieldBox, 
+                                        { flex: 1, backgroundColor: theme.bgInput, borderColor: phoneAvailable === false ? '#EF4444' : focusedInput === 'phone' ? theme.borderFocus : theme.borderPrimary }
+                                    ]}>
+                                        <Ionicons name="call-outline" size={18} color={focusedInput === 'phone' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                        <TextInput 
+                                            style={[styles.textInput, { color: theme.textPrimary }]}
+                                            placeholder="8012345678"
+                                            placeholderTextColor={theme.textMuted}
+                                            keyboardType="phone-pad"
+                                            value={phone}
+                                            onChangeText={setPhone}
+                                            onFocus={() => setFocusedInput('phone')}
+                                            onBlur={() => setFocusedInput(null)}
                                         />
                                     </View>
                                 </View>
-                            )}
 
-                            {/* RIGHT SIDE: SIGNUP CARD */}
-                            <View style={isSmall ? s.cardCenter : s.cardRight}>
+                                {/* 5. Password & Strength Meter */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Password</Text>
                                 <View style={[
-                                    s.loginCard,
-                                    {
-                                        marginTop: isSmall ? 40 * scale : 80 * scale,
-                                        paddingTop: spacing.cardPaddingTop,
-                                        paddingBottom: spacing.cardPaddingBottom,
-                                        paddingHorizontal: spacing.cardPaddingHorizontal,
-                                    }
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
                                 ]}>
-                                    <View style={[s.userIconCircle, { width: 56 * scale, height: 56 * scale, borderRadius: 28 * scale, top: -28 * scale }]}>
-                                        <Ionicons name="person-add" size={24 * scale} color="#0056D2" />
-                                    </View>
+                                    <Ionicons name="lock-closed-outline" size={18} color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="At least 8 characters"
+                                        placeholderTextColor={theme.textMuted}
+                                        secureTextEntry={!showPassword}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        onFocus={() => setFocusedInput('password')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color={theme.textMuted} />
+                                    </TouchableOpacity>
+                                </View>
 
-                                    {settingsLoading ? (
-                                        <ActivityIndicator size="large" color="#0056D2" style={{ marginVertical: 40 }} />
-                                    ) : !settings.allow_registrations ? (
-                                        <View style={{ alignItems: 'center', paddingVertical: 40 * scale }}>
-                                            <Ionicons name="lock-closed" size={48 * scale} color="#94a3b8" />
-                                            <Text style={[s.cardTitle, { fontSize: 24 * scale, marginTop: 16 * scale }]}>
-                                                Registrations Closed
-                                            </Text>
-                                            <Text style={[s.cardSubtitle, { fontSize: 13 * scale, marginTop: 8 * scale }]}>
-                                                We are currently not accepting new registrations. Please try again later.
-                                            </Text>
-                                            <TouchableOpacity 
-                                                onPress={() => router.push('/(auth)/login')}
-                                                style={[s.loginButton, { marginTop: 24 * scale, borderRadius: 12 * scale }]}
-                                            >
-                                                <LinearGradient
-                                                    colors={['#0056D2', '#0043A8']}
-                                                    style={[s.loginButtonGradient, { height: 46 * scale }]}
-                                                >
-                                                    <Text style={[s.loginButtonText, { fontSize: 15 * scale }]}>Back to Login</Text>
-                                                </LinearGradient>
-                                            </TouchableOpacity>
+                                {/* Password Strength Meter Bar */}
+                                {password.length > 0 && (
+                                    <View style={{ marginTop: 6 }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted }}>Password Strength</Text>
+                                            <Text style={{ fontSize: 10, fontWeight: '800', color: strength.color }}>{strength.label}</Text>
                                         </View>
-                                    ) : (
-                                        <>
-                                            <Text style={[s.cardTitle, { fontSize: 24 * scale }]}>
-                                                Join <Text style={{ color: '#d97706' }}>Mafhal Sub</Text>
-                                            </Text>
-                                            <Text style={[s.cardSubtitle, { fontSize: 12 * scale, marginBottom: 20 * scale }]}>Enter your details to get started</Text>
-
-                                            {/* Input: Full Name */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Full Name</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale }]}>
-                                            <Ionicons name="person-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="Enter full name"
-                                                placeholderTextColor="#94a3b8"
-                                                value={fullName}
-                                                onChangeText={setFullName}
-                                                selectionColor="#0056D2"
-                                            />
+                                        <View style={[styles.strengthBgTrack, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}>
+                                            <View style={[styles.strengthFillTrack, { width: `${strength.percent * 100}%`, backgroundColor: strength.color }]} />
                                         </View>
                                     </View>
+                                )}
 
-                                    {/* Input: Username */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Username</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale }, 
-                                            usernameAvailable === false ? { borderColor: '#fca5a5', backgroundColor: '#fef2f2', borderWidth: 1 } : 
-                                            usernameAvailable === true ? { borderColor: '#86efac', backgroundColor: '#f0fdf4', borderWidth: 1 } : {}
-                                        ]}>
-                                            <Ionicons name="at-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="Choose a username"
-                                                placeholderTextColor="#94a3b8"
-                                                value={username}
-                                                onChangeText={setUsername}
-                                                autoCapitalize="none"
-                                                selectionColor="#0056D2"
-                                            />
-                                            {checkingUsername ? (
-                                                <ActivityIndicator size="small" color="#0056D2" />
-                                            ) : usernameAvailable === true ? (
-                                                <Ionicons name="checkmark-circle" size={18 * scale} color="#10B981" />
-                                            ) : usernameAvailable === false ? (
-                                                <Ionicons name="close-circle" size={18 * scale} color="#EF4444" />
-                                            ) : null}
-                                        </View>
-                                        {usernameAvailable === false && (
-                                            <View style={{ marginTop: 8 }}>
-                                                <Text style={{ color: '#ef4444', fontSize: 10 * scale, marginLeft: 4, marginBottom: 4 }}>Username is taken. Try these:</Text>
-                                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                                                    {usernameSuggestions.map((suggestion, index) => (
-                                                        <TouchableOpacity 
-                                                            key={index}
-                                                            onPress={() => setUsername(suggestion)}
-                                                            style={{ backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#dbeafe' }}
-                                                        >
-                                                            <Text style={{ color: '#2563eb', fontSize: 10 * scale, fontWeight: '700' }}>{suggestion}</Text>
-                                                        </TouchableOpacity>
-                                                    ))}
-                                                </View>
+                                {/* 6. Confirm Password */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Confirm Password</Text>
+                                <View style={[
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
+                                ]}>
+                                    <Ionicons name="shield-checkmark-outline" size={18} color={focusedInput === 'confirmPassword' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="Repeat password"
+                                        placeholderTextColor={theme.textMuted}
+                                        secureTextEntry={!showConfirmPassword}
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        onFocus={() => setFocusedInput('confirmPassword')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={{ padding: 4 }}>
+                                        <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={18} color={theme.textMuted} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* 7. Referral Code (Optional) */}
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 12 }]}>Referral Code (Optional)</Text>
+                                <View style={[
+                                    styles.inputFieldBox, 
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'referralCode' ? theme.borderFocus : theme.borderPrimary }
+                                ]}>
+                                    <Ionicons name="gift-outline" size={18} color={focusedInput === 'referralCode' ? theme.gold : theme.textMuted} style={{ marginRight: 8 }} />
+                                    <TextInput 
+                                        style={[styles.textInput, { color: theme.textPrimary }]}
+                                        placeholder="e.g. ABUMAF123"
+                                        placeholderTextColor={theme.textMuted}
+                                        autoCapitalize="characters"
+                                        value={referralCode}
+                                        onChangeText={setReferralCode}
+                                        onFocus={() => setFocusedInput('referralCode')}
+                                        onBlur={() => setFocusedInput(null)}
+                                    />
+                                </View>
+
+                                {/* Accept Terms Checkbox */}
+                                <TouchableOpacity 
+                                    onPress={() => setAcceptTerms(!acceptTerms)}
+                                    style={styles.termsRow}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[
+                                        styles.checkboxBox, 
+                                        acceptTerms && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
+                                    ]}>
+                                        {acceptTerms && <Ionicons name="checkmark" size={12} color="#0E1A2E" />}
+                                    </View>
+                                    <Text style={[styles.termsText, { color: theme.textSecondary }]}>
+                                        I agree to ABUMAFHAL's <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Terms of Service</Text> and <Text style={{ color: theme.accentTeal, fontWeight: '800' }}>Privacy Policy</Text>.
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* Primary Create Account Button */}
+                                <TouchableOpacity 
+                                    onPress={handleSignup}
+                                    disabled={loading}
+                                    style={styles.primaryBtn}
+                                    activeOpacity={0.85}
+                                >
+                                    <LinearGradient 
+                                        colors={['#0E1A2E', '#1E293B']} 
+                                        style={styles.primaryBtnGradient}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator color="#08E4C7" size="small" />
+                                        ) : (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={styles.primaryBtnText}>Create My Account</Text>
+                                                <Ionicons name="checkmark-circle" size={18} color="#08E4C7" style={{ marginLeft: 8 }} />
                                             </View>
                                         )}
-                                    </View>
+                                    </LinearGradient>
+                                </TouchableOpacity>
 
-                                    {/* Input: Email */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Email Address</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale },
-                                            emailAvailable === false ? { borderColor: '#fca5a5', backgroundColor: '#fef2f2', borderWidth: 1 } : 
-                                            emailAvailable === true ? { borderColor: '#86efac', backgroundColor: '#f0fdf4', borderWidth: 1 } : {}
-                                        ]}>
-                                            <Ionicons name="mail-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="Enter your email"
-                                                placeholderTextColor="#94a3b8"
-                                                value={email}
-                                                onChangeText={setEmail}
-                                                autoCapitalize="none"
-                                                keyboardType="email-address"
-                                                selectionColor="#0056D2"
-                                            />
-                                            {checkingEmail ? (
-                                                <ActivityIndicator size="small" color="#0056D2" />
-                                            ) : emailAvailable === true ? (
-                                                <Ionicons name="checkmark-circle" size={18 * scale} color="#10B981" />
-                                            ) : emailAvailable === false ? (
-                                                <Ionicons name="close-circle" size={18 * scale} color="#EF4444" />
-                                            ) : null}
-                                        </View>
-                                        {emailAvailable === false && (
-                                             <Text style={{ color: '#ef4444', fontSize: 10 * scale, marginLeft: 4, marginTop: 4 }}>Email already registered</Text>
-                                        )}
-                                    </View>
-
-                                    {/* Input: Phone */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Phone Number</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale },
-                                            phoneAvailable === false ? { borderColor: '#fca5a5', backgroundColor: '#fef2f2', borderWidth: 1 } : 
-                                            phoneAvailable === true ? { borderColor: '#86efac', backgroundColor: '#f0fdf4', borderWidth: 1 } : {}
-                                        ]}>
-                                            <Ionicons name="call-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="Enter phone number"
-                                                placeholderTextColor="#94a3b8"
-                                                value={phone}
-                                                onChangeText={setPhone}
-                                                keyboardType="phone-pad"
-                                                selectionColor="#0056D2"
-                                            />
-                                             {checkingPhone ? (
-                                                <ActivityIndicator size="small" color="#0056D2" />
-                                            ) : phoneAvailable === true ? (
-                                                <Ionicons name="checkmark-circle" size={18 * scale} color="#10B981" />
-                                            ) : phoneAvailable === false ? (
-                                                <Ionicons name="close-circle" size={18 * scale} color="#EF4444" />
-                                            ) : null}
-                                        </View>
-                                        {phoneAvailable === false && (
-                                             <Text style={{ color: '#ef4444', fontSize: 10 * scale, marginLeft: 4, marginTop: 4 }}>Phone number already in use</Text>
-                                        )}
-                                    </View>
-
-                                    {/* Input: Password */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Password</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale }]}>
-                                            <Ionicons name="lock-closed-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="Create a password"
-                                                placeholderTextColor="#94a3b8"
-                                                secureTextEntry={!showPassword}
-                                                value={password}
-                                                onChangeText={setPassword}
-                                                selectionColor="#0056D2"
-                                            />
-                                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                                                <Ionicons 
-                                                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                                                    size={18 * scale} 
-                                                    color="#94a3b8" 
-                                                />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    {/* Input: Referral Code */}
-                                    <View style={[s.inputContainer, { marginBottom: spacing.inputMargin }]}>
-                                        <Text style={[s.inputLabel, { fontSize: 12 * scale }]}>Referral Code (Optional)</Text>
-                                        <View style={[s.inputBox, { height: 46 * scale, borderRadius: 12 * scale, paddingHorizontal: 12 * scale }]}>
-                                            <Ionicons name="gift-outline" size={18 * scale} color="#94a3b8" style={s.inputIcon} />
-                                            <TextInput
-                                                style={[s.textInput, { fontSize: 13 * scale }]}
-                                                placeholder="e.g. johndoe123"
-                                                placeholderTextColor="#94a3b8"
-                                                value={referralCode}
-                                                onChangeText={setReferralCode}
-                                                autoCapitalize="none"
-                                                selectionColor="#0056D2"
-                                            />
-                                        </View>
-                                    </View>
-
-                                    {/* Signup Button */}
-                                    <TouchableOpacity
-                                        onPress={handleSignup}
-                                        disabled={loading}
-                                        activeOpacity={0.8}
-                                        style={[s.loginButton, { marginTop: 8 * scale, borderRadius: 12 * scale }]}
-                                    >
-                                        <LinearGradient
-                                            colors={['#eab308', '#d97706']}
-                                            style={[s.loginButtonGradient, { height: 46 * scale }]}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                        >
-                                            {loading ? (
-                                                <ActivityIndicator color="white" size="small" />
-                                            ) : (
-                                                <View style={s.buttonInner}>
-                                                    <View style={{ width: 16 * scale }} />
-                                                    <Text style={[s.loginButtonText, { fontSize: 15 * scale }]}>Create Account</Text>
-                                                    <Ionicons name="arrow-forward" size={20 * scale} color="#ffffff" style={s.buttonArrow} />
-                                                </View>
-                                            )}
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-
-                                    {/* OR Separator */}
-                                    <View style={[s.orSeparatorRow, { marginVertical: spacing.orMargin }]}>
-                                        <View style={s.separatorLine} />
-                                        <Text style={[s.orText, { fontSize: 11 * scale, marginHorizontal: 12 * scale }]}>OR</Text>
-                                        <View style={s.separatorLine} />
-                                    </View>
-
-                                    {/* Google Button */}
-                                    <TouchableOpacity 
-                                        onPress={handleGoogleLogin} 
-                                        disabled={loadingGoogle || loading}
-                                        style={[s.googleButton, { height: 46 * scale, borderRadius: 12 * scale }]} 
-                                        activeOpacity={0.7}
-                                    >
-                                        {loadingGoogle ? (
-                                            <ActivityIndicator color="#334155" size="small" />
-                                        ) : (
-                                            <>
-                                                <Image 
-                                                    source={{ uri: 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png' }} 
-                                                    style={{ width: 20 * scale, height: 20 * scale, marginRight: 10 * scale }}
-                                                    resizeMode="contain"
-                                                />
-                                                <Text style={[s.googleButtonText, { fontSize: 13 * scale }]}>Continue with Google</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-
-                                    {/* Login Link */}
-                                    <View style={[s.signupFooter, { marginTop: 20 * scale }]}>
-                                        <Text style={[s.signupFooterNormal, { fontSize: 13 * scale }]}>Already have an account? </Text>
-                                        <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-                                            <Text style={[s.signupFooterLink, { fontSize: 13 * scale }]}>Sign In</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    </>
-                                    )}
+                                {/* Social Provider Row */}
+                                <View style={styles.dividerRow}>
+                                    <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
+                                    <Text style={[styles.dividerText, { color: theme.textMuted }]}>OR SIGN UP WITH</Text>
+                                    <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
                                 </View>
+
+                                <View style={styles.socialGrid}>
+                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={18} color="#EA4335" />}
+                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
+                                    </TouchableOpacity>
+
+                                    {(Platform.OS === 'ios' || Platform.OS === 'web') && (
+                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={18} color={theme.textPrimary} />}
+                                            <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={18} color={theme.textPrimary} />}
+                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Footer Link */}
+                                <View style={styles.footerLinkRow}>
+                                    <Text style={[styles.footerText, { color: theme.textSecondary }]}>Already have an account?</Text>
+                                    <TouchableOpacity onPress={() => router.push('/(auth)/login')} activeOpacity={0.8}>
+                                        <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Sign In</Text>
+                                    </TouchableOpacity>
+                                </View>
+
                             </View>
+
                         </View>
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>
+
+            {/* Country Selector Modal */}
+            <Modal transparent visible={showCountryModal} animationType="fade" onRequestClose={() => setShowCountryModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF', borderColor: theme.borderPrimary }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Select Country</Text>
+                            <TouchableOpacity onPress={() => setShowCountryModal(false)}>
+                                <Ionicons name="close-circle" size={24} color={theme.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {COUNTRIES.map((c) => (
+                            <TouchableOpacity 
+                                key={c.code}
+                                onPress={() => {
+                                    setSelectedCountry(c);
+                                    setShowCountryModal(false);
+                                }}
+                                style={[
+                                    styles.countryOptionRow,
+                                    { borderBottomColor: theme.borderPrimary },
+                                    selectedCountry.code === c.code && { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }
+                                ]}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ fontSize: 20, marginRight: 10 }}>{c.flag}</Text>
+                                <Text style={{ flex: 1, color: theme.textPrimary, fontWeight: '700', fontSize: 13 }}>{c.name}</Text>
+                                <Text style={{ color: theme.accentTeal, fontWeight: '800', fontSize: 12 }}>{c.dialCode}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Registration Success Celebration Modal */}
+            <Modal transparent visible={showSuccessModal} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.successCard, { backgroundColor: isDark ? '#0E1A2E' : '#FFFFFF' }]}>
+                        <View style={styles.successIconCircle}>
+                            <Ionicons name="checkmark-done" size={40} color="#08E4C7" />
+                        </View>
+                        <Text style={[styles.successTitle, { color: theme.textPrimary }]}>Welcome to ABUMAFHAL 🎉</Text>
+                        <Text style={[styles.successSubText, { color: theme.textSecondary }]}>
+                            Your account has been created successfully! Preparing your personalized fintech portal...
+                        </Text>
+                        <ActivityIndicator size="small" color="#08E4C7" style={{ marginTop: 12 }} />
+                    </View>
+                </View>
+            </Modal>
+
         </View>
     );
 }
 
-
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
     },
-    scrollContainer: {
-        flexGrow: 1,
-        paddingTop: 16,
-        paddingBottom: 32,
-        maxWidth: 1200,
-        alignSelf: 'center',
-        width: '100%',
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 40,
     },
-    topNav: {
+    topControlRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
+        paddingVertical: 12,
+    },
+    backBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         alignItems: 'center',
-        marginBottom: 28,
-    },
-    brandLogoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    brandLogo: {
-        width: 36,
-        height: 36,
-    },
-    brandText: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: '#0f172a',
-        lineHeight: 14,
-    },
-    brandSubtext: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: '#d97706',
-        lineHeight: 10,
-    },
-    langSelector: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        backgroundColor: '#ffffff',
-    },
-    langText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#0f172a',
-    },
-    bodyRow: {
-        flexDirection: 'row',
-        width: '100%',
-        maxWidth: 1200,
-        alignSelf: 'center',
-        alignItems: 'flex-start',
         justifyContent: 'center',
     },
-    bodyColumn: {
-        flexDirection: 'column',
-        width: '100%',
+    brandRow: {
+        flexDirection: 'row',
         alignItems: 'center',
     },
-    heroLeft: {
-        flex: 0.8,
-        alignItems: 'flex-start',
+    logoImage: {
+        width: 28,
+        height: 28,
+        marginRight: 6,
     },
-    heroCenter: {
-        width: '100%',
-        alignItems: 'center',
-    },
-    cardRight: {
-        flex: 1.6,
-        alignItems: 'flex-start',
-    },
-    cardCenter: {
-        width: '100%',
-        alignItems: 'center',
-    },
-    oneSubTextLeft: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#64748b',
-        textTransform: 'uppercase',
+    brandTitle: {
+        fontWeight: '900',
+        fontSize: 15,
         letterSpacing: 0.5,
+    },
+    themeToggleBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardWrapper: {
+        width: '100%',
         marginTop: 4,
-        textAlign: 'left',
     },
-    welcomeTextContainer: {
-        position: 'relative',
-        marginBottom: 4,
+    desktopCardWrapper: {
+        maxWidth: 440,
+        alignSelf: 'center',
+        marginTop: 14,
     },
-    welcomeMain: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: '#0a192f',
-    },
-    welcomeHighlight: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: '#d97706',
-        marginTop: -4,
-    },
-    yellowUnderline: {
-        width: 48,
-        height: 3,
-        backgroundColor: '#eab308',
-        borderRadius: 1.5,
-        marginTop: 2,
-    },
-    heroSubtext: {
-        fontSize: 12,
-        color: '#64748b',
-        lineHeight: 16,
-        marginBottom: 16,
-        maxWidth: 320,
-    },
-    podiumWrapper: {
-        width: '120%',
-        marginLeft: '-10%',
-        marginTop: 20,
-        aspectRatio: 0.7,
-        maxHeight: 600,
+    mascotContainer: {
         alignItems: 'center',
         justifyContent: 'center',
+        marginVertical: 2,
     },
-    podiumImage: {
-        width: '100%',
-        height: '100%',
-        transform: [{ scale: 1.5 }, { translateX: 0 }],
-    },
-    bottomBlur: {
-        position: 'absolute',
-        bottom: -10,
-        left: -40,
-        right: -40,
-        height: 80,
-    },
-    loginCard: {
-        width: '100%',
-        maxWidth: 500,
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#0a1633',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.06,
-        shadowRadius: 20,
-        elevation: 3,
+    headlineBox: {
         alignItems: 'center',
-        position: 'relative',
+        marginBottom: 14,
     },
-    userIconCircle: {
-        position: 'absolute',
-        top: -24,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#eff6ff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: '#ffffff',
-        shadowColor: '#0a1633',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    cardTitle: {
+    welcomeTitle: {
+        fontWeight: '900',
         fontSize: 22,
-        fontWeight: '800',
-        color: '#0f172a',
-        marginBottom: 4,
         textAlign: 'center',
     },
-    cardSubtitle: {
-        fontSize: 11,
-        color: '#64748b',
+    welcomeSubText: {
+        fontSize: 11.5,
         fontWeight: '500',
-        marginBottom: 18,
         textAlign: 'center',
+        marginTop: 4,
+        lineHeight: 16,
     },
-    inputContainer: {
+    formContainer: {
         width: '100%',
-        marginBottom: 12,
     },
     inputLabel: {
-        fontSize: 11,
         fontWeight: '700',
-        color: '#334155',
+        fontSize: 11.5,
         marginBottom: 6,
-        marginLeft: 2,
     },
-    inputBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#cbd5e1',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 46,
-        backgroundColor: '#ffffff',
-    },
-    inputIcon: {
-        marginRight: 8,
-    },
-    textInput: {
-        flex: 1,
-        color: '#0f172a',
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    forgotLink: {
-        alignSelf: 'flex-end',
-        marginTop: 6,
-    },
-    forgotText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#0056D2',
-    },
-    loginButton: {
-        width: '100%',
-        marginTop: 8,
-        borderRadius: 12,
-        overflow: 'hidden',
-        shadowColor: '#d97706',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    loginButtonGradient: {
-        height: 46,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    buttonInner: {
-        width: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-    },
-    loginButtonText: {
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: '800',
-    },
-    buttonArrow: {
-        position: 'absolute',
-        right: 16,
-    },
-    orSeparatorRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: '100%',
-        marginVertical: 14,
-    },
-    separatorLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#e2e8f0',
-    },
-    orText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#94a3b8',
-        marginHorizontal: 12,
-    },
-    googleButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
+    inputFieldBox: {
         height: 44,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#cbd5e1',
-        backgroundColor: '#ffffff',
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.02,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    googleButtonText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#334155',
-    },
-    signupFooter: {
+        paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 18,
     },
-    signupFooterNormal: {
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    signupFooterLink: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#0056D2',
-    },
-    featuresRow: {
-        flexDirection: 'row',
-        minWidth: '100%',
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#0f172a',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.02,
-        shadowRadius: 8,
-        elevation: 2,
-        marginBottom: 20,
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    featureCard: {
+    textInput: {
         flex: 1,
-        flexDirection: 'column',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    suggestionsRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 2,
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 6,
     },
-    verticalDivider: {
-        width: 1,
-        height: 36,
-        backgroundColor: '#e2e8f0',
+    suggestionLabel: {
+        fontSize: 10,
+        fontWeight: '600',
     },
-    featureIconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    suggestionPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 99,
+    },
+    suggestionPillText: {
+        fontSize: 10.5,
+        fontWeight: '700',
+    },
+    countryBtn: {
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 6,
     },
-    featureTitle: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: '#0f172a',
-        marginBottom: 2,
-        textAlign: 'center',
-    },
-    featureDesc: {
-        fontSize: 8,
-        color: '#64748b',
-        fontWeight: '500',
-        textAlign: 'center',
-        lineHeight: 11,
-    },
-    securityPartnersCard: {
-        flexDirection: 'row',
+    strengthBgTrack: {
+        height: 5,
+        borderRadius: 99,
         width: '100%',
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#0f172a',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.02,
-        shadowRadius: 8,
-        elevation: 2,
-        marginBottom: 20,
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        overflow: 'hidden',
     },
-    securityFooterLeft: {
-        flex: 1.2,
+    strengthFillTrack: {
+        height: '100%',
+        borderRadius: 99,
+    },
+    termsRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 14,
+        marginBottom: 16,
     },
-    securityFooterIconCircle: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: '#ffffff',
+    checkboxBox: {
+        width: 18,
+        height: 18,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#94A3B8',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 8,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
     },
-    securityFooterText: {
+    termsText: {
         flex: 1,
-        fontSize: 8.5,
-        color: '#64748b',
+        fontSize: 11,
         fontWeight: '500',
-        lineHeight: 12,
+        lineHeight: 15,
     },
-    verticalDividerPartners: {
-        width: 1,
-        height: 32,
-        backgroundColor: '#e2e8f0',
-        marginHorizontal: 12,
+    primaryBtn: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        shadowColor: '#0E1A2E',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 14,
     },
-    partnersRow: {
-        flex: 1.1,
+    primaryBtnGradient: {
+        height: 46,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryBtnText: {
+        color: '#FFFFFF',
+        fontWeight: '800',
+        fontSize: 13.5,
+    },
+    dividerRow: {
         flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 10,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+    },
+    dividerText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        letterSpacing: 0.8,
+        marginHorizontal: 10,
+    },
+    socialGrid: {
+        flexDirection: 'row',
+        gap: 8,
         justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 4,
+        marginBottom: 16,
     },
-    partnerLogo: {
-        width: 24,
-        height: 24,
-    },
-    aedcWrapper: {
+    socialTile: {
+        flex: 1,
+        height: 40,
+        borderRadius: 10,
+        borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    aedcText: {
-        fontSize: 10,
+    socialTileText: {
+        fontWeight: '700',
+        fontSize: 11,
+        marginLeft: 5,
+    },
+    footerLinkRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    footerText: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    signupLinkText: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(6, 13, 30, 0.75)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 380,
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+    },
+    modalTitle: {
+        fontWeight: '800',
+        fontSize: 16,
+    },
+    countryOptionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        paddingHorizontal: 8,
+        borderRadius: 8,
+    },
+    successCard: {
+        width: '100%',
+        maxWidth: 340,
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    successIconCircle: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: 'rgba(8, 228, 199, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+        borderWidth: 2,
+        borderColor: '#08E4C7',
+    },
+    successTitle: {
         fontWeight: '900',
-        color: '#0056D2',
-    },
-    copyrightText: {
-        fontSize: 9,
-        color: '#94a3b8',
-        fontWeight: '600',
+        fontSize: 17,
         textAlign: 'center',
-        marginTop: 8,
+        marginBottom: 6,
+    },
+    successSubText: {
+        fontSize: 12,
+        fontWeight: '500',
+        textAlign: 'center',
+        lineHeight: 17,
     },
 });
-
