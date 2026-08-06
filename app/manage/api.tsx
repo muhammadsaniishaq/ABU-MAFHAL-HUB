@@ -119,9 +119,18 @@ export default function APIVaultScreen() {
 
             {/* Title Banner */}
             <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6">
-                <View className="flex-row items-center gap-2 mb-1">
-                    <Ionicons name="key" size={20} color="#3b82f6" />
-                    <Text className="text-white font-extrabold text-base">API Vault & Provider Routing</Text>
+                <View className="flex-row items-center justify-between mb-2">
+                    <View className="flex-row items-center gap-2">
+                        <Ionicons name="key" size={20} color="#3b82f6" />
+                        <Text className="text-white font-extrabold text-base">API Vault & Provider Routing</Text>
+                    </View>
+                    <TouchableOpacity 
+                        onPress={() => router.push('/manage/liquidity')}
+                        className="bg-emerald-600/20 px-3 py-1.5 rounded-lg border border-emerald-500 flex-row items-center gap-1"
+                    >
+                        <Ionicons name="wallet-outline" size={14} color="#10b981" />
+                        <Text className="text-emerald-400 font-bold text-xs">Live Balances →</Text>
+                    </TouchableOpacity>
                 </View>
                 <Text className="text-slate-400 text-xs leading-5">
                     Manage AgentHub, Bilalsadasub, Bigi, and ClubKonnect API credentials. Select multiple active APIs for automatic failover.
