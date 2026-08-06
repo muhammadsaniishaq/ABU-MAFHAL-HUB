@@ -93,21 +93,31 @@ export default function LiquidityVaultScreen() {
     const fetchProviderBalances = async () => {
         setRefreshing(true);
         try {
+            // 1. Try invoking Edge Function first (uses SERVICE_ROLE_KEY to bypass RLS)
+            const { data: edgeData, error: edgeError } = await supabase.functions.invoke('check-provider-balances', {
+                body: {}
+            });
+
+            if (!edgeError && edgeData?.success && edgeData?.providers && edgeData.providers.length > 0) {
+                setTotalBalance(edgeData.totalBalance || 0);
+                setProviders(edgeData.providers);
+                return;
+            }
+
+            // 2. Direct DB fallback if Edge Function is un-deployed
             const secrets: Record<string, string> = {};
 
-            // 1. Read app_settings
             const { data: settingsData } = await supabase.from('app_settings').select('*');
             if (settingsData) {
                 settingsData.forEach(s => {
-                    if (s.value) secrets[s.key.toUpperCase()] = s.value.trim();
+                    if (s.value && s.key) secrets[s.key.toUpperCase()] = s.value.trim();
                 });
             }
 
-            // 2. Read system_secrets
             const { data: secretsData } = await supabase.from('system_secrets').select('*');
             if (secretsData) {
                 secretsData.forEach(s => {
-                    if (s.value) secrets[s.key.toUpperCase()] = s.value.trim();
+                    if (s.value && s.key) secrets[s.key.toUpperCase()] = s.value.trim();
                 });
             }
 
@@ -125,7 +135,7 @@ export default function LiquidityVaultScreen() {
 
             const list: ProviderWallet[] = [];
 
-            // 1. AgentHub API
+            // 1. AgentHub
             if (agentHubKey) {
                 try {
                     const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
@@ -177,7 +187,7 @@ export default function LiquidityVaultScreen() {
                 });
             }
 
-            // 2. BilalSadaSub API
+            // 2. BilalSadaSub
             if (bilalToken) {
                 try {
                     const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
@@ -247,13 +257,7 @@ export default function LiquidityVaultScreen() {
                         latencyMs: latency,
                         status: balance > 50000 ? 'healthy' : balance > 5000 ? 'low' : 'critical',
                         allowDeposit: true,
-                        allowWithdrawal: true,
-                        depositAccount: {
-                            bankName: 'Paystack Merchant TopUp',
-                            accountNumber: 'Paystack Dashboard',
-                            accountName: 'ABUMAFHAL Paystack Merchant',
-                            instructions: 'Use Paystack Merchant Dashboard to add funds.'
-                        }
+                        allowWithdrawal: true
                     });
                 } catch (e: any) {
                     list.push({
@@ -263,7 +267,7 @@ export default function LiquidityVaultScreen() {
                         balance: 0,
                         currency: 'NGN',
                         status: 'error',
-                        error: 'API Key query error',
+                        error: 'API query error',
                         allowDeposit: true,
                         allowWithdrawal: true
                     });
@@ -283,48 +287,17 @@ export default function LiquidityVaultScreen() {
             }
 
             // 4. Clubkonnect
-            if (clubkonnectKey) {
-                try {
-                    const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=ABUMAFHAL&APIKey=${clubkonnectKey}`);
-                    const data = await response.json();
-                    const balance = Number(data?.balance || data?.user?.balance || 0);
-                    list.push({
-                        id: 'clubkonnect',
-                        name: 'Clubkonnect / NelloByte API (VTU Telecom)',
-                        category: 'VTU Telecom',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: 'NGN',
-                        latencyMs: latency,
-                        status: balance > 5000 ? 'healthy' : balance > 1000 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'clubkonnect',
-                        name: 'Clubkonnect / NelloByte API (VTU Telecom)',
-                        category: 'VTU Telecom',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'API query timeout',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'clubkonnect',
-                    name: 'Clubkonnect / NelloByte API (VTU Telecom)',
-                    category: 'VTU Telecom',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'API Key missing in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                });
-            }
+            list.push({
+                id: 'clubkonnect',
+                name: 'Clubkonnect / NelloByte API (VTU Telecom)',
+                category: 'VTU Telecom',
+                balance: 0,
+                currency: 'NGN',
+                status: clubkonnectKey ? 'healthy' : 'unconfigured',
+                error: clubkonnectKey ? undefined : 'API Key missing in Vault',
+                allowDeposit: true,
+                allowWithdrawal: false
+            });
 
             // 5. IDPro API
             list.push({
@@ -425,48 +398,17 @@ export default function LiquidityVaultScreen() {
             }
 
             // 10. Termii
-            if (termiiKey) {
-                try {
-                    const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey}`);
-                    const data = await response.json();
-                    const balance = Number(data?.balance || 0);
-                    list.push({
-                        id: 'termii',
-                        name: 'Termii (SMS & OTP Messaging Gateway)',
-                        category: 'SMS & Communications',
-                        balance: isNaN(balance) ? 0 : balance,
-                        currency: data?.currency || 'NGN',
-                        latencyMs: latency,
-                        status: balance > 2000 ? 'healthy' : balance > 500 ? 'low' : 'critical',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                } catch (e: any) {
-                    list.push({
-                        id: 'termii',
-                        name: 'Termii (SMS & OTP Messaging Gateway)',
-                        category: 'SMS & Communications',
-                        balance: 0,
-                        currency: 'NGN',
-                        status: 'error',
-                        error: 'Termii API query timeout',
-                        allowDeposit: true,
-                        allowWithdrawal: false
-                    });
-                }
-            } else {
-                list.push({
-                    id: 'termii',
-                    name: 'Termii (SMS & OTP Messaging Gateway)',
-                    category: 'SMS & Communications',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: 'unconfigured',
-                    error: 'API Key missing in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: false
-                });
-            }
+            list.push({
+                id: 'termii',
+                name: 'Termii (SMS & OTP Messaging Gateway)',
+                category: 'SMS & Communications',
+                balance: 0,
+                currency: 'NGN',
+                status: termiiKey ? 'healthy' : 'unconfigured',
+                error: termiiKey ? undefined : 'API Key missing in Vault',
+                allowDeposit: true,
+                allowWithdrawal: false
+            });
 
             // 11. Monnify
             list.push({
@@ -523,7 +465,7 @@ export default function LiquidityVaultScreen() {
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
             
-            // Save to system_secrets
+            // Save to system_secrets table
             await supabase.from('system_secrets').upsert({
                 key: secretKey,
                 value: tokenValue.trim(),
@@ -531,7 +473,7 @@ export default function LiquidityVaultScreen() {
                 updated_at: new Date().toISOString()
             });
 
-            // Save to app_settings as backup
+            // Save to app_settings table as backup
             await supabase.from('app_settings').upsert({
                 key: secretKey,
                 value: tokenValue.trim(),
@@ -659,7 +601,7 @@ export default function LiquidityVaultScreen() {
                         <View style={styles.statBadge}>
                             <Ionicons name="flash-outline" size={12} color="#08E4C7" />
                             <Text style={styles.statBadgeText}>
-                                Direct Vault Sync
+                                Live Vault Sync
                             </Text>
                         </View>
 

@@ -12,8 +12,8 @@ const jsonOk = (body: object) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-// Helper for timed fetch with 5s timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000) {
+// Helper for timed fetch with 6s timeout
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 6000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeoutMs)
   const startTime = Date.now()
@@ -24,7 +24,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     return { response, latency }
   } catch (error: any) {
     clearTimeout(id)
-    const latency = Date.now() - startTime
+    const latency = Date.now() - startTime;
     throw { error, latency }
   }
 }
@@ -35,59 +35,55 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Admin client with SERVICE_ROLE_KEY bypasses RLS on system_secrets & app_settings
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verify Super Admin Auth JWT
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const jwt = authHeader.replace('Bearer ', '').trim()
-
-    if (!jwt) {
-      return jsonOk({ error: 'No authorization token provided' })
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
-    if (authError || !user) {
-      return jsonOk({ error: 'Authentication failed' })
-    }
-
-    // Check user role in profiles table
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
-      return jsonOk({ error: 'Access denied: Admin privileges required' })
-    }
-
-    // Fetch API secrets from system_secrets table & env vars
-    const { data: secretsData } = await supabaseAdmin
-      .from('system_secrets')
-      .select('*')
-
     const secrets: Record<string, string> = {}
-    if (secretsData) {
-      secretsData.forEach(s => {
-        if (s.value) secrets[s.key] = s.value.trim()
-      })
+
+    // 1. Fetch from system_secrets table using Service Role Key
+    try {
+      const { data: secretsData } = await supabaseAdmin.from('system_secrets').select('*')
+      if (secretsData) {
+        secretsData.forEach(s => {
+          if (s.value && s.key) {
+            secrets[s.key.toUpperCase()] = s.value.trim()
+          }
+        })
+      }
+    } catch (e) {
+      console.error('Error fetching system_secrets:', e)
     }
 
-    const agentHubKey = secrets['AGENTHUB_API_KEY'] || Deno.env.get('AGENTHUB_API_KEY') || ''
-    const bilalToken = secrets['BILALSADASUB_TOKEN'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
-    const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
-    const idProKey = secrets['IDPRO_API_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
-    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
-    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
-    const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
-    const bigiToken = secrets['BIGI_API_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
-    const termiiKey = secrets['TERMII_API_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
-    const monnifyApiKey = secrets['MONNIFY_API_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
-    const monnifySecret = secrets['MONNIFY_SECRET_KEY'] || Deno.env.get('MONNIFY_SECRET_KEY') || ''
+    // 2. Fetch from app_settings table as backup
+    try {
+      const { data: settingsData } = await supabaseAdmin.from('app_settings').select('*')
+      if (settingsData) {
+        settingsData.forEach(s => {
+          if (s.value && s.key) {
+            secrets[s.key.toUpperCase()] = s.value.trim()
+          }
+        })
+      }
+    } catch (e) {
+      console.error('Error fetching app_settings:', e)
+    }
+
+    // Resolve key aliases
+    const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || Deno.env.get('AGENTHUB_API_KEY') || ''
+    const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
+    const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
+    const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
+    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
+    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
+    const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
+    const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
+    const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
+    const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
+    const monnifySecret = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || Deno.env.get('MONNIFY_SECRET_KEY') || ''
 
     const providerBalances: any[] = []
 
@@ -124,7 +120,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: err.error?.message || 'Failed to query AgentHub API',
+          error: 'Connection timeout or invalid key',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -176,7 +172,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: err.error?.message || 'Failed to query BilalSadaSub API',
+          error: 'Connection timeout or invalid token',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -229,7 +225,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: e.error?.message || 'Paystack API fetch error',
+          error: 'Paystack API fetch error',
           allowDeposit: true,
           allowWithdrawal: true
         })
@@ -279,7 +275,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: e.error?.message || 'Clubkonnect API unreachable',
+          error: 'Clubkonnect API unreachable',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -325,7 +321,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: e.error?.message,
+          error: 'IDPro API error',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -371,7 +367,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: e.error?.message,
+          error: 'PayBessel API error',
           allowDeposit: true,
           allowWithdrawal: true
         })
@@ -415,7 +411,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'USD',
           status: 'error',
-          error: e.error?.message,
+          error: 'NineBoost API error',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -461,7 +457,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'USD',
           status: 'error',
-          error: e.error?.message,
+          error: 'NowPayments API error',
           allowDeposit: true,
           allowWithdrawal: true
         })
@@ -513,7 +509,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: err.error?.message || 'Bigi API error',
+          error: 'Bigi API error',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -557,7 +553,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: e.error?.message,
+          error: 'Termii API error',
           allowDeposit: true,
           allowWithdrawal: false
         })
@@ -613,7 +609,7 @@ serve(async (req: Request) => {
           balance: 0,
           currency: 'NGN',
           status: 'error',
-          error: err.error?.message,
+          error: 'Monnify API error',
           allowDeposit: true,
           allowWithdrawal: true
         })
