@@ -41,10 +41,10 @@ const modules = {
         { title: 'Reviews Control', icon: 'star-outline', route: '/manage/reviews', color: '#F59E0B' },
     ],
     banking: [
+        { title: 'API Wallets & Liquidity', icon: 'wallet-outline', route: '/manage/liquidity', color: '#10B981', badge: 'Live Balances' },
         { title: 'Cards', icon: 'card-outline', route: '/manage/cards', color: '#EC4899' },
         { title: 'Lending', icon: 'cash-outline', route: '/manage/lending', color: '#10B981', badge: 0 },
         { title: 'Wealth', icon: 'briefcase-outline', route: '/manage/wealth', color: '#8B5CF6' },
-        { title: 'Liquidity', icon: 'water-outline', route: '/manage/liquidity', color: '#10B981' },
         { title: 'Rates', icon: 'trending-up-outline', route: '/manage/rates', color: '#F59E0B', stat: 'Live' },
     ],
     finance: [
