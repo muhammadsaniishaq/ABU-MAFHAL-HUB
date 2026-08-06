@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     },
     mascotWrapper: {
         alignItems: 'center',
-        justify: 'center',
+        justifyContent: 'center',
     },
     shadow: {
         position: 'absolute',
