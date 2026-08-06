@@ -115,6 +115,7 @@ export default function APIVaultScreen() {
                 { key: 'PAYSTACK_SECRET_KEY', value: paystackSecret, description: 'Paystack Secret Key for Payments & Transfers' },
                 { key: 'CLUBKONNECT_API_KEY', value: clubkonnectApiKey, description: 'ClubKonnect API Key for Telecom & Bills' },
                 { key: 'IDPRO_API_KEY', value: idProApiKey, description: 'IDPro API Key for Identity Verification' },
+                { key: 'PAYVESSEL_API_KEY', value: payBesselApiKey, description: 'PayVessel API Key for Payment Gateway' },
                 { key: 'PAYBESSEL_API_KEY', value: payBesselApiKey, description: 'PayBessel API Key for Payment Gateway' },
                 { key: 'NINEBOOST_API_KEY', value: nineBoostApiKey, description: 'NineBoost API Key for Social Media Services' },
                 { key: 'NOWPAYMENTS_API_KEY', value: nowPaymentsApiKey, description: 'NowPayments API Key for Crypto' },

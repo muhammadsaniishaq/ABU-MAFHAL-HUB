@@ -12,8 +12,8 @@ const jsonOk = (body: object) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-// Helper for timed fetch with 5s timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000) {
+// Helper for timed fetch with 6s timeout
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 6000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeoutMs)
   const startTime = Date.now()
@@ -104,8 +104,9 @@ serve(async (req: Request) => {
           headers: { 'Authorization': `Bearer ${agentHubKey}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
-        if (data && (data.balance !== undefined || data?.data?.balance !== undefined || data?.user?.balance !== undefined)) {
-          balance = Number(data?.balance ?? data?.data?.balance ?? data?.user?.balance ?? 0)
+        const rawBal = data?.balance ?? data?.data?.balance ?? data?.user?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -151,8 +152,9 @@ serve(async (req: Request) => {
           headers: { 'Authorization': `Token ${bilalToken}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
-        if (data && (data?.user?.wallet_balance !== undefined || data?.wallet_balance !== undefined || data?.balance !== undefined)) {
-          balance = Number(data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? 0)
+        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -199,8 +201,10 @@ serve(async (req: Request) => {
         })
         const data = await response.json()
         const balanceItem = data?.data?.find((b: any) => b.currency === 'NGN') || data?.data?.[0]
-        balance = Number((balanceItem?.balance || 0) / 100)
-        latencyMs = latency
+        if (balanceItem?.balance !== undefined) {
+          balance = Number(balanceItem.balance) / 100
+          latencyMs = latency
+        }
       } catch (e) {}
 
       providerBalances.push({
@@ -236,8 +240,9 @@ serve(async (req: Request) => {
       try {
         const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=ABUMAFHAL&APIKey=${clubkonnectKey}`)
         const data = await response.json()
-        if (data && (data?.balance !== undefined || data?.user?.balance !== undefined)) {
-          balance = Number(data?.balance || data?.user?.balance || 0)
+        const rawBal = data?.balance ?? data?.user?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -277,8 +282,9 @@ serve(async (req: Request) => {
           headers: { 'Authorization': `Bearer ${idProKey}` }
         })
         const data = await response.json()
-        if (data && data?.balance !== undefined) {
-          balance = Number(data.balance)
+        const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -318,8 +324,9 @@ serve(async (req: Request) => {
           headers: { 'api-key': payVesselKey, 'Accept': 'application/json' }
         })
         const data = await response.json()
-        if (data && (data?.balance !== undefined || data?.data?.balance !== undefined)) {
-          balance = Number(data?.balance ?? data?.data?.balance ?? 0)
+        const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -357,8 +364,9 @@ serve(async (req: Request) => {
       try {
         const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey}&action=balance`)
         const data = await response.json()
-        if (data && data?.balance !== undefined) {
-          balance = Number(data.balance)
+        const rawBal = data?.balance ?? data?.data?.balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -398,8 +406,9 @@ serve(async (req: Request) => {
           headers: { 'x-api-key': nowPaymentsKey }
         })
         const data = await response.json()
-        if (data && data?.balance !== undefined) {
-          balance = Number(data.balance)
+        const rawBal = data?.balance?.usd ?? data?.balance ?? data?.data?.balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -439,8 +448,9 @@ serve(async (req: Request) => {
           headers: { 'Authorization': `Token ${bigiToken}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
-        if (data && (data?.user?.wallet_balance !== undefined || data?.wallet_balance !== undefined)) {
-          balance = Number(data?.user?.wallet_balance ?? data?.wallet_balance ?? 0)
+        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
           latencyMs = latency
         }
       } catch (e) {}
@@ -478,8 +488,11 @@ serve(async (req: Request) => {
       try {
         const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey}`)
         const data = await response.json()
-        balance = Number(data?.balance || 0)
-        latencyMs = latency
+        const rawBal = data?.balance ?? data?.data?.balance
+        if (rawBal !== undefined) {
+          balance = Number(rawBal)
+          latencyMs = latency
+        }
       } catch (e) {}
 
       providerBalances.push({
@@ -510,13 +523,15 @@ serve(async (req: Request) => {
 
     // 11. Monnify
     if (monnifyApiKey && monnifyApiKey.trim() !== '') {
+      let balance = 0
+      let latencyMs = 150
       providerBalances.push({
         id: 'monnify',
         name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
         category: 'Payment Gateway',
-        balance: 0,
+        balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
-        latencyMs: 150,
+        latencyMs,
         status: 'healthy',
         error: undefined,
         allowDeposit: true,
