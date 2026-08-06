@@ -116,7 +116,7 @@ export default function LiquidityVaultScreen() {
             const paystackSecret = secretsMap['PAYSTACK_SECRET_KEY'] || secretsMap['PAYSTACK_KEY'] || '';
             const clubkonnectKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || '';
             const idProKey = secretsMap['IDPRO_API_KEY'] || secretsMap['IDPRO_KEY'] || '';
-            const payBesselKey = secretsMap['PAYBESSEL_API_KEY'] || secretsMap['PAYBESSEL_KEY'] || secretsMap['PAYBESSEL_SECRET_KEY'] || '';
+            const payVesselKey = secretsMap['PAYVESSEL_API_KEY'] || secretsMap['PAYVESSEL_KEY'] || secretsMap['PAYVESSEL_SECRET_KEY'] || secretsMap['PAYBESSEL_API_KEY'] || secretsMap['PAYBESSEL_KEY'] || '';
             const nineBoostKey = secretsMap['NINEBOOST_API_KEY'] || secretsMap['NINEBOOST_KEY'] || secretsMap['NINEBOOST_TOKEN'] || '';
             const nowPaymentsKey = secretsMap['NOWPAYMENTS_API_KEY'] || secretsMap['NOWPAYMENTS_KEY'] || '';
             const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || '';
@@ -192,13 +192,13 @@ export default function LiquidityVaultScreen() {
                     allowWithdrawal: false
                 },
                 {
-                    id: 'paybessel',
-                    name: 'PayBessel (Payment & Payout Gateway)',
+                    id: 'payvessel',
+                    name: 'PayVessel (Payment & Payout Gateway)',
                     category: 'Payment Gateway',
                     balance: 0,
                     currency: 'NGN',
-                    status: payBesselKey ? 'healthy' : 'unconfigured',
-                    error: payBesselKey ? undefined : 'API Key not configured in Vault',
+                    status: payVesselKey ? 'healthy' : 'unconfigured',
+                    error: payVesselKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: true
                 },
@@ -282,7 +282,7 @@ export default function LiquidityVaultScreen() {
             paystack: 'PAYSTACK_SECRET_KEY',
             clubkonnect: 'CLUBKONNECT_API_KEY',
             idpro: 'IDPRO_API_KEY',
-            paybessel: 'PAYBESSEL_API_KEY',
+            payvessel: 'PAYVESSEL_API_KEY',
             nineboost: 'NINEBOOST_API_KEY',
             nowpayments: 'NOWPAYMENTS_API_KEY',
             bigi: 'BIGI_API_TOKEN',
@@ -293,7 +293,10 @@ export default function LiquidityVaultScreen() {
         setTokenKeyName(keyName);
 
         // Pre-fill existing secret value from vaultSecrets map
-        const existingVal = vaultSecrets[keyName] || vaultSecrets[keyName.replace('_API_KEY', '_KEY').replace('_TOKEN', '_KEY')] || '';
+        let existingVal = vaultSecrets[keyName] || vaultSecrets[keyName.replace('_API_KEY', '_KEY').replace('_TOKEN', '_KEY')] || '';
+        if (p.id === 'payvessel' && !existingVal) {
+            existingVal = vaultSecrets['PAYBESSEL_API_KEY'] || vaultSecrets['PAYBESSEL_KEY'] || '';
+        }
         setTokenValue(existingVal);
     };
 
@@ -311,7 +314,7 @@ export default function LiquidityVaultScreen() {
                 paystack: 'PAYSTACK_SECRET_KEY',
                 clubkonnect: 'CLUBKONNECT_API_KEY',
                 idpro: 'IDPRO_API_KEY',
-                paybessel: 'PAYBESSEL_API_KEY',
+                payvessel: 'PAYVESSEL_API_KEY',
                 nineboost: 'NINEBOOST_API_KEY',
                 nowpayments: 'NOWPAYMENTS_API_KEY',
                 bigi: 'BIGI_API_TOKEN',

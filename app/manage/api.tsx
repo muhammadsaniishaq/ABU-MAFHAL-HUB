@@ -41,7 +41,7 @@ export default function APIVaultScreen() {
                     if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
                     if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
                     if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
-                    if (k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
                     if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
                     if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
@@ -61,7 +61,7 @@ export default function APIVaultScreen() {
                     if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
                     if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
                     if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
-                    if (k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
                     if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
                     if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);

@@ -86,7 +86,7 @@ serve(async (req: Request) => {
     const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
     const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
-    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || secrets['PAYBESSEL_SECRET_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
+    const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
     const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || Deno.env.get('NINEBOOST_API_KEY') || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
@@ -309,13 +309,13 @@ serve(async (req: Request) => {
       })
     }
 
-    // 6. PayBessel (Payment & Payout Gateway)
-    if (payBesselKey && payBesselKey.trim() !== '') {
+    // 6. PayVessel (Payment & Payout Gateway)
+    if (payVesselKey && payVesselKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
       try {
-        const { response, latency } = await fetchWithTimeout('https://api.paybessel.com/v1/wallet/balance', {
-          headers: { 'Authorization': `Bearer ${payBesselKey}` }
+        const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', {
+          headers: { 'api-key': payVesselKey, 'Accept': 'application/json' }
         })
         const data = await response.json()
         if (data && (data?.balance !== undefined || data?.data?.balance !== undefined)) {
@@ -325,8 +325,8 @@ serve(async (req: Request) => {
       } catch (e) {}
 
       providerBalances.push({
-        id: 'paybessel',
-        name: 'PayBessel (Payment & Payout Gateway)',
+        id: 'payvessel',
+        name: 'PayVessel (Payment & Payout Gateway)',
         category: 'Payment Gateway',
         balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
@@ -338,8 +338,8 @@ serve(async (req: Request) => {
       })
     } else {
       providerBalances.push({
-        id: 'paybessel',
-        name: 'PayBessel (Payment & Payout Gateway)',
+        id: 'payvessel',
+        name: 'PayVessel (Payment & Payout Gateway)',
         category: 'Payment Gateway',
         balance: 0,
         currency: 'NGN',
