@@ -12,8 +12,8 @@ const jsonOk = (body: object) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-// Helper for timed fetch with 6s timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 6000) {
+// Helper for timed fetch with 5s timeout
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000) {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeoutMs)
   const startTime = Date.now()
@@ -72,24 +72,27 @@ serve(async (req: Request) => {
     const secrets: Record<string, string> = {}
     if (secretsData) {
       secretsData.forEach(s => {
-        secrets[s.key] = s.value
+        if (s.value) secrets[s.key] = s.value.trim()
       })
     }
 
     const agentHubKey = secrets['AGENTHUB_API_KEY'] || Deno.env.get('AGENTHUB_API_KEY') || ''
     const bilalToken = secrets['BILALSADASUB_TOKEN'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
-    const bigiToken = secrets['BIGI_API_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
-    const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
     const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
+    const idProKey = secrets['IDPRO_API_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
+    const payBesselKey = secrets['PAYBESSEL_API_KEY'] || Deno.env.get('PAYBESSEL_API_KEY') || ''
+    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
+    const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
+    const bigiToken = secrets['BIGI_API_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
+    const termiiKey = secrets['TERMII_API_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
     const monnifyApiKey = secrets['MONNIFY_API_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
     const monnifySecret = secrets['MONNIFY_SECRET_KEY'] || Deno.env.get('MONNIFY_SECRET_KEY') || ''
-    const termiiKey = secrets['TERMII_API_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
-    const smmApiKey = secrets['SMM_API_KEY'] || Deno.env.get('SMM_API_KEY') || ''
 
     const providerBalances: any[] = []
 
-    // 1. AgentHub API Balance Check (Identity, NIN, BVN, CAC, TAX)
-    if (agentHubKey && agentHubKey.trim() !== '') {
+    // 1. AgentHub API (Identity, NIN, BVN, CAC, TAX)
+    if (agentHubKey) {
       try {
         const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
           headers: { 'Authorization': `Bearer ${agentHubKey}`, 'Accept': 'application/json' }
@@ -110,7 +113,7 @@ serve(async (req: Request) => {
             bankName: 'Sterling Bank / Monnify (AgentHub)',
             accountNumber: '9081234567',
             accountName: 'AgentHub Corporate / ABUMAFHAL',
-            instructions: 'Transfer to this virtual account to instantly top up your AgentHub balance.'
+            instructions: 'Transfer to this virtual account to top up AgentHub balance.'
           }
         })
       } catch (err: any) {
@@ -118,18 +121,12 @@ serve(async (req: Request) => {
           id: 'agenthub',
           name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
           category: 'Digital Identity & CAC',
-          balance: 45800, // Safe display estimate on API latency
+          balance: 0,
           currency: 'NGN',
-          latencyMs: err.latency || 450,
-          status: 'healthy',
+          status: 'error',
+          error: err.error?.message || 'Failed to query AgentHub API',
           allowDeposit: true,
-          allowWithdrawal: false,
-          depositAccount: {
-            bankName: 'Sterling Bank / Monnify (AgentHub)',
-            accountNumber: '9081234567',
-            accountName: 'AgentHub Corporate / ABUMAFHAL',
-            instructions: 'Transfer to this virtual account to top up AgentHub balance.'
-          }
+          allowWithdrawal: false
         })
       }
     } else {
@@ -137,17 +134,17 @@ serve(async (req: Request) => {
         id: 'agenthub',
         name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
         category: 'Digital Identity & CAC',
-        balance: 45800,
+        balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'API Key not configured in Vault',
+        error: 'Key missing in API Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
     }
 
-    // 2. BilalSadaSub API Balance Check (Data, Airtime, Cable, Bills)
-    if (bilalToken && bilalToken.trim() !== '') {
+    // 2. BilalSadaSub API (Data, Airtime, Cable, Bills)
+    if (bilalToken) {
       try {
         const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
           headers: { 'Authorization': `Token ${bilalToken}`, 'Accept': 'application/json' }
@@ -176,18 +173,12 @@ serve(async (req: Request) => {
           id: 'bilalsadasub',
           name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
           category: 'VTU Telecom',
-          balance: 128450,
+          balance: 0,
           currency: 'NGN',
-          latencyMs: err.latency || 380,
-          status: 'healthy',
+          status: 'error',
+          error: err.error?.message || 'Failed to query BilalSadaSub API',
           allowDeposit: true,
-          allowWithdrawal: false,
-          depositAccount: {
-            bankName: 'Sterling / Monnify (BilalSadaSub)',
-            accountNumber: '8910293841',
-            accountName: 'BilalSadaSub Telecom',
-            instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
-          }
+          allowWithdrawal: false
         })
       }
     } else {
@@ -195,17 +186,302 @@ serve(async (req: Request) => {
         id: 'bilalsadasub',
         name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
         category: 'VTU Telecom',
-        balance: 128450,
+        balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Token not configured in Vault',
+        error: 'Token missing in API Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
     }
 
-    // 3. Bigi VTU / BigiSub API Balance Check
-    if (bigiToken && bigiToken.trim() !== '') {
+    // 3. Paystack Merchant Settlement Balance
+    if (paystackSecret && paystackSecret.startsWith('sk_')) {
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.paystack.co/balance', {
+          headers: { 'Authorization': `Bearer ${paystackSecret}`, 'Accept': 'application/json' }
+        })
+        const data = await response.json()
+        const balanceItem = data?.data?.find((b: any) => b.currency === 'NGN') || data?.data?.[0]
+        const balance = Number((balanceItem?.balance || 0) / 100)
+        providerBalances.push({
+          id: 'paystack',
+          name: 'Paystack (Payment Gateway & Settlements)',
+          category: 'Payment Gateway',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'NGN',
+          latencyMs: latency,
+          status: balance > 50000 ? 'healthy' : balance > 5000 ? 'low' : 'critical',
+          allowDeposit: true,
+          allowWithdrawal: true,
+          depositAccount: {
+            bankName: 'Paystack Merchant TopUp',
+            accountNumber: 'Paystack Dashboard',
+            accountName: 'ABUMAFHAL Paystack Merchant',
+            instructions: 'Use Paystack Merchant Dashboard to add funds.'
+          }
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'paystack',
+          name: 'Paystack (Payment Gateway & Settlements)',
+          category: 'Payment Gateway',
+          balance: 0,
+          currency: 'NGN',
+          status: 'error',
+          error: e.error?.message || 'Paystack API fetch error',
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'paystack',
+        name: 'Paystack (Payment Gateway & Settlements)',
+        category: 'Payment Gateway',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'Secret Key missing in API Vault',
+        allowDeposit: true,
+        allowWithdrawal: true
+      })
+    }
+
+    // 4. Clubkonnect API
+    if (clubkonnectKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=ABUMAFHAL&APIKey=${clubkonnectKey}`)
+        const data = await response.json()
+        const balance = Number(data?.balance || data?.user?.balance || 0)
+        providerBalances.push({
+          id: 'clubkonnect',
+          name: 'Clubkonnect / NelloByte API (VTU Telecom)',
+          category: 'VTU Telecom',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'NGN',
+          latencyMs: latency,
+          status: balance > 5000 ? 'healthy' : balance > 1000 ? 'low' : 'critical',
+          allowDeposit: true,
+          allowWithdrawal: false,
+          depositAccount: {
+            bankName: 'Wema Bank (Clubkonnect)',
+            accountNumber: '9182345678',
+            accountName: 'Clubkonnect Telecom',
+            instructions: 'Transfer to virtual account for Clubkonnect portal.'
+          }
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'clubkonnect',
+          name: 'Clubkonnect / NelloByte API (VTU Telecom)',
+          category: 'VTU Telecom',
+          balance: 0,
+          currency: 'NGN',
+          status: 'error',
+          error: e.error?.message || 'Clubkonnect API unreachable',
+          allowDeposit: true,
+          allowWithdrawal: false
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'clubkonnect',
+        name: 'Clubkonnect / NelloByte API (VTU Telecom)',
+        category: 'VTU Telecom',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 5. IDPro API (Identity Verification)
+    if (idProKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout('https://idpro.ng/api/balance', {
+          headers: { 'Authorization': `Bearer ${idProKey}` }
+        })
+        const data = await response.json()
+        const balance = Number(data?.balance || 0)
+        providerBalances.push({
+          id: 'idpro',
+          name: 'IDPro (Identity & KYC Verification API)',
+          category: 'Digital Identity & CAC',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'NGN',
+          latencyMs: latency,
+          status: balance > 5000 ? 'healthy' : 'low',
+          allowDeposit: true,
+          allowWithdrawal: false
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'idpro',
+          name: 'IDPro (Identity & KYC Verification API)',
+          category: 'Digital Identity & CAC',
+          balance: 0,
+          currency: 'NGN',
+          status: 'error',
+          error: e.error?.message,
+          allowDeposit: true,
+          allowWithdrawal: false
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'idpro',
+        name: 'IDPro (Identity & KYC Verification API)',
+        category: 'Digital Identity & CAC',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 6. PayBessel Payment Gateway
+    if (payBesselKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.paybessel.com/v1/wallet/balance', {
+          headers: { 'Authorization': `Bearer ${payBesselKey}` }
+        })
+        const data = await response.json()
+        const balance = Number(data?.balance || 0)
+        providerBalances.push({
+          id: 'paybessel',
+          name: 'PayBessel (Payment & Payout Gateway)',
+          category: 'Payment Gateway',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'NGN',
+          latencyMs: latency,
+          status: balance > 20000 ? 'healthy' : 'low',
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'paybessel',
+          name: 'PayBessel (Payment & Payout Gateway)',
+          category: 'Payment Gateway',
+          balance: 0,
+          currency: 'NGN',
+          status: 'error',
+          error: e.error?.message,
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'paybessel',
+        name: 'PayBessel (Payment & Payout Gateway)',
+        category: 'Payment Gateway',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
+        allowDeposit: true,
+        allowWithdrawal: true
+      })
+    }
+
+    // 7. NineBoost SMM Services API
+    if (nineBoostKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey}&action=balance`)
+        const data = await response.json()
+        const balance = Number(data?.balance || 0)
+        providerBalances.push({
+          id: 'nineboost',
+          name: 'NineBoost (Social Media Marketing SMM Panel)',
+          category: 'Marketing Services',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: data?.currency || 'USD',
+          latencyMs: latency,
+          status: balance > 20 ? 'healthy' : 'low',
+          allowDeposit: true,
+          allowWithdrawal: false
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'nineboost',
+          name: 'NineBoost (Social Media Marketing SMM Panel)',
+          category: 'Marketing Services',
+          balance: 0,
+          currency: 'USD',
+          status: 'error',
+          error: e.error?.message,
+          allowDeposit: true,
+          allowWithdrawal: false
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'nineboost',
+        name: 'NineBoost (Social Media Marketing SMM Panel)',
+        category: 'Marketing Services',
+        balance: 0,
+        currency: 'USD',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 8. NowPayments Crypto Gateway
+    if (nowPaymentsKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout('https://api.nowpayments.io/v1/balance', {
+          headers: { 'x-api-key': nowPaymentsKey }
+        })
+        const data = await response.json()
+        const balance = Number(data?.balance || 0)
+        providerBalances.push({
+          id: 'nowpayments',
+          name: 'NowPayments (Crypto Payment Gateway)',
+          category: 'Payment Gateway',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'USD',
+          latencyMs: latency,
+          status: balance > 100 ? 'healthy' : 'low',
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      } catch (e: any) {
+        providerBalances.push({
+          id: 'nowpayments',
+          name: 'NowPayments (Crypto Payment Gateway)',
+          category: 'Payment Gateway',
+          balance: 0,
+          currency: 'USD',
+          status: 'error',
+          error: e.error?.message,
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      }
+    } else {
+      providerBalances.push({
+        id: 'nowpayments',
+        name: 'NowPayments (Crypto Payment Gateway)',
+        category: 'Payment Gateway',
+        balance: 0,
+        currency: 'USD',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
+        allowDeposit: true,
+        allowWithdrawal: true
+      })
+    }
+
+    // 9. Bigi VTU / BigiSub API
+    if (bigiToken) {
       try {
         const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
           headers: { 'Authorization': `Token ${bigiToken}`, 'Accept': 'application/json' }
@@ -234,18 +510,12 @@ serve(async (req: Request) => {
           id: 'bigi',
           name: 'Bigi VTU Portal (SME Data & Airtime)',
           category: 'VTU Telecom',
-          balance: 34200,
+          balance: 0,
           currency: 'NGN',
-          latencyMs: err.latency || 410,
-          status: 'healthy',
+          status: 'error',
+          error: err.error?.message || 'Bigi API error',
           allowDeposit: true,
-          allowWithdrawal: false,
-          depositAccount: {
-            bankName: 'Moniepoint / Wema (Bigi VTU)',
-            accountNumber: '7082930412',
-            accountName: 'Bigi Data Services',
-            instructions: 'Top up virtual account for Bigi VTU API portal.'
-          }
+          allowWithdrawal: false
         })
       }
     } else {
@@ -253,73 +523,60 @@ serve(async (req: Request) => {
         id: 'bigi',
         name: 'Bigi VTU Portal (SME Data & Airtime)',
         category: 'VTU Telecom',
-        balance: 34200,
+        balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Bigi API Token not configured in Vault',
+        error: 'Token missing in API Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
     }
 
-    // 4. Paystack Merchant Balance (Payment Gateway & Settlements)
-    try {
-      if (paystackSecret && paystackSecret.startsWith('sk_')) {
-        const { response, latency } = await fetchWithTimeout('https://api.paystack.co/balance', {
-          headers: { 'Authorization': `Bearer ${paystackSecret}`, 'Accept': 'application/json' }
-        })
+    // 10. Termii SMS Gateway
+    if (termiiKey) {
+      try {
+        const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey}`)
         const data = await response.json()
-        const balanceItem = data?.data?.find((b: any) => b.currency === 'NGN') || data?.data?.[0]
-        const balance = Number((balanceItem?.balance || 0) / 100)
+        const balance = Number(data?.balance || 0)
         providerBalances.push({
-          id: 'paystack',
-          name: 'Paystack (Payment Gateway & Settlements)',
-          category: 'Payment Gateway',
+          id: 'termii',
+          name: 'Termii (SMS & OTP Messaging Gateway)',
+          category: 'SMS & Communications',
           balance: isNaN(balance) ? 0 : balance,
-          currency: 'NGN',
+          currency: data?.currency || 'NGN',
           latencyMs: latency,
-          status: balance > 50000 ? 'healthy' : balance > 5000 ? 'low' : 'critical',
+          status: balance > 2000 ? 'healthy' : balance > 500 ? 'low' : 'critical',
           allowDeposit: true,
-          allowWithdrawal: true,
-          depositAccount: {
-            bankName: 'Paystack Merchant TopUp',
-            accountNumber: 'Paystack Dashboard',
-            accountName: 'ABUMAFHAL Paystack Merchant',
-            instructions: 'Use Paystack Merchant Dashboard to add funds or auto-settlement.'
-          }
+          allowWithdrawal: false
         })
-      } else {
+      } catch (e: any) {
         providerBalances.push({
-          id: 'paystack',
-          name: 'Paystack (Payment Gateway & Settlements)',
-          category: 'Payment Gateway',
-          balance: 185000,
+          id: 'termii',
+          name: 'Termii (SMS & OTP Messaging Gateway)',
+          category: 'SMS & Communications',
+          balance: 0,
           currency: 'NGN',
-          status: 'healthy',
+          status: 'error',
+          error: e.error?.message,
           allowDeposit: true,
-          allowWithdrawal: true,
-          depositAccount: {
-            bankName: 'Paystack Merchant TopUp',
-            accountNumber: 'Paystack Dashboard',
-            accountName: 'ABUMAFHAL Paystack Merchant',
-            instructions: 'Use Paystack Merchant Dashboard to add funds.'
-          }
+          allowWithdrawal: false
         })
       }
-    } catch (e: any) {
+    } else {
       providerBalances.push({
-        id: 'paystack',
-        name: 'Paystack (Payment Gateway & Settlements)',
-        category: 'Payment Gateway',
-        balance: 185000,
+        id: 'termii',
+        name: 'Termii (SMS & OTP Messaging Gateway)',
+        category: 'SMS & Communications',
+        balance: 0,
         currency: 'NGN',
-        status: 'healthy',
+        status: 'unconfigured',
+        error: 'API Key missing in Vault',
         allowDeposit: true,
-        allowWithdrawal: true
+        allowWithdrawal: false
       })
     }
 
-    // 5. Monnify Disbursement Wallet Balance
+    // 11. Monnify Disbursement Wallet
     if (monnifyApiKey && monnifySecret) {
       try {
         const authStr = btoa(`${monnifyApiKey}:${monnifySecret}`)
@@ -345,13 +602,7 @@ serve(async (req: Request) => {
             latencyMs: latency,
             status: balance > 30000 ? 'healthy' : balance > 3000 ? 'low' : 'critical',
             allowDeposit: true,
-            allowWithdrawal: true,
-            depositAccount: {
-              bankName: 'Wema / Monnify Merchant Account',
-              accountNumber: '7819203912',
-              accountName: 'ABUMAFHAL Monnify Reserve',
-              instructions: 'Monnify merchant funding account.'
-            }
+            allowWithdrawal: true
           })
         }
       } catch (err: any) {
@@ -359,9 +610,10 @@ serve(async (req: Request) => {
           id: 'monnify',
           name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
           category: 'Payment Gateway',
-          balance: 92400,
+          balance: 0,
           currency: 'NGN',
-          status: 'healthy',
+          status: 'error',
+          error: err.error?.message,
           allowDeposit: true,
           allowWithdrawal: true
         })
@@ -371,128 +623,14 @@ serve(async (req: Request) => {
         id: 'monnify',
         name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
         category: 'Payment Gateway',
-        balance: 92400,
+        balance: 0,
         currency: 'NGN',
-        status: 'healthy',
+        status: 'unconfigured',
+        error: 'API Key / Secret missing in Vault',
         allowDeposit: true,
         allowWithdrawal: true
       })
     }
-
-    // 6. Termii SMS Gateway Balance
-    if (termiiKey) {
-      try {
-        const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey}`)
-        const data = await response.json()
-        const balance = Number(data?.balance || 0)
-        providerBalances.push({
-          id: 'termii',
-          name: 'Termii (SMS & OTP Messaging Gateway)',
-          category: 'SMS & Communications',
-          balance: isNaN(balance) ? 0 : balance,
-          currency: data?.currency || 'NGN',
-          latencyMs: latency,
-          status: balance > 2000 ? 'healthy' : balance > 500 ? 'low' : 'critical',
-          allowDeposit: true,
-          allowWithdrawal: false,
-          depositAccount: {
-            bankName: 'Termii Merchant Account',
-            accountNumber: 'Termii Portal',
-            accountName: 'ABUMAFHAL SMS',
-            instructions: 'Top up SMS credits via Termii online merchant portal.'
-          }
-        })
-      } catch (e: any) {
-        providerBalances.push({
-          id: 'termii',
-          name: 'Termii (SMS & OTP Messaging Gateway)',
-          category: 'SMS & Communications',
-          balance: 4500,
-          currency: 'NGN',
-          status: 'healthy',
-          allowDeposit: true,
-          allowWithdrawal: false
-        })
-      }
-    } else {
-      providerBalances.push({
-        id: 'termii',
-        name: 'Termii (SMS & OTP Messaging Gateway)',
-        category: 'SMS & Communications',
-        balance: 4500,
-        currency: 'NGN',
-        status: 'healthy',
-        allowDeposit: true,
-        allowWithdrawal: false
-      })
-    }
-
-    // 7. SMM Provider (Social Media Services API)
-    if (smmApiKey) {
-      try {
-        const { response, latency } = await fetchWithTimeout(`https://smm-provider.com/api/v2?key=${smmApiKey}&action=balance`)
-        const data = await response.json()
-        const balance = Number(data?.balance || 0)
-        providerBalances.push({
-          id: 'smm',
-          name: 'SMM Provider (Social Boost & Services)',
-          category: 'Marketing Services',
-          balance: isNaN(balance) ? 0 : balance,
-          currency: data?.currency || 'USD',
-          latencyMs: latency,
-          status: balance > 20 ? 'healthy' : balance > 5 ? 'low' : 'critical',
-          allowDeposit: true,
-          allowWithdrawal: false,
-          depositAccount: {
-            bankName: 'SMM Panel Crypto / Deposit',
-            accountNumber: 'SMM Dashboard',
-            accountName: 'ABUMAFHAL SMM',
-            instructions: 'Deposit funds to SMM reseller panel dashboard.'
-          }
-        })
-      } catch (e: any) {
-        providerBalances.push({
-          id: 'smm',
-          name: 'SMM Provider (Social Boost & Services)',
-          category: 'Marketing Services',
-          balance: 85,
-          currency: 'USD',
-          status: 'healthy',
-          allowDeposit: true,
-          allowWithdrawal: false
-        })
-      }
-    } else {
-      providerBalances.push({
-        id: 'smm',
-        name: 'SMM Provider (Social Boost & Services)',
-        category: 'Marketing Services',
-        balance: 85,
-        currency: 'USD',
-        status: 'healthy',
-        allowDeposit: true,
-        allowWithdrawal: false
-      })
-    }
-
-    // 8. Clubkonnect VTU API Backup
-    providerBalances.push({
-      id: 'clubkonnect',
-      name: 'Clubkonnect (VTU Backup Provider)',
-      category: 'VTU Telecom',
-      balance: 15400,
-      currency: 'NGN',
-      latencyMs: 190,
-      status: 'healthy',
-      allowDeposit: true,
-      allowWithdrawal: false,
-      depositAccount: {
-        bankName: 'Wema Bank (Clubkonnect)',
-        accountNumber: '9182345678',
-        accountName: 'Clubkonnect Telecom',
-        instructions: 'Transfer to virtual account for Clubkonnect portal.'
-      }
-    })
 
     // Calculate total aggregated balance across NGN providers safely
     const totalAggregatedBalance = providerBalances

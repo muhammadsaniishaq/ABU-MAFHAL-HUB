@@ -91,144 +91,19 @@ export default function LiquidityVaultScreen() {
             }
         } catch (e: any) {
             console.error("Provider Balance Fetch Error", e);
-            // Fallback complete array
+            // Default 11 real providers array with 0.00 balance if unconfigured
             setProviders([
-                {
-                    id: 'agenthub',
-                    name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-                    category: 'Digital Identity & CAC',
-                    balance: 45800,
-                    currency: 'NGN',
-                    latencyMs: 320,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Sterling Bank / Monnify (AgentHub)',
-                        accountNumber: '9081234567',
-                        accountName: 'AgentHub Corporate / ABUMAFHAL',
-                        instructions: 'Transfer to this virtual account to instantly top up your AgentHub balance.'
-                    }
-                },
-                {
-                    id: 'bilalsadasub',
-                    name: 'BilalSadaSub (Data, Airtime, Cable, Bills)',
-                    category: 'VTU Telecom',
-                    balance: 128450,
-                    currency: 'NGN',
-                    latencyMs: 240,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Sterling / Monnify (BilalSadaSub)',
-                        accountNumber: '8910293841',
-                        accountName: 'BilalSadaSub Telecom',
-                        instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
-                    }
-                },
-                {
-                    id: 'bigi',
-                    name: 'Bigi VTU Portal (SME Data & Airtime)',
-                    category: 'VTU Telecom',
-                    balance: 34200,
-                    currency: 'NGN',
-                    latencyMs: 180,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Moniepoint / Wema (Bigi VTU)',
-                        accountNumber: '7082930412',
-                        accountName: 'Bigi Data Services',
-                        instructions: 'Top up virtual account for Bigi VTU API portal.'
-                    }
-                },
-                {
-                    id: 'paystack',
-                    name: 'Paystack (Payment Gateway & Settlements)',
-                    category: 'Payment Gateway',
-                    balance: 185000,
-                    currency: 'NGN',
-                    latencyMs: 140,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: true,
-                    depositAccount: {
-                        bankName: 'Paystack Merchant TopUp',
-                        accountNumber: 'Paystack Dashboard',
-                        accountName: 'ABUMAFHAL Paystack Merchant',
-                        instructions: 'Use Paystack Merchant Dashboard to add funds or auto-settlement.'
-                    }
-                },
-                {
-                    id: 'monnify',
-                    name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
-                    category: 'Payment Gateway',
-                    balance: 92400,
-                    currency: 'NGN',
-                    latencyMs: 160,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: true,
-                    depositAccount: {
-                        bankName: 'Wema / Monnify Merchant Account',
-                        accountNumber: '7819203912',
-                        accountName: 'ABUMAFHAL Monnify Reserve',
-                        instructions: 'Monnify merchant funding account.'
-                    }
-                },
-                {
-                    id: 'termii',
-                    name: 'Termii (SMS & OTP Messaging Gateway)',
-                    category: 'SMS & Communications',
-                    balance: 4500,
-                    currency: 'NGN',
-                    latencyMs: 210,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Termii Merchant Account',
-                        accountNumber: 'Termii Portal',
-                        accountName: 'ABUMAFHAL SMS',
-                        instructions: 'Top up SMS credits via Termii online merchant portal.'
-                    }
-                },
-                {
-                    id: 'smm',
-                    name: 'SMM Provider (Social Boost & Services)',
-                    category: 'Marketing Services',
-                    balance: 85,
-                    currency: 'USD',
-                    latencyMs: 290,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'SMM Panel Crypto / Deposit',
-                        accountNumber: 'SMM Dashboard',
-                        accountName: 'ABUMAFHAL SMM',
-                        instructions: 'Deposit funds to SMM reseller panel dashboard.'
-                    }
-                },
-                {
-                    id: 'clubkonnect',
-                    name: 'Clubkonnect (VTU Backup Provider)',
-                    category: 'VTU Telecom',
-                    balance: 15400,
-                    currency: 'NGN',
-                    latencyMs: 190,
-                    status: 'healthy',
-                    allowDeposit: true,
-                    allowWithdrawal: false,
-                    depositAccount: {
-                        bankName: 'Wema Bank (Clubkonnect)',
-                        accountNumber: '9182345678',
-                        accountName: 'Clubkonnect Telecom',
-                        instructions: 'Transfer to virtual account for Clubkonnect portal.'
-                    }
-                }
+                { id: 'agenthub', name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Key missing in API Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'bilalsadasub', name: 'BilalSadaSub (Data, Airtime, Cable, Bills)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Token missing in API Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'paystack', name: 'Paystack (Payment Gateway & Settlements)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Secret Key missing in API Vault', allowDeposit: true, allowWithdrawal: true },
+                { id: 'clubkonnect', name: 'Clubkonnect / NelloByte API (VTU Telecom)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'idpro', name: 'IDPro (Identity & KYC Verification API)', category: 'Digital Identity & CAC', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'paybessel', name: 'PayBessel (Payment & Payout Gateway)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: true },
+                { id: 'nineboost', name: 'NineBoost (Social Media Marketing SMM Panel)', category: 'Marketing Services', balance: 0, currency: 'USD', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'nowpayments', name: 'NowPayments (Crypto Payment Gateway)', category: 'Payment Gateway', balance: 0, currency: 'USD', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: true },
+                { id: 'bigi', name: 'Bigi VTU Portal (SME Data & Airtime)', category: 'VTU Telecom', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'Token missing in API Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'termii', name: 'Termii (SMS & OTP Messaging Gateway)', category: 'SMS & Communications', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'API Key missing in Vault', allowDeposit: true, allowWithdrawal: false },
+                { id: 'monnify', name: 'Monnify (Dynamic Virtual Accounts & Payouts)', category: 'Payment Gateway', balance: 0, currency: 'NGN', status: 'unconfigured', error: 'API Key / Secret missing in Vault', allowDeposit: true, allowWithdrawal: true }
             ]);
         } finally {
             setLoading(false);
@@ -250,7 +125,21 @@ export default function LiquidityVaultScreen() {
 
         setTokenSaving(true);
         try {
-            const secretKey = tokenKeyName || (selectedTokenProvider?.id === 'agenthub' ? 'AGENTHUB_API_KEY' : selectedTokenProvider?.id === 'bilalsadasub' ? 'BILALSADASUB_TOKEN' : 'BIGI_API_TOKEN');
+            const secretKeyMap: Record<string, string> = {
+                agenthub: 'AGENTHUB_API_KEY',
+                bilalsadasub: 'BILALSADASUB_TOKEN',
+                paystack: 'PAYSTACK_SECRET_KEY',
+                clubkonnect: 'CLUBKONNECT_API_KEY',
+                idpro: 'IDPRO_API_KEY',
+                paybessel: 'PAYBESSEL_API_KEY',
+                nineboost: 'NINEBOOST_API_KEY',
+                nowpayments: 'NOWPAYMENTS_API_KEY',
+                bigi: 'BIGI_API_TOKEN',
+                termii: 'TERMII_API_KEY',
+                monnify: 'MONNIFY_API_KEY'
+            };
+
+            const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
             
             const { error } = await supabase.from('system_secrets').upsert({
                 key: secretKey,
@@ -261,7 +150,7 @@ export default function LiquidityVaultScreen() {
 
             if (error) throw error;
 
-            Alert.alert("Success 🎉", "API Token saved to Vault successfully!");
+            Alert.alert("Success 🎉", `Saved ${secretKey} to Vault successfully!`);
             setSelectedTokenProvider(null);
             setTokenValue('');
             fetchProviderBalances();
@@ -327,7 +216,7 @@ export default function LiquidityVaultScreen() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{
-                title: 'API Wallet & Finance Command Center',
+                title: 'API Wallet & Finance Hub',
                 headerStyle: { backgroundColor: '#0E1A2E' },
                 headerTintColor: '#FFFFFF',
                 headerRight: () => (
@@ -348,7 +237,7 @@ export default function LiquidityVaultScreen() {
                 >
                     <View style={styles.heroTopRow}>
                         <View>
-                            <Text style={styles.heroSubTitle}>TOTAL INTEGRATED API BALANCE</Text>
+                            <Text style={styles.heroSubTitle}>REAL-TIME ACTIVE API AGGREGATE BALANCE</Text>
                             <Text style={styles.heroBalanceText}>
                                 ₦ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
@@ -382,14 +271,14 @@ export default function LiquidityVaultScreen() {
                         <View style={styles.statBadge}>
                             <Ionicons name="flash-outline" size={12} color="#08E4C7" />
                             <Text style={styles.statBadgeText}>
-                                Real-Time Live Sync
+                                Live Vault Sync
                             </Text>
                         </View>
 
                         <View style={styles.statBadge}>
                             <Ionicons name="key" size={12} color="#D9A73A" />
                             <Text style={styles.statBadgeText}>
-                                {providers.length} Connected Vendors
+                                {providers.length} Active Vendors
                             </Text>
                         </View>
                     </View>
@@ -410,7 +299,7 @@ export default function LiquidityVaultScreen() {
                                 styles.filterChipText,
                                 activeFilter === f && styles.filterChipTextActive
                             ]}>
-                                {f === 'All' ? 'All Provider APIs' : f}
+                                {f === 'All' ? 'All 11 Active Providers' : f}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -418,7 +307,7 @@ export default function LiquidityVaultScreen() {
 
                 {/* Section Header */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Connected API Vendor Balances</Text>
+                    <Text style={styles.sectionTitle}>Real API Vendor Balances & Deposit Accounts</Text>
                     <TouchableOpacity onPress={() => router.push('/manage/api')}>
                         <Text style={styles.manageVaultLink}>Manage Vault Credentials →</Text>
                     </TouchableOpacity>
@@ -427,7 +316,7 @@ export default function LiquidityVaultScreen() {
                 {loading ? (
                     <View style={styles.loadingBox}>
                         <ActivityIndicator size="large" color="#0E1A2E" />
-                        <Text style={styles.loadingText}>Connecting to live provider APIs...</Text>
+                        <Text style={styles.loadingText}>Fetching live balances from API Vault providers...</Text>
                     </View>
                 ) : (
                     <View style={styles.providersGrid}>
@@ -505,7 +394,20 @@ export default function LiquidityVaultScreen() {
                                         <TouchableOpacity 
                                             onPress={() => {
                                                 setSelectedTokenProvider(p);
-                                                setTokenKeyName(p.id === 'agenthub' ? 'AGENTHUB_API_KEY' : p.id === 'bilalsadasub' ? 'BILALSADASUB_TOKEN' : p.id === 'bigi' ? 'BIGI_API_TOKEN' : 'PAYSTACK_SECRET_KEY');
+                                                const secretMap: Record<string, string> = {
+                                                    agenthub: 'AGENTHUB_API_KEY',
+                                                    bilalsadasub: 'BILALSADASUB_TOKEN',
+                                                    paystack: 'PAYSTACK_SECRET_KEY',
+                                                    clubkonnect: 'CLUBKONNECT_API_KEY',
+                                                    idpro: 'IDPRO_API_KEY',
+                                                    paybessel: 'PAYBESSEL_API_KEY',
+                                                    nineboost: 'NINEBOOST_API_KEY',
+                                                    nowpayments: 'NOWPAYMENTS_API_KEY',
+                                                    bigi: 'BIGI_API_TOKEN',
+                                                    termii: 'TERMII_API_KEY',
+                                                    monnify: 'MONNIFY_API_KEY'
+                                                };
+                                                setTokenKeyName(secretMap[p.id] || 'GENERIC_API_KEY');
                                             }}
                                             style={[styles.actionBtn, styles.tokenBtn]}
                                             activeOpacity={0.8}

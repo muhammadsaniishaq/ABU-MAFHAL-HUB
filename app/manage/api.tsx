@@ -6,10 +6,21 @@ import { supabase } from '../../services/supabase';
 
 export default function APIVaultScreen() {
     const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect');
+    
+    // 11 Core Active API Provider Credentials
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [bilalToken, setBilalToken] = useState('');
+    const [paystackSecret, setPaystackSecret] = useState('');
+    const [clubkonnectApiKey, setClubkonnectApiKey] = useState('');
+    const [idProApiKey, setIdProApiKey] = useState('');
+    const [payBesselApiKey, setPayBesselApiKey] = useState('');
+    const [nineBoostApiKey, setNineBoostApiKey] = useState('');
+    const [nowPaymentsApiKey, setNowPaymentsApiKey] = useState('');
     const [bigiToken, setBigiToken] = useState('');
     const [bigiPin, setBigiPin] = useState('');
+    const [termiiApiKey, setTermiiApiKey] = useState('');
+    const [monnifyApiKey, setMonnifyApiKey] = useState('');
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -20,23 +31,31 @@ export default function APIVaultScreen() {
     const fetchApiVaultData = async () => {
         try {
             // Fetch vtu_vendor setting
-            const { data: settings } = await supabase.from('app_settings').select('*').eq('key', 'vtu_vendor').single();
+            const { data: settings } = await supabase.from('app_settings').select('*').eq('key', 'vtu_vendor').maybeSingle();
             if (settings) {
                 setVtuVendor(settings.value || 'bilalsadasub,bigi,clubkonnect');
             }
 
-            // Fetch secrets
+            // Fetch all system secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
                 secrets.forEach((s) => {
                     if (s.key === 'AGENTHUB_API_KEY') setAgentHubApiKey(s.value);
                     if (s.key === 'BILALSADASUB_TOKEN') setBilalToken(s.value);
+                    if (s.key === 'PAYSTACK_SECRET_KEY') setPaystackSecret(s.value);
+                    if (s.key === 'CLUBKONNECT_API_KEY') setClubkonnectApiKey(s.value);
+                    if (s.key === 'IDPRO_API_KEY') setIdProApiKey(s.value);
+                    if (s.key === 'PAYBESSEL_API_KEY') setPayBesselApiKey(s.value);
+                    if (s.key === 'NINEBOOST_API_KEY') setNineBoostApiKey(s.value);
+                    if (s.key === 'NOWPAYMENTS_API_KEY') setNowPaymentsApiKey(s.value);
                     if (s.key === 'BIGI_API_TOKEN') setBigiToken(s.value);
                     if (s.key === 'BIGI_API_PIN') setBigiPin(s.value);
+                    if (s.key === 'TERMII_API_KEY') setTermiiApiKey(s.value);
+                    if (s.key === 'MONNIFY_API_KEY') setMonnifyApiKey(s.value);
                 });
             }
         } catch (e: any) {
-            console.error(e);
+            console.error("API Vault Load Error:", e);
         } finally {
             setLoading(false);
         }
@@ -73,12 +92,20 @@ export default function APIVaultScreen() {
                 updated_at: new Date().toISOString()
             });
 
-            // Save secrets
+            // Secrets payload
             const secretsToSave = [
                 { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng for NIN/BVN & Slips)' },
                 { key: 'BILALSADASUB_TOKEN', value: bilalToken, description: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)' },
+                { key: 'PAYSTACK_SECRET_KEY', value: paystackSecret, description: 'Paystack Secret Key for Payments & Transfers' },
+                { key: 'CLUBKONNECT_API_KEY', value: clubkonnectApiKey, description: 'ClubKonnect API Key for Telecom & Bills' },
+                { key: 'IDPRO_API_KEY', value: idProApiKey, description: 'IDPro API Key for Identity Verification' },
+                { key: 'PAYBESSEL_API_KEY', value: payBesselApiKey, description: 'PayBessel API Key for Payment Gateway' },
+                { key: 'NINEBOOST_API_KEY', value: nineBoostApiKey, description: 'NineBoost API Key for Social Media Services' },
+                { key: 'NOWPAYMENTS_API_KEY', value: nowPaymentsApiKey, description: 'NowPayments API Key for Crypto' },
                 { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigi API Token for VTU Services' },
-                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' }
+                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' },
+                { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key for SMS Gateway' },
+                { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key for Virtual Accounts' }
             ];
 
             for (const sec of secretsToSave) {
@@ -92,7 +119,7 @@ export default function APIVaultScreen() {
                 }
             }
 
-            Alert.alert("Success", "API Vault credentials & Multi-API settings saved successfully!");
+            Alert.alert("Success 🎉", "All 11 Active API Vault credentials saved successfully!");
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to save API Vault settings");
         } finally {
@@ -103,8 +130,8 @@ export default function APIVaultScreen() {
     if (loading) {
         return (
             <View className="flex-1 bg-slate-900 justify-center items-center">
-                <ActivityIndicator color="#3b82f6" size="large" />
-                <Text className="text-slate-400 mt-3 text-xs">Loading API Vault...</Text>
+                <ActivityIndicator color="#08E4C7" size="large" />
+                <Text className="text-slate-400 mt-3 text-xs font-semibold">Loading Active API Vault Credentials...</Text>
             </View>
         );
     }
@@ -112,7 +139,7 @@ export default function APIVaultScreen() {
     return (
         <ScrollView className="flex-1 bg-slate-950 p-4">
             <Stack.Screen options={{
-                title: 'API Vault & Multi-Routing',
+                title: 'API Vault & Active Providers Hub',
                 headerStyle: { backgroundColor: '#0F172A' },
                 headerTintColor: '#fff'
             }} />
@@ -121,8 +148,8 @@ export default function APIVaultScreen() {
             <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6">
                 <View className="flex-row items-center justify-between mb-2">
                     <View className="flex-row items-center gap-2">
-                        <Ionicons name="key" size={20} color="#3b82f6" />
-                        <Text className="text-white font-extrabold text-base">API Vault & Provider Routing</Text>
+                        <Ionicons name="key" size={20} color="#08E4C7" />
+                        <Text className="text-white font-extrabold text-base">API Vault & Provider Keys Hub</Text>
                     </View>
                     <TouchableOpacity 
                         onPress={() => router.push('/manage/liquidity')}
@@ -133,22 +160,22 @@ export default function APIVaultScreen() {
                     </TouchableOpacity>
                 </View>
                 <Text className="text-slate-400 text-xs leading-5">
-                    Manage AgentHub, Bilalsadasub, Bigi, and ClubKonnect API credentials. Select multiple active APIs for automatic failover.
+                    Manage real API credentials for AgentHub, BilalSadaSub, Paystack, Clubkonnect, IDPro, PayBessel, NineBoost, NowPayments, Bigi, Termii, and Monnify.
                 </Text>
             </View>
 
-            {/* 1. Multi-API Vendor Selection */}
+            {/* Multi-API Failover Selector */}
             <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
-                <Text className="text-blue-400 font-extrabold text-sm mb-1">⚡ Multi-API Provider Selection (Zabi API Biyu ko Ukku)</Text>
+                <Text className="text-teal-400 font-extrabold text-sm mb-1">⚡ Multi-API Active Failover Selection</Text>
                 <Text className="text-slate-400 text-xs mb-4">
-                    Check all APIs you want active. Your system will automatically route and failover between checked APIs for 99.9% uptime!
+                    Check all APIs active for automatic failover and load-balancing:
                 </Text>
 
                 <View className="gap-3">
                     {[
-                        { id: 'bilalsadasub', name: 'Bilalsadasub API (bilalsadasub.com)', desc: 'Data, Airtime, Cable, Bills & Telecom' },
-                        { id: 'bigi', name: 'Bigi API (bigisub.ng)', desc: 'SME & Gifting Data Provider' },
-                        { id: 'clubkonnect', name: 'ClubKonnect API (nellobytesystems.com)', desc: 'Fallback VTU & Bill Payments' }
+                        { id: 'bilalsadasub', name: 'BilalSadaSub API (bilalsadasub.com)', desc: 'Data, Airtime, Cable, Bills & Telecom' },
+                        { id: 'bigi', name: 'Bigi VTU API (bigidata.com)', desc: 'SME & Gifting Data Provider' },
+                        { id: 'clubkonnect', name: 'Clubkonnect API (nellobytesystems.com)', desc: 'Telecom & Utility Payments' }
                     ].map((item) => {
                         const checked = isVendorSelected(item.id);
                         return (
@@ -176,73 +203,154 @@ export default function APIVaultScreen() {
                 </View>
             </View>
 
-            {/* 2. Identity Verification API (AgentHub) */}
-            <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
-                <View className="flex-row items-center gap-2 mb-2">
-                    <Ionicons name="finger-print" size={18} color="#10b981" />
-                    <Text className="text-emerald-400 font-extrabold text-sm">🆔 AgentHub Identity API (agenthub.ng)</Text>
-                </View>
-                <Text className="text-slate-400 text-xs mb-3">
-                    Used for NIN Verification, BVN Lookup, and VNIN Slip Generation.
-                </Text>
-                
-                <Text className="text-slate-300 font-bold text-xs mb-1">AgentHub API Key (Bearer Token)</Text>
+            {/* 1. AgentHub API */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-emerald-400 font-extrabold text-xs mb-1">🆔 AgentHub API Key (agenthub.ng for NIN / BVN / CAC / TAX)</Text>
                 <TextInput
                     value={agentHubApiKey}
                     onChangeText={setAgentHubApiKey}
                     placeholder="Enter AgentHub API Key..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
                 />
             </View>
 
-            {/* 3. Bilalsadasub Telecom API */}
-            <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
-                <View className="flex-row items-center gap-2 mb-2">
-                    <Ionicons name="phone-portrait" size={18} color="#f59e0b" />
-                    <Text className="text-amber-400 font-extrabold text-sm">📶 Bilalsadasub Telecom API (bilalsadasub.com)</Text>
-                </View>
-                <Text className="text-slate-400 text-xs mb-3">
-                    Used for automated Airtime, Data, and VTU recharges.
-                </Text>
-
-                <Text className="text-slate-300 font-bold text-xs mb-1">Bilalsadasub API Token</Text>
+            {/* 2. BilalSadaSub API */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-amber-400 font-extrabold text-xs mb-1">📶 BilalSadaSub API Token (bilalsadasub.com for Telecom)</Text>
                 <TextInput
                     value={bilalToken}
                     onChangeText={setBilalToken}
-                    placeholder="Enter Bilalsadasub API Token..."
+                    placeholder="Enter BilalSadaSub API Token..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
                 />
             </View>
 
-            {/* 4. Bigi API Credentials */}
-            <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
-                <View className="flex-row items-center gap-2 mb-2">
-                    <Ionicons name="flash" size={18} color="#ec4899" />
-                    <Text className="text-pink-400 font-extrabold text-sm">⚡ Bigi API Credentials (bigisub.ng)</Text>
-                </View>
+            {/* 3. Paystack Secret Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-blue-400 font-extrabold text-xs mb-1">💳 Paystack Secret Key (sk_live_... for Merchant Settlements)</Text>
+                <TextInput
+                    value={paystackSecret}
+                    onChangeText={setPaystackSecret}
+                    placeholder="Enter Paystack Secret Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
 
-                <Text className="text-slate-300 font-bold text-xs mb-1">Bigi API Token</Text>
+            {/* 4. Clubkonnect API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-indigo-400 font-extrabold text-xs mb-1">🔌 Clubkonnect / NelloByte API Key</Text>
+                <TextInput
+                    value={clubkonnectApiKey}
+                    onChangeText={setClubkonnectApiKey}
+                    placeholder="Enter Clubkonnect API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 5. IDPro API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-purple-400 font-extrabold text-xs mb-1">🛡️ IDPro Verification API Key</Text>
+                <TextInput
+                    value={idProApiKey}
+                    onChangeText={setIdProApiKey}
+                    placeholder="Enter IDPro API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 6. PayBessel API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-cyan-400 font-extrabold text-xs mb-1">🏦 PayBessel Payment API Key</Text>
+                <TextInput
+                    value={payBesselApiKey}
+                    onChangeText={setPayBesselApiKey}
+                    placeholder="Enter PayBessel API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 7. NineBoost API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-pink-400 font-extrabold text-xs mb-1">🚀 NineBoost SMM Panel API Key</Text>
+                <TextInput
+                    value={nineBoostApiKey}
+                    onChangeText={setNineBoostApiKey}
+                    placeholder="Enter NineBoost API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 8. NowPayments Crypto API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-yellow-400 font-extrabold text-xs mb-1">🪙 NowPayments Crypto Gateway Key</Text>
+                <TextInput
+                    value={nowPaymentsApiKey}
+                    onChangeText={setNowPaymentsApiKey}
+                    placeholder="Enter NowPayments API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 9. Bigi API */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-pink-400 font-extrabold text-xs mb-1">⚡ Bigi VTU Token & Transaction PIN</Text>
                 <TextInput
                     value={bigiToken}
                     onChangeText={setBigiToken}
                     placeholder="Enter Bigi Token..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-3"
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
                 />
-
-                <Text className="text-slate-300 font-bold text-xs mb-1">Bigi Transaction PIN</Text>
                 <TextInput
                     value={bigiPin}
                     onChangeText={setBigiPin}
                     placeholder="Enter 4-digit PIN..."
                     placeholderTextColor="#64748b"
-                    secureTextEntry
                     keyboardType="number-pad"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 10. Termii SMS API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-orange-400 font-extrabold text-xs mb-1">📩 Termii SMS & OTP API Key</Text>
+                <TextInput
+                    value={termiiApiKey}
+                    onChangeText={setTermiiApiKey}
+                    placeholder="Enter Termii API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* 11. Monnify API Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6">
+                <Text className="text-teal-400 font-extrabold text-xs mb-1">🏛️ Monnify Merchant API Key</Text>
+                <TextInput
+                    value={monnifyApiKey}
+                    onChangeText={setMonnifyApiKey}
+                    placeholder="Enter Monnify API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
                 />
             </View>
@@ -251,7 +359,7 @@ export default function APIVaultScreen() {
             <TouchableOpacity
                 onPress={handleSaveVault}
                 disabled={saving}
-                className="bg-blue-600 p-4 rounded-xl items-center justify-center flex-row gap-2 mb-10"
+                className="bg-teal-600 p-4 rounded-xl items-center justify-center flex-row gap-2 mb-10"
                 activeOpacity={0.8}
             >
                 {saving ? (
@@ -259,7 +367,7 @@ export default function APIVaultScreen() {
                 ) : (
                     <>
                         <Ionicons name="checkmark-circle" size={20} color="white" />
-                        <Text className="text-white font-extrabold text-sm">Save All API Vault Settings</Text>
+                        <Text className="text-white font-extrabold text-sm">Save All 11 API Vault Credentials</Text>
                     </>
                 )}
             </TouchableOpacity>
