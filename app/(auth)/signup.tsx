@@ -304,9 +304,9 @@ export default function SignupScreen() {
                         {/* Centered Form Card Wrapper */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* Compact 3D Game Cartoon Mascot */}
+                            {/* Compact 3D Male Cartoon Mascot */}
                             <View style={styles.mascotContainer}>
-                                <Mascot3D size={85} mode="waving" isDarkMode={isDark} />
+                                <Mascot3D size={85} greetingText="Welcome to ABUMAFHAL! ✨" isDarkMode={isDark} />
                             </View>
 
                             {/* Headline */}

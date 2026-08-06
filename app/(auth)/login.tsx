@@ -332,9 +332,9 @@ export default function LoginScreen() {
                         {/* Centered Single-Screen Locked Card */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* Compact 3D Game Cartoon Mascot */}
+                            {/* Compact 3D Male Cartoon Mascot */}
                             <View style={styles.mascotContainer}>
-                                <Mascot3D size={95} mode="waving" isDarkMode={isDark} />
+                                <Mascot3D size={95} greetingText="Welcome Back! 👋" isDarkMode={isDark} />
                             </View>
 
                             {/* Welcome Headline */}
