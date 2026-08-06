@@ -10,9 +10,9 @@ import { verificationHistory } from '../../../services/verificationHistory';
 import * as Clipboard from 'expo-clipboard';
 
 const MODIFICATION_SERVICES = [
-    { id: 'nin_mod_name', name: 'Change of Name', code: '501', fee: 6000 },
-    { id: 'nin_mod_phone', name: 'Change of Phone Number', code: '502', fee: 6000 },
-    { id: 'nin_mod_address', name: 'Change of Address', code: '503', fee: 6000 },
+    { id: 'nin_mod_name', name: 'Change of Name', code: '501', fee: 6000, icon: 'person-outline' },
+    { id: 'nin_mod_phone', name: 'Change of Phone', code: '502', fee: 6000, icon: 'call-outline' },
+    { id: 'nin_mod_address', name: 'Change of Address', code: '503', fee: 6000, icon: 'location-outline' },
 ];
 
 export default function NINModificationScreen() {
@@ -129,6 +129,17 @@ export default function NINModificationScreen() {
         }
     };
 
+    const handleClearForm = () => {
+        setTargetNin('');
+        setCurrentPhone('');
+        setCurrentFullName('');
+        setNewFirstName('');
+        setNewSurname('');
+        setNewMiddleName('');
+        setNewPhoneToLink('');
+        setNewAddress('');
+    };
+
     const handleFormSubmit = () => {
         if (!termsAccepted) {
             setShowTermsModal(true);
@@ -240,30 +251,30 @@ export default function NINModificationScreen() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ 
-                title: 'NIN Modification', 
+                title: 'NIN Modification Hub', 
                 headerStyle: { backgroundColor: '#060d21' }, 
                 headerTintColor: '#f5a623', 
                 headerShadowVisible: false,
                 headerRight: () => (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <TouchableOpacity onPress={() => setShowTermsModal(true)} style={{ padding: 4 }}>
-                            <Ionicons name="document-text-outline" size={20} color="#f5a623" />
+                        <TouchableOpacity onPress={() => setShowTermsModal(true)} style={styles.navHeaderBtn}>
+                            <Ionicons name="shield-checkmark" size={18} color="#f5a623" />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={{ padding: 4, marginRight: 2 }}>
-                            <Ionicons name="time-outline" size={20} color="#f5a623" />
+                        <TouchableOpacity onPress={() => router.push('/nin-services/history')} style={styles.navHeaderBtn}>
+                            <Ionicons name="time-outline" size={18} color="#f5a623" />
                         </TouchableOpacity>
                     </View>
                 )
             }} />
             <StatusBar style="light" />
 
-            {/* Ultra-Clean & Compact Terms of Agreement Modal */}
+            {/* Ultra-Clean Compact Navy & Gold Terms of Agreement Modal */}
             <Modal transparent visible={showTermsModal} animationType="fade" onRequestClose={() => setShowTermsModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.termsModalCard}>
                         
                         {/* Compact Header Banner */}
-                        <LinearGradient colors={['#060d21', '#0d1b3e']} style={styles.termsHeaderGradient}>
+                        <LinearGradient colors={['#060d21', '#0f1b3d']} style={styles.termsHeaderGradient}>
                             <View style={styles.warningIconBg}>
                                 <Ionicons name="warning" size={20} color="#f5a623" />
                             </View>
@@ -455,31 +466,56 @@ export default function NINModificationScreen() {
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 50 }}>
                         
-                        {/* Compact Header Banner */}
-                        <LinearGradient colors={['#060d21', '#0d1b3e']} style={{ paddingTop: insets.top > 0 ? insets.top + 6 : 14, paddingBottom: 16, paddingHorizontal: 16 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', maxWidth: 460, alignSelf: 'center', width: '100%' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="create-outline" size={20} color="#f5a623" />
-                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16, marginLeft: 6 }}>NIN Modification</Text>
-                                </View>
-                                {userBalance !== null && (
-                                    <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.12)', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.25)' }}>
-                                        <Text style={{ color: '#f5a623', fontWeight: '800', fontSize: 11 }}>₦{userBalance.toLocaleString()}</Text>
+                        {/* Header Banner - Ultra Modern Navy & Gold */}
+                        <LinearGradient colors={['#060d21', '#0c183a', '#10224d']} style={{ paddingTop: insets.top > 0 ? insets.top + 6 : 14, paddingBottom: 18, paddingHorizontal: 16 }}>
+                            <View style={{ maxWidth: 460, alignSelf: 'center', width: '100%' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(245, 166, 35, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.3)', marginRight: 8 }}>
+                                            <Ionicons name="create-outline" size={18} color="#f5a623" />
+                                        </View>
+                                        <View>
+                                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>NIN Modification Hub</Text>
+                                            <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '600' }}>Direct NIMC Record Update</Text>
+                                        </View>
                                     </View>
-                                )}
+                                    {userBalance !== null && (
+                                        <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.35)' }}>
+                                            <Text style={{ color: '#f5a623', fontWeight: '800', fontSize: 11 }}>₦{userBalance.toLocaleString()}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Step Tracker Bar */}
+                                <View style={styles.stepProgressRow}>
+                                    <View style={styles.stepItem}>
+                                        <View style={[styles.stepDot, styles.stepDotActive]}><Text style={styles.stepDotNum}>1</Text></View>
+                                        <Text style={[styles.stepText, styles.stepTextActive]}>Select Type</Text>
+                                    </View>
+                                    <View style={styles.stepLineActive} />
+                                    <View style={styles.stepItem}>
+                                        <View style={[styles.stepDot, targetNin.length === 11 && styles.stepDotActive]}><Text style={styles.stepDotNum}>2</Text></View>
+                                        <Text style={[styles.stepText, targetNin.length === 11 && styles.stepTextActive]}>Fill Details</Text>
+                                    </View>
+                                    <View style={styles.stepLine} />
+                                    <View style={styles.stepItem}>
+                                        <View style={styles.stepDot}><Text style={styles.stepDotNum}>3</Text></View>
+                                        <Text style={styles.stepText}>Submit</Text>
+                                    </View>
+                                </View>
                             </View>
                         </LinearGradient>
 
-                        <View style={{ paddingHorizontal: 14, marginTop: 12, maxWidth: 460, width: '100%', alignSelf: 'center' }}>
+                        <View style={{ paddingHorizontal: 14, marginTop: 10, maxWidth: 460, width: '100%', alignSelf: 'center' }}>
                             
-                            {/* Sleek Terms Banner Box */}
+                            {/* Terms Badge Bar */}
                             <TouchableOpacity 
                                 onPress={() => setShowTermsModal(true)} 
                                 style={styles.termsBannerBox}
                                 activeOpacity={0.8}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                    <Ionicons name="shield-checkmark" size={16} color="#d97706" style={{ marginRight: 6 }} />
+                                    <Ionicons name="shield-checkmark" size={15} color="#d97706" style={{ marginRight: 6 }} />
                                     <Text style={{ color: '#78350f', fontWeight: '700', fontSize: 11 }}>
                                         {termsAccepted ? 'Terms Accepted ✓' : 'Terms of Agreement Required'}
                                     </Text>
@@ -488,9 +524,17 @@ export default function NINModificationScreen() {
                             </TouchableOpacity>
 
                             {/* Selector Header Bar */}
-                            <Text style={{ color: '#334155', fontWeight: '700', fontSize: 12, marginBottom: 8, marginTop: 2 }}>
-                                What would you like to modify?
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, marginTop: 2 }}>
+                                <Text style={{ color: '#334155', fontWeight: '700', fontSize: 11.5 }}>
+                                    Select Modification Type
+                                </Text>
+                                {(targetNin || newFirstName || newPhoneToLink || newAddress) ? (
+                                    <TouchableOpacity onPress={handleClearForm} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Ionicons name="refresh-outline" size={12} color="#64748b" style={{ marginRight: 2 }} />
+                                        <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600' }}>Clear Form</Text>
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
 
                             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                                 {servicesList.map((serv) => {
@@ -505,12 +549,10 @@ export default function NINModificationScreen() {
                                             ]}
                                             activeOpacity={0.8}
                                         >
+                                            <Ionicons name={serv.icon as any} size={13} color={isSel ? '#f5a623' : '#64748b'} style={{ marginRight: 4 }} />
                                             <Text style={[styles.selectorTabText, isSel && styles.selectorTabTextActive]} numberOfLines={1}>
                                                 {serv.name}
                                             </Text>
-                                            {isSel && (
-                                                <Ionicons name="checkmark-circle" size={13} color="#f5a623" style={{ marginLeft: 3 }} />
-                                            )}
                                         </TouchableOpacity>
                                     );
                                 })}
@@ -520,8 +562,15 @@ export default function NINModificationScreen() {
                             <View style={styles.mainFormCard}>
                                 
                                 {/* Target NIN */}
-                                <Text style={styles.fieldLabel}>Target NIN</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, marginTop: 4 }}>
+                                    <Text style={styles.fieldLabel}>Target NIN</Text>
+                                    <Text style={{ fontSize: 9.5, fontWeight: '700', color: targetNin.length === 11 ? '#059669' : '#94a3b8' }}>
+                                        {targetNin.length}/11 Digits {targetNin.length === 11 ? '✓' : ''}
+                                    </Text>
+                                </View>
+
                                 <View style={styles.fieldInputBox}>
+                                    <Ionicons name="card-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
                                     <TextInput 
                                         style={styles.fieldTextInput}
                                         placeholder="11-digit NIN"
@@ -543,6 +592,7 @@ export default function NINModificationScreen() {
                                     <>
                                         <Text style={styles.fieldLabel}>Current Phone Number linked to NIN</Text>
                                         <View style={styles.fieldInputBox}>
+                                            <Ionicons name="call-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
                                             <TextInput 
                                                 style={styles.fieldTextInput} 
                                                 placeholder="08012345678" 
@@ -581,6 +631,7 @@ export default function NINModificationScreen() {
                                     <>
                                         <Text style={styles.fieldLabel}>Current Full Name on NIN</Text>
                                         <View style={styles.fieldInputBox}>
+                                            <Ionicons name="person-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
                                             <TextInput 
                                                 style={styles.fieldTextInput} 
                                                 placeholder="First Last" 
@@ -592,6 +643,7 @@ export default function NINModificationScreen() {
 
                                         <Text style={styles.fieldLabel}>New Phone Number to Link</Text>
                                         <View style={styles.fieldInputBox}>
+                                            <Ionicons name="phone-portrait-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
                                             <TextInput 
                                                 style={styles.fieldTextInput} 
                                                 placeholder="08012345678" 
@@ -624,15 +676,18 @@ export default function NINModificationScreen() {
                                         </View>
 
                                         <Text style={styles.fieldLabel}>New Address</Text>
-                                        <View style={[styles.fieldInputBox, { height: 60, alignItems: 'flex-start', paddingTop: 8 }]}>
+                                        <View style={[styles.fieldInputBox, { height: 58, alignItems: 'flex-start', paddingTop: 8 }]}>
                                             <TextInput style={[styles.fieldTextInput, { textAlignVertical: 'top' }]} placeholder="Full new residential address" placeholderTextColor="#94a3b8" multiline numberOfLines={2} value={newAddress} onChangeText={setNewAddress} />
                                         </View>
                                     </>
                                 )}
 
-                                {/* Fee Container */}
+                                {/* Modern Fee Container */}
                                 <View style={styles.feeCardBox}>
-                                    <Text style={{ color: '#334155', fontWeight: '700', fontSize: 12 }}>Modification Fee</Text>
+                                    <View>
+                                        <Text style={{ color: '#334155', fontWeight: '700', fontSize: 11 }}>Modification Fee</Text>
+                                        <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '500' }}>⚡ Fast-Track Admin Review (12-24h)</Text>
+                                    </View>
                                     <Text style={{ color: '#d97706', fontWeight: '800', fontSize: 18 }}>₦{(activeService.fee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </View>
 
@@ -641,10 +696,13 @@ export default function NINModificationScreen() {
                                     onPress={handleFormSubmit}
                                     disabled={loading}
                                     style={styles.submitBtn}
-                                    activeOpacity={0.8}
+                                    activeOpacity={0.85}
                                 >
                                     {loading ? <ActivityIndicator color="#f5a623" size="small" /> : (
-                                        <Text style={styles.submitBtnText}>Submit Modification Request</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="send" size={15} color="#f5a623" style={{ marginRight: 6 }} />
+                                            <Text style={styles.submitBtnText}>Submit Modification Request</Text>
+                                        </View>
                                     )}
                                 </TouchableOpacity>
                             </View>
@@ -700,6 +758,67 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8fafc',
     },
+    navHeaderBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(245, 166, 35, 0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 166, 35, 0.3)',
+    },
+    stepProgressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    stepItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    stepDot: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 4,
+    },
+    stepDotActive: {
+        backgroundColor: '#f5a623',
+    },
+    stepDotNum: {
+        color: '#060d21',
+        fontWeight: '900',
+        fontSize: 9.5,
+    },
+    stepText: {
+        color: '#94a3b8',
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    stepTextActive: {
+        color: '#ffffff',
+        fontWeight: '700',
+    },
+    stepLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        marginHorizontal: 6,
+    },
+    stepLineActive: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#f5a623',
+        marginHorizontal: 6,
+    },
     termsBannerBox: {
         backgroundColor: '#fffbeb',
         borderRadius: 10,
@@ -721,7 +840,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#cbd5e1',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         flexDirection: 'row',
     },
     selectorTabActive: {
@@ -755,7 +874,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         fontSize: 11,
         marginBottom: 4,
-        marginTop: 8,
+        marginTop: 6,
     },
     fieldInputBox: {
         backgroundColor: '#ffffff',
@@ -793,7 +912,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justify: 'space-between',
         marginTop: 12,
         marginBottom: 12,
     },
@@ -802,7 +921,7 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 10,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         shadowColor: '#060d21',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
@@ -828,7 +947,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: '#060d21',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     viewHistoryBtn: {
         backgroundColor: '#f8fafc',
@@ -839,7 +958,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         alignSelf: 'flex-start',
         marginTop: 8,
     },
@@ -862,7 +981,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(6, 13, 33, 0.8)',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         padding: 14,
     },
     termsModalCard: {
@@ -894,7 +1013,7 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         backgroundColor: 'rgba(245, 166, 35, 0.12)',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         borderWidth: 1,
         borderColor: 'rgba(245, 166, 35, 0.3)',
     },
@@ -916,7 +1035,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     termsScroll: {
         flex: 1,
@@ -936,7 +1055,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: '#060d21',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         marginTop: 1,
     },
     termNumBadgeText: {
@@ -1012,7 +1131,7 @@ const styles = StyleSheet.create({
         height: 52,
         borderRadius: 26,
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
         marginBottom: 12,
     },
     alertTitle: {
@@ -1036,7 +1155,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
+        justify: 'center',
     },
     alertButtonText: {
         color: '#f5a623',
