@@ -123,18 +123,29 @@ export default function ManageDataPlans() {
     const handleSync = async (vendorToSync: string = 'all') => {
         setSyncing(true);
         try {
+            const targetVendor = vendorToSync === 'all' ? (activeVendor || 'bilalsadasub') : vendorToSync;
             const { data, error } = await supabase.functions.invoke('sync-plans', {
-                body: { vendor: vendorToSync }
+                body: { vendor: targetVendor }
             });
-            if (error) throw error;
-            if (data && data.success === false) {
-                 throw new Error(data.error || 'Sync Failed');
+
+            if (error) {
+                Alert.alert('Sync Error ⚠️', `Could not invoke sync function: ${error.message}`);
+                return;
             }
-            Alert.alert('Sync Complete', data.message || 'Data plans synced successfully!');
-            fetchPlans();
+
+            if (data && data.success === false) {
+                Alert.alert('Sync Failed ⚠️', data.error || 'Failed to sync data plans from API');
+                return;
+            }
+
+            const message = data?.message || `Data plans synced successfully for ${targetVendor.toUpperCase()}!`;
+            Alert.alert('Sync Complete ✅', message, [
+                { text: 'OK', onPress: () => fetchPlans() }
+            ]);
+            await fetchPlans();
         } catch (err: any) {
-            Alert.alert('Sync Status', err.message || 'Sync completed with updates');
-            fetchPlans();
+            console.error('Sync Error:', err);
+            Alert.alert('Sync Exception ⚠️', err.message || 'An error occurred while syncing data plans.');
         } finally {
             setSyncing(false);
         }
