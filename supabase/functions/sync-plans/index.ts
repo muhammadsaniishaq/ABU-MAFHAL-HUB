@@ -90,14 +90,14 @@ Deno.serve(async (req) => {
             });
         } catch (_) {}
 
-        // Parse Request Body for Target Vendor (e.g. 'clubkonnect', 'bigi', 'bilalsadasub', 'vital', or 'all')
+        // Parse Request Body for Target Vendor (e.g. 'clubkonnect', 'bigi', 'bilalsadasub', or 'all')
         const reqData = await req.json().catch(() => ({}));
         
         let targetVendors: string[] = [];
         if (reqData.vendor && reqData.vendor !== 'all') {
             targetVendors = [reqData.vendor.toLowerCase()];
         } else if (reqData.vendor === 'all') {
-            targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub', 'vital'];
+            targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub'];
         } else {
             const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             const activeVendor = vendorSetting?.value || 'clubkonnect';
@@ -114,9 +114,9 @@ Deno.serve(async (req) => {
         for (const vendor of targetVendors) {
             let networksData: any = {};
 
-            if (vendor === 'bilalsadasub' || vendor === 'vital') {
-                // BilalSadaSub & Vital Sub share identical MSORG API architecture
-                const bilalNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2'];
+            if (vendor === 'bilalsadasub') {
+                // BilalSadaSub API supports MTN, AIRTEL, GLO, T2 (9mobile), and VITEL (Vital Network)
+                const bilalNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2', 'VITEL'];
                 for (const net of bilalNetworks) {
                     try {
                         const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${net}`);
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
                             networksData[net] = plansList.map((p: any) => ({
                                 PRODUCT_ID: (p.plan_id || p.id).toString(),
                                 PRODUCT_AMOUNT: (p.amount || 0).toString(),
-                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'} [${vendor.toUpperCase()}]`,
+                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'} [BILAL]`,
                                 validity: p.plan_day || '30 days',
                                 volume: p.plan_name || ''
                             }));
@@ -188,6 +188,7 @@ Deno.serve(async (req) => {
                 if (networkName.includes('mtn')) networkName = 'mtn';
                 else if (networkName.includes('glo')) networkName = 'glo';
                 else if (networkName.includes('airtel')) networkName = 'airtel';
+                else if (networkName.includes('vitel') || networkName.includes('vital')) networkName = 'vitel';
                 else if (networkName.includes('mobile') || networkName.includes('etisalat') || networkName.includes('t2')) networkName = '9mobile';
 
                 if (!Array.isArray(plans)) continue;
@@ -245,12 +246,9 @@ Deno.serve(async (req) => {
                             name: name,
                             cost_price: costPrice,
                             selling_price: finalSellingPrice,
-                            is_active: true
+                            is_active: true,
+                            api_vendor: vendor
                         };
-
-                        try {
-                            recordData.api_vendor = vendor;
-                        } catch (_) {}
 
                         if (existingPlan) {
                             const { error } = await supabaseAdmin.from('data_plans')
@@ -261,6 +259,22 @@ Deno.serve(async (req) => {
                             const { error } = await supabaseAdmin.from('data_plans')
                                 .insert(recordData);
                             opError = error;
+                        }
+
+                        // Automatic Fallback if api_vendor column is missing in PostgreSQL data_plans table
+                        if (opError && (opError.code === '42703' || (opError.message && opError.message.includes('api_vendor')))) {
+                            const fallbackData = { ...recordData };
+                            delete fallbackData.api_vendor;
+                            if (existingPlan) {
+                                const { error: fErr } = await supabaseAdmin.from('data_plans')
+                                    .update(fallbackData)
+                                    .eq('id', existingPlan.id);
+                                opError = fErr;
+                            } else {
+                                const { error: fErr } = await supabaseAdmin.from('data_plans')
+                                    .insert(fallbackData);
+                                opError = fErr;
+                            }
                         }
 
                         if (!opError) {

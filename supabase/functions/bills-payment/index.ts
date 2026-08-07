@@ -229,7 +229,7 @@ Deno.serve(async (req: Request) => {
         let result: any;
         try {
             if (type === 'get_plans') {
-                if (vtuVendor === 'bilalsadasub' || vtuVendor === 'vital') {
+                if (vtuVendor === 'bilalsadasub') {
                     const netName = (data.network || 'MTN').toString().toUpperCase();
                     const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${netName}`);
                     const plansData = await res.json();
@@ -272,22 +272,19 @@ Deno.serve(async (req: Request) => {
                 if (vtuVendor && vtuVendor.includes(',')) {
                     vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
                 } else if (vtuVendor === 'bigi') {
-                    vendorOrder = ['bigi', 'bilalsadasub', 'vital', 'clubkonnect'];
+                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
                 } else if (vtuVendor === 'clubkonnect') {
-                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'vital', 'bigi'];
-                } else if (vtuVendor === 'vital') {
-                    vendorOrder = ['vital', 'bilalsadasub', 'bigi', 'clubkonnect'];
+                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
                 } else {
-                    vendorOrder = ['bilalsadasub', 'vital', 'bigi', 'clubkonnect'];
+                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
                 }
 
                 let lastError: any = null;
                 for (const vendor of vendorOrder) {
                     try {
                         console.log(`[Bills] Trying VTU Vendor: ${vendor}`);
-                        if ((vendor === 'bilalsadasub' || vendor === 'vital') && (bilalToken || vitalToken)) {
-                            const activeToken = (vendor === 'vital' ? vitalToken : bilalToken) || bilalToken || '';
-                            const bilalClient = new BilalsadasubClient(activeToken);
+                        if (vendor === 'bilalsadasub' && bilalToken) {
+                            const bilalClient = new BilalsadasubClient(bilalToken);
                             if (type === 'airtime') {
                                 result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
@@ -298,7 +295,7 @@ Deno.serve(async (req: Request) => {
                             if (type === 'airtime') {
                                 result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
-                                result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                                result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
                             if (type === 'airtime') {

@@ -20,7 +20,6 @@ const VENDORS = [
     { id: 'clubkonnect', name: 'ClubKonnect', color: '#1d4ed8', bg: '#dbeafe', text: '#1e40af' },
     { id: 'bigi', name: 'Bigi VTU', color: '#6366f1', bg: '#e0e7ff', text: '#3730a3' },
     { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#d1fae5', text: '#065f46' },
-    { id: 'vital', name: 'Vital Sub', color: '#d97706', bg: '#fef3c7', text: '#92400e' },
 ];
 
 export default function ManageDataPlans() {
@@ -41,7 +40,7 @@ export default function ManageDataPlans() {
     const [newMarkupType, setNewMarkupType] = useState<'fixed' | 'percentage'>('fixed');
     const [applyingMarkups, setApplyingMarkups] = useState(false);
 
-    const networks = ['mtn', 'glo', 'airtel', '9mobile'];
+    const networks = ['mtn', 'glo', 'airtel', '9mobile', 'vitel'];
 
     useEffect(() => {
         fetchConfigs();

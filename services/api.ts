@@ -111,25 +111,63 @@ export const api = {
     data: {
         getPlans: async (network: string) => {
             try {
-                // Normalize network (mtn, glo, airtel, 9mobile)
-                let netLower = network.toLowerCase();
+                // Normalize network (mtn, glo, airtel, 9mobile, vitel)
+                let netLower = (network || 'mtn').toLowerCase();
                 if (netLower.includes('mtn')) netLower = 'mtn';
                 else if (netLower.includes('glo')) netLower = 'glo';
                 else if (netLower.includes('airtel')) netLower = 'airtel';
                 else if (netLower.includes('mobile') || netLower.includes('etisalat')) netLower = '9mobile';
-                else netLower = 'mtn';
+                else if (netLower.includes('vitel') || netLower.includes('vital')) netLower = 'vitel';
 
-                const { data: plans, error } = await supabase
+                // Check active VTU vendor from app_settings
+                let activeVendor = 'clubkonnect';
+                try {
+                    const { data: vendorSetting } = await supabase
+                        .from('app_settings')
+                        .select('value')
+                        .eq('key', 'vtu_vendor')
+                        .maybeSingle();
+                    if (vendorSetting?.value) {
+                        activeVendor = vendorSetting.value.toLowerCase();
+                    }
+                } catch (_) {}
+
+                let query = supabase
                     .from('data_plans')
                     .select('*')
-                    .eq('network', netLower)
                     .or('is_active.eq.true,is_active.is.null')
                     .order('cost_price', { ascending: true });
 
-                if (error) throw new Error(error.message);
-                if (!plans || plans.length === 0) throw new Error(`No data plans available for ${netLower}`);
+                if (netLower === 'vitel' || netLower === 'vital') {
+                    query = query.or('network.eq.vitel,network.eq.vital');
+                } else {
+                    query = query.eq('network', netLower);
+                }
 
-                return plans.map(p => ({
+                const { data: plans, error } = await query;
+                if (error) throw new Error(error.message);
+
+                let resultPlans = plans || [];
+
+                // Filter by active vendor if api_vendor column exists and plans specify vendor
+                if (resultPlans.length > 0 && resultPlans.some(p => p.api_vendor)) {
+                    const vendorFiltered = resultPlans.filter(p => p.api_vendor === activeVendor || p.api_vendor === 'bilalsadasub');
+                    if (vendorFiltered.length > 0) {
+                        resultPlans = vendorFiltered;
+                    }
+                }
+
+                // Fallback if no plans found for specific network filter
+                if (resultPlans.length === 0) {
+                    const { data: allPlans } = await supabase
+                        .from('data_plans')
+                        .select('*')
+                        .or('is_active.eq.true,is_active.is.null')
+                        .order('cost_price', { ascending: true });
+                    resultPlans = allPlans || [];
+                }
+
+                return resultPlans.map(p => ({
                     id: p.plan_id,
                     code: p.plan_id,
                     name: p.name,
@@ -138,6 +176,7 @@ export const api = {
                     validity: p.validity || '30 Days',
                     volume: p.volume || '',
                     network: p.network,
+                    apiVendor: p.api_vendor || activeVendor,
                     icon: ''
                 }));
             } catch (e) {

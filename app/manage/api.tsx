@@ -201,8 +201,7 @@ export default function APIVaultScreen() {
                     {[
                         { id: 'bilalsadasub', name: 'BilalSadaSub API (bilalsadasub.com)', desc: 'Data, Airtime, Cable, Bills & Telecom' },
                         { id: 'bigi', name: 'Bigi VTU API (bigidata.com)', desc: 'SME & Gifting Data Provider' },
-                        { id: 'clubkonnect', name: 'Clubkonnect API (nellobytesystems.com)', desc: 'Telecom & Utility Payments' },
-                        { id: 'vital', name: 'Vital Sub VTU API (vitalsub.ng)', desc: 'VTU SME & Corporate Data' }
+                        { id: 'clubkonnect', name: 'Clubkonnect API (nellobytesystems.com)', desc: 'Telecom & Utility Payments' }
                     ].map((item) => {
                         const checked = isVendorSelected(item.id);
                         return (
