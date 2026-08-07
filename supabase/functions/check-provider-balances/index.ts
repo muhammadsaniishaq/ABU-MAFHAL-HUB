@@ -339,21 +339,61 @@ serve(async (req: Request) => {
       })
     }
 
-    // 6. PayVessel (Payment & Payout Gateway)
+    // 6. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret, available_balance
     if (payVesselKey && payVesselKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
+      let fetched = false
+
+      const headers: Record<string, string> = {
+        'api-key': payVesselKey.trim(),
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+      if (payVesselSecret && payVesselSecret.trim() !== '') {
+        headers['api-secret'] = payVesselSecret.trim()
+      }
+
+      // Attempt 1: GET https://api.payvessel.com/api/v1/user/balance
       try {
-        const headers: Record<string, string> = { 'api-key': payVesselKey.trim(), 'Accept': 'application/json' }
-        if (payVesselSecret) headers['api-secret'] = payVesselSecret.trim()
         const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers })
         const data = await response.json()
-        const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
-        if (rawBal !== undefined) {
+        const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: GET https://api.payvessel.com/api/v1/wallet/balance
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/wallet/balance', { headers })
+          const data = await response.json()
+          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: GET https://api.payvessel.com/api/v1/wallets
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/wallets', { headers })
+          const data = await response.json()
+          const walletObj = Array.isArray(data) ? data[0] : (data?.data?.[0] || data?.wallets?.[0] || data)
+          const rawBal = walletObj?.available_balance ?? walletObj?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'payvessel',
