@@ -15,11 +15,19 @@ const T = {
   textSub: '#5a6890',
 };
 
+const VENDORS = [
+    { id: 'all', name: 'All Vendors', color: '#0d1b3e', bg: '#e2e8f0', text: '#0d1b3e' },
+    { id: 'clubkonnect', name: 'ClubKonnect', color: '#1d4ed8', bg: '#dbeafe', text: '#1e40af' },
+    { id: 'bigi', name: 'Bigi VTU', color: '#6366f1', bg: '#e0e7ff', text: '#3730a3' },
+    { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#d1fae5', text: '#065f46' },
+];
+
 export default function ManageDataPlans() {
     const [plans, setPlans] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [selectedNetwork, setSelectedNetwork] = useState('mtn');
+    const [selectedVendorFilter, setSelectedVendorFilter] = useState('all');
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
@@ -39,11 +47,10 @@ export default function ManageDataPlans() {
 
     useEffect(() => {
         fetchPlans();
-    }, [selectedNetwork]);
+    }, [selectedNetwork, selectedVendorFilter]);
 
     const fetchConfigs = async () => {
         try {
-            // Fetch VTU Vendor
             const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             if (vendorData) {
                 setActiveVendor(vendorData.value);
@@ -62,26 +69,49 @@ export default function ManageDataPlans() {
 
     const fetchPlans = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('data_plans')
-            .select('*')
-            .eq('network', selectedNetwork)
-            .order('cost_price', { ascending: true });
+        try {
+            let query = supabase
+                .from('data_plans')
+                .select('*')
+                .eq('network', selectedNetwork)
+                .order('cost_price', { ascending: true });
 
-        if (error) Alert.alert('Error', error.message);
-        else setPlans(data || []);
-        setLoading(false);
+            if (selectedVendorFilter !== 'all') {
+                // If api_vendor column exists, filter by it
+                query = query.eq('api_vendor', selectedVendorFilter);
+            }
+
+            const { data, error } = await query;
+
+            if (error) {
+                // Fallback query if api_vendor column isn't queried properly
+                const { data: fallbackData } = await supabase
+                    .from('data_plans')
+                    .select('*')
+                    .eq('network', selectedNetwork)
+                    .order('cost_price', { ascending: true });
+                setPlans(fallbackData || []);
+            } else {
+                setPlans(data || []);
+            }
+        } catch (err: any) {
+            console.error("Error fetching plans:", err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSync = async () => {
+    const handleSync = async (vendorToSync: string = 'all') => {
         setSyncing(true);
         try {
-            const { data, error } = await supabase.functions.invoke('sync-plans');
+            const { data, error } = await supabase.functions.invoke('sync-plans', {
+                body: { vendor: vendorToSync }
+            });
             if (error) throw error;
             if (data && data.success === false) {
                  throw new Error(data.error || 'Sync Failed');
             }
-            Alert.alert('Success', data.message || 'Plans synced successfully');
+            Alert.alert('Success', data.message || 'Data plans synced successfully');
             fetchPlans();
         } catch (err: any) {
             Alert.alert('Sync Failed', err.message);
@@ -109,7 +139,7 @@ export default function ManageDataPlans() {
         } else {
             setEditingPlan(null);
             setNewPrice('');
-            fetchPlans(); // Refresh
+            fetchPlans();
         }
     };
 
@@ -155,7 +185,6 @@ export default function ManageDataPlans() {
                 return;
             }
 
-            // Fetch current plans for selected network
             const { data: activePlans, error: fetchErr } = await supabase
                 .from('data_plans')
                 .select('*')
@@ -167,7 +196,6 @@ export default function ManageDataPlans() {
                 return;
             }
 
-            // Apply markup formulas individually to avoid generated column issues
             for (const plan of activePlans) {
                 const cost = parseFloat(plan.cost_price);
                 let selling = cost;
@@ -205,6 +233,25 @@ export default function ManageDataPlans() {
         else fetchPlans();
     };
 
+    const getVendorBadge = (vendorId?: string, planName?: string) => {
+        let v = vendorId || 'clubkonnect';
+        if (!vendorId && planName) {
+            const nameLower = planName.toLowerCase();
+            if (nameLower.includes('bigi')) v = 'bigi';
+            else if (nameLower.includes('bilal')) v = 'bilalsadasub';
+        }
+
+        const info = VENDORS.find(item => item.id === v) || VENDORS[1];
+        return (
+            <View style={{ backgroundColor: info.bg }} className="px-2 py-0.5 rounded-full flex-row items-center border border-slate-200/50 mr-2">
+                <View style={{ backgroundColor: info.color }} className="w-1.5 h-1.5 rounded-full mr-1" />
+                <Text style={{ color: info.text }} className="text-[9px] font-black uppercase">
+                    {info.name}
+                </Text>
+            </View>
+        );
+    };
+
     return (
         <View className="flex-1 bg-slate-50">
             <Stack.Screen options={{ 
@@ -214,27 +261,54 @@ export default function ManageDataPlans() {
                 headerTitleStyle: { fontWeight: '800', fontSize: 16 }
             }} />
             
-            {/* Header Controls */}
-            <View className="px-4 py-3 bg-white border-b border-gray-100 flex-row justify-between items-center">
-                <View>
-                    <Text className="text-sm font-extrabold text-[#0d1b3e]">Apply Markup & Pricing</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 4 }} />
-                        <Text className="text-[10px] font-bold text-emerald-600 uppercase">API: {activeVendor}</Text>
+            {/* Top Sync & Vendor Controls Header */}
+            <View className="px-4 py-3 bg-white border-b border-gray-100">
+                <View className="flex-row justify-between items-center mb-2">
+                    <View>
+                        <Text className="text-sm font-extrabold text-[#0d1b3e]">Data Pricing & Multi-API Sync</Text>
+                        <Text className="text-[10px] font-bold text-slate-400">Sync & Manage ClubKonnect, Bigi VTU & BilalSadaSub</Text>
                     </View>
+                    <TouchableOpacity 
+                        onPress={() => handleSync('all')} 
+                        disabled={syncing}
+                        className={`flex-row items-center px-3 py-1.5 rounded-lg ${syncing ? 'bg-gray-100' : 'bg-[#0d1b3e]'}`}
+                    >
+                        {syncing ? (
+                            <ActivityIndicator size="small" color={T.gold} className="mr-1.5" />
+                        ) : (
+                            <Ionicons name="cloud-download-outline" size={13} color={T.gold} className="mr-1.5" />
+                        )}
+                        <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync All APIs</Text>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity 
-                    onPress={handleSync} 
-                    disabled={syncing}
-                    className={`flex-row items-center px-3 py-1.5 rounded-lg ${syncing ? 'bg-gray-100' : 'bg-[#0d1b3e]'}`}
-                >
-                    {syncing ? (
-                        <ActivityIndicator size="small" color={T.gold} className="mr-1.5" />
-                    ) : (
-                        <Ionicons name="refresh" size={13} color={T.white} className="mr-1.5" />
-                    )}
-                    <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync {activeVendor === 'bigi' ? 'Bigi' : 'ClubKonnect'}</Text>
-                </TouchableOpacity>
+
+                {/* API Vendor Filter Tabs */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
+                    {VENDORS.map(vendor => {
+                        const isSelected = selectedVendorFilter === vendor.id;
+                        return (
+                            <TouchableOpacity
+                                key={vendor.id}
+                                onPress={() => setSelectedVendorFilter(vendor.id)}
+                                style={{
+                                    backgroundColor: isSelected ? T.navy : '#f8fafc',
+                                    borderColor: isSelected ? T.navy : '#e2e8f0'
+                                }}
+                                className="px-3 py-1.5 rounded-lg border mr-2 flex-row items-center"
+                            >
+                                <Ionicons 
+                                    name={vendor.id === 'all' ? 'layers-outline' : 'server-outline'} 
+                                    size={11} 
+                                    color={isSelected ? T.gold : '#64748b'} 
+                                    style={{ marginRight: 4 }} 
+                                />
+                                <Text className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-600'}`}>
+                                    {vendor.name}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
             </View>
 
             {/* Markup Dashboard Card */}
@@ -299,7 +373,7 @@ export default function ManageDataPlans() {
                 ))}
             </View>
 
-            {/* plans list */}
+            {/* Plans List */}
             {loading ? (
                 <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color={T.navy} />
@@ -309,25 +383,23 @@ export default function ManageDataPlans() {
                     {plans.map(plan => (
                         <View key={plan.id} className="bg-white p-2.5 rounded-xl mb-2 border border-slate-100 shadow-sm flex-row justify-between items-center">
                             <View className="flex-1 pr-2">
-                                <View className="flex-row items-center mb-0.5">
-                                    <Text className="font-extrabold text-slate-800 text-xs mr-1.5" numberOfLines={1}>{plan.name}</Text>
+                                <View className="flex-row items-center mb-1 flex-wrap">
+                                    {getVendorBadge(plan.api_vendor, plan.name)}
+                                    <Text className="font-extrabold text-slate-800 text-xs mr-1.5 flex-1" numberOfLines={1}>{plan.name}</Text>
                                     <View className={`px-1.5 py-0.5 rounded ${plan.is_active ? 'bg-emerald-50' : 'bg-red-50'}`}>
                                         <Text className={`${plan.is_active ? 'text-emerald-700' : 'text-red-700'} text-[8px] font-black uppercase`}>
                                             {plan.is_active ? 'Active' : 'Off'}
                                         </Text>
                                     </View>
                                 </View>
-                                <View className="mt-1 bg-blue-50 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
+                                <View className="mt-1 bg-blue-50/70 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
                                     <Text className="text-slate-500 text-[10px] font-bold">API Price: ₦{plan.cost_price}</Text>
                                     <Text className="text-[#0d1b3e] font-extrabold text-xs">Selling: ₦{plan.selling_price}</Text>
                                 </View>
                                 <View className="flex-row items-center mt-1">
-                                    {plan.profit ? (
-                                        <>
-                                            <Text className="text-slate-300 text-[10px]">|</Text>
-                                            <Text className="text-emerald-600 text-[9px] font-bold">Profit: ₦{plan.profit}</Text>
-                                        </>
-                                    ) : null}
+                                    <Text className="text-emerald-600 text-[9px] font-bold">
+                                        Profit Margin: ₦{Math.max(0, Number(plan.selling_price) - Number(plan.cost_price))}
+                                    </Text>
                                 </View>
                             </View>
 
@@ -353,7 +425,7 @@ export default function ManageDataPlans() {
                     ))}
                     {plans.length === 0 && (
                         <View className="items-center py-8">
-                            <Text className="text-gray-400 text-xs">No plans found. Sync from ClubKonnect.</Text>
+                            <Text className="text-gray-400 text-xs">No plans found. Click "Sync All APIs" above to populate plans.</Text>
                         </View>
                     )}
                 </ScrollView>
@@ -367,9 +439,12 @@ export default function ManageDataPlans() {
                             <Text className="font-extrabold text-sm text-[#0d1b3e] mb-1">Edit Price Manually</Text>
                             <Text className="text-slate-400 text-[11px] mb-3" numberOfLines={1}>{editingPlan.name}</Text>
                             
-                            <View className="mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                 <Text className="text-[9px] text-slate-400 uppercase font-extrabold">API Original Price</Text>
-                                 <Text className="text-sm font-extrabold text-slate-600">₦{editingPlan.cost_price}</Text>
+                            <View className="mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex-row justify-between items-center">
+                                 <View>
+                                     <Text className="text-[9px] text-slate-400 uppercase font-extrabold">API Original Price</Text>
+                                     <Text className="text-sm font-extrabold text-slate-600">₦{editingPlan.cost_price}</Text>
+                                 </View>
+                                 {getVendorBadge(editingPlan.api_vendor, editingPlan.name)}
                             </View>
 
                             <Text className="text-[9px] text-[#0d1b3e] uppercase font-extrabold mb-1">New Selling Price (₦)</Text>
