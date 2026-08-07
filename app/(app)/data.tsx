@@ -490,7 +490,8 @@ export default function DataScreen() {
                 phone: phoneNumber,
                 planId: selectedPlan.id,
                 amount: selectedPlan.price,
-                planName: planNameString
+                planName: planNameString,
+                vendor: (selectedPlan as any).apiVendor || 'bilalsadasub'
             });
 
             if (result.success) {

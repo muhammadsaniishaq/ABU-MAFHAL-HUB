@@ -120,7 +120,7 @@ export const api = {
                 else if (netLower.includes('vitel') || netLower.includes('vital')) netLower = 'vitel';
 
                 // Check active VTU vendor from app_settings
-                let activeVendor = 'clubkonnect';
+                let activeVendor = 'bilalsadasub';
                 try {
                     const { data: vendorSetting } = await supabase
                         .from('app_settings')
@@ -185,7 +185,7 @@ export const api = {
             }
         },
         
-        purchase: async (userId: string, params: { network: string; phone: string; planId: string; amount: number; planName: string }) => {
+        purchase: async (userId: string, params: { network: string; phone: string; planId: string; amount: number; planName: string; vendor?: string }) => {
             // 1. Record 'Pending' Transaction
             const { data: txn, error: txnError } = await supabase
                 .from('transactions')
@@ -205,11 +205,11 @@ export const api = {
             const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
                 body: {
                     type: 'data',
-                    network: params.network, // Frontend sends 'mtn', backend expects mapped string or we map here.
-                    // Similar mapping needed.
+                    network: params.network,
                     phone: params.phone,
                     planId: params.planId,
-                    amount: params.amount
+                    amount: params.amount,
+                    vendor: params.vendor || 'bilalsadasub'
                 }
             });
             

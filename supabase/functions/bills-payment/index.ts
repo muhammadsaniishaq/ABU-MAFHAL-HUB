@@ -82,7 +82,19 @@ Deno.serve(async (req: Request) => {
             .from('app_settings')
             .select('key, value')
             .eq('key', 'vtu_vendor');
-        const vtuVendor = settingsData && settingsData.length > 0 ? settingsData[0].value : 'clubkonnect';
+        let vtuVendor = (settingsData && settingsData.length > 0 && settingsData[0].value) ? settingsData[0].value.toLowerCase() : '';
+
+        // Allow explicit override via request body vendor parameter if supplied
+        if (data && data.vendor) {
+            vtuVendor = data.vendor.toLowerCase();
+        }
+
+        // Smart fail-safe fallback: If no vendor explicitly saved in app_settings, pick configured vendor from system_secrets
+        if (!vtuVendor) {
+            if (bilalToken) vtuVendor = 'bilalsadasub';
+            else if (bigiToken) vtuVendor = 'bigi';
+            else vtuVendor = 'clubkonnect';
+        }
 
         // Handle Airtime to Cash actions directly before balance deduction
         if (type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
