@@ -85,31 +85,54 @@ serve(async (req: Request) => {
     const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || secrets['BILALSADASUB_API_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
     const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
+    const clubkonnectUserId = secrets['CLUBKONNECT_USER_ID'] || secrets['CLUBKONNECT_USER'] || ''
     const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
-    const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
+    const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
+    const payVesselSecret = secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_SECRET'] || ''
     const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || Deno.env.get('NINEBOOST_API_KEY') || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
     const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
+    const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || ''
 
     const providerBalances: any[] = []
 
-    // 1. AgentHub (Identity, NIN, BVN, CAC)
+    // 1. AgentHub (Identity, NIN, BVN, CAC, TAX) - Official API Spec: GET /wallet/balance Header: x-api-key
     if (agentHubKey && agentHubKey.trim() !== '') {
       let balance = 0
       let latencyMs = 180
+      let fetched = false
+
+      // Attempt 1: Official Endpoint GET https://agenthub.ng/api/wallet/balance with x-api-key
       try {
-        const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
-          headers: { 'Authorization': `Bearer ${agentHubKey}`, 'Accept': 'application/json' }
+        const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/wallet/balance', {
+          headers: { 'x-api-key': agentHubKey.trim(), 'Accept': 'application/json' }
         })
         const data = await response.json()
-        const rawBal = data?.balance ?? data?.data?.balance ?? data?.user?.balance ?? data?.wallet_balance
+        const rawBal = data?.data?.balance ?? data?.balance ?? data?.user?.balance
         if (rawBal !== undefined) {
           balance = Number(rawBal)
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: Fallback GET https://agenthub.ng/api/balance with x-api-key
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://agenthub.ng/api/balance', {
+            headers: { 'x-api-key': agentHubKey.trim(), 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.data?.balance ?? data?.balance
+          if (rawBal !== undefined) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'agenthub',
@@ -149,7 +172,7 @@ serve(async (req: Request) => {
       let latencyMs = 210
       try {
         const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
-          headers: { 'Authorization': `Token ${bilalToken}`, 'Accept': 'application/json' }
+          headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
         const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
@@ -191,13 +214,13 @@ serve(async (req: Request) => {
       })
     }
 
-    // 3. Paystack
+    // 3. Paystack Merchant Settlement Balance
     if (paystackSecret && paystackSecret.trim() !== '') {
       let balance = 0
       let latencyMs = 150
       try {
         const { response, latency } = await fetchWithTimeout('https://api.paystack.co/balance', {
-          headers: { 'Authorization': `Bearer ${paystackSecret}`, 'Accept': 'application/json' }
+          headers: { 'Authorization': `Bearer ${paystackSecret.trim()}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
         const balanceItem = data?.data?.find((b: any) => b.currency === 'NGN') || data?.data?.[0]
@@ -233,12 +256,13 @@ serve(async (req: Request) => {
       })
     }
 
-    // 4. Clubkonnect
+    // 4. Clubkonnect API
     if (clubkonnectKey && clubkonnectKey.trim() !== '') {
       let balance = 0
       let latencyMs = 140
+      const userId = clubkonnectUserId || 'ABUMAFHAL'
       try {
-        const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=ABUMAFHAL&APIKey=${clubkonnectKey}`)
+        const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=${userId}&APIKey=${clubkonnectKey.trim()}`)
         const data = await response.json()
         const rawBal = data?.balance ?? data?.user?.balance ?? data?.wallet_balance
         if (rawBal !== undefined) {
@@ -278,11 +302,11 @@ serve(async (req: Request) => {
       let balance = 0
       let latencyMs = 160
       try {
-        const { response, latency } = await fetchWithTimeout('https://idpro.ng/api/balance', {
-          headers: { 'Authorization': `Bearer ${idProKey}` }
+        const { response, latency } = await fetchWithTimeout('https://idpro.ng/api/v1/balance', {
+          headers: { 'Authorization': `Bearer ${idProKey.trim()}` }
         })
         const data = await response.json()
-        const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        const rawBal = data?.balance ?? data?.data?.balance
         if (rawBal !== undefined) {
           balance = Number(rawBal)
           latencyMs = latency
@@ -320,9 +344,9 @@ serve(async (req: Request) => {
       let balance = 0
       let latencyMs = 170
       try {
-        const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', {
-          headers: { 'api-key': payVesselKey, 'Accept': 'application/json' }
-        })
+        const headers: Record<string, string> = { 'api-key': payVesselKey.trim(), 'Accept': 'application/json' }
+        if (payVesselSecret) headers['api-secret'] = payVesselSecret.trim()
+        const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers })
         const data = await response.json()
         const rawBal = data?.balance ?? data?.data?.balance ?? data?.wallet_balance
         if (rawBal !== undefined) {
@@ -362,7 +386,7 @@ serve(async (req: Request) => {
       let balance = 0
       let latencyMs = 190
       try {
-        const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey}&action=balance`)
+        const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey.trim()}&action=balance`)
         const data = await response.json()
         const rawBal = data?.balance ?? data?.data?.balance
         if (rawBal !== undefined) {
@@ -403,7 +427,7 @@ serve(async (req: Request) => {
       let latencyMs = 200
       try {
         const { response, latency } = await fetchWithTimeout('https://api.nowpayments.io/v1/balance', {
-          headers: { 'x-api-key': nowPaymentsKey }
+          headers: { 'x-api-key': nowPaymentsKey.trim() }
         })
         const data = await response.json()
         const rawBal = data?.balance?.usd ?? data?.balance ?? data?.data?.balance
@@ -445,7 +469,7 @@ serve(async (req: Request) => {
       let latencyMs = 230
       try {
         const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
-          headers: { 'Authorization': `Token ${bigiToken}`, 'Accept': 'application/json' }
+          headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
         const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
@@ -486,7 +510,7 @@ serve(async (req: Request) => {
       let balance = 0
       let latencyMs = 170
       try {
-        const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey}`)
+        const { response, latency } = await fetchWithTimeout(`https://api.ng.termii.com/api/get-balance?api_key=${termiiKey.trim()}`)
         const data = await response.json()
         const rawBal = data?.balance ?? data?.data?.balance
         if (rawBal !== undefined) {
@@ -525,6 +549,28 @@ serve(async (req: Request) => {
     if (monnifyApiKey && monnifyApiKey.trim() !== '') {
       let balance = 0
       let latencyMs = 150
+      if (monnifySecretKey && monnifySecretKey.trim() !== '') {
+        try {
+          const authStr = btoa(`${monnifyApiKey.trim()}:${monnifySecretKey.trim()}`)
+          const { response: authRes } = await fetchWithTimeout('https://api.monnify.com/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Authorization': `Basic ${authStr}`, 'Content-Type': 'application/json' }
+          })
+          const authData = await authRes.json()
+          const token = authData?.responseBody?.accessToken
+          if (token) {
+            const { response: balRes, latency } = await fetchWithTimeout('https://api.monnify.com/api/v2/disbursements/wallet-balance', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const balData = await balRes.json()
+            if (balData?.responseBody?.availableBalance !== undefined) {
+              balance = Number(balData.responseBody.availableBalance)
+              latencyMs = latency
+            }
+          }
+        } catch (e) {}
+      }
+
       providerBalances.push({
         id: 'monnify',
         name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
