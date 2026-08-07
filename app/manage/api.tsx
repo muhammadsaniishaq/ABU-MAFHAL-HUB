@@ -12,14 +12,17 @@ export default function APIVaultScreen() {
     const [bilalToken, setBilalToken] = useState('');
     const [paystackSecret, setPaystackSecret] = useState('');
     const [clubkonnectApiKey, setClubkonnectApiKey] = useState('');
+    const [clubkonnectUserId, setClubkonnectUserId] = useState('');
     const [idProApiKey, setIdProApiKey] = useState('');
-    const [payBesselApiKey, setPayBesselApiKey] = useState('');
+    const [payVesselApiKey, setPayVesselApiKey] = useState('');
+    const [payVesselSecretKey, setPayVesselSecretKey] = useState('');
     const [nineBoostApiKey, setNineBoostApiKey] = useState('');
     const [nowPaymentsApiKey, setNowPaymentsApiKey] = useState('');
     const [bigiToken, setBigiToken] = useState('');
     const [bigiPin, setBigiPin] = useState('');
     const [termiiApiKey, setTermiiApiKey] = useState('');
     const [monnifyApiKey, setMonnifyApiKey] = useState('');
+    const [monnifySecretKey, setMonnifySecretKey] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -30,7 +33,7 @@ export default function APIVaultScreen() {
 
     const fetchApiVaultData = async () => {
         try {
-            // 1. Fetch vtu_vendor setting
+            // 1. Fetch vtu_vendor & settings
             const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
                 settings.forEach((s) => {
@@ -40,18 +43,21 @@ export default function APIVaultScreen() {
                     if (k === 'BILALSADASUB_TOKEN' || k === 'BILAL_TOKEN') setBilalToken(s.value);
                     if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
                     if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
+                    if (k === 'CLUBKONNECT_USER_ID' || k === 'CLUBKONNECT_USER') setClubkonnectUserId(s.value);
                     if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
-                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayVesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYVESSEL_SECRET') setPayVesselSecretKey(s.value);
                     if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
                     if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
                     if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
                     if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
+                    if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
                 });
             }
 
-            // 2. Fetch all system secrets
+            // 2. Fetch system secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
                 secrets.forEach((s) => {
@@ -60,14 +66,17 @@ export default function APIVaultScreen() {
                     if (k === 'BILALSADASUB_TOKEN' || k === 'BILAL_TOKEN') setBilalToken(s.value);
                     if (k === 'PAYSTACK_SECRET_KEY' || k === 'PAYSTACK_KEY') setPaystackSecret(s.value);
                     if (k === 'CLUBKONNECT_API_KEY' || k === 'CLUBKONNECT_KEY') setClubkonnectApiKey(s.value);
+                    if (k === 'CLUBKONNECT_USER_ID' || k === 'CLUBKONNECT_USER') setClubkonnectUserId(s.value);
                     if (k === 'IDPRO_API_KEY' || k === 'IDPRO_KEY') setIdProApiKey(s.value);
-                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayBesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_API_KEY' || k === 'PAYVESSEL_KEY' || k === 'PAYBESSEL_API_KEY' || k === 'PAYBESSEL_KEY') setPayVesselApiKey(s.value);
+                    if (k === 'PAYVESSEL_SECRET_KEY' || k === 'PAYVESSEL_SECRET') setPayVesselSecretKey(s.value);
                     if (k === 'NINEBOOST_API_KEY' || k === 'NINEBOOST_KEY') setNineBoostApiKey(s.value);
                     if (k === 'NOWPAYMENTS_API_KEY' || k === 'NOWPAYMENTS_KEY') setNowPaymentsApiKey(s.value);
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
                     if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
                     if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
+                    if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
                 });
             }
         } catch (e: any) {
@@ -78,24 +87,17 @@ export default function APIVaultScreen() {
     };
 
     const isVendorSelected = (vendorKey: string) => {
-        if (!vtuVendor) return vendorKey === 'clubkonnect';
-        if (vtuVendor === 'auto') return true;
-        return vtuVendor.split(',').map(v => v.trim()).includes(vendorKey);
+        return vtuVendor.split(',').map(v => v.trim().toLowerCase()).includes(vendorKey.toLowerCase());
     };
 
     const toggleVendorSelect = (vendorKey: string) => {
-        let list = vtuVendor ? vtuVendor.split(',').map(v => v.trim()) : ['bilalsadasub', 'bigi', 'clubkonnect'];
-        if (list.includes(vendorKey)) {
-            if (list.length > 1) {
-                list = list.filter(v => v !== vendorKey);
-            } else {
-                Alert.alert("Notice", "You must keep at least 1 API provider active.");
-                return;
-            }
+        let current = vtuVendor.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        if (current.includes(vendorKey.toLowerCase())) {
+            current = current.filter(v => v !== vendorKey.toLowerCase());
         } else {
-            list.push(vendorKey);
+            current.push(vendorKey.toLowerCase());
         }
-        setVtuVendor(list.join(','));
+        setVtuVendor(current.join(','));
     };
 
     const handleSaveVault = async () => {
@@ -114,15 +116,17 @@ export default function APIVaultScreen() {
                 { key: 'BILALSADASUB_TOKEN', value: bilalToken, description: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)' },
                 { key: 'PAYSTACK_SECRET_KEY', value: paystackSecret, description: 'Paystack Secret Key for Payments & Transfers' },
                 { key: 'CLUBKONNECT_API_KEY', value: clubkonnectApiKey, description: 'ClubKonnect API Key for Telecom & Bills' },
+                { key: 'CLUBKONNECT_USER_ID', value: clubkonnectUserId, description: 'ClubKonnect Registered User ID / Phone' },
                 { key: 'IDPRO_API_KEY', value: idProApiKey, description: 'IDPro API Key for Identity Verification' },
-                { key: 'PAYVESSEL_API_KEY', value: payBesselApiKey, description: 'PayVessel API Key for Payment Gateway' },
-                { key: 'PAYBESSEL_API_KEY', value: payBesselApiKey, description: 'PayBessel API Key for Payment Gateway' },
+                { key: 'PAYVESSEL_API_KEY', value: payVesselApiKey, description: 'PayVessel API Key for Payment Gateway' },
+                { key: 'PAYVESSEL_SECRET_KEY', value: payVesselSecretKey, description: 'PayVessel Secret Key / Signature' },
                 { key: 'NINEBOOST_API_KEY', value: nineBoostApiKey, description: 'NineBoost API Key for Social Media Services' },
                 { key: 'NOWPAYMENTS_API_KEY', value: nowPaymentsApiKey, description: 'NowPayments API Key for Crypto' },
                 { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigi API Token for VTU Services' },
                 { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' },
                 { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key for SMS Gateway' },
-                { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key for Virtual Accounts' }
+                { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key for Virtual Accounts' },
+                { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key for Wallet Disbursements' }
             ];
 
             for (const sec of secretsToSave) {
@@ -144,7 +148,7 @@ export default function APIVaultScreen() {
                 }
             }
 
-            Alert.alert("Success 🎉", "All 11 Active API Vault credentials saved successfully!");
+            Alert.alert("Success 🎉", "All Active API Vault credentials saved successfully!");
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to save API Vault settings");
         } finally {
@@ -169,14 +173,11 @@ export default function APIVaultScreen() {
                 headerTintColor: '#fff'
             }} />
 
-            {/* Title Banner */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6">
+            {/* Header Banner */}
+            <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6">
                 <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-row items-center gap-2">
-                        <Ionicons name="key" size={20} color="#08E4C7" />
-                        <Text className="text-white font-extrabold text-base">API Vault & Provider Keys Hub</Text>
-                    </View>
-                    <TouchableOpacity 
+                    <Text className="text-white font-black text-lg">🔑 API Vault & Credentials</Text>
+                    <TouchableOpacity
                         onPress={() => router.push('/manage/liquidity')}
                         className="bg-emerald-600/20 px-3 py-1.5 rounded-lg border border-emerald-500 flex-row items-center gap-1"
                     >
@@ -185,7 +186,7 @@ export default function APIVaultScreen() {
                     </TouchableOpacity>
                 </View>
                 <Text className="text-slate-400 text-xs leading-5">
-                    Manage real API credentials for AgentHub, BilalSadaSub, Paystack, Clubkonnect, IDPro, PayBessel, NineBoost, NowPayments, Bigi, Termii, and Monnify.
+                    Manage real API credentials for AgentHub, BilalSadaSub, Paystack, Clubkonnect, IDPro, PayVessel, NineBoost, NowPayments, Bigi, Termii, and Monnify.
                 </Text>
             </View>
 
@@ -267,15 +268,22 @@ export default function APIVaultScreen() {
                 />
             </View>
 
-            {/* 4. Clubkonnect API Key */}
+            {/* 4. Clubkonnect API Key & User ID */}
             <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-indigo-400 font-extrabold text-xs mb-1">🔌 Clubkonnect / NelloByte API Key</Text>
+                <Text className="text-indigo-400 font-extrabold text-xs mb-1">🔌 Clubkonnect / NelloByte API Key & User ID</Text>
                 <TextInput
                     value={clubkonnectApiKey}
                     onChangeText={setClubkonnectApiKey}
                     placeholder="Enter Clubkonnect API Key..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
+                />
+                <TextInput
+                    value={clubkonnectUserId}
+                    onChangeText={setClubkonnectUserId}
+                    placeholder="Enter Clubkonnect User ID / Phone..."
+                    placeholderTextColor="#64748b"
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
                 />
             </View>
@@ -293,13 +301,21 @@ export default function APIVaultScreen() {
                 />
             </View>
 
-            {/* 6. PayBessel API Key */}
+            {/* 6. PayVessel API Key & Secret Key */}
             <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-cyan-400 font-extrabold text-xs mb-1">🏦 PayBessel Payment API Key</Text>
+                <Text className="text-cyan-400 font-extrabold text-xs mb-1">🏦 PayVessel API Key & Business Secret</Text>
                 <TextInput
-                    value={payBesselApiKey}
-                    onChangeText={setPayBesselApiKey}
-                    placeholder="Enter PayBessel API Key..."
+                    value={payVesselApiKey}
+                    onChangeText={setPayVesselApiKey}
+                    placeholder="Enter PayVessel API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
+                />
+                <TextInput
+                    value={payVesselSecretKey}
+                    onChangeText={setPayVesselSecretKey}
+                    placeholder="Enter PayVessel Secret Key..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
@@ -354,9 +370,9 @@ export default function APIVaultScreen() {
                 />
             </View>
 
-            {/* 10. Termii SMS API Key */}
+            {/* 10. Termii API Key */}
             <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-orange-400 font-extrabold text-xs mb-1">📩 Termii SMS & OTP API Key</Text>
+                <Text className="text-teal-400 font-extrabold text-xs mb-1">✉️ Termii SMS Gateway API Key</Text>
                 <TextInput
                     value={termiiApiKey}
                     onChangeText={setTermiiApiKey}
@@ -367,13 +383,21 @@ export default function APIVaultScreen() {
                 />
             </View>
 
-            {/* 11. Monnify API Key */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-6">
-                <Text className="text-teal-400 font-extrabold text-xs mb-1">🏛️ Monnify Merchant API Key</Text>
+            {/* 11. Monnify API Key & Secret Key */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-emerald-400 font-extrabold text-xs mb-1">🏦 Monnify API Key & Secret Key</Text>
                 <TextInput
                     value={monnifyApiKey}
                     onChangeText={setMonnifyApiKey}
                     placeholder="Enter Monnify API Key..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
+                />
+                <TextInput
+                    value={monnifySecretKey}
+                    onChangeText={setMonnifySecretKey}
+                    placeholder="Enter Monnify Secret Key..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
@@ -382,20 +406,18 @@ export default function APIVaultScreen() {
 
             {/* Save Button */}
             <TouchableOpacity
-                onPress={handleSaveVault}
+                onPress={saving ? undefined : handleSaveVault}
                 disabled={saving}
-                className="bg-teal-600 p-4 rounded-xl items-center justify-center flex-row gap-2 mb-10"
-                activeOpacity={0.8}
+                className="bg-emerald-600 p-4 rounded-2xl items-center justify-center mb-12"
+                activeOpacity={0.85}
             >
                 {saving ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                    <>
-                        <Ionicons name="checkmark-circle" size={20} color="white" />
-                        <Text className="text-white font-extrabold text-sm">Save All 11 API Vault Credentials</Text>
-                    </>
+                    <Text className="text-white font-extrabold text-sm">Save All 11 Active API Vault Credentials</Text>
                 )}
             </TouchableOpacity>
+
         </ScrollView>
     );
 }
