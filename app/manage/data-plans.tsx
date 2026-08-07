@@ -77,22 +77,21 @@ export default function ManageDataPlans() {
                 .eq('network', selectedNetwork)
                 .order('cost_price', { ascending: true });
 
-            if (selectedVendorFilter !== 'all') {
-                query = query.eq('api_vendor', selectedVendorFilter);
-            }
-
             const { data, error } = await query;
+            let resultPlans = data || [];
 
-            if (error) {
-                const { data: fallbackData } = await supabase
-                    .from('data_plans')
-                    .select('*')
-                    .eq('network', selectedNetwork)
-                    .order('cost_price', { ascending: true });
-                setPlans(fallbackData || []);
-            } else {
-                setPlans(data || []);
+            if (selectedVendorFilter === 'bilalsadasub') {
+                const filtered = resultPlans.filter(p => p.name?.includes('[BILAL]') || p.api_vendor === 'bilalsadasub');
+                if (filtered.length > 0) resultPlans = filtered;
+            } else if (selectedVendorFilter === 'bigi') {
+                const filtered = resultPlans.filter(p => p.name?.includes('[BIGI]') || p.api_vendor === 'bigi');
+                if (filtered.length > 0) resultPlans = filtered;
+            } else if (selectedVendorFilter === 'clubkonnect') {
+                const filtered = resultPlans.filter(p => !p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]'));
+                if (filtered.length > 0) resultPlans = filtered;
             }
+
+            setPlans(resultPlans);
         } catch (err: any) {
             console.error("Error fetching plans:", err);
         } finally {
