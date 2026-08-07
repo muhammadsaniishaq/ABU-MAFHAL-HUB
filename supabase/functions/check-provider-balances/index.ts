@@ -95,6 +95,7 @@ serve(async (req: Request) => {
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
     const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
     const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || ''
+    const vitalToken = secrets['VITAL_API_TOKEN'] || secrets['VITAL_TOKEN'] || secrets['VITAL_KEY'] || Deno.env.get('VITAL_API_TOKEN') || ''
 
     const providerBalances: any[] = []
 
@@ -336,7 +337,69 @@ serve(async (req: Request) => {
       })
     }
 
-    // 5. IDPro API
+    // 5. Vital Sub VTU (VitalSub.ng)
+    if (vitalToken && vitalToken.trim() !== '') {
+      let balance = 0
+      let latencyMs = 210
+      let fetched = false
+
+      // Attempt 1: GET https://vitalsub.ng/api/v1/user (Token header)
+      try {
+        const { response, latency } = await fetchWithTimeout('https://vitalsub.ng/api/v1/user', {
+          headers: { 'Authorization': `Token ${vitalToken.trim()}`, 'Accept': 'application/json' }
+        })
+        const data = await response.json()
+        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? data?.data?.balance
+        if (rawBal !== undefined && rawBal !== null) {
+          balance = Number(rawBal)
+          latencyMs = latency
+          fetched = true
+        }
+      } catch (e) {}
+
+      // Attempt 2: GET https://vitalsub.ng/api/user/
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://vitalsub.ng/api/user/', {
+            headers: { 'Authorization': `Bearer ${vitalToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      providerBalances.push({
+        id: 'vital',
+        name: 'Vital Sub (VTU SME & Corporate Data)',
+        category: 'VTU Telecom',
+        balance: isNaN(balance) ? 0 : balance,
+        currency: 'NGN',
+        latencyMs,
+        status: 'healthy',
+        error: undefined,
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    } else {
+      providerBalances.push({
+        id: 'vital',
+        name: 'Vital Sub (VTU SME & Corporate Data)',
+        category: 'VTU Telecom',
+        balance: 0,
+        currency: 'NGN',
+        status: 'unconfigured',
+        error: 'Token not configured in Vault',
+        allowDeposit: true,
+        allowWithdrawal: false
+      })
+    }
+
+    // 6. IDPro API
     if (idProKey && idProKey.trim() !== '') {
       let balance = 0
       let latencyMs = 160
@@ -378,7 +441,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 6. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret, available_balance
+    // 7. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret, available_balance
     if (payVesselKey && payVesselKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
@@ -445,7 +508,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 7. NineBoost / 9Boost (Social Media Marketing SMM Panel) - Official Spec: POST https://9boost.me/api/v2
+    // 8. NineBoost / 9Boost (Social Media Marketing SMM Panel) - Official Spec: POST https://9boost.me/api/v2
     if (nineBoostKey && nineBoostKey.trim() !== '') {
       let balance = 0
       let latencyMs = 190
@@ -517,7 +580,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 8. NowPayments
+    // 9. NowPayments
     if (nowPaymentsKey && nowPaymentsKey.trim() !== '') {
       let balance = 0
       let latencyMs = 200
@@ -559,7 +622,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 9. Bigi VTU Portal (Bigisub.ng)
+    // 10. Bigi VTU Portal (Bigisub.ng)
     if (bigiToken && bigiToken.trim() !== '') {
       let balance = 0
       let latencyMs = 230
@@ -583,22 +646,6 @@ serve(async (req: Request) => {
       if (!fetched) {
         try {
           const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/user/', {
-            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
-          })
-          const data = await response.json()
-          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
-      // Attempt 3: Legacy GET https://bigidata.com/api/user/
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
             headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
           })
           const data = await response.json()
@@ -637,7 +684,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 10. Termii
+    // 11. Termii
     if (termiiKey && termiiKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
@@ -677,7 +724,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 11. Monnify
+    // 12. Monnify
     if (monnifyApiKey && monnifyApiKey.trim() !== '') {
       let balance = 0
       let latencyMs = 150

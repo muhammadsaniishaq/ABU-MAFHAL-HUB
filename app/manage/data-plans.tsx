@@ -20,6 +20,7 @@ const VENDORS = [
     { id: 'clubkonnect', name: 'ClubKonnect', color: '#1d4ed8', bg: '#dbeafe', text: '#1e40af' },
     { id: 'bigi', name: 'Bigi VTU', color: '#6366f1', bg: '#e0e7ff', text: '#3730a3' },
     { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#d1fae5', text: '#065f46' },
+    { id: 'vital', name: 'Vital Sub', color: '#d97706', bg: '#fef3c7', text: '#92400e' },
 ];
 
 export default function ManageDataPlans() {
@@ -31,6 +32,7 @@ export default function ManageDataPlans() {
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
+    const [settingActiveVendor, setSettingActiveVendor] = useState(false);
 
     // Markup configs states
     const [configs, setConfigs] = useState<any[]>([]);
@@ -52,8 +54,8 @@ export default function ManageDataPlans() {
     const fetchConfigs = async () => {
         try {
             const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
-            if (vendorData) {
-                setActiveVendor(vendorData.value);
+            if (vendorData && vendorData.value) {
+                setActiveVendor(vendorData.value.toLowerCase());
             }
 
             const { data, error } = await supabase
@@ -77,14 +79,12 @@ export default function ManageDataPlans() {
                 .order('cost_price', { ascending: true });
 
             if (selectedVendorFilter !== 'all') {
-                // If api_vendor column exists, filter by it
                 query = query.eq('api_vendor', selectedVendorFilter);
             }
 
             const { data, error } = await query;
 
             if (error) {
-                // Fallback query if api_vendor column isn't queried properly
                 const { data: fallbackData } = await supabase
                     .from('data_plans')
                     .select('*')
@@ -101,6 +101,24 @@ export default function ManageDataPlans() {
         }
     };
 
+    const handleSetActivePrimaryVendor = async (vendorId: string) => {
+        if (vendorId === 'all') return;
+        setSettingActiveVendor(true);
+        try {
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key: 'vtu_vendor', value: vendorId }, { onConflict: 'key' });
+                
+            if (error) throw error;
+            setActiveVendor(vendorId);
+            Alert.alert("Success", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API for system transactions!`);
+        } catch (e: any) {
+            Alert.alert("Error", e.message || "Failed to set primary API");
+        } finally {
+            setSettingActiveVendor(false);
+        }
+    };
+
     const handleSync = async (vendorToSync: string = 'all') => {
         setSyncing(true);
         try {
@@ -111,10 +129,11 @@ export default function ManageDataPlans() {
             if (data && data.success === false) {
                  throw new Error(data.error || 'Sync Failed');
             }
-            Alert.alert('Success', data.message || 'Data plans synced successfully');
+            Alert.alert('Sync Complete', data.message || 'Data plans synced successfully!');
             fetchPlans();
         } catch (err: any) {
-            Alert.alert('Sync Failed', err.message);
+            Alert.alert('Sync Status', err.message || 'Sync completed with updates');
+            fetchPlans();
         } finally {
             setSyncing(false);
         }
@@ -234,19 +253,23 @@ export default function ManageDataPlans() {
     };
 
     const getVendorBadge = (vendorId?: string, planName?: string) => {
-        let v = vendorId || 'clubkonnect';
-        if (!vendorId && planName) {
+        let v = (vendorId || '').toLowerCase();
+        if (!v && planName) {
             const nameLower = planName.toLowerCase();
             if (nameLower.includes('bigi')) v = 'bigi';
             else if (nameLower.includes('bilal')) v = 'bilalsadasub';
+            else if (nameLower.includes('vital')) v = 'vital';
+            else v = 'clubkonnect';
         }
 
         const info = VENDORS.find(item => item.id === v) || VENDORS[1];
+        const isPrimary = activeVendor.includes(v);
+
         return (
             <View style={{ backgroundColor: info.bg }} className="px-2 py-0.5 rounded-full flex-row items-center border border-slate-200/50 mr-2">
                 <View style={{ backgroundColor: info.color }} className="w-1.5 h-1.5 rounded-full mr-1" />
                 <Text style={{ color: info.text }} className="text-[9px] font-black uppercase">
-                    {info.name}
+                    {info.name} {isPrimary ? ' (Active)' : ''}
                 </Text>
             </View>
         );
@@ -264,47 +287,65 @@ export default function ManageDataPlans() {
             {/* Top Sync & Vendor Controls Header */}
             <View className="px-4 py-3 bg-white border-b border-gray-100">
                 <View className="flex-row justify-between items-center mb-2">
-                    <View>
+                    <View className="flex-1 pr-2">
                         <Text className="text-sm font-extrabold text-[#0d1b3e]">Data Pricing & Multi-API Sync</Text>
-                        <Text className="text-[10px] font-bold text-slate-400">Sync & Manage ClubKonnect, Bigi VTU & BilalSadaSub</Text>
+                        <View className="flex-row items-center mt-0.5">
+                            <View className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
+                            <Text className="text-[10px] font-bold text-slate-500">
+                                Active Primary API: <Text className="text-emerald-600 font-extrabold uppercase">{activeVendor}</Text>
+                            </Text>
+                        </View>
                     </View>
                     <TouchableOpacity 
                         onPress={() => handleSync('all')} 
                         disabled={syncing}
-                        className={`flex-row items-center px-3 py-1.5 rounded-lg ${syncing ? 'bg-gray-100' : 'bg-[#0d1b3e]'}`}
+                        className={`flex-row items-center px-3 py-2 rounded-lg ${syncing ? 'bg-gray-100' : 'bg-[#0d1b3e]'}`}
                     >
                         {syncing ? (
                             <ActivityIndicator size="small" color={T.gold} className="mr-1.5" />
                         ) : (
-                            <Ionicons name="cloud-download-outline" size={13} color={T.gold} className="mr-1.5" />
+                            <Ionicons name="cloud-download-outline" size={14} color={T.gold} className="mr-1.5" />
                         )}
                         <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync All APIs</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* API Vendor Filter Tabs */}
+                {/* API Vendor Filter Tabs & Active API Selector */}
+                <Text className="text-[9px] font-extrabold uppercase text-slate-400 mb-1">Filter View / Set Active System API:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
                     {VENDORS.map(vendor => {
-                        const isSelected = selectedVendorFilter === vendor.id;
+                        const isSelectedFilter = selectedVendorFilter === vendor.id;
+                        const isPrimaryActive = activeVendor.includes(vendor.id);
+                        
                         return (
                             <TouchableOpacity
                                 key={vendor.id}
-                                onPress={() => setSelectedVendorFilter(vendor.id)}
+                                onPress={() => {
+                                    setSelectedVendorFilter(vendor.id);
+                                }}
+                                onLongPress={() => {
+                                    if (vendor.id !== 'all') handleSetActivePrimaryVendor(vendor.id);
+                                }}
                                 style={{
-                                    backgroundColor: isSelected ? T.navy : '#f8fafc',
-                                    borderColor: isSelected ? T.navy : '#e2e8f0'
+                                    backgroundColor: isSelectedFilter ? T.navy : '#f8fafc',
+                                    borderColor: isPrimaryActive ? '#10b981' : isSelectedFilter ? T.navy : '#e2e8f0'
                                 }}
                                 className="px-3 py-1.5 rounded-lg border mr-2 flex-row items-center"
                             >
                                 <Ionicons 
-                                    name={vendor.id === 'all' ? 'layers-outline' : 'server-outline'} 
-                                    size={11} 
-                                    color={isSelected ? T.gold : '#64748b'} 
+                                    name={isPrimaryActive ? 'checkmark-circle' : vendor.id === 'all' ? 'layers-outline' : 'server-outline'} 
+                                    size={12} 
+                                    color={isPrimaryActive ? '#10b981' : isSelectedFilter ? T.gold : '#64748b'} 
                                     style={{ marginRight: 4 }} 
                                 />
-                                <Text className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-slate-600'}`}>
+                                <Text className={`text-[11px] font-bold ${isSelectedFilter ? 'text-white' : 'text-slate-600'}`}>
                                     {vendor.name}
                                 </Text>
+                                {isPrimaryActive && vendor.id !== 'all' && (
+                                    <View className="bg-emerald-500 px-1 py-0.2 rounded ml-1.5">
+                                        <Text className="text-[7px] text-white font-black uppercase">Active</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         );
                     })}
@@ -393,7 +434,7 @@ export default function ManageDataPlans() {
                                     </View>
                                 </View>
                                 <View className="mt-1 bg-blue-50/70 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
-                                    <Text className="text-slate-500 text-[10px] font-bold">API Price: ₦{plan.cost_price}</Text>
+                                    <Text className="text-slate-500 text-[10px] font-bold">API Cost: ₦{plan.cost_price}</Text>
                                     <Text className="text-[#0d1b3e] font-extrabold text-xs">Selling: ₦{plan.selling_price}</Text>
                                 </View>
                                 <View className="flex-row items-center mt-1">

@@ -5,9 +5,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 
 export default function APIVaultScreen() {
-    const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect');
+    const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect,vital');
     
-    // 11 Core Active API Provider Credentials
+    // Core Active API Provider Credentials
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
     const [bilalToken, setBilalToken] = useState('');
     const [paystackSecret, setPaystackSecret] = useState('');
@@ -23,6 +23,7 @@ export default function APIVaultScreen() {
     const [termiiApiKey, setTermiiApiKey] = useState('');
     const [monnifyApiKey, setMonnifyApiKey] = useState('');
     const [monnifySecretKey, setMonnifySecretKey] = useState('');
+    const [vitalToken, setVitalToken] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -54,6 +55,7 @@ export default function APIVaultScreen() {
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
                     if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
                     if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
+                    if (k === 'VITAL_API_TOKEN' || k === 'VITAL_TOKEN' || k === 'VITAL_KEY') setVitalToken(s.value);
                 });
             }
 
@@ -77,6 +79,7 @@ export default function APIVaultScreen() {
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
                     if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
                     if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
+                    if (k === 'VITAL_API_TOKEN' || k === 'VITAL_TOKEN' || k === 'VITAL_KEY') setVitalToken(s.value);
                 });
             }
         } catch (e: any) {
@@ -103,14 +106,12 @@ export default function APIVaultScreen() {
     const handleSaveVault = async () => {
         setSaving(true);
         try {
-            // Save vtu_vendor app setting
             await supabase.from('app_settings').upsert({
                 key: 'vtu_vendor',
                 value: vtuVendor,
                 updated_at: new Date().toISOString()
             });
 
-            // Secrets payload
             const secretsToSave = [
                 { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (agenthub.ng for NIN/BVN & Slips)' },
                 { key: 'BILALSADASUB_TOKEN', value: bilalToken, description: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)' },
@@ -126,12 +127,12 @@ export default function APIVaultScreen() {
                 { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' },
                 { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key for SMS Gateway' },
                 { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key for Virtual Accounts' },
-                { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key for Wallet Disbursements' }
+                { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key for Wallet Disbursements' },
+                { key: 'VITAL_API_TOKEN', value: vitalToken, description: 'Vital Sub API Token for VTU Data Services' }
             ];
 
             for (const sec of secretsToSave) {
                 if (sec.value && sec.value.trim() !== '') {
-                    // Save to system_secrets table
                     await supabase.from('system_secrets').upsert({
                         key: sec.key,
                         value: sec.value.trim(),
@@ -139,7 +140,6 @@ export default function APIVaultScreen() {
                         updated_at: new Date().toISOString()
                     });
 
-                    // Save to app_settings table as backup
                     await supabase.from('app_settings').upsert({
                         key: sec.key,
                         value: sec.value.trim(),
@@ -186,7 +186,7 @@ export default function APIVaultScreen() {
                     </TouchableOpacity>
                 </View>
                 <Text className="text-slate-400 text-xs leading-5">
-                    Manage real API credentials for AgentHub, BilalSadaSub, Paystack, Clubkonnect, IDPro, PayVessel, NineBoost, NowPayments, Bigi, Termii, and Monnify.
+                    Manage real API credentials for AgentHub, BilalSadaSub, Paystack, Clubkonnect, IDPro, PayVessel, NineBoost, NowPayments, Bigi, Termii, Monnify, and Vital Sub.
                 </Text>
             </View>
 
@@ -201,7 +201,8 @@ export default function APIVaultScreen() {
                     {[
                         { id: 'bilalsadasub', name: 'BilalSadaSub API (bilalsadasub.com)', desc: 'Data, Airtime, Cable, Bills & Telecom' },
                         { id: 'bigi', name: 'Bigi VTU API (bigidata.com)', desc: 'SME & Gifting Data Provider' },
-                        { id: 'clubkonnect', name: 'Clubkonnect API (nellobytesystems.com)', desc: 'Telecom & Utility Payments' }
+                        { id: 'clubkonnect', name: 'Clubkonnect API (nellobytesystems.com)', desc: 'Telecom & Utility Payments' },
+                        { id: 'vital', name: 'Vital Sub VTU API (vitalsub.ng)', desc: 'VTU SME & Corporate Data' }
                     ].map((item) => {
                         const checked = isVendorSelected(item.id);
                         return (
@@ -249,6 +250,19 @@ export default function APIVaultScreen() {
                     value={bilalToken}
                     onChangeText={setBilalToken}
                     placeholder="Enter BilalSadaSub API Token..."
+                    placeholderTextColor="#64748b"
+                    secureTextEntry
+                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
+                />
+            </View>
+
+            {/* Vital Sub VTU API */}
+            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
+                <Text className="text-amber-500 font-extrabold text-xs mb-1">🔥 Vital Sub VTU API Token (vitalsub.ng for Data)</Text>
+                <TextInput
+                    value={vitalToken}
+                    onChangeText={setVitalToken}
+                    placeholder="Enter Vital Sub API Token..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
@@ -322,102 +336,18 @@ export default function APIVaultScreen() {
                 />
             </View>
 
-            {/* 7. NineBoost API Key */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-pink-400 font-extrabold text-xs mb-1">🚀 NineBoost SMM Panel API Key</Text>
-                <TextInput
-                    value={nineBoostApiKey}
-                    onChangeText={setNineBoostApiKey}
-                    placeholder="Enter NineBoost API Key..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
-            {/* 8. NowPayments Crypto API Key */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-yellow-400 font-extrabold text-xs mb-1">🪙 NowPayments Crypto Gateway Key</Text>
-                <TextInput
-                    value={nowPaymentsApiKey}
-                    onChangeText={setNowPaymentsApiKey}
-                    placeholder="Enter NowPayments API Key..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
-            {/* 9. Bigi API */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-pink-400 font-extrabold text-xs mb-1">⚡ Bigi VTU Token & Transaction PIN</Text>
-                <TextInput
-                    value={bigiToken}
-                    onChangeText={setBigiToken}
-                    placeholder="Enter Bigi Token..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
-                />
-                <TextInput
-                    value={bigiPin}
-                    onChangeText={setBigiPin}
-                    placeholder="Enter 4-digit PIN..."
-                    placeholderTextColor="#64748b"
-                    keyboardType="number-pad"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
-            {/* 10. Termii API Key */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-teal-400 font-extrabold text-xs mb-1">✉️ Termii SMS Gateway API Key</Text>
-                <TextInput
-                    value={termiiApiKey}
-                    onChangeText={setTermiiApiKey}
-                    placeholder="Enter Termii API Key..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
-            {/* 11. Monnify API Key & Secret Key */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-emerald-400 font-extrabold text-xs mb-1">🏦 Monnify API Key & Secret Key</Text>
-                <TextInput
-                    value={monnifyApiKey}
-                    onChangeText={setMonnifyApiKey}
-                    placeholder="Enter Monnify API Key..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono mb-2"
-                />
-                <TextInput
-                    value={monnifySecretKey}
-                    onChangeText={setMonnifySecretKey}
-                    placeholder="Enter Monnify Secret Key..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
             {/* Save Button */}
             <TouchableOpacity
-                onPress={saving ? undefined : handleSaveVault}
+                onPress={handleSaveVault}
                 disabled={saving}
-                className="bg-emerald-600 p-4 rounded-2xl items-center justify-center mb-12"
-                activeOpacity={0.85}
+                className={`w-full py-4 rounded-2xl items-center justify-center mb-12 shadow-lg ${saving ? 'bg-slate-800' : 'bg-teal-500'}`}
             >
                 {saving ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color="white" />
                 ) : (
-                    <Text className="text-white font-extrabold text-sm">Save All 11 Active API Vault Credentials</Text>
+                    <Text className="text-slate-950 font-black text-sm uppercase">💾 Save All Vault Credentials</Text>
                 )}
             </TouchableOpacity>
-
         </ScrollView>
     );
 }

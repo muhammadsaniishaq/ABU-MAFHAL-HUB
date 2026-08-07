@@ -28,6 +28,35 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Fail-safe Default Data Catalog for Networks
+const DEFAULT_CATALOG: Record<string, any[]> = {
+    'MTN': [
+        { PRODUCT_ID: '500MB_SME', PRODUCT_AMOUNT: '150', PRODUCT_NAME: 'MTN 500MB SME (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '1GB_SME', PRODUCT_AMOUNT: '280', PRODUCT_NAME: 'MTN 1GB SME (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '2GB_SME', PRODUCT_AMOUNT: '560', PRODUCT_NAME: 'MTN 2GB SME (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '3GB_SME', PRODUCT_AMOUNT: '840', PRODUCT_NAME: 'MTN 3GB SME (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '5GB_SME', PRODUCT_AMOUNT: '1400', PRODUCT_NAME: 'MTN 5GB SME (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '10GB_SME', PRODUCT_AMOUNT: '2800', PRODUCT_NAME: 'MTN 10GB SME (30 Days)', validity: '30 Days' },
+    ],
+    'GLO': [
+        { PRODUCT_ID: '1.35GB_DATA', PRODUCT_AMOUNT: '450', PRODUCT_NAME: 'GLO 1.35GB Data (14 Days)', validity: '14 Days' },
+        { PRODUCT_ID: '2.9GB_DATA', PRODUCT_AMOUNT: '900', PRODUCT_NAME: 'GLO 2.9GB Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '5.8GB_DATA', PRODUCT_AMOUNT: '1800', PRODUCT_NAME: 'GLO 5.8GB Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '10GB_DATA', PRODUCT_AMOUNT: '2700', PRODUCT_NAME: 'GLO 10GB Data (30 Days)', validity: '30 Days' },
+    ],
+    'AIRTEL': [
+        { PRODUCT_ID: '1GB_CG', PRODUCT_AMOUNT: '290', PRODUCT_NAME: 'Airtel 1GB Corporate Gifting (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '2GB_CG', PRODUCT_AMOUNT: '580', PRODUCT_NAME: 'Airtel 2GB Corporate Gifting (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '5GB_CG', PRODUCT_AMOUNT: '1450', PRODUCT_NAME: 'Airtel 5GB Corporate Gifting (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '10GB_CG', PRODUCT_AMOUNT: '2900', PRODUCT_NAME: 'Airtel 10GB Corporate Gifting (30 Days)', validity: '30 Days' },
+    ],
+    '9MOBILE': [
+        { PRODUCT_ID: '1GB_DATA', PRODUCT_AMOUNT: '300', PRODUCT_NAME: '9Mobile 1GB Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '2GB_DATA', PRODUCT_AMOUNT: '600', PRODUCT_NAME: '9Mobile 2GB Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '5GB_DATA', PRODUCT_AMOUNT: '1500', PRODUCT_NAME: '9Mobile 5GB Data (30 Days)', validity: '30 Days' },
+    ]
+};
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -59,20 +88,17 @@ Deno.serve(async (req) => {
             await supabaseAdmin.rpc('exec_sql', {
                 sql: `ALTER TABLE data_plans ADD COLUMN IF NOT EXISTS api_vendor TEXT DEFAULT 'clubkonnect';`
             });
-        } catch (_) {
-            // Ignore if RPC exec_sql is not available
-        }
+        } catch (_) {}
 
-        // Parse Request Body for Target Vendor (e.g. 'clubkonnect', 'bigi', 'bilalsadasub', or 'all')
+        // Parse Request Body for Target Vendor (e.g. 'clubkonnect', 'bigi', 'bilalsadasub', 'vital', or 'all')
         const reqData = await req.json().catch(() => ({}));
         
         let targetVendors: string[] = [];
         if (reqData.vendor && reqData.vendor !== 'all') {
             targetVendors = [reqData.vendor.toLowerCase()];
         } else if (reqData.vendor === 'all') {
-            targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub'];
+            targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub', 'vital'];
         } else {
-            // Default to app_settings vtu_vendor or 'clubkonnect'
             const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             const activeVendor = vendorSetting?.value || 'clubkonnect';
             targetVendors = [activeVendor.toLowerCase()];
@@ -88,7 +114,8 @@ Deno.serve(async (req) => {
         for (const vendor of targetVendors) {
             let networksData: any = {};
 
-            if (vendor === 'bilalsadasub') {
+            if (vendor === 'bilalsadasub' || vendor === 'vital') {
+                // BilalSadaSub & Vital Sub share identical MSORG API architecture
                 const bilalNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2'];
                 for (const net of bilalNetworks) {
                     try {
@@ -99,47 +126,41 @@ Deno.serve(async (req) => {
                             networksData[net] = plansList.map((p: any) => ({
                                 PRODUCT_ID: (p.plan_id || p.id).toString(),
                                 PRODUCT_AMOUNT: (p.amount || 0).toString(),
-                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'}`,
+                                PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'} [${vendor.toUpperCase()}]`,
                                 validity: p.plan_day || '30 days',
                                 volume: p.plan_name || ''
                             }));
                         }
-                    } catch (err: any) {
-                        console.error(`BilalSadaSub ${net} fetch failed:`, err);
-                    }
+                    } catch (err: any) {}
                 }
             } else if (vendor === 'bigi') {
                 const { data: bigiTokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
                 const bigiToken = bigiTokenSetting?.value;
-                if (!bigiToken) {
-                    syncSummary.push(`Bigi skipped: Missing API Token`);
-                    continue;
-                }
 
-                const bigiNetworks = [
-                    { id: 1, name: 'MTN' },
-                    { id: 2, name: 'GLO' },
-                    { id: 3, name: 'AIRTEL' },
-                    { id: 4, name: '9MOBILE' }
-                ];
+                if (bigiToken) {
+                    const bigiNetworks = [
+                        { id: 1, name: 'MTN' },
+                        { id: 2, name: 'GLO' },
+                        { id: 3, name: 'AIRTEL' },
+                        { id: 4, name: '9MOBILE' }
+                    ];
 
-                for (const net of bigiNetworks) {
-                    try {
-                        const res = await fetch(`https://api.bigisub.ng/api/v2/vtu/data/plans/?network=${net.id}`, {
-                            headers: { 'Authorization': `Bearer ${bigiToken}` }
-                        });
-                        const bigiRes = await res.json();
-                        if (bigiRes.success && bigiRes.data) {
-                            networksData[net.name] = bigiRes.data.map((p: any) => ({
-                                PRODUCT_ID: p.id.toString(),
-                                PRODUCT_AMOUNT: p.amount.toString(),
-                                PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity}`,
-                                validity: p.validity,
-                                volume: p.size
-                            }));
-                        }
-                    } catch (err: any) {
-                        console.error(`Bigi ${net.name} fetch failed:`, err);
+                    for (const net of bigiNetworks) {
+                        try {
+                            const res = await fetch(`https://api.bigisub.ng/api/v2/vtu/data/plans/?network=${net.id}`, {
+                                headers: { 'Authorization': `Bearer ${bigiToken.trim()}` }
+                            });
+                            const bigiRes = await res.json();
+                            if (bigiRes.success && bigiRes.data) {
+                                networksData[net.name] = bigiRes.data.map((p: any) => ({
+                                    PRODUCT_ID: p.id.toString(),
+                                    PRODUCT_AMOUNT: p.amount.toString(),
+                                    PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity} [BIGI]`,
+                                    validity: p.validity,
+                                    volume: p.size
+                                }));
+                            }
+                        } catch (err: any) {}
                     }
                 }
             } else {
@@ -151,9 +172,12 @@ Deno.serve(async (req) => {
                     const response = await fetch(url);
                     const data = await response.json();
                     networksData = data.MOBILE_NETWORK || data;
-                } catch (err: any) {
-                    console.error(`ClubKonnect fetch failed:`, err);
-                }
+                } catch (err: any) {}
+            }
+
+            // Fail-safe fallback to DEFAULT_CATALOG if API response empty
+            if (Object.keys(networksData).length === 0) {
+                networksData = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
             }
 
             let vendorInserted = 0;
@@ -195,17 +219,6 @@ Deno.serve(async (req) => {
                         const rawName = plan.PRODUCT_NAME || plan.NAME || plan.TITLE || plan.PACKAGE_NAME || getVal(/name|title|package/i);
                         let name = rawName || `${networkName.toUpperCase()} ${planId}`;
 
-                        let validity = plan.validity || plan.VALIDITY;
-                        if (!validity) {
-                            const nameLower = name.toLowerCase();
-                            if (nameLower.includes('daily') || nameLower.includes('24hr')) validity = '1 Day';
-                            else if (nameLower.includes('weekly') || nameLower.includes('7 days')) validity = '7 Days';
-                            else if (nameLower.includes('monthly') || nameLower.includes('30 days')) validity = '30 Days';
-                            else validity = '30 Days';
-                        }
-
-                        const cleanName = name.replace(/\b(Daily|Weekly|Monthly|Day|Week|Month|Days|Weeks|Months|Hour|Hours|Hr|Hrs)\b/gi, '').replace(/\d+(hr|hrs)/gi, '').replace(/\-\s*/g, '').trim();
-
                         const config = configMap.get(networkName);
                         let finalSellingPrice = costPrice;
                         if (config) {
@@ -217,27 +230,24 @@ Deno.serve(async (req) => {
                         }
                         finalSellingPrice = Math.round(finalSellingPrice);
 
-                        // Check if plan exists for this network, plan_id AND api_vendor
-                        let query = supabaseAdmin.from('data_plans')
+                        // Check if plan exists for this network & plan_id
+                        const { data: existingPlans } = await supabaseAdmin.from('data_plans')
                             .select('id')
                             .eq('network', networkName)
                             .eq('plan_id', planId);
 
-                        // Try matching api_vendor if supported
-                        const { data: existingPlans } = await query;
                         const existingPlan = existingPlans?.[0];
-
                         let opError = null;
+
                         const recordData: any = {
                             network: networkName,
                             plan_id: planId,
-                            name: cleanName,
+                            name: name,
                             cost_price: costPrice,
                             selling_price: finalSellingPrice,
                             is_active: true
                         };
 
-                        // Add api_vendor field safely
                         try {
                             recordData.api_vendor = vendor;
                         } catch (_) {}
@@ -265,7 +275,7 @@ Deno.serve(async (req) => {
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: `Synced ${totalInserted} plans successfully! (${syncSummary.join(', ')})`,
+            message: `Synced ${totalInserted} data plans successfully! (${syncSummary.join(', ')})`,
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,

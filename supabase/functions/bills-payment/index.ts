@@ -68,13 +68,14 @@ Deno.serve(async (req: Request) => {
         const { data: secretsData } = await rpcClient
             .from('system_secrets')
             .select('key, value')
-            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN', 'BILALSADASUB_API_TOKEN', 'BILAL_TOKEN', 'BILAL_API_TOKEN']);
+            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN', 'BILALSADASUB_API_TOKEN', 'BILAL_TOKEN', 'BILAL_API_TOKEN', 'VITAL_API_TOKEN', 'VITAL_TOKEN', 'VITAL_KEY']);
             
         const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
         const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
         const bigiToken = secretsData?.find(s => s.key === 'BIGI_API_TOKEN')?.value;
         const bigiPin = secretsData?.find(s => s.key === 'BIGI_API_PIN')?.value;
         const bilalToken = secretsData?.find(s => s.key === 'BILALSADASUB_TOKEN' || s.key === 'BILALSADASUB_API_TOKEN' || s.key === 'BILAL_TOKEN' || s.key === 'BILAL_API_TOKEN')?.value;
+        const vitalToken = secretsData?.find(s => s.key === 'VITAL_API_TOKEN' || s.key === 'VITAL_TOKEN' || s.key === 'VITAL_KEY')?.value || bilalToken;
 
         // Fetch VTU vendor from app_settings
         const { data: settingsData } = await rpcClient
@@ -85,73 +86,64 @@ Deno.serve(async (req: Request) => {
 
         // Handle Airtime to Cash actions directly before balance deduction
         if (type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
-            if (!bilalToken) {
-                console.error("[Bills] BILALSADASUB_TOKEN is missing in system_secrets table");
+            const activeCashToken = bilalToken || vitalToken;
+            if (!activeCashToken) {
+                console.error("[Bills] BILALSADASUB_TOKEN / VITAL_TOKEN is missing in system_secrets table");
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    error: "Bilalsadasub API Token missing. Admin must configure Bilalsadasub API Token in Settings -> API Vault." 
+                    error: "Bilalsadasub / Vital Sub API Token missing. Admin must configure API Token in Settings -> API Vault." 
                 }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200
                 });
             }
-            const bilalClient = new BilalsadasubClient(bilalToken);
+            const bilalClient = new BilalsadasubClient(activeCashToken);
 
             if (type === 'cash_rates') {
-                const rates = await bilalClient.getCashRates();
-                return new Response(JSON.stringify({ success: true, data: rates }), {
+                const res = await fetch('https://bilalsadasub.com/api/v1/airtime-to-cash/rates');
+                const data = await res.json();
+                return new Response(JSON.stringify({ success: true, data }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200
                 });
             }
 
-            const pParams = data.providerParams || data;
-            const netVal = pParams.network;
-            const phoneVal = pParams.phone;
-
             if (type === 'cash_step1') {
-                console.log(`[Bills] Airtime to Cash Step 1 (Request OTP) for ${phoneVal} on network ${netVal}`);
-                const step1Res = await bilalClient.requestCashOtp(netVal, phoneVal);
-                return new Response(JSON.stringify({ success: true, data: step1Res }), {
+                const { network, amount, phone } = data;
+                const res = await bilalClient.airtimeToCashStep1(network, Number(amount), phone);
+                return new Response(JSON.stringify({ success: true, data: res }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200
                 });
             }
 
             if (type === 'cash_step2') {
-                console.log(`[Bills] Airtime to Cash Step 2 (Verify OTP) for ${phoneVal}`);
-                const step2Res = await bilalClient.verifyCashOtp(netVal, phoneVal, pParams.otp, pParams.sessionBlob);
-                return new Response(JSON.stringify({ success: true, data: step2Res }), {
+                const { transid, otp } = data;
+                const res = await bilalClient.airtimeToCashStep2(transid, otp);
+                return new Response(JSON.stringify({ success: true, data: res }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200
                 });
             }
 
             if (type === 'cash_step3') {
-                console.log(`[Bills] Airtime to Cash Step 3 (Finalise) for ${phoneVal}, amount: ₦${pParams.amount}`);
-                const step3Res = await bilalClient.finaliseCashConversion(
-                    netVal,
-                    phoneVal,
-                    Number(pParams.amount),
-                    pParams.sharePin,
-                    pParams.sessionBlob
-                );
-
-                // Credit user wallet with converted cash amount
-                const creditedAmount = parseFloat(step3Res.credited || (Number(pParams.amount) * 0.8));
-                if (creditedAmount > 0 && userId) {
+                const { network, amount, phone } = data;
+                const step3Res = await bilalClient.airtimeToCashStep3(network, Number(amount), phone);
+                
+                if (step3Res.status === 'success' || step3Res.status === 'completed') {
+                    const creditedAmount = Number(step3Res.credited_amount || amount * 0.8);
                     await rpcClient.rpc('deduct_balance', {
-                        user_id_param: userId,
-                        amount_param: -creditedAmount
+                        user_id: userId,
+                        amount: -creditedAmount
                     });
 
-                    await rpcClient.from('transactions').insert({
+                    await rpcClient.from('wallet_transactions').insert({
                         user_id: userId,
                         type: 'credit',
                         amount: creditedAmount,
                         status: 'completed',
                         reference: step3Res.transid || `AC_${Date.now()}`,
-                        description: `Airtime to Cash (${phoneVal}) -> +₦${creditedAmount.toLocaleString()}`
+                        description: `Airtime to Cash (${phone}) -> +₦${creditedAmount.toLocaleString()}`
                     });
                 }
 
@@ -167,7 +159,6 @@ Deno.serve(async (req: Request) => {
         const client = new ClubKonnectClient(ckUserId, ckApiKey);
         const requestId = data.requestId || `REQ-${Date.now()}`;
 
-        // Network Mapping
         const getNetworkCode = (net: string): '01' | '02' | '03' | '04' | string => {
             const map: Record<string, '01' | '02' | '03' | '04'> = { 'mtn': '01', 'glo': '02', '9mobile': '03', 'airtel': '04' };
             return map[net?.toLowerCase()] || net;
@@ -191,7 +182,6 @@ Deno.serve(async (req: Request) => {
             amountToCharge = Number(data.amount);
             if (amountToCharge < 50) throw new Error("Minimum Airtime is N50");
 
-            // Airtime Discount Check
             const { data: config } = await supabaseClient
                 .from('airtime_configs')
                 .select('sell_percentage')
@@ -211,18 +201,15 @@ Deno.serve(async (req: Request) => {
              amountToCharge = Number(data.amount) * (Number(data.quantity) || 1);
              if (amountToCharge < 500) throw new Error("Invalid Education Amount");
              providerParams = { examType: data.examType, phone: data.phone, profileId: data.profileId, quantity: data.quantity || 1 };
-        } else if (type === 'get_plans' || type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
-             // Just pass through (already processed or non-deductible)
+        } else if (type === 'get_plans') {
+             // Just pass through
         } else {
              throw new Error(`Unsupported service type: ${type}`);
         }
 
         console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
 
-        console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
-
         if (type !== 'get_plans') {
-            // 3. Deduct Balance
             const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
                 user_id: userId,
                 amount: amountToCharge
@@ -238,11 +225,11 @@ Deno.serve(async (req: Request) => {
             console.log(`[Bills] Balance Deducted. New Balance: ₦${newBalance}`);
         }
 
-        // 4. Call Provider (ClubKonnect, Bigi, or Bilalsadasub)
+        // 4. Call Provider (ClubKonnect, Bigi, Bilalsadasub, or Vital Sub)
         let result: any;
         try {
             if (type === 'get_plans') {
-                if (vtuVendor === 'bilalsadasub') {
+                if (vtuVendor === 'bilalsadasub' || vtuVendor === 'vital') {
                     const netName = (data.network || 'MTN').toString().toUpperCase();
                     const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${netName}`);
                     const plansData = await res.json();
@@ -254,7 +241,6 @@ Deno.serve(async (req: Request) => {
                     if (!bigiToken) throw new Error("Bigi API Token missing in settings");
                     const bigiClient = new BigiClient(bigiToken, bigiPin || '');
                     
-                    // Bigi network IDs
                     const netLower = data.network.toLowerCase();
                     let netId = 1;
                     if (netLower.includes('glo')) netId = 2;
@@ -282,24 +268,26 @@ Deno.serve(async (req: Request) => {
             }
 
             if (type === 'airtime' || type === 'data') {
-                // Determine vendor execution order with automatic failover
                 let vendorOrder: string[] = [];
                 if (vtuVendor && vtuVendor.includes(',')) {
                     vendorOrder = vtuVendor.split(',').map((v: string) => v.trim()).filter(Boolean);
                 } else if (vtuVendor === 'bigi') {
-                    vendorOrder = ['bigi', 'bilalsadasub', 'clubkonnect'];
+                    vendorOrder = ['bigi', 'bilalsadasub', 'vital', 'clubkonnect'];
                 } else if (vtuVendor === 'clubkonnect') {
-                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'bigi'];
+                    vendorOrder = ['clubkonnect', 'bilalsadasub', 'vital', 'bigi'];
+                } else if (vtuVendor === 'vital') {
+                    vendorOrder = ['vital', 'bilalsadasub', 'bigi', 'clubkonnect'];
                 } else {
-                    vendorOrder = ['bilalsadasub', 'bigi', 'clubkonnect'];
+                    vendorOrder = ['bilalsadasub', 'vital', 'bigi', 'clubkonnect'];
                 }
 
                 let lastError: any = null;
                 for (const vendor of vendorOrder) {
                     try {
                         console.log(`[Bills] Trying VTU Vendor: ${vendor}`);
-                        if (vendor === 'bilalsadasub' && bilalToken) {
-                            const bilalClient = new BilalsadasubClient(bilalToken);
+                        if ((vendor === 'bilalsadasub' || vendor === 'vital') && (bilalToken || vitalToken)) {
+                            const activeToken = (vendor === 'vital' ? vitalToken : bilalToken) || bilalToken || '';
+                            const bilalClient = new BilalsadasubClient(activeToken);
                             if (type === 'airtime') {
                                 result = await bilalClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
@@ -310,7 +298,7 @@ Deno.serve(async (req: Request) => {
                             if (type === 'airtime') {
                                 result = await bigiClient.buyAirtime(providerParams.network as string, providerParams.phone as string, providerParams.amount as number, requestId);
                             } else {
-                                result = await bigiClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
+                                result = await bilalClient.buyData(providerParams.network as string, providerParams.phone as string, providerParams.planId as string, requestId);
                             }
                         } else if (vendor === 'clubkonnect' && ckUserId && ckApiKey) {
                             if (type === 'airtime') {
