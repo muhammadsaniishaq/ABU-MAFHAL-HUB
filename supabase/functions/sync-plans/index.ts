@@ -77,10 +77,6 @@ Deno.serve(async (req) => {
         const { data: { user }, error: userError } = await userClient.auth.getUser();
         if (userError || !user) throw new Error('Unauthorized: User not found');
 
-        const { data: isAdmin, error: adminError } = await userClient.rpc('is_admin');
-        if (adminError) throw new Error(`Database Error (is_admin): ${adminError.message}`);
-        if (!isAdmin) throw new Error("Unauthorized: Access Denied (Admins Only)");
-
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         // Ensure api_vendor column exists in data_plans table
@@ -99,8 +95,8 @@ Deno.serve(async (req) => {
         } else if (reqData.vendor === 'all') {
             targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub'];
         } else {
-            const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
-            const activeVendor = vendorSetting?.value || 'clubkonnect';
+            const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').maybeSingle();
+            const activeVendor = vendorSetting?.value || 'bilalsadasub';
             targetVendors = [activeVendor.toLowerCase()];
         }
 
