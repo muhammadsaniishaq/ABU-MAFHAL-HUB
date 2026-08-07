@@ -88,8 +88,8 @@ serve(async (req: Request) => {
     const clubkonnectUserId = secrets['CLUBKONNECT_USER_ID'] || secrets['CLUBKONNECT_USER'] || ''
     const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
     const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
-    const payVesselSecret = secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_SECRET'] || ''
-    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || Deno.env.get('NINEBOOST_API_KEY') || ''
+    const payVesselSecret = secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_SECRET'] || secrets['PAYVESSEL_API_SECRET'] || ''
+    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || secrets['NINE_BOOST_API_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
@@ -166,21 +166,42 @@ serve(async (req: Request) => {
       })
     }
 
-    // 2. BilalSadaSub (Data, Airtime, VTU)
+    // 2. BilalSadaSub (Data, Airtime, VTU) - Official Spec: POST https://bilalsadasub.com/api/user
     if (bilalToken && bilalToken.trim() !== '') {
       let balance = 0
       let latencyMs = 210
+      let fetched = false
+
+      // Attempt 1: POST https://bilalsadasub.com/api/user with Token header
       try {
-        const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
-          headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json' }
+        const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user', {
+          method: 'POST',
+          headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
         })
         const data = await response.json()
-        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
-        if (rawBal !== undefined) {
+        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? data?.user?.balance
+        if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: GET https://bilalsadasub.com/api/user/ with Token header
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
+            headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'bilalsadasub',
@@ -256,20 +277,38 @@ serve(async (req: Request) => {
       })
     }
 
-    // 4. Clubkonnect API
+    // 4. Clubkonnect / NelloByte API - Official Spec: GET https://www.nellobytesystems.com/APIWalletBalanceV1.asp?UserID=...&APIKey=...
     if (clubkonnectKey && clubkonnectKey.trim() !== '') {
       let balance = 0
       let latencyMs = 140
-      const userId = clubkonnectUserId || 'ABUMAFHAL'
+      let fetched = false
+      const userId = clubkonnectUserId || 'CK101269551' || 'ABUMAFHAL'
+
+      // Attempt 1: Official NelloByte Systems API Endpoint
       try {
-        const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/api/balance/?UserID=${userId}&APIKey=${clubkonnectKey.trim()}`)
+        const { response, latency } = await fetchWithTimeout(`https://www.nellobytesystems.com/APIWalletBalanceV1.asp?UserID=${userId}&APIKey=${clubkonnectKey.trim()}`)
         const data = await response.json()
         const rawBal = data?.balance ?? data?.user?.balance ?? data?.wallet_balance
-        if (rawBal !== undefined) {
+        if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: Fallback Clubkonnect Domain Endpoint
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout(`https://www.clubkonnect.com/APIWalletBalanceV1.asp?UserID=${userId}&APIKey=${clubkonnectKey.trim()}`)
+          const data = await response.json()
+          const rawBal = data?.balance ?? data?.user?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'clubkonnect',
@@ -380,21 +419,6 @@ serve(async (req: Request) => {
         } catch (e) {}
       }
 
-      // Attempt 3: GET https://api.payvessel.com/api/v1/wallets
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/wallets', { headers })
-          const data = await response.json()
-          const walletObj = Array.isArray(data) ? data[0] : (data?.data?.[0] || data?.wallets?.[0] || data)
-          const rawBal = walletObj?.available_balance ?? walletObj?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
       providerBalances.push({
         id: 'payvessel',
         name: 'PayVessel (Payment & Payout Gateway)',
@@ -421,26 +445,58 @@ serve(async (req: Request) => {
       })
     }
 
-    // 7. NineBoost (Social Media Marketing SMM Panel)
+    // 7. NineBoost / 9Boost (Social Media Marketing SMM Panel) - Official Spec: POST https://9boost.me/api/v2
     if (nineBoostKey && nineBoostKey.trim() !== '') {
       let balance = 0
       let latencyMs = 190
+      let currency = 'NGN'
+      let fetched = false
+
+      // Attempt 1: POST https://9boost.me/api/v2 (Official SMM Panel v2 POST form)
       try {
-        const { response, latency } = await fetchWithTimeout(`https://nineboost.com/api/v2?key=${nineBoostKey.trim()}&action=balance`)
+        const bodyParams = new URLSearchParams()
+        bodyParams.append('key', nineBoostKey.trim())
+        bodyParams.append('action', 'balance')
+
+        const { response, latency } = await fetchWithTimeout('https://9boost.me/api/v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: bodyParams.toString()
+        })
         const data = await response.json()
         const rawBal = data?.balance ?? data?.data?.balance
-        if (rawBal !== undefined) {
+        if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
+          if (data?.currency) currency = data.currency
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: Fallback GET https://9boost.me/api/v2?key=...&action=balance
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout(`https://9boost.me/api/v2?key=${nineBoostKey.trim()}&action=balance`)
+          const data = await response.json()
+          const rawBal = data?.balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            if (data?.currency) currency = data.currency
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'nineboost',
         name: 'NineBoost (Social Media Marketing SMM Panel)',
         category: 'Marketing Services',
         balance: isNaN(balance) ? 0 : balance,
-        currency: 'USD',
+        currency: currency,
         latencyMs,
         status: 'healthy',
         error: undefined,
@@ -453,7 +509,7 @@ serve(async (req: Request) => {
         name: 'NineBoost (Social Media Marketing SMM Panel)',
         category: 'Marketing Services',
         balance: 0,
-        currency: 'USD',
+        currency: 'NGN',
         status: 'unconfigured',
         error: 'API Key not configured in Vault',
         allowDeposit: true,
@@ -503,21 +559,57 @@ serve(async (req: Request) => {
       })
     }
 
-    // 9. Bigi VTU
+    // 9. Bigi VTU Portal (Bigisub.ng)
     if (bigiToken && bigiToken.trim() !== '') {
       let balance = 0
       let latencyMs = 230
+      let fetched = false
+
+      // Attempt 1: GET https://bigisub.ng/api/v2/wallet/balance (Bearer header)
       try {
-        const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
-          headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
+        const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/wallet/balance', {
+          headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
         })
         const data = await response.json()
-        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
-        if (rawBal !== undefined) {
+        const rawBal = data?.balance ?? data?.data?.balance ?? data?.user?.wallet_balance ?? data?.wallet_balance
+        if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
+          fetched = true
         }
       } catch (e) {}
+
+      // Attempt 2: GET https://bigisub.ng/api/user/ (Token header)
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/user/', {
+            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: Legacy GET https://bigidata.com/api/user/
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bigidata.com/api/user/', {
+            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
 
       providerBalances.push({
         id: 'bigi',
