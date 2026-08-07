@@ -33,6 +33,23 @@ export default function ManageDataPlans() {
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
     const [settingActiveVendor, setSettingActiveVendor] = useState(false);
 
+    // Custom Alert Popup State for Web & Mobile
+    const [alertModal, setAlertModal] = useState<{ visible: boolean; title: string; message: string; type: 'success' | 'error' }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'success'
+    });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+        setAlertModal({ visible: true, title, message, type });
+        if (Platform.OS === 'web') {
+            try { window.alert(`${title}\n\n${message}`); } catch (_) {}
+        } else {
+            Alert.alert(title, message);
+        }
+    };
+
     // Markup configs states
     const [configs, setConfigs] = useState<any[]>([]);
     const [editingConfig, setEditingConfig] = useState<any | null>(null);
@@ -111,10 +128,10 @@ export default function ManageDataPlans() {
                 await supabase.from('system_secrets').upsert({ key: 'VTU_VENDOR', value: vendorId }, { onConflict: 'key' });
             }
             setActiveVendor(vendorId);
-            Alert.alert("Success", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API for system transactions!`);
+            showAlert("Success 🎉", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API for system transactions!`, 'success');
         } catch (e: any) {
             setActiveVendor(vendorId);
-            Alert.alert("Active Vendor Updated", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API!`);
+            showAlert("Active Vendor Updated ✅", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API!`, 'success');
         } finally {
             setSettingActiveVendor(false);
         }
@@ -129,23 +146,21 @@ export default function ManageDataPlans() {
             });
 
             if (error) {
-                Alert.alert('Sync Error ⚠️', `Could not invoke sync function: ${error.message}`);
+                showAlert('Sync Error ⚠️', `Could not invoke sync function: ${error.message}`, 'error');
                 return;
             }
 
             if (data && data.success === false) {
-                Alert.alert('Sync Failed ⚠️', data.error || 'Failed to sync data plans from API');
+                showAlert('Sync Failed ⚠️', data.error || 'Failed to sync data plans from API', 'error');
                 return;
             }
 
             const message = data?.message || `Data plans synced successfully for ${targetVendor.toUpperCase()}!`;
-            Alert.alert('Sync Complete ✅', message, [
-                { text: 'OK', onPress: () => fetchPlans() }
-            ]);
+            showAlert('Sync Complete ✅', message, 'success');
             await fetchPlans();
         } catch (err: any) {
             console.error('Sync Error:', err);
-            Alert.alert('Sync Exception ⚠️', err.message || 'An error occurred while syncing data plans.');
+            showAlert('Sync Exception ⚠️', err.message || 'An error occurred while syncing data plans.', 'error');
         } finally {
             setSyncing(false);
         }
@@ -595,6 +610,37 @@ export default function ManageDataPlans() {
                     </View>
                 </Modal>
             )}
+
+            {/* Custom Interactive Alert Modal for Web Browsers & Mobile */}
+            <Modal
+                transparent
+                visible={alertModal.visible}
+                animationType="fade"
+                onRequestClose={() => setAlertModal(prev => ({ ...prev, visible: false }))}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                    <View style={{ width: '100%', maxWidth: 420, backgroundColor: '#ffffff', borderRadius: 20, padding: 24, borderWidth: 2, borderColor: alertModal.type === 'success' ? '#22c55e' : '#ef4444', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
+                        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: alertModal.type === 'success' ? '#dcfce7' : '#fee2e2', alignItems: 'center', justifySelf: 'center', alignSelf: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <Text style={{ fontSize: 26 }}>{alertModal.type === 'success' ? '✅' : '⚠️'}</Text>
+                        </View>
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: alertModal.type === 'success' ? '#15803d' : '#b91c1c', textAlign: 'center', marginBottom: 10 }}>
+                            {alertModal.title}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: '#334155', lineHeight: 22, textAlign: 'center', fontWeight: '500', marginBottom: 24 }}>
+                            {alertModal.message}
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setAlertModal(prev => ({ ...prev, visible: false }));
+                                fetchPlans();
+                            }}
+                            style={{ backgroundColor: alertModal.type === 'success' ? '#16a34a' : '#dc2626', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' }}
+                        >
+                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>OK / Tabbatar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
