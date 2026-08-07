@@ -66,7 +66,8 @@ export class BilalsadasubClient {
      */
     async buyData(network: string, phone: string, planId: string, requestId: string) {
         const networkId = this.getNetworkId(network);
-        const planInt = parseInt(planId, 10);
+        const cleanPlanId = (planId || '').toString().replace(/^[^\d]+/, '');
+        const planInt = parseInt(cleanPlanId || planId, 10);
 
         const res = await fetch(`${this.baseUrl}/api/data`, {
             method: 'POST',

@@ -149,22 +149,18 @@ export const api = {
 
                 let resultPlans = plans || [];
 
-                // Filter by active vendor if api_vendor column exists and plans specify vendor
-                if (resultPlans.length > 0 && resultPlans.some(p => p.api_vendor)) {
-                    const vendorFiltered = resultPlans.filter(p => p.api_vendor === activeVendor || p.api_vendor === 'bilalsadasub');
-                    if (vendorFiltered.length > 0) {
-                        resultPlans = vendorFiltered;
+                // Filter by active vendor (BilalSadaSub, Bigi, ClubKonnect)
+                if (resultPlans.length > 0) {
+                    if (activeVendor === 'bilalsadasub') {
+                        const bilalPlans = resultPlans.filter(p => p.name?.includes('[BILAL]') || p.api_vendor === 'bilalsadasub');
+                        if (bilalPlans.length > 0) resultPlans = bilalPlans;
+                    } else if (activeVendor === 'bigi') {
+                        const bigiPlans = resultPlans.filter(p => p.name?.includes('[BIGI]') || p.api_vendor === 'bigi');
+                        if (bigiPlans.length > 0) resultPlans = bigiPlans;
+                    } else if (activeVendor === 'clubkonnect') {
+                        const ckPlans = resultPlans.filter(p => !p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]'));
+                        if (ckPlans.length > 0) resultPlans = ckPlans;
                     }
-                }
-
-                // Fallback if no plans found for specific network filter
-                if (resultPlans.length === 0) {
-                    const { data: allPlans } = await supabase
-                        .from('data_plans')
-                        .select('*')
-                        .or('is_active.eq.true,is_active.is.null')
-                        .order('cost_price', { ascending: true });
-                    resultPlans = allPlans || [];
                 }
 
                 return resultPlans.map(p => ({
