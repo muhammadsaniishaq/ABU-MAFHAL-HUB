@@ -746,7 +746,7 @@ serve(async (req: Request) => {
             })
           })
           
-          if (!loginResp.ok) {
+          if (!loginResp.ok && loginResp.status !== 400) {
             // Fallback: try /api/v2/token/
             loginResp = await fetch('https://bigisub.ng/api/v2/token/', {
               method: 'POST',
@@ -759,12 +759,32 @@ serve(async (req: Request) => {
             })
           }
 
-          const loginData = await loginResp.json()
+          const loginData = await loginResp.json().catch(() => ({}))
           bigiDebugRaw = { loginStatus: loginResp.status, loginData }
 
-          const jwt = loginData?.data?.token ?? loginData?.data?.access_token ?? loginData?.data?.access ??
-            loginData?.token ?? loginData?.access ?? loginData?.access_token ?? loginData?.jwt ??
-            loginData?.key ?? loginData?.data?.key ?? loginData?.user?.token
+          const findJwtToken = (obj: any): string | null => {
+            if (!obj || typeof obj !== 'object') return null
+            const candidates = [
+              obj?.data?.token, obj?.data?.access_token, obj?.data?.access,
+              obj?.data?.tokens?.access, obj?.data?.token?.access, obj?.data?.key,
+              obj?.data?.auth_token, obj?.token, obj?.access, obj?.access_token,
+              obj?.jwt, obj?.key, obj?.auth_token, obj?.user?.token
+            ]
+            for (const c of candidates) {
+              if (c && typeof c === 'string' && c.trim().length > 5) return c.trim()
+            }
+            if (obj.data && typeof obj.data === 'object') {
+              for (const k of Object.keys(obj.data)) {
+                const v = obj.data[k]
+                if (typeof v === 'string' && (k.includes('token') || k.includes('key') || k.includes('access') || v.length > 20)) {
+                  return v.trim()
+                }
+              }
+            }
+            return null
+          }
+
+          const jwt = findJwtToken(loginData)
 
           if (jwt) {
             // Use JWT to fetch balance - try Bearer first, then Token
@@ -786,7 +806,7 @@ serve(async (req: Request) => {
               })
             }
 
-            balData = await balResp.json()
+            balData = await balResp.json().catch(() => ({}))
             bigiDebugRaw.balStatus = balResp.status
             bigiDebugRaw.balData = balData
             latencyMs = Date.now() - loginStart
@@ -794,7 +814,8 @@ serve(async (req: Request) => {
             if (rawBal !== undefined) balance = rawBal
             else bigiDebugError = `JWT ok but balance field unknown: ${JSON.stringify(balData).substring(0, 200)}`
           } else {
-            bigiDebugError = `Login failed (status ${loginResp.status}): ${JSON.stringify(loginData).substring(0, 200)}`
+            const errMsg = loginData?.message || loginData?.errors?.error?.[0] || loginData?.detail || JSON.stringify(loginData).substring(0, 150)
+            bigiDebugError = `Login failed (${errMsg})`
           }
         } catch (e: any) {
           bigiDebugError = `JWT login error: ${e?.message || 'fetch failed'}`
