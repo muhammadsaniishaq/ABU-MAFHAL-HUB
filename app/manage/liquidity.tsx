@@ -85,6 +85,9 @@ export default function LiquidityVaultScreen() {
     const [tokenKeyName, setTokenKeyName] = useState('');
     const [tokenValue, setTokenValue] = useState('');
     const [tokenSaving, setTokenSaving] = useState(false);
+    // BilalSadaSub-specific: username + password
+    const [bilalUsername, setBilalUsername] = useState('');
+    const [bilalPassword, setBilalPassword] = useState('');
 
     // Withdrawal Form States
     const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -322,12 +325,35 @@ export default function LiquidityVaultScreen() {
             existingVal = vaultSecrets['PAYBESSEL_API_KEY'] || vaultSecrets['PAYBESSEL_KEY'] || '';
         }
         setTokenValue(existingVal);
+
+        // Pre-fill BilalSadaSub username & password from vault
+        if (p.id === 'bilalsadasub') {
+            setBilalUsername(
+                vaultSecrets['BILALSADASUB_USERNAME'] || vaultSecrets['BILAL_USERNAME'] || vaultSecrets['BILALSADASUB_USER'] || ''
+            );
+            setBilalPassword(
+                vaultSecrets['BILALSADASUB_PASSWORD'] || vaultSecrets['BILAL_PASSWORD'] || vaultSecrets['BILALSADASUB_PASS'] || ''
+            );
+        } else {
+            setBilalUsername('');
+            setBilalPassword('');
+        }
     };
 
     const handleSaveVaultToken = async () => {
-        if (!tokenValue || tokenValue.trim() === '') {
-            Alert.alert("Invalid Input", "Please enter a valid secret key value.");
-            return;
+        const isBilal = selectedTokenProvider?.id === 'bilalsadasub';
+
+        // For BilalSadaSub: require username + password (token is optional bonus)
+        if (isBilal) {
+            if (!bilalUsername.trim() || !bilalPassword.trim()) {
+                Alert.alert("Invalid Input", "Please enter both Username and Password for BilalSadaSub.");
+                return;
+            }
+        } else {
+            if (!tokenValue || tokenValue.trim() === '') {
+                Alert.alert("Invalid Input", "Please enter a valid secret key value.");
+                return;
+            }
         }
 
         setTokenSaving(true);
@@ -347,35 +373,55 @@ export default function LiquidityVaultScreen() {
             };
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';
-            
-            // Save to system_secrets table
-            await supabase.from('system_secrets').upsert({
-                key: secretKey,
-                value: tokenValue.trim(),
-                description: `Updated secret for ${selectedTokenProvider?.name}`,
-                updated_at: new Date().toISOString()
-            });
 
-            // Save to app_settings table as backup
-            await supabase.from('app_settings').upsert({
-                key: secretKey,
-                value: tokenValue.trim(),
-                updated_at: new Date().toISOString()
-            });
-
-            setVaultSecrets(prev => ({ ...prev, [secretKey]: tokenValue.trim() }));
-
-            await supabase.functions.invoke('check-provider-balances', {
-                body: {
-                    customKeys: {
-                        [secretKey]: tokenValue.trim()
-                    }
+            if (isBilal) {
+                // Save username & password to vault
+                const credsToSave = [
+                    { key: 'BILALSADASUB_USERNAME', value: bilalUsername.trim() },
+                    { key: 'BILALSADASUB_PASSWORD', value: bilalPassword.trim() },
+                ];
+                // Also save token if provided
+                if (tokenValue.trim()) {
+                    credsToSave.push({ key: 'BILALSADASUB_TOKEN', value: tokenValue.trim() });
                 }
-            });
+                for (const cred of credsToSave) {
+                    await supabase.from('system_secrets').upsert({
+                        key: cred.key, value: cred.value,
+                        description: `BilalSadaSub credential - ${cred.key}`,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    await supabase.from('app_settings').upsert({
+                        key: cred.key, value: cred.value,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+                }
+            } else {
+                // Normal save for other providers
+                await supabase.from('system_secrets').upsert({
+                    key: secretKey,
+                    value: tokenValue.trim(),
+                    description: `Updated secret for ${selectedTokenProvider?.name}`,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
+                await supabase.from('app_settings').upsert({
+                    key: secretKey,
+                    value: tokenValue.trim(),
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
+                setVaultSecrets(prev => ({ ...prev, [secretKey]: tokenValue.trim() }));
+            }
 
-            Alert.alert("Success 🎉", `Saved ${secretKey} to Vault successfully!`);
+            await supabase.functions.invoke('check-provider-balances', { body: {} });
+
+            Alert.alert("Success 🎉", isBilal
+                ? `BilalSadaSub credentials saved to Vault! Balance will update now.`
+                : `Saved ${secretKey} to Vault successfully!`
+            );
             setSelectedTokenProvider(null);
             setTokenValue('');
+            setBilalUsername('');
+            setBilalPassword('');
             fetchProviderBalances();
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to save secret key to Vault.");
@@ -755,34 +801,85 @@ export default function LiquidityVaultScreen() {
                         <View style={styles.modalDecorStripe} />
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={styles.modalTitle}>Vault Key for {selectedTokenProvider?.name}</Text>
+                            <Text style={styles.modalTitle}>Vault Key — {selectedTokenProvider?.name}</Text>
                             <TouchableOpacity onPress={() => setSelectedTokenProvider(null)}>
                                 <Ionicons name="close-circle" size={24} color={T.textSub} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.modalSubText}>
-                            View or update the secret API key for this vendor stored in Vault.
-                        </Text>
+                        {selectedTokenProvider?.id === 'bilalsadasub' ? (
+                            // BilalSadaSub: needs Username + Password (Basic Auth)
+                            <>
+                                <View style={{
+                                    backgroundColor: '#fffbeb', borderRadius: 10, padding: 10,
+                                    borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 14
+                                }}>
+                                    <Text style={{ color: '#92400e', fontSize: 11.5, fontWeight: '700' }}>
+                                        🔐 BilalSadaSub uses Username + Password authentication.
+                                        Enter your login credentials below — they are saved securely in Vault.
+                                    </Text>
+                                </View>
 
-                        <Text style={styles.inputLabel}>Secret Key Name</Text>
-                        <TextInput 
-                            style={[styles.modalInput, { backgroundColor: '#e2e8f0', color: T.textSub }]}
-                            value={tokenKeyName}
-                            editable={false}
-                        />
+                                <Text style={styles.inputLabel}>Username (Login)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Enter your BilalSadaSub username"
+                                    placeholderTextColor="#94a3b8"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    value={bilalUsername}
+                                    onChangeText={setBilalUsername}
+                                />
 
-                        <Text style={styles.inputLabel}>Secret Token Value</Text>
-                        <TextInput 
-                            style={styles.modalInput}
-                            placeholder="Paste API Key or Token here..."
-                            placeholderTextColor="#94a3b8"
-                            secureTextEntry={false}
-                            value={tokenValue}
-                            onChangeText={setTokenValue}
-                        />
+                                <Text style={styles.inputLabel}>Password</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Enter your BilalSadaSub password"
+                                    placeholderTextColor="#94a3b8"
+                                    secureTextEntry={true}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    value={bilalPassword}
+                                    onChangeText={setBilalPassword}
+                                />
 
-                        <TouchableOpacity 
+                                <Text style={[styles.inputLabel, { marginTop: 8 }]}>Access Token (Optional)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Paste token if you have one (optional)"
+                                    placeholderTextColor="#94a3b8"
+                                    autoCapitalize="none"
+                                    value={tokenValue}
+                                    onChangeText={setTokenValue}
+                                />
+                            </>
+                        ) : (
+                            // All other providers: just show Secret Key Name + Token Value
+                            <>
+                                <Text style={styles.modalSubText}>
+                                    View or update the secret API key for this vendor stored in Vault.
+                                </Text>
+
+                                <Text style={styles.inputLabel}>Secret Key Name</Text>
+                                <TextInput
+                                    style={[styles.modalInput, { backgroundColor: '#e2e8f0', color: T.textSub }]}
+                                    value={tokenKeyName}
+                                    editable={false}
+                                />
+
+                                <Text style={styles.inputLabel}>Secret Token Value</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Paste API Key or Token here..."
+                                    placeholderTextColor="#94a3b8"
+                                    secureTextEntry={false}
+                                    value={tokenValue}
+                                    onChangeText={setTokenValue}
+                                />
+                            </>
+                        )}
+
+                        <TouchableOpacity
                             onPress={handleSaveVaultToken}
                             disabled={tokenSaving}
                             style={styles.executeWithdrawBtn}
@@ -791,7 +888,9 @@ export default function LiquidityVaultScreen() {
                             {tokenSaving ? (
                                 <ActivityIndicator color={T.navy} size="small" />
                             ) : (
-                                <Text style={styles.executeWithdrawBtnText}>Save Secret Key to Vault</Text>
+                                <Text style={styles.executeWithdrawBtnText}>
+                                    {selectedTokenProvider?.id === 'bilalsadasub' ? 'Save Credentials to Vault' : 'Save Secret Key to Vault'}
+                                </Text>
                             )}
                         </TouchableOpacity>
                     </View>
