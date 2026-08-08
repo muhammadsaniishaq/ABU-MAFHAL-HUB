@@ -379,7 +379,6 @@ export const api = {
             await supabase.from('profiles').update({ balance: newBal }).eq('id', user.id);
 
             const txId = 'RCP' + Date.now().toString(36).toUpperCase();
-            const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);
 
             try {
                 await supabase.from('recharge_pins').insert({
