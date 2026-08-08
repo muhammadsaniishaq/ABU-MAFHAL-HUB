@@ -269,51 +269,24 @@ export const api = {
                 validPlanId = planMap[validPlanId] || 1;
             }
 
-            try {
-                const { data, error } = await supabase.functions.invoke('recharge-pin', {
-                    body: {
-                        action: 'purchase',
-                        planId: validPlanId,
-                        quantity: params.quantity,
-                        businessName: params.businessName
-                    }
-                });
-
-                if (!error && data && data.success !== false) {
-                    return data.data || data;
-                }
-                if (data && data.error) {
-                    throw new Error(data.error);
-                }
-            } catch (err: any) {
-                if (err.message && !err.message.includes('FunctionsFetchError')) {
-                    throw err;
-                }
-            }
-
-            const { data: secrets } = await supabase.from('system_secrets').select('key, value').in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
-            const secretMap = new Map(secrets?.map((s: any) => [s.key, s.value]) || []);
-            const token = secretMap.get('BIGI_API_TOKEN') || '';
-            const pin = secretMap.get('BIGI_API_PIN') || '0018';
-
-            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    plan: validPlanId,
+            const { data, error } = await supabase.functions.invoke('recharge-pin', {
+                body: {
+                    action: 'purchase',
+                    planId: validPlanId,
                     quantity: params.quantity,
-                    business_name: params.businessName || 'ABU MAFHAL VTU',
-                    pin: pin
-                })
+                    businessName: params.businessName
+                }
             });
-            const json = await res.json();
-            if (json.success) {
-                return json.data || json;
+
+            if (error) {
+                throw new Error(error.message || 'Recharge pin purchase request failed');
             }
-            throw new Error(json.message || json.detail || 'Recharge pin purchase failed');
+
+            if (data && data.success === false) {
+                throw new Error(data.error || data.message || 'Recharge pin purchase failed');
+            }
+
+            return data.data || data;
         }
     },
 

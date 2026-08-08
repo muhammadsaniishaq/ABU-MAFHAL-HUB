@@ -316,7 +316,7 @@ export default function RechargePinScreen() {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 32, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 120, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
 
                 <View style={{ width: '100%', maxWidth: 560 }}>
 
