@@ -761,61 +761,106 @@ serve(async (req: Request) => {
 
           const loginData = await loginResp.json().catch(() => ({}))
           bigiDebugRaw = { loginStatus: loginResp.status, loginData }
+          const cookies = loginResp.headers.get('set-cookie')
 
-          const findJwtToken = (obj: any): string | null => {
-            if (!obj || typeof obj !== 'object') return null
-            const candidates = [
-              obj?.data?.token, obj?.data?.access_token, obj?.data?.access,
-              obj?.data?.tokens?.access, obj?.data?.token?.access, obj?.data?.key,
-              obj?.data?.auth_token, obj?.token, obj?.access, obj?.access_token,
-              obj?.jwt, obj?.key, obj?.auth_token, obj?.user?.token
-            ]
-            for (const c of candidates) {
-              if (c && typeof c === 'string' && c.trim().length > 5) return c.trim()
-            }
-            if (obj.data && typeof obj.data === 'object') {
-              for (const k of Object.keys(obj.data)) {
-                const v = obj.data[k]
-                if (typeof v === 'string' && (k.includes('token') || k.includes('key') || k.includes('access') || v.length > 20)) {
-                  return v.trim()
+          // Check 1: Check if wallet_balance/balance is returned DIRECTLY in loginData!
+          const directBal = extractBigiBalance(loginData)
+          if (directBal !== undefined) {
+            balance = directBal
+            latencyMs = Date.now() - loginStart
+            bigiDebugError = ''
+          } else {
+            // Check 2: Deep recursive search for any token string inside loginData
+            const deepSearchToken = (val: any, depth = 0): string | null => {
+              if (!val || depth > 5) return null
+              if (typeof val === 'string') {
+                if (val.length >= 10 && !val.includes(' ') && !val.includes('{') && !val.includes('http')) {
+                  return val.trim()
+                }
+                return null
+              }
+              if (typeof val === 'object') {
+                const priorityKeys = ['token', 'access_token', 'access', 'jwt', 'key', 'auth_token', 'session_key', 'id_token', 'bearer']
+                for (const pk of priorityKeys) {
+                  if (typeof val[pk] === 'string' && val[pk].trim().length >= 5) {
+                    return val[pk].trim()
+                  }
+                }
+                if (val.data) {
+                  const res = deepSearchToken(val.data, depth + 1)
+                  if (res) return res
+                }
+                if (val.user) {
+                  const res = deepSearchToken(val.user, depth + 1)
+                  if (res) return res
+                }
+                if (val.result) {
+                  const res = deepSearchToken(val.result, depth + 1)
+                  if (res) return res
+                }
+                for (const k of Object.keys(val)) {
+                  if (k === 'message' || k === 'success' || k === 'status' || k === 'error' || k === 'errors' || k === 'detail') continue
+                  const res = deepSearchToken(val[k], depth + 1)
+                  if (res) return res
                 }
               }
-            }
-            return null
-          }
-
-          const jwt = findJwtToken(loginData)
-
-          if (jwt) {
-            // Use JWT to fetch balance - try Bearer first, then Token
-            let balData: any = null
-            let balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
-              method: 'GET',
-              headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' }
-            })
-            if (!balResp.ok) {
-              balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
-                method: 'GET',
-                headers: { 'Authorization': `Token ${jwt}`, 'Accept': 'application/json' }
-              })
-            }
-            if (!balResp.ok) {
-              balResp = await fetch('https://bigisub.ng/api/v2/user/', {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' }
-              })
+              return null
             }
 
-            balData = await balResp.json().catch(() => ({}))
-            bigiDebugRaw.balStatus = balResp.status
-            bigiDebugRaw.balData = balData
-            latencyMs = Date.now() - loginStart
-            const rawBal = extractBigiBalance(balData)
-            if (rawBal !== undefined) balance = rawBal
-            else bigiDebugError = `JWT ok but balance field unknown: ${JSON.stringify(balData).substring(0, 200)}`
-          } else {
-            const errMsg = loginData?.message || loginData?.errors?.error?.[0] || loginData?.detail || JSON.stringify(loginData).substring(0, 150)
-            bigiDebugError = `Login failed (${errMsg})`
+            const jwt = deepSearchToken(loginData)
+
+            if (jwt || cookies) {
+              // Try fetching balance with Bearer, Token, or Cookie
+              const fetchOptions: Array<{ headers: Record<string, string> }> = []
+              if (jwt) {
+                fetchOptions.push({ headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' } })
+                fetchOptions.push({ headers: { 'Authorization': `Token ${jwt}`, 'Accept': 'application/json' } })
+              }
+              if (cookies) {
+                fetchOptions.push({ headers: { 'Cookie': cookies, 'Accept': 'application/json' } })
+              }
+
+              const endpoints = [
+                'https://bigisub.ng/api/v2/wallet/balance/',
+                'https://bigisub.ng/api/v2/user/',
+                'https://bigisub.ng/api/v2/user/balance/'
+              ]
+
+              let fetchedBal = false
+              for (const ep of endpoints) {
+                if (fetchedBal) break
+                for (const opt of fetchOptions) {
+                  try {
+                    const bResp = await fetch(ep, opt)
+                    if (bResp.ok) {
+                      const bData = await bResp.json().catch(() => ({}))
+                      bigiDebugRaw.balStatus = bResp.status
+                      bigiDebugRaw.balData = bData
+                      const foundBal = extractBigiBalance(bData)
+                      if (foundBal !== undefined) {
+                        balance = foundBal
+                        latencyMs = Date.now() - loginStart
+                        fetchedBal = true
+                        bigiDebugError = ''
+                        break
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+
+              if (!fetchedBal) {
+                bigiDebugError = `Login ok but balance response structure: ${JSON.stringify(loginData).substring(0, 200)}`
+              }
+            } else {
+              const isSuccessMessage = loginData?.success === true || (typeof loginData?.message === 'string' && loginData.message.toLowerCase().includes('success'))
+              if (isSuccessMessage) {
+                bigiDebugError = `Login successful! Response data: ${JSON.stringify(loginData?.data || loginData).substring(0, 200)}`
+              } else {
+                const errMsg = loginData?.message || loginData?.errors?.error?.[0] || loginData?.detail || JSON.stringify(loginData).substring(0, 150)
+                bigiDebugError = `Login failed: ${errMsg}`
+              }
+            }
           }
         } catch (e: any) {
           bigiDebugError = `JWT login error: ${e?.message || 'fetch failed'}`
