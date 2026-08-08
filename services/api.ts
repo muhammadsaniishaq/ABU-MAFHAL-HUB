@@ -236,9 +236,12 @@ export const api = {
                 }
             } catch (_) {}
 
+            const { data: secrets } = await supabase.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
+            const token = secrets?.value || '';
+
             const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/plans/', {
                 headers: {
-                    'Authorization': 'Token 1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e',
+                    'Authorization': `Token ${token}`,
                     'Accept': 'application/json'
                 }
             });
@@ -256,7 +259,7 @@ export const api = {
                     info: p.info || ''
                 }));
             }
-            throw new Error('Failed to fetch recharge pin plans');
+            throw new Error(json.message || 'Failed to fetch recharge pin plans');
         },
 
         purchase: async (params: { planId: string | number; quantity: number; businessName?: string }) => {
@@ -288,17 +291,22 @@ export const api = {
                 }
             }
 
+            const { data: secrets } = await supabase.from('system_secrets').select('key, value').in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
+            const secretMap = new Map(secrets?.map((s: any) => [s.key, s.value]) || []);
+            const token = secretMap.get('BIGI_API_TOKEN') || '';
+            const pin = secretMap.get('BIGI_API_PIN') || '0018';
+
             const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
                 method: 'POST',
                 headers: {
-                    'Authorization': 'Token 1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e',
+                    'Authorization': `Token ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     plan: validPlanId,
                     quantity: params.quantity,
                     business_name: params.businessName || 'ABU MAFHAL VTU',
-                    pin: '0018'
+                    pin: pin
                 })
             });
             const json = await res.json();

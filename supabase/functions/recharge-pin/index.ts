@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
         const { data: secrets } = await supabaseAdmin.from('system_secrets').select('key, value');
         const secretMap = new Map(secrets?.map((s: any) => [s.key, s.value]) || []);
 
-        const bigiToken = secretMap.get('BIGI_API_TOKEN') || '1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e';
-        const bigiPin = secretMap.get('BIGI_API_PIN') || '0018';
+        const bigiToken = secretMap.get('BIGI_API_TOKEN') || Deno.env.get('BIGI_API_TOKEN') || '';
+        const bigiPin = secretMap.get('BIGI_API_PIN') || Deno.env.get('BIGI_API_PIN') || '0018';
 
         // 1. ACTION: GET RECHARGE PIN PLANS
         if (action === 'get-plans') {
