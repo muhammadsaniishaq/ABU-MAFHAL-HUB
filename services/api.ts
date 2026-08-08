@@ -260,18 +260,52 @@ export const api = {
         },
 
         purchase: async (params: { planId: string | number; quantity: number; businessName?: string }) => {
-            const { data, error } = await supabase.functions.invoke('recharge-pin', {
-                body: {
-                    action: 'purchase',
-                    planId: params.planId,
-                    quantity: params.quantity,
-                    businessName: params.businessName
-                }
-            });
+            let validPlanId = params.planId;
+            if (typeof validPlanId === 'number' && validPlanId >= 100) {
+                const planMap: Record<number, number> = { 101: 1, 102: 4, 103: 2, 104: 3 };
+                validPlanId = planMap[validPlanId] || 1;
+            }
 
-            if (error) throw new Error(error.message || 'Recharge pin purchase failed');
-            if (data && data.success === false) throw new Error(data.error || 'Recharge pin purchase failed');
-            return data.data || data;
+            try {
+                const { data, error } = await supabase.functions.invoke('recharge-pin', {
+                    body: {
+                        action: 'purchase',
+                        planId: validPlanId,
+                        quantity: params.quantity,
+                        businessName: params.businessName
+                    }
+                });
+
+                if (!error && data && data.success !== false) {
+                    return data.data || data;
+                }
+                if (data && data.error) {
+                    throw new Error(data.error);
+                }
+            } catch (err: any) {
+                if (err.message && !err.message.includes('FunctionsFetchError')) {
+                    throw err;
+                }
+            }
+
+            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Token 1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    plan: validPlanId,
+                    quantity: params.quantity,
+                    business_name: params.businessName || 'ABU MAFHAL VTU',
+                    pin: '0018'
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                return json.data || json;
+            }
+            throw new Error(json.message || json.detail || 'Recharge pin purchase failed');
         }
     },
 

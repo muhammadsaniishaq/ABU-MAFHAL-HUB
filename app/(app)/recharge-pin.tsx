@@ -77,7 +77,20 @@ export default function RechargePinScreen() {
     const [userBalance, setUserBalance] = useState<number>(474.00);
     const [purchasing, setPurchasing] = useState(false);
 
-    // Success Result Modal State
+    // Interactive Web/Mobile Alert Popup Modal State
+    const [alertModal, setAlertModal] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: 'success' | 'error' | 'warning';
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'warning'
+    });
+
+    // Success Voucher Result Modal State
     const [successModal, setSuccessModal] = useState<{
         visible: boolean;
         txData: any | null;
@@ -90,6 +103,15 @@ export default function RechargePinScreen() {
         fetchUserData();
         loadRechargePlans();
     }, []);
+
+    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'warning') => {
+        setAlertModal({ visible: true, title, message, type });
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            try { window.alert(`${title}\n\n${message}`); } catch (_) {}
+        } else {
+            Alert.alert(title, message);
+        }
+    };
 
     const fetchUserData = async () => {
         try {
@@ -160,14 +182,15 @@ export default function RechargePinScreen() {
 
     const handlePurchase = async () => {
         if (!selectedPlan) {
-            Alert.alert('Selection Required', 'Please select a recharge card denomination.');
+            showAlert('Selection Required ⚠️', 'Please select a recharge card denomination.', 'warning');
             return;
         }
 
         if (totalCost > userBalance) {
-            Alert.alert(
-                'Insufficient Wallet Balance',
-                `Your wallet balance (₦${userBalance.toFixed(2)}) is insufficient for this purchase (₦${totalCost.toFixed(2)}). Please fund your wallet.`
+            showAlert(
+                'Insufficient Wallet Balance ⚠️',
+                `Your wallet balance (₦${userBalance.toFixed(2)}) is insufficient for this purchase (₦${totalCost.toFixed(2)}). Please top up your wallet.`,
+                'warning'
             );
             return;
         }
@@ -191,7 +214,7 @@ export default function RechargePinScreen() {
                 }
             });
         } catch (e: any) {
-            Alert.alert('Purchase Failed ⚠️', e.message || 'Could not complete recharge pin purchase');
+            showAlert('Purchase Failed ⚠️', e.message || 'Could not complete recharge pin purchase. Please try again.', 'error');
         } finally {
             setPurchasing(false);
         }
@@ -199,7 +222,7 @@ export default function RechargePinScreen() {
 
     const copyPinToClipboard = async (pinText: string) => {
         await Clipboard.setStringAsync(pinText);
-        Alert.alert('Copied ✅', 'Recharge PIN copied to clipboard!');
+        showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
     const handlePrintCards = () => {
@@ -210,7 +233,7 @@ export default function RechargePinScreen() {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                Alert.alert('Popup Blocked', 'Please allow popups in your browser to print cards.');
+                showAlert('Popup Blocked ⚠️', 'Please allow popups in your browser to print cards.', 'warning');
                 return;
             }
 
@@ -276,7 +299,7 @@ export default function RechargePinScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: '#f4f6fb', paddingTop: insets.top }}>
             
-            {/* Top Navigation Bar - BRAND NAVY & GOLD WITH DECORATIONS */}
+            {/* Top Navigation Bar */}
             <View style={s.topNav}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
                     <Ionicons name="arrow-back" size={16} color="#f5a623" />
@@ -284,181 +307,229 @@ export default function RechargePinScreen() {
                 
                 <View style={{ flex: 1 }}>
                     <Text style={s.topNavTitle}>Recharge Pin Printing</Text>
-                    <Text style={s.topNavSubTitle}>Print instant vouchers for all networks</Text>
+                    <Text style={s.topNavSubTitle}>Print instant airtime vouchers</Text>
                 </View>
 
                 <View style={s.liveBadge}>
                     <View style={s.greenDot} />
-                    <Text style={s.liveBadgeTxt}>Live Printing</Text>
+                    <Text style={s.liveBadgeTxt}>Live Online</Text>
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 8, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 32, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
 
-                {/* 1. SELECT NETWORK SECTION (4-GRID COLUMN ROW - NO AVAILABLE TEXT) */}
-                <View style={s.cardSection}>
-                    <View style={s.stepHeaderRow}>
-                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 1</Text></View>
-                        <Text style={s.sectionHeader}>Select Network</Text>
-                    </View>
-                    
-                    <View style={s.grid4Row}>
-                        {NETWORKS.map(net => {
-                            const isSelected = selectedNetwork === net.id;
-                            const logoSource = NETWORK_LOGOS[net.id];
+                <View style={{ width: '100%', maxWidth: 560 }}>
 
-                            return (
-                                <TouchableOpacity
-                                    key={net.id}
-                                    onPress={() => handleSelectNetwork(net.id)}
-                                    activeOpacity={0.85}
-                                    style={[
-                                        s.grid4CardItem,
-                                        isSelected && s.grid4CardItemSelected
-                                    ]}
-                                >
-                                    {isSelected && (
-                                        <View style={s.checkCornerBadge}>
-                                            <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
-                                        </View>
-                                    )}
-
-                                    <View style={s.netLogoBoxCompact}>
-                                        <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
-                                    </View>
-                                    <Text style={[s.netNameTxtCompact, isSelected && { color: T.navy, fontWeight: '900' }]}>{net.name}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* 2. DENOMINATIONS SECTION (4-GRID COLUMN ROW - NO AVAILABLE TEXT) */}
-                <View style={s.cardSection}>
-                    <View style={s.stepHeaderRow}>
-                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 2</Text></View>
-                        <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
-                    </View>
-
-                    <View style={s.grid4Row}>
-                        {activePlansToDisplay.map((plan: any) => {
-                            const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
-                            const sizeVal = parseFloat(plan.size || '100');
-                            const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
-
-                            return (
-                                <TouchableOpacity
-                                    key={plan.id || plan.size}
-                                    onPress={() => setSelectedPlan(plan)}
-                                    activeOpacity={0.85}
-                                    style={[
-                                        s.grid4CardItem,
-                                        isSelected && s.grid4CardItemSelected
-                                    ]}
-                                >
-                                    {isSelected && (
-                                        <View style={s.checkCornerBadge}>
-                                            <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
-                                        </View>
-                                    )}
-
-                                    <Text style={[s.denom4ValTxt, isSelected && { color: T.navy }]}>
-                                        {plan.denomination || `₦${plan.size}`}
-                                    </Text>
-                                    <Text style={s.denom4UnitPriceTxt}>₦{unitPriceVal} each</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* 3. ORDER DETAILS SECTION */}
-                <View style={s.cardSection}>
-                    <View style={s.stepHeaderRow}>
-                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 3</Text></View>
-                        <Text style={s.sectionHeader}>Order Details</Text>
-                    </View>
-
-                    <View style={s.orderDetailRow}>
-                        <Text style={s.orderDetailLabel}>Network</Text>
-                        <Text style={s.orderDetailVal}>{selectedNetwork.toUpperCase()}</Text>
-                    </View>
-
-                    <View style={s.orderDetailRow}>
-                        <Text style={s.orderDetailLabel}>Pin Value</Text>
-                        <Text style={s.orderDetailVal}>{selectedPlan ? selectedPlan.denomination || `₦${selectedPlan.size}` : '₦100'}</Text>
-                    </View>
-
-                    {/* Quantity Pills */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 8, marginBottom: 4 }]}>Quantity</Text>
-                    <View style={s.qtyPillRow}>
-                        {[1, 2, 5, 10].map(q => {
-                            const isSelected = quantity === q;
-                            return (
-                                <TouchableOpacity
-                                    key={q}
-                                    onPress={() => setQuantity(q)}
-                                    activeOpacity={0.8}
-                                    style={[
-                                        s.qtyPillBtn,
-                                        isSelected && s.qtyPillBtnSelected
-                                    ]}
-                                >
-                                    <Text style={[s.qtyPillTxt, isSelected && s.qtyPillTxtSelected]}>
-                                        {q} {q === 1 ? 'Pin' : 'Pins'}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {/* Name on Card Input */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 8, marginBottom: 3 }]}>Name on Card (optional)</Text>
-                    <TextInput
-                        style={s.nameInput}
-                        value={nameOnCard}
-                        onChangeText={setNameOnCard}
-                        placeholder="muhammadsaniisyaku3@gmail.com"
-                        placeholderTextColor="#94a3b8"
-                    />
-
-                    {/* Total Cost Display Box */}
-                    <View style={s.totalBox}>
-                        <View>
-                            <Text style={s.totalBoxLabel}>Total Amount</Text>
-                            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{qtyNumber} x {selectedPlan?.denomination || '₦100'}</Text>
+                    {/* 1. SELECT NETWORK SECTION */}
+                    <View style={s.cardSection}>
+                        <View style={s.stepHeaderRow}>
+                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 1</Text></View>
+                            <Text style={s.sectionHeader}>Select Network</Text>
                         </View>
-                        <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
+                        
+                        <View style={s.grid4Row}>
+                            {NETWORKS.map(net => {
+                                const isSelected = selectedNetwork === net.id;
+                                const logoSource = NETWORK_LOGOS[net.id];
+
+                                return (
+                                    <TouchableOpacity
+                                        key={net.id}
+                                        onPress={() => handleSelectNetwork(net.id)}
+                                        activeOpacity={0.85}
+                                        style={[
+                                            s.grid4CardItem,
+                                            isSelected && s.grid4CardItemSelected
+                                        ]}
+                                    >
+                                        {isSelected && (
+                                            <View style={s.checkCornerBadge}>
+                                                <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                            </View>
+                                        )}
+
+                                        <View style={s.netLogoBoxCompact}>
+                                            <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
+                                        </View>
+                                        <Text style={[s.netNameTxtCompact, isSelected && { color: T.navy, fontWeight: '900' }]}>{net.name}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     </View>
 
-                    {/* Wallet Balance Display Box */}
-                    <View style={s.walletBox}>
-                        <Text style={s.walletBoxLabel}>Wallet Balance:</Text>
-                        <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
+                    {/* 2. DENOMINATIONS SECTION */}
+                    <View style={s.cardSection}>
+                        <View style={s.stepHeaderRow}>
+                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 2</Text></View>
+                            <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
+                        </View>
+
+                        <View style={s.grid4Row}>
+                            {activePlansToDisplay.map((plan: any) => {
+                                const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
+                                const sizeVal = parseFloat(plan.size || '100');
+                                const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
+
+                                return (
+                                    <TouchableOpacity
+                                        key={plan.id || plan.size}
+                                        onPress={() => setSelectedPlan(plan)}
+                                        activeOpacity={0.85}
+                                        style={[
+                                            s.grid4CardItem,
+                                            isSelected && s.grid4CardItemSelected
+                                        ]}
+                                    >
+                                        {isSelected && (
+                                            <View style={s.checkCornerBadge}>
+                                                <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                            </View>
+                                        )}
+
+                                        <Text style={[s.denom4ValTxt, isSelected && { color: T.navy }]}>
+                                            {plan.denomination || `₦${plan.size}`}
+                                        </Text>
+                                        <Text style={s.denom4UnitPriceTxt}>₦{unitPriceVal} each</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     </View>
 
-                    {/* Purchase Button */}
-                    <TouchableOpacity
-                        onPress={handlePurchase}
-                        disabled={purchasing || !selectedPlan}
-                        activeOpacity={0.85}
-                        style={[
-                            s.purchaseBtn,
-                            (purchasing || !selectedPlan) && { opacity: 0.6 }
-                        ]}
-                    >
-                        {purchasing ? (
-                            <ActivityIndicator size="small" color={T.navy} />
-                        ) : (
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons name="print-outline" size={14} color={T.navy} style={{ marginRight: 5 }} />
-                                <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                    {/* 3. ORDER DETAILS SECTION */}
+                    <View style={s.cardSection}>
+                        <View style={s.stepHeaderRow}>
+                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 3</Text></View>
+                            <Text style={s.sectionHeader}>Order Details</Text>
+                        </View>
+
+                        <View style={s.orderDetailRow}>
+                            <Text style={s.orderDetailLabel}>Network</Text>
+                            <Text style={s.orderDetailVal}>{selectedNetwork.toUpperCase()}</Text>
+                        </View>
+
+                        <View style={s.orderDetailRow}>
+                            <Text style={s.orderDetailLabel}>Pin Value</Text>
+                            <Text style={s.orderDetailVal}>{selectedPlan ? selectedPlan.denomination || `₦${selectedPlan.size}` : '₦100'}</Text>
+                        </View>
+
+                        {/* Quantity Pills */}
+                        <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 5 }]}>Quantity</Text>
+                        <View style={s.qtyPillRow}>
+                            {[1, 2, 5, 10].map(q => {
+                                const isSelected = quantity === q;
+                                return (
+                                    <TouchableOpacity
+                                        key={q}
+                                        onPress={() => setQuantity(q)}
+                                        activeOpacity={0.8}
+                                        style={[
+                                            s.qtyPillBtn,
+                                            isSelected && s.qtyPillBtnSelected
+                                        ]}
+                                    >
+                                        <Text style={[s.qtyPillTxt, isSelected && s.qtyPillTxtSelected]}>
+                                            {q} {q === 1 ? 'Pin' : 'Pins'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        {/* Name on Card Input */}
+                        <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 4 }]}>Name on Card (optional)</Text>
+                        <TextInput
+                            style={s.nameInput}
+                            value={nameOnCard}
+                            onChangeText={setNameOnCard}
+                            placeholder="muhammadsaniisyaku3@gmail.com"
+                            placeholderTextColor="#94a3b8"
+                        />
+
+                        {/* Total Cost Display Box */}
+                        <View style={s.totalBox}>
+                            <View>
+                                <Text style={s.totalBoxLabel}>Total Amount</Text>
+                                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{qtyNumber} x {selectedPlan?.denomination || '₦100'}</Text>
                             </View>
-                        )}
-                    </TouchableOpacity>
+                            <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
+                        </View>
+
+                        {/* Wallet Balance Display Box */}
+                        <View style={s.walletBox}>
+                            <Text style={s.walletBoxLabel}>Wallet Balance:</Text>
+                            <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
+                        </View>
+
+                        {/* Purchase Button */}
+                        <TouchableOpacity
+                            onPress={handlePurchase}
+                            disabled={purchasing || !selectedPlan}
+                            activeOpacity={0.85}
+                            style={[
+                                s.purchaseBtn,
+                                (purchasing || !selectedPlan) && { opacity: 0.6 }
+                            ]}
+                        >
+                            {purchasing ? (
+                                <ActivityIndicator size="small" color={T.navy} />
+                            ) : (
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 6 }} />
+                                    <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
                 </View>
 
             </ScrollView>
+
+            {/* INTERACTIVE ALERT POPUP MODAL (FOR WEB & MOBILE) */}
+            <Modal
+                transparent
+                visible={alertModal.visible}
+                animationType="fade"
+                onRequestClose={() => setAlertModal(prev => ({ ...prev, visible: false }))}
+            >
+                <View style={s.alertModalOverlay}>
+                    <View style={[
+                        s.alertModalCard,
+                        { borderColor: alertModal.type === 'success' ? '#22c55e' : alertModal.type === 'error' ? '#ef4444' : T.gold }
+                    ]}>
+                        <View style={[
+                            s.alertIconBox,
+                            { backgroundColor: alertModal.type === 'success' ? '#dcfce7' : alertModal.type === 'error' ? '#fee2e2' : '#fef3c7' }
+                        ]}>
+                            <Text style={{ fontSize: 24 }}>
+                                {alertModal.type === 'success' ? '✅' : alertModal.type === 'error' ? '❌' : '⚠️'}
+                            </Text>
+                        </View>
+
+                        <Text style={[
+                            s.alertTitleTxt,
+                            { color: alertModal.type === 'success' ? '#15803d' : alertModal.type === 'error' ? '#b91c1c' : T.navy }
+                        ]}>
+                            {alertModal.title}
+                        </Text>
+
+                        <Text style={s.alertMsgTxt}>{alertModal.message}</Text>
+
+                        <TouchableOpacity
+                            onPress={() => setAlertModal(prev => ({ ...prev, visible: false }))}
+                            style={[
+                                s.alertCloseBtn,
+                                { backgroundColor: alertModal.type === 'success' ? '#16a34a' : alertModal.type === 'error' ? '#dc2626' : T.navy }
+                            ]}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={s.alertCloseBtnTxt}>OK</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* GENERATED RECHARGE CARD RESULTS MODAL */}
             <Modal
@@ -540,23 +611,23 @@ const s = StyleSheet.create({
     topNav: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         backgroundColor: T.navy,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(245,166,35,0.3)'
     },
     backBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 8
+        marginRight: 10
     },
     topNavTitle: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '800',
         color: T.white
     },
@@ -568,66 +639,66 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(34,197,94,0.15)',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: 'rgba(34,197,94,0.3)'
     },
     greenDot: {
-        width: 5,
-        height: 5,
-        borderRadius: 2.5,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: '#22c55e',
-        marginRight: 4
+        marginRight: 5
     },
     liveBadgeTxt: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '700',
         color: '#4ade80'
     },
     cardSection: {
         backgroundColor: T.white,
-        borderRadius: 10,
-        padding: 8,
-        marginBottom: 8,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
         borderWidth: 1,
         borderColor: '#e2e8f0'
     },
     stepHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 6
+        marginBottom: 8
     },
     stepBadge: {
         backgroundColor: T.navy,
-        paddingHorizontal: 5,
-        paddingVertical: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
         borderRadius: 4,
-        marginRight: 6
+        marginRight: 8
     },
     stepBadgeTxt: {
-        fontSize: 8,
+        fontSize: 9,
         fontWeight: '800',
         color: T.gold
     },
     sectionHeader: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '800',
         color: T.navy
     },
 
-    // 4-GRID COLUMN ROW (Shared for Networks & Denominations)
+    // 4-GRID COLUMN ROW
     grid4Row: {
         flexDirection: 'row',
-        gap: 5
+        gap: 6
     },
     grid4CardItem: {
         flex: 1,
         backgroundColor: T.white,
-        borderRadius: 7,
-        paddingVertical: 7,
-        paddingHorizontal: 2,
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -651,60 +722,60 @@ const s = StyleSheet.create({
         justifyContent: 'center'
     },
     netLogoBoxCompact: {
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 2
+        marginBottom: 3
     },
     netLogoImgCompact: {
-        width: 20,
-        height: 20
+        width: 24,
+        height: 24
     },
     netNameTxtCompact: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         color: T.navy
     },
 
     // DENOMINATION 4-GRID TEXT STYLES
     denom4ValTxt: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '900',
         color: T.navy
     },
     denom4UnitPriceTxt: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '600',
         color: '#64748b',
-        marginTop: 1
+        marginTop: 2
     },
 
     orderDetailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingVertical: 4,
+        paddingVertical: 6,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9'
     },
     orderDetailLabel: {
-        fontSize: 10,
+        fontSize: 11,
         color: '#64748b',
         fontWeight: '500'
     },
     orderDetailVal: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '800',
         color: T.navy
     },
     qtyPillRow: {
         flexDirection: 'row',
-        gap: 5
+        gap: 6
     },
     qtyPillBtn: {
         flex: 1,
-        height: 30,
-        borderRadius: 6,
+        height: 34,
+        borderRadius: 8,
         backgroundColor: T.white,
         borderWidth: 1,
         borderColor: '#cbd5e1',
@@ -717,7 +788,7 @@ const s = StyleSheet.create({
         backgroundColor: T.goldLight
     },
     qtyPillTxt: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         color: '#334155'
     },
@@ -726,13 +797,13 @@ const s = StyleSheet.create({
         fontWeight: '800'
     },
     nameInput: {
-        height: 32,
+        height: 36,
         backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#cbd5e1',
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        fontSize: 10,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        fontSize: 11,
         fontWeight: '600',
         color: T.navy
     },
@@ -743,18 +814,18 @@ const s = StyleSheet.create({
         backgroundColor: T.navy,
         borderWidth: 1,
         borderColor: T.gold,
-        borderRadius: 7,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        marginTop: 8
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: 10
     },
     totalBoxLabel: {
-        fontSize: 11,
+        fontSize: 12,
         color: T.white,
         fontWeight: '700'
     },
     totalBoxAmount: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '900',
         color: T.gold
     },
@@ -763,59 +834,111 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: T.goldLight,
-        borderRadius: 6,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: 'rgba(245,166,35,0.3)',
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        marginTop: 4
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginTop: 6
     },
     walletBoxLabel: {
-        fontSize: 9,
+        fontSize: 10,
         color: T.navy
     },
     walletBoxAmount: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '800',
         color: T.goldDk
     },
     purchaseBtn: {
-        height: 36,
+        height: 40,
         backgroundColor: T.gold,
-        borderRadius: 7,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 10
+        marginTop: 12
     },
     purchaseBtnTxt: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '900',
         color: T.navy
     },
+
+    // INTERACTIVE ALERT MODAL STYLES
+    alertModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(13, 27, 62, 0.75)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    alertModalCard: {
+        width: '100%',
+        maxWidth: 400,
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 2,
+        alignItems: 'center'
+    },
+    alertIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12
+    },
+    alertTitleTxt: {
+        fontSize: 16,
+        fontWeight: '800',
+        textAlign: 'center',
+        marginBottom: 8
+    },
+    alertMsgTxt: {
+        fontSize: 12,
+        color: '#334155',
+        textAlign: 'center',
+        lineHeight: 18,
+        marginBottom: 18
+    },
+    alertCloseBtn: {
+        width: '100%',
+        height: 38,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    alertCloseBtnTxt: {
+        color: '#ffffff',
+        fontWeight: '800',
+        fontSize: 13
+    },
+
     resultModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(13, 27, 62, 0.75)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 10
+        padding: 12
     },
     resultModalCard: {
         width: '100%',
-        maxWidth: 540,
+        maxWidth: 560,
         backgroundColor: '#f1f5f9',
-        borderRadius: 12,
-        padding: 10
+        borderRadius: 14,
+        padding: 12
     },
     resultTopBtnRow: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 8
+        marginBottom: 10
     },
     printCardsBtn: {
         flex: 1.5,
-        height: 36,
+        height: 38,
         backgroundColor: T.gold,
-        borderRadius: 7,
+        borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center'
@@ -823,13 +946,13 @@ const s = StyleSheet.create({
     printCardsBtnTxt: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 12
+        fontSize: 13
     },
     buyMoreBtn: {
         flex: 1,
-        height: 36,
+        height: 38,
         backgroundColor: T.white,
-        borderRadius: 7,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#cbd5e1',
         alignItems: 'center',
@@ -838,7 +961,7 @@ const s = StyleSheet.create({
     buyMoreBtnTxt: {
         color: T.navy,
         fontWeight: '800',
-        fontSize: 11
+        fontSize: 12
     },
     voucherCardsGrid: {
         flexDirection: 'row',
@@ -846,10 +969,10 @@ const s = StyleSheet.create({
         gap: 8
     },
     printedVoucherCard: {
-        width: (W > 480 ? 230 : (W - 16 - 16)),
+        width: (W > 480 ? 240 : (W - 24 - 24)),
         backgroundColor: T.white,
-        borderRadius: 7,
-        padding: 6,
+        borderRadius: 8,
+        padding: 8,
         borderWidth: 1.5,
         borderColor: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
@@ -860,7 +983,7 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vNameTxt: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: 'bold',
         color: '#000000',
         flex: 1,
@@ -878,7 +1001,7 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#000000',
         borderStyle: 'dashed',
-        marginVertical: 3
+        marginVertical: 4
     },
     vBodyRow: {
         flexDirection: 'row',
@@ -889,7 +1012,7 @@ const s = StyleSheet.create({
         fontSize: 8,
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        lineHeight: 11
+        lineHeight: 12
     },
     vPinTxt: {
         fontSize: 11,
@@ -899,8 +1022,8 @@ const s = StyleSheet.create({
         marginVertical: 1
     },
     vLogoBox: {
-        width: 28,
-        height: 28,
+        width: 30,
+        height: 30,
         backgroundColor: '#ffcc00',
         borderRadius: 4,
         alignItems: 'center',
@@ -908,8 +1031,8 @@ const s = StyleSheet.create({
         marginLeft: 4
     },
     vLogoImg: {
-        width: 22,
-        height: 22
+        width: 24,
+        height: 24
     },
     vFooterRow: {
         flexDirection: 'row',
