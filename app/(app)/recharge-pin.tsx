@@ -279,23 +279,51 @@ export default function RechargePinScreen() {
         }
 
         try {
-            showAlert('Connecting... 🔵', 'Searching for Bluetooth printer. Please select your mini printer from the list.', 'warning');
+            showAlert('Connecting... 🔵', 'Searching for paired Bluetooth printer...', 'warning');
             const bt = (navigator as any).bluetooth;
-            const device = await bt.requestDevice({
-                filters: [
-                    { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
-                    { services: ['0000ff00-0000-1000-8000-00805f9b34fb'] },
-                    { services: ['e7810a71-73ae-499d-8c15-faa9aef0c3f2'] },
-                ],
-                optionalServices: [
-                    '000018f0-0000-1000-8000-00805f9b34fb',
-                    '0000ff00-0000-1000-8000-00805f9b34fb',
-                    'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-                    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
-                ]
-            });
+            let device: any = null;
 
-            const server = await device.gatt.connect();
+            // 1. Try auto-detecting previously granted/paired devices first
+            if (typeof bt.getDevices === 'function') {
+                try {
+                    const pairedDevices = await bt.getDevices();
+                    if (pairedDevices && pairedDevices.length > 0) {
+                        // Find first connected or available device
+                        for (const dev of pairedDevices) {
+                            if (dev.gatt) {
+                                try {
+                                    if (!dev.gatt.connected) {
+                                        await dev.gatt.connect();
+                                    }
+                                    device = dev;
+                                    break;
+                                } catch (_) {
+                                    // Connection failed, try next paired device
+                                }
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // 2. If no paired device connected automatically, prompt user to select printer
+            if (!device) {
+                device = await bt.requestDevice({
+                    filters: [
+                        { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+                        { services: ['0000ff00-0000-1000-8000-00805f9b34fb'] },
+                        { services: ['e7810a71-73ae-499d-8c15-faa9aef0c3f2'] },
+                    ],
+                    optionalServices: [
+                        '000018f0-0000-1000-8000-00805f9b34fb',
+                        '0000ff00-0000-1000-8000-00805f9b34fb',
+                        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                    ]
+                });
+            }
+
+            const server = device.gatt.connected ? device.gatt : await device.gatt.connect();
             // Try known service UUIDs for common mini BT printers
             let characteristic: any = null;
             const serviceUUIDs = [
