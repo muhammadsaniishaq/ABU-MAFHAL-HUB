@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -620,7 +620,7 @@ export default function ManageDataPlans() {
             >
                 <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
                     <View style={{ width: '100%', maxWidth: 420, backgroundColor: '#ffffff', borderRadius: 20, padding: 24, borderWidth: 2, borderColor: alertModal.type === 'success' ? '#22c55e' : '#ef4444', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
-                        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: alertModal.type === 'success' ? '#dcfce7' : '#fee2e2', alignItems: 'center', justifySelf: 'center', alignSelf: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: alertModal.type === 'success' ? '#dcfce7' : '#fee2e2', alignItems: 'center', alignSelf: 'center', justifyContent: 'center', marginBottom: 16 }}>
                             <Text style={{ fontSize: 26 }}>{alertModal.type === 'success' ? '✅' : '⚠️'}</Text>
                         </View>
                         <Text style={{ fontSize: 20, fontWeight: '800', color: alertModal.type === 'success' ? '#15803d' : '#b91c1c', textAlign: 'center', marginBottom: 10 }}>
