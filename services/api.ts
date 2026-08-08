@@ -262,6 +262,22 @@ export const api = {
             throw new Error(json.message || 'Failed to fetch recharge pin plans');
         },
 
+        getHistory: async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return [];
+                const { data, error } = await supabase
+                    .from('recharge_pins')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+                if (error) return [];
+                return data || [];
+            } catch (_) {
+                return [];
+            }
+        },
+
         purchase: async (params: { planId: string | number; quantity: number; businessName?: string }) => {
             let validPlanId = params.planId;
             if (typeof validPlanId === 'number' && validPlanId >= 100) {
@@ -331,38 +347,31 @@ export const api = {
                 throw new Error(`Insufficient wallet balance. Total cost is ₦${totalCost.toFixed(2)}, but your balance is ₦${currentBal.toFixed(2)}.`);
             }
 
-            // Execute purchase API call
-            let pData: any = null;
-            try {
-                const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Token ${token.trim()}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        plan: validPlanId,
-                        quantity: qty,
-                        business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
-                        pin: pin.trim()
-                    })
-                });
-                const json = await res.json();
-                if (!json.success && !json.data) {
-                    throw new Error(json.message || json.detail || json.error || 'Recharge pin purchase failed at provider');
-                }
-                pData = json.data || json;
-            } catch (_) {
-                // Generate valid recharge PIN vouchers if provider call is blocked by CORS
-                const generatedPins = Array.from({ length: qty }).map((_, i) => ({
-                    pin: Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString(),
-                    serial: (Date.now() + i).toString().slice(-10),
-                    load_code: '*311*PIN#'
-                }));
-                pData = {
-                    pins: generatedPins,
-                    load_code: '*311*PIN#'
-                };
+            // Execute real live purchase API call to Bigi API
+            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token.trim()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    plan: validPlanId,
+                    quantity: qty,
+                    business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
+                    pin: pin.trim()
+                })
+            });
+
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.success === false) {
+                throw new Error(json.message || json.detail || json.error || 'Recharge pin purchase failed at provider');
+            }
+
+            const pData = json.data || json;
+            const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);
+
+            if (!pinsList || pinsList.length === 0) {
+                throw new Error('No valid PIN returned from provider. Purchase was cancelled.');
             }
 
             // Deduct balance and record transaction

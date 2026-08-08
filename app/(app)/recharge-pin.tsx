@@ -53,7 +53,7 @@ const NETWORKS = [
     { id: '9mobile', name: '9Mobile' }
 ];
 
-// Default Fallback Denominations (1 row, 4 items)
+// Default Fallback Denominations
 const DEFAULT_DENOMS = [
     { id: 101, size: '100', denomination: '₦100', price: 98.9 },
     { id: 103, size: '200', denomination: '₦200', price: 197.8 },
@@ -65,19 +65,25 @@ export default function RechargePinScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
+    const [activeTab, setActiveTab] = useState<'buy' | 'history'>('buy');
+
     const [selectedNetwork, setSelectedNetwork] = useState('mtn');
     const [allPlans, setAllPlans] = useState<any[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [selectedPlan, setSelectedPlan] = useState<any | null>(DEFAULT_DENOMS[0]);
 
-    const [quantity, setQuantity] = useState(2); // Default 2 pins
+    const [quantity, setQuantity] = useState(2);
     const [nameOnCard, setNameOnCard] = useState('');
     const [userEmail, setUserEmail] = useState('');
 
     const [userBalance, setUserBalance] = useState<number>(474.00);
     const [purchasing, setPurchasing] = useState(false);
 
-    // Interactive Web/Mobile Alert Popup Modal State
+    // History State
+    const [historyList, setHistoryList] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
+    // Interactive Alert Popup Modal State
     const [alertModal, setAlertModal] = useState<{
         visible: boolean;
         title: string;
@@ -90,7 +96,7 @@ export default function RechargePinScreen() {
         type: 'warning'
     });
 
-    // Success Voucher Result Modal State
+    // Success Result Voucher Modal State
     const [successModal, setSuccessModal] = useState<{
         visible: boolean;
         txData: any | null;
@@ -102,6 +108,7 @@ export default function RechargePinScreen() {
     useEffect(() => {
         fetchUserData();
         loadRechargePlans();
+        loadHistory();
     }, []);
 
     const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'warning') => {
@@ -133,6 +140,17 @@ export default function RechargePinScreen() {
         } catch (_) {}
     };
 
+    const loadHistory = async () => {
+        setLoadingHistory(true);
+        try {
+            const history = await api.rechargePin.getHistory();
+            setHistoryList(history || []);
+        } catch (_) {
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
     const isPlanMatchNetwork = (plan: any, netId: string) => {
         const netLower = netId.toLowerCase();
         const planNetName = (plan.networkName || plan.network_name || '').toLowerCase();
@@ -162,7 +180,6 @@ export default function RechargePinScreen() {
         }
     };
 
-    // Filter plans for selected network with default fallback
     const matchedPlans = allPlans.filter((p: any) => isPlanMatchNetwork(p, selectedNetwork));
     const activePlansToDisplay = matchedPlans.length > 0 ? matchedPlans : DEFAULT_DENOMS;
 
@@ -213,6 +230,7 @@ export default function RechargePinScreen() {
                     nameOnCard: nameOnCard.trim() || userEmail || 'ABU MAFHAL VTU'
                 }
             });
+            loadHistory(); // Refresh History list!
         } catch (e: any) {
             showAlert('Purchase Failed ⚠️', e.message || 'Could not complete recharge pin purchase. Please try again.', 'error');
         } finally {
@@ -225,9 +243,9 @@ export default function RechargePinScreen() {
         showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
-    const handlePrintCards = () => {
-        if (!successModal.txData || !successModal.txData.pins) return;
-        const tx = successModal.txData;
+    const handlePrintCards = (customTxData?: any) => {
+        const tx = customTxData || successModal.txData;
+        if (!tx || !tx.pins) return;
         const pins = tx.pins || [];
 
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -242,13 +260,13 @@ export default function RechargePinScreen() {
             const cardsHtml = pins.map((p: any, idx: number) => `
                 <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif; word-break: break-all;">${(tx.nameOnCard || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
+                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif; word-break: break-all;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
                         <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
                     </div>
                     <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="font-size: 10px; line-height: 1.4;">
-                            <div><strong>REF:</strong> ${tx.transactionId || 'RCP' + Date.now()}</div>
+                            <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}</div>
                             <div style="font-size: 12px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
                             <div><strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
                             <div><strong>Date:</strong> ${formattedDate}</div>
@@ -259,7 +277,7 @@ export default function RechargePinScreen() {
                     </div>
                     <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
                     <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px;">
-                        <span>${p.load_code || tx.loadCode || '*311*PIN#'}</span>
+                        <span>${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
                         <span>${tx.denomination || '₦100'}</span>
                     </div>
                 </div>
@@ -269,14 +287,17 @@ export default function RechargePinScreen() {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Print Recharge Cards - ${tx.nameOnCard || 'ABU MAFHAL'}</title>
+                    <title>Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}</title>
                     <style>
-                        @page { size: A4; margin: 10mm; }
-                        body { margin: 0; padding: 10px; background: #fff; }
+                        @page { size: A4 portrait; margin: 10mm; }
+                        body { margin: 0; padding: 10px; background: #fff; font-family: monospace; }
                         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+                        @media print {
+                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        }
                     </style>
                 </head>
-                <body onload="window.print(); window.close();">
+                <body onload="window.print();">
                     <div class="grid">
                         ${cardsHtml}
                     </div>
@@ -287,9 +308,9 @@ export default function RechargePinScreen() {
             printWindow.document.write(htmlDoc);
             printWindow.document.close();
         } else {
-            const pinsList = successModal.txData.pins;
+            const pinsList = tx.pins;
             const textToShare = pinsList.map((p: any, idx: number) => 
-                `Card #${idx + 1} (${successModal.txData.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || successModal.txData.loadCode}`
+                `Card #${idx + 1} (${tx.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
             ).join('\n\n');
 
             Share.share({ message: textToShare }).catch(() => {});
@@ -316,172 +337,264 @@ export default function RechargePinScreen() {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 120, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
+            {/* TAB SWITCHER: BUY PINS vs HISTORY */}
+            <View style={s.tabBarContainer}>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('buy')}
+                    style={[s.tabBarBtn, activeTab === 'buy' && s.tabBarBtnActive]}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="card-outline" size={14} color={activeTab === 'buy' ? T.navy : '#64748b'} style={{ marginRight: 4 }} />
+                    <Text style={[s.tabBarTxt, activeTab === 'buy' && s.tabBarTxtActive]}>Buy Pins</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={() => { setActiveTab('history'); loadHistory(); }}
+                    style={[s.tabBarBtn, activeTab === 'history' && s.tabBarBtnActive]}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="time-outline" size={14} color={activeTab === 'history' ? T.navy : '#64748b'} style={{ marginRight: 4 }} />
+                    <Text style={[s.tabBarTxt, activeTab === 'history' && s.tabBarTxtActive]}>History</Text>
+                    {historyList.length > 0 && (
+                        <View style={s.historyBadge}>
+                            <Text style={s.historyBadgeTxt}>{historyList.length}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 140, alignItems: 'center' }} showsVerticalScrollIndicator={false}>
 
                 <View style={{ width: '100%', maxWidth: 560 }}>
 
-                    {/* 1. SELECT NETWORK SECTION */}
-                    <View style={s.cardSection}>
-                        <View style={s.stepHeaderRow}>
-                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 1</Text></View>
-                            <Text style={s.sectionHeader}>Select Network</Text>
-                        </View>
-                        
-                        <View style={s.grid4Row}>
-                            {NETWORKS.map(net => {
-                                const isSelected = selectedNetwork === net.id;
-                                const logoSource = NETWORK_LOGOS[net.id];
+                    {activeTab === 'buy' ? (
+                        <>
+                            {/* 1. SELECT NETWORK SECTION */}
+                            <View style={s.cardSection}>
+                                <View style={s.stepHeaderRow}>
+                                    <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 1</Text></View>
+                                    <Text style={s.sectionHeader}>Select Network</Text>
+                                </View>
+                                
+                                <View style={s.grid4Row}>
+                                    {NETWORKS.map(net => {
+                                        const isSelected = selectedNetwork === net.id;
+                                        const logoSource = NETWORK_LOGOS[net.id];
 
-                                return (
-                                    <TouchableOpacity
-                                        key={net.id}
-                                        onPress={() => handleSelectNetwork(net.id)}
-                                        activeOpacity={0.85}
-                                        style={[
-                                            s.grid4CardItem,
-                                            isSelected && s.grid4CardItemSelected
-                                        ]}
-                                    >
-                                        {isSelected && (
-                                            <View style={s.checkCornerBadge}>
-                                                <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
-                                            </View>
-                                        )}
+                                        return (
+                                            <TouchableOpacity
+                                                key={net.id}
+                                                onPress={() => handleSelectNetwork(net.id)}
+                                                activeOpacity={0.85}
+                                                style={[
+                                                    s.grid4CardItem,
+                                                    isSelected && s.grid4CardItemSelected
+                                                ]}
+                                            >
+                                                {isSelected && (
+                                                    <View style={s.checkCornerBadge}>
+                                                        <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                                    </View>
+                                                )}
 
-                                        <View style={s.netLogoBoxCompact}>
-                                            <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
-                                        </View>
-                                        <Text style={[s.netNameTxtCompact, isSelected && { color: T.navy, fontWeight: '900' }]}>{net.name}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </View>
-
-                    {/* 2. DENOMINATIONS SECTION */}
-                    <View style={s.cardSection}>
-                        <View style={s.stepHeaderRow}>
-                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 2</Text></View>
-                            <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
-                        </View>
-
-                        <View style={s.grid4Row}>
-                            {activePlansToDisplay.map((plan: any) => {
-                                const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
-                                const sizeVal = parseFloat(plan.size || '100');
-                                const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
-
-                                return (
-                                    <TouchableOpacity
-                                        key={plan.id || plan.size}
-                                        onPress={() => setSelectedPlan(plan)}
-                                        activeOpacity={0.85}
-                                        style={[
-                                            s.grid4CardItem,
-                                            isSelected && s.grid4CardItemSelected
-                                        ]}
-                                    >
-                                        {isSelected && (
-                                            <View style={s.checkCornerBadge}>
-                                                <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
-                                            </View>
-                                        )}
-
-                                        <Text style={[s.denom4ValTxt, isSelected && { color: T.navy }]}>
-                                            {plan.denomination || `₦${plan.size}`}
-                                        </Text>
-                                        <Text style={s.denom4UnitPriceTxt}>₦{unitPriceVal} each</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </View>
-
-                    {/* 3. ORDER DETAILS SECTION */}
-                    <View style={s.cardSection}>
-                        <View style={s.stepHeaderRow}>
-                            <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 3</Text></View>
-                            <Text style={s.sectionHeader}>Order Details</Text>
-                        </View>
-
-                        <View style={s.orderDetailRow}>
-                            <Text style={s.orderDetailLabel}>Network</Text>
-                            <Text style={s.orderDetailVal}>{selectedNetwork.toUpperCase()}</Text>
-                        </View>
-
-                        <View style={s.orderDetailRow}>
-                            <Text style={s.orderDetailLabel}>Pin Value</Text>
-                            <Text style={s.orderDetailVal}>{selectedPlan ? selectedPlan.denomination || `₦${selectedPlan.size}` : '₦100'}</Text>
-                        </View>
-
-                        {/* Quantity Pills */}
-                        <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 5 }]}>Quantity</Text>
-                        <View style={s.qtyPillRow}>
-                            {[1, 2, 5, 10].map(q => {
-                                const isSelected = quantity === q;
-                                return (
-                                    <TouchableOpacity
-                                        key={q}
-                                        onPress={() => setQuantity(q)}
-                                        activeOpacity={0.8}
-                                        style={[
-                                            s.qtyPillBtn,
-                                            isSelected && s.qtyPillBtnSelected
-                                        ]}
-                                    >
-                                        <Text style={[s.qtyPillTxt, isSelected && s.qtyPillTxtSelected]}>
-                                            {q} {q === 1 ? 'Pin' : 'Pins'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        {/* Name on Card Input */}
-                        <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 4 }]}>Name on Card (optional)</Text>
-                        <TextInput
-                            style={s.nameInput}
-                            value={nameOnCard}
-                            onChangeText={setNameOnCard}
-                            placeholder="muhammadsaniisyaku3@gmail.com"
-                            placeholderTextColor="#94a3b8"
-                        />
-
-                        {/* Total Cost Display Box */}
-                        <View style={s.totalBox}>
-                            <View>
-                                <Text style={s.totalBoxLabel}>Total Amount</Text>
-                                <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{qtyNumber} x {selectedPlan?.denomination || '₦100'}</Text>
+                                                <View style={s.netLogoBoxCompact}>
+                                                    <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
+                                                </View>
+                                                <Text style={[s.netNameTxtCompact, isSelected && { color: T.navy, fontWeight: '900' }]}>{net.name}</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
                             </View>
-                            <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
-                        </View>
 
-                        {/* Wallet Balance Display Box */}
-                        <View style={s.walletBox}>
-                            <Text style={s.walletBoxLabel}>Wallet Balance:</Text>
-                            <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
-                        </View>
+                            {/* 2. DENOMINATIONS SECTION */}
+                            <View style={s.cardSection}>
+                                <View style={s.stepHeaderRow}>
+                                    <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 2</Text></View>
+                                    <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
+                                </View>
 
-                        {/* Purchase Button */}
-                        <TouchableOpacity
-                            onPress={handlePurchase}
-                            disabled={purchasing || !selectedPlan}
-                            activeOpacity={0.85}
-                            style={[
-                                s.purchaseBtn,
-                                (purchasing || !selectedPlan) && { opacity: 0.6 }
-                            ]}
-                        >
-                            {purchasing ? (
-                                <ActivityIndicator size="small" color={T.navy} />
+                                <View style={s.grid4Row}>
+                                    {activePlansToDisplay.map((plan: any) => {
+                                        const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
+                                        const sizeVal = parseFloat(plan.size || '100');
+                                        const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={plan.id || plan.size}
+                                                onPress={() => setSelectedPlan(plan)}
+                                                activeOpacity={0.85}
+                                                style={[
+                                                    s.grid4CardItem,
+                                                    isSelected && s.grid4CardItemSelected
+                                                ]}
+                                            >
+                                                {isSelected && (
+                                                    <View style={s.checkCornerBadge}>
+                                                        <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                                    </View>
+                                                )}
+
+                                                <Text style={[s.denom4ValTxt, isSelected && { color: T.navy }]}>
+                                                    {plan.denomination || `₦${plan.size}`}
+                                                </Text>
+                                                <Text style={s.denom4UnitPriceTxt}>₦{unitPriceVal} each</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+
+                            {/* 3. ORDER DETAILS SECTION */}
+                            <View style={s.cardSection}>
+                                <View style={s.stepHeaderRow}>
+                                    <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 3</Text></View>
+                                    <Text style={s.sectionHeader}>Order Details</Text>
+                                </View>
+
+                                <View style={s.orderDetailRow}>
+                                    <Text style={s.orderDetailLabel}>Network</Text>
+                                    <Text style={s.orderDetailVal}>{selectedNetwork.toUpperCase()}</Text>
+                                </View>
+
+                                <View style={s.orderDetailRow}>
+                                    <Text style={s.orderDetailLabel}>Pin Value</Text>
+                                    <Text style={s.orderDetailVal}>{selectedPlan ? selectedPlan.denomination || `₦${selectedPlan.size}` : '₦100'}</Text>
+                                </View>
+
+                                {/* Quantity Pills */}
+                                <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 5 }]}>Quantity</Text>
+                                <View style={s.qtyPillRow}>
+                                    {[1, 2, 5, 10].map(q => {
+                                        const isSelected = quantity === q;
+                                        return (
+                                            <TouchableOpacity
+                                                key={q}
+                                                onPress={() => setQuantity(q)}
+                                                activeOpacity={0.8}
+                                                style={[
+                                                    s.qtyPillBtn,
+                                                    isSelected && s.qtyPillBtnSelected
+                                                ]}
+                                            >
+                                                <Text style={[s.qtyPillTxt, isSelected && s.qtyPillTxtSelected]}>
+                                                    {q} {q === 1 ? 'Pin' : 'Pins'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+
+                                {/* Name on Card Input */}
+                                <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 4 }]}>Name on Card (optional)</Text>
+                                <TextInput
+                                    style={s.nameInput}
+                                    value={nameOnCard}
+                                    onChangeText={setNameOnCard}
+                                    placeholder="muhammadsaniisyaku3@gmail.com"
+                                    placeholderTextColor="#94a3b8"
+                                />
+
+                                {/* Total Cost Display Box */}
+                                <View style={s.totalBox}>
+                                    <View>
+                                        <Text style={s.totalBoxLabel}>Total Amount</Text>
+                                        <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{qtyNumber} x {selectedPlan?.denomination || '₦100'}</Text>
+                                    </View>
+                                    <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
+                                </View>
+
+                                {/* Wallet Balance Display Box */}
+                                <View style={s.walletBox}>
+                                    <Text style={s.walletBoxLabel}>Wallet Balance:</Text>
+                                    <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
+                                </View>
+
+                                {/* Purchase Button */}
+                                <TouchableOpacity
+                                    onPress={handlePurchase}
+                                    disabled={purchasing || !selectedPlan}
+                                    activeOpacity={0.85}
+                                    style={[
+                                        s.purchaseBtn,
+                                        (purchasing || !selectedPlan) && { opacity: 0.6 }
+                                    ]}
+                                >
+                                    {purchasing ? (
+                                        <ActivityIndicator size="small" color={T.navy} />
+                                    ) : (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 6 }} />
+                                            <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    ) : (
+                        /* HISTORY TAB CONTENT */
+                        <View style={s.cardSection}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <Text style={s.sectionHeader}>Purchase History</Text>
+                                <TouchableOpacity onPress={loadHistory} activeOpacity={0.7}>
+                                    <Ionicons name="refresh-outline" size={16} color={T.navy} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {loadingHistory ? (
+                                <View style={{ padding: 24, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color={T.navy} />
+                                    <Text style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>Loading pin purchase history...</Text>
+                                </View>
+                            ) : historyList.length === 0 ? (
+                                <View style={{ padding: 24, alignItems: 'center' }}>
+                                    <Ionicons name="receipt-outline" size={32} color="#cbd5e1" />
+                                    <Text style={{ fontSize: 14, fontWeight: '700', color: T.navy, marginTop: 8 }}>No History Found</Text>
+                                    <Text style={{ fontSize: 11, color: '#64748b', textAlign: 'center', marginTop: 4 }}>You have not made any recharge pin purchases yet.</Text>
+                                </View>
                             ) : (
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 6 }} />
-                                    <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                                <View style={{ gap: 10 }}>
+                                    {historyList.map((item: any) => {
+                                        const netKey = (item.network || 'mtn').toLowerCase();
+                                        const logoSrc = NETWORK_LOGOS[netKey] || NETWORK_LOGOS.mtn;
+                                        const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent';
+
+                                        return (
+                                            <View key={item.id || item.transaction_id} style={s.historyCardItem}>
+                                                <View style={s.historyLogoBox}>
+                                                    <Image source={logoSrc} style={{ width: 24, height: 24 }} resizeMode="contain" />
+                                                </View>
+
+                                                <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '800', color: T.navy }}>
+                                                        {item.network || 'MTN'} {item.denomination} ({item.quantity}x)
+                                                    </Text>
+                                                    <Text style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+                                                        REF: {item.transaction_id} • {dateStr}
+                                                    </Text>
+                                                </View>
+
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setSuccessModal({
+                                                            visible: true,
+                                                            txData: item
+                                                        });
+                                                    }}
+                                                    style={s.historyPrintBtn}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Ionicons name="print-outline" size={12} color={T.navy} style={{ marginRight: 3 }} />
+                                                    <Text style={s.historyPrintBtnTxt}>Print</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
                                 </View>
                             )}
-                        </TouchableOpacity>
-                    </View>
+                        </View>
+                    )}
 
                 </View>
 
@@ -543,7 +656,7 @@ export default function RechargePinScreen() {
                         
                         {/* Top Buttons */}
                         <View style={s.resultTopBtnRow}>
-                            <TouchableOpacity onPress={handlePrintCards} style={s.printCardsBtn} activeOpacity={0.85}>
+                            <TouchableOpacity onPress={() => handlePrintCards()} style={s.printCardsBtn} activeOpacity={0.85}>
                                 <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 5 }} />
                                 <Text style={s.printCardsBtnTxt}>Print Cards</Text>
                             </TouchableOpacity>
@@ -553,7 +666,7 @@ export default function RechargePinScreen() {
                                 style={s.buyMoreBtn}
                                 activeOpacity={0.85}
                             >
-                                <Text style={s.buyMoreBtnTxt}>Buy More</Text>
+                                <Text style={s.buyMoreBtnTxt}>Close</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -565,7 +678,7 @@ export default function RechargePinScreen() {
                                     {/* Header Row */}
                                     <View style={s.vHeaderRow}>
                                         <Text style={s.vNameTxt} numberOfLines={1}>
-                                            {successModal.txData?.nameOnCard || userEmail || 'ABU MAFHAL VTU'}
+                                            {successModal.txData?.nameOnCard || successModal.txData?.business_name || successModal.txData?.businessName || userEmail || 'ABU MAFHAL VTU'}
                                         </Text>
                                         <TouchableOpacity onPress={() => copyPinToClipboard(pinObj.pin)} style={s.vCopyIconBtn}>
                                             <Ionicons name="copy-outline" size={11} color="#334155" />
@@ -577,14 +690,14 @@ export default function RechargePinScreen() {
                                     {/* Body Row */}
                                     <View style={s.vBodyRow}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
+                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transaction_id || successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
                                             <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 9, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>S/N:</Text> {pinObj.serial || (idx + 1)}</Text>
-                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}</Text>
+                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                                         </View>
 
                                         <View style={s.vLogoBox}>
-                                            <Image source={NETWORK_LOGOS[selectedNetwork] || NETWORK_LOGOS.mtn} style={s.vLogoImg} resizeMode="contain" />
+                                            <Image source={NETWORK_LOGOS[(successModal.txData?.network || selectedNetwork || 'mtn').toLowerCase()] || NETWORK_LOGOS.mtn} style={s.vLogoImg} resizeMode="contain" />
                                         </View>
                                     </View>
 
@@ -592,7 +705,7 @@ export default function RechargePinScreen() {
 
                                     {/* Footer Row */}
                                     <View style={s.vFooterRow}>
-                                        <Text style={s.vDialTxt}>{pinObj.load_code || successModal.txData?.loadCode || '*311*PIN#'}</Text>
+                                        <Text style={s.vDialTxt}>{pinObj.load_code || successModal.txData?.load_code || successModal.txData?.loadCode || '*311*PIN#'}</Text>
                                         <Text style={s.vDenomTxt}>{successModal.txData?.denomination || '₦100'}</Text>
                                     </View>
                                 </View>
@@ -656,6 +769,54 @@ const s = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         color: '#4ade80'
+    },
+    tabBarContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#e2e8f0',
+        marginHorizontal: 10,
+        marginTop: 10,
+        borderRadius: 10,
+        padding: 3,
+        maxWidth: 560,
+        alignSelf: 'center',
+        width: '95%'
+    },
+    tabBarBtn: {
+        flex: 1,
+        height: 32,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    tabBarBtnActive: {
+        backgroundColor: T.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2
+    },
+    tabBarTxt: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#64748b'
+    },
+    tabBarTxtActive: {
+        color: T.navy,
+        fontWeight: '800'
+    },
+    historyBadge: {
+        backgroundColor: T.gold,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 8,
+        marginLeft: 5
+    },
+    historyBadgeTxt: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: T.navy
     },
     cardSection: {
         backgroundColor: T.white,
@@ -738,7 +899,6 @@ const s = StyleSheet.create({
         color: T.navy
     },
 
-    // DENOMINATION 4-GRID TEXT STYLES
     denom4ValTxt: {
         fontSize: 15,
         fontWeight: '900',
@@ -861,6 +1021,40 @@ const s = StyleSheet.create({
     purchaseBtnTxt: {
         fontSize: 13,
         fontWeight: '900',
+        color: T.navy
+    },
+
+    // HISTORY CARD ITEM STYLES
+    historyCardItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#cbd5e1'
+    },
+    historyLogoBox: {
+        width: 34,
+        height: 34,
+        borderRadius: 6,
+        backgroundColor: T.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#cbd5e1'
+    },
+    historyPrintBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.gold,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6
+    },
+    historyPrintBtnTxt: {
+        fontSize: 11,
+        fontWeight: '800',
         color: T.navy
     },
 
