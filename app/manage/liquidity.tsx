@@ -274,17 +274,6 @@ export default function LiquidityVaultScreen() {
                     error: termiiKey ? undefined : 'API Key not configured in Vault',
                     allowDeposit: true,
                     allowWithdrawal: false
-                },
-                {
-                    id: 'monnify',
-                    name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
-                    category: 'Payment Gateway',
-                    balance: 0,
-                    currency: 'NGN',
-                    status: monnifyApiKey ? 'healthy' : 'unconfigured',
-                    error: monnifyApiKey ? undefined : 'API Key not configured in Vault',
-                    allowDeposit: true,
-                    allowWithdrawal: true
                 }
             ];
 
@@ -317,8 +306,7 @@ export default function LiquidityVaultScreen() {
             nineboost: 'NINEBOOST_API_KEY',
             nowpayments: 'NOWPAYMENTS_API_KEY',
             bigi: 'BIGI_API_TOKEN',
-            termii: 'TERMII_API_KEY',
-            monnify: 'MONNIFY_API_KEY'
+            termii: 'TERMII_API_KEY'
         };
         const keyName = secretMap[p.id] || 'GENERIC_API_KEY';
         setTokenKeyName(keyName);
@@ -390,8 +378,7 @@ export default function LiquidityVaultScreen() {
                 nineboost: 'NINEBOOST_API_KEY',
                 nowpayments: 'NOWPAYMENTS_API_KEY',
                 bigi: 'BIGI_API_TOKEN',
-                termii: 'TERMII_API_KEY',
-                monnify: 'MONNIFY_API_KEY'
+                termii: 'TERMII_API_KEY'
             };
 
             const secretKey = tokenKeyName || secretKeyMap[selectedTokenProvider?.id || ''] || 'GENERIC_API_KEY';

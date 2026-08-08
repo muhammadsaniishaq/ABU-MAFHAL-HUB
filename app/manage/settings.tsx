@@ -145,7 +145,6 @@ export default function AdminSettings() {
     const [payvesselSecret, setPayvesselSecret] = useState('');
     const [payvesselBusinessId, setPayvesselBusinessId] = useState('');
     const [paystackKey, setPaystackKey] = useState('');
-    const [monnifyKey, setMonnifyKey] = useState('');
     const [flutterwaveKey, setFlutterwaveKey] = useState('');
 
     // Identity & Communication Keys
@@ -229,7 +228,6 @@ export default function AdminSettings() {
             if (secrets) {
                 secrets.forEach((secret) => {
                     if (secret.key === 'PAYSTACK_SECRET_KEY') setPaystackKey(secret.value);
-                    if (secret.key === 'MONNIFY_API_KEY') setMonnifyKey(secret.value);
                     if (secret.key === 'PAYVESSEL_API_KEY') setPayvesselKey(secret.value);
                     if (secret.key === 'PAYVESSEL_API_SECRET') setPayvesselSecret(secret.value);
                     if (secret.key === 'PAYVESSEL_BUSINESS_ID') setPayvesselBusinessId(secret.value);
@@ -253,7 +251,6 @@ export default function AdminSettings() {
         try {
             const keysToSave = [
                 { key: 'PAYSTACK_SECRET_KEY', value: paystackKey, description: 'Paystack Secret Key' },
-                { key: 'MONNIFY_API_KEY', value: monnifyKey, description: 'Monnify API Key' },
                 { key: 'PAYVESSEL_API_KEY', value: payvesselKey, description: 'Payvessel API Key' },
                 { key: 'PAYVESSEL_API_SECRET', value: payvesselSecret, description: 'Payvessel API Secret' },
                 { key: 'PAYVESSEL_BUSINESS_ID', value: payvesselBusinessId, description: 'Payvessel Business ID' },
@@ -813,7 +810,6 @@ export default function AdminSettings() {
                                 <ApiInputRow placeholder="Payvessel Business ID" value={payvesselBusinessId} onChangeText={setPayvesselBusinessId} />
                                 <View style={s.divider} />
                                 <ApiInputRow placeholder="Paystack Secret Key" value={paystackKey} onChangeText={setPaystackKey} isSecret={true} />
-                                <ApiInputRow placeholder="Monnify API Key" value={monnifyKey} onChangeText={setMonnifyKey} isSecret={true} />
                                 <ApiInputRow placeholder="Flutterwave Secret Key" value={flutterwaveKey} onChangeText={setFlutterwaveKey} isSecret={true} />
                             </View>
                         )}

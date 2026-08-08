@@ -68,14 +68,13 @@ Deno.serve(async (req: Request) => {
         const { data: secretsData } = await rpcClient
             .from('system_secrets')
             .select('key, value')
-            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN', 'BILALSADASUB_API_TOKEN', 'BILAL_TOKEN', 'BILAL_API_TOKEN', 'VITAL_API_TOKEN', 'VITAL_TOKEN', 'VITAL_KEY']);
+            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN', 'BILALSADASUB_API_TOKEN', 'BILAL_TOKEN', 'BILAL_API_TOKEN']);
             
         const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
         const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
         const bigiToken = secretsData?.find(s => s.key === 'BIGI_API_TOKEN')?.value;
         const bigiPin = secretsData?.find(s => s.key === 'BIGI_API_PIN')?.value;
         const bilalToken = secretsData?.find(s => s.key === 'BILALSADASUB_TOKEN' || s.key === 'BILALSADASUB_API_TOKEN' || s.key === 'BILAL_TOKEN' || s.key === 'BILAL_API_TOKEN')?.value;
-        const vitalToken = secretsData?.find(s => s.key === 'VITAL_API_TOKEN' || s.key === 'VITAL_TOKEN' || s.key === 'VITAL_KEY')?.value || bilalToken;
 
         // Fetch VTU vendor from app_settings
         const { data: settingsData } = await rpcClient
@@ -98,12 +97,12 @@ Deno.serve(async (req: Request) => {
 
         // Handle Airtime to Cash actions directly before balance deduction
         if (type === 'cash_rates' || type === 'cash_step1' || type === 'cash_step2' || type === 'cash_step3') {
-            const activeCashToken = bilalToken || vitalToken;
+            const activeCashToken = bilalToken;
             if (!activeCashToken) {
-                console.error("[Bills] BILALSADASUB_TOKEN / VITAL_TOKEN is missing in system_secrets table");
+                console.error("[Bills] BILALSADASUB_TOKEN is missing in system_secrets table");
                 return new Response(JSON.stringify({ 
                     success: false, 
-                    error: "Bilalsadasub / Vital Sub API Token missing. Admin must configure API Token in Settings -> API Vault." 
+                    error: "Bilalsadasub API Token missing. Admin must configure API Token in Settings -> API Vault." 
                 }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200

@@ -97,9 +97,6 @@ serve(async (req: Request) => {
     const bigiUsername = secrets['BIGISUB_USERNAME'] || secrets['BIGI_USERNAME'] || secrets['BIGI_USER'] || Deno.env.get('BIGISUB_USERNAME') || ''
     const bigiPassword = secrets['BIGISUB_PASSWORD'] || secrets['BIGI_PASSWORD'] || secrets['BIGI_PASS'] || Deno.env.get('BIGISUB_PASSWORD') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
-    const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
-    const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || ''
-    const vitalToken = secrets['VITAL_API_TOKEN'] || secrets['VITAL_TOKEN'] || secrets['VITAL_KEY'] || Deno.env.get('VITAL_API_TOKEN') || ''
 
     const providerBalances: any[] = []
 
@@ -373,68 +370,6 @@ serve(async (req: Request) => {
         currency: 'NGN',
         status: 'unconfigured',
         error: 'API Key not configured in Vault',
-        allowDeposit: true,
-        allowWithdrawal: false
-      })
-    }
-
-    // 5. Vital Sub VTU (VitalSub.ng)
-    if (vitalToken && vitalToken.trim() !== '') {
-      let balance = 0
-      let latencyMs = 210
-      let fetched = false
-
-      // Attempt 1: GET https://vitalsub.ng/api/v1/user (Token header)
-      try {
-        const { response, latency } = await fetchWithTimeout('https://vitalsub.ng/api/v1/user', {
-          headers: { 'Authorization': `Token ${vitalToken.trim()}`, 'Accept': 'application/json' }
-        })
-        const data = await response.json()
-        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? data?.data?.balance
-        if (rawBal !== undefined && rawBal !== null) {
-          balance = Number(rawBal)
-          latencyMs = latency
-          fetched = true
-        }
-      } catch (e) {}
-
-      // Attempt 2: GET https://vitalsub.ng/api/user/
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://vitalsub.ng/api/user/', {
-            headers: { 'Authorization': `Bearer ${vitalToken.trim()}`, 'Accept': 'application/json' }
-          })
-          const data = await response.json()
-          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
-      providerBalances.push({
-        id: 'vital',
-        name: 'Vital Sub (VTU SME & Corporate Data)',
-        category: 'VTU Telecom',
-        balance: isNaN(balance) ? 0 : balance,
-        currency: 'NGN',
-        latencyMs,
-        status: 'healthy',
-        error: undefined,
-        allowDeposit: true,
-        allowWithdrawal: false
-      })
-    } else {
-      providerBalances.push({
-        id: 'vital',
-        name: 'Vital Sub (VTU SME & Corporate Data)',
-        category: 'VTU Telecom',
-        balance: 0,
-        currency: 'NGN',
-        status: 'unconfigured',
-        error: 'Token not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -959,58 +894,6 @@ serve(async (req: Request) => {
         error: 'API Key not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
-      })
-    }
-
-    // 12. Monnify
-    if (monnifyApiKey && monnifyApiKey.trim() !== '') {
-      let balance = 0
-      let latencyMs = 150
-      if (monnifySecretKey && monnifySecretKey.trim() !== '') {
-        try {
-          const authStr = btoa(`${monnifyApiKey.trim()}:${monnifySecretKey.trim()}`)
-          const { response: authRes } = await fetchWithTimeout('https://api.monnify.com/api/v1/auth/login', {
-            method: 'POST',
-            headers: { 'Authorization': `Basic ${authStr}`, 'Content-Type': 'application/json' }
-          })
-          const authData = await authRes.json()
-          const token = authData?.responseBody?.accessToken
-          if (token) {
-            const { response: balRes, latency } = await fetchWithTimeout('https://api.monnify.com/api/v2/disbursements/wallet-balance', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const balData = await balRes.json()
-            if (balData?.responseBody?.availableBalance !== undefined) {
-              balance = Number(balData.responseBody.availableBalance)
-              latencyMs = latency
-            }
-          }
-        } catch (e) {}
-      }
-
-      providerBalances.push({
-        id: 'monnify',
-        name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
-        category: 'Payment Gateway',
-        balance: isNaN(balance) ? 0 : balance,
-        currency: 'NGN',
-        latencyMs,
-        status: 'healthy',
-        error: undefined,
-        allowDeposit: true,
-        allowWithdrawal: true
-      })
-    } else {
-      providerBalances.push({
-        id: 'monnify',
-        name: 'Monnify (Dynamic Virtual Accounts & Payouts)',
-        category: 'Payment Gateway',
-        balance: 0,
-        currency: 'NGN',
-        status: 'unconfigured',
-        error: 'API Key not configured in Vault',
-        allowDeposit: true,
-        allowWithdrawal: true
       })
     }
 

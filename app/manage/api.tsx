@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 
 export default function APIVaultScreen() {
-    const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect,vital');
+    const [vtuVendor, setVtuVendor] = useState('bilalsadasub,bigi,clubkonnect');
     
     // Core Active API Provider Credentials
     const [agentHubApiKey, setAgentHubApiKey] = useState('');
@@ -21,9 +21,6 @@ export default function APIVaultScreen() {
     const [bigiToken, setBigiToken] = useState('');
     const [bigiPin, setBigiPin] = useState('');
     const [termiiApiKey, setTermiiApiKey] = useState('');
-    const [monnifyApiKey, setMonnifyApiKey] = useState('');
-    const [monnifySecretKey, setMonnifySecretKey] = useState('');
-    const [vitalToken, setVitalToken] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -125,10 +122,7 @@ export default function APIVaultScreen() {
                 { key: 'NOWPAYMENTS_API_KEY', value: nowPaymentsApiKey, description: 'NowPayments API Key for Crypto' },
                 { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigi API Token for VTU Services' },
                 { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' },
-                { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key for SMS Gateway' },
-                { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key for Virtual Accounts' },
-                { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key for Wallet Disbursements' },
-                { key: 'VITAL_API_TOKEN', value: vitalToken, description: 'Vital Sub API Token for VTU Data Services' }
+                { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key for SMS Gateway' }
             ];
 
             for (const sec of secretsToSave) {
@@ -249,19 +243,6 @@ export default function APIVaultScreen() {
                     value={bilalToken}
                     onChangeText={setBilalToken}
                     placeholder="Enter BilalSadaSub API Token..."
-                    placeholderTextColor="#64748b"
-                    secureTextEntry
-                    className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
-                />
-            </View>
-
-            {/* Vital Sub VTU API */}
-            <View className="bg-slate-900 p-4 rounded-2xl border border-slate-800 mb-4">
-                <Text className="text-amber-500 font-extrabold text-xs mb-1">🔥 Vital Sub VTU API Token (vitalsub.ng for Data)</Text>
-                <TextInput
-                    value={vitalToken}
-                    onChangeText={setVitalToken}
-                    placeholder="Enter Vital Sub API Token..."
                     placeholderTextColor="#64748b"
                     secureTextEntry
                     className="bg-slate-950 text-white p-3 rounded-xl border border-slate-800 text-xs font-mono"
