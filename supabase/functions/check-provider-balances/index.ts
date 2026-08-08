@@ -94,6 +94,8 @@ serve(async (req: Request) => {
     const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || secrets['NINE_BOOST_API_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
+    const bigiUsername = secrets['BIGISUB_USERNAME'] || secrets['BIGI_USERNAME'] || secrets['BIGI_USER'] || Deno.env.get('BIGISUB_USERNAME') || ''
+    const bigiPassword = secrets['BIGISUB_PASSWORD'] || secrets['BIGI_PASSWORD'] || secrets['BIGI_PASS'] || Deno.env.get('BIGISUB_PASSWORD') || ''
     const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || Deno.env.get('EXPO_PUBLIC_TERMII_API_KEY') || ''
     const monnifyApiKey = secrets['MONNIFY_API_KEY'] || secrets['MONNIFY_KEY'] || Deno.env.get('EXPO_PUBLIC_MONNIFY_API_KEY') || ''
     const monnifySecretKey = secrets['MONNIFY_SECRET_KEY'] || secrets['MONNIFY_SECRET'] || ''
@@ -700,76 +702,85 @@ serve(async (req: Request) => {
       })
     }
 
-    // 10. Bigi VTU Portal - Official: GET https://bigisub.ng/api/v2/wallet/balance (Bearer token)
-    if (bigiToken && bigiToken.trim() !== '') {
+    // 10. Bigi VTU Portal - JWT auth: POST /api/v2/token/ (username+password) → Bearer JWT → GET /api/v2/wallet/balance/
+    const bigiHasCreds = bigiUsername && bigiPassword
+    const bigiHasToken = bigiToken && bigiToken.trim() !== ''
+    if (bigiHasCreds || bigiHasToken) {
       let balance = 0
       let latencyMs = 230
-      let fetched = false
+      let bigiDebugRaw: any = null
+      let bigiDebugError: string = ''
 
-      // Attempt 1 (PRIMARY): GET https://bigisub.ng/api/v2/wallet/balance with Bearer — OFFICIAL endpoint per docs
-      try {
-        const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/wallet/balance', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
-        })
-        const data = await response.json()
-        const rawBal = data?.balance ?? data?.wallet_balance ?? data?.data?.balance ?? data?.data?.wallet_balance
-        if (rawBal !== undefined && rawBal !== null) {
-          balance = Number(rawBal)
-          latencyMs = latency
-          fetched = true
+      const extractBigiBalance = (data: any): number | undefined => {
+        if (!data) return undefined
+        const candidates = [
+          data?.balance, data?.wallet_balance, data?.walletBalance,
+          data?.available_balance, data?.availableBalance,
+          data?.data?.balance, data?.data?.wallet_balance, data?.data?.walletBalance,
+          data?.data?.available_balance, data?.data?.availableBalance,
+          data?.user?.balance, data?.user?.wallet_balance, data?.user?.walletBalance,
+          data?.wallet?.balance, data?.wallet?.available,
+          data?.result?.balance, data?.result?.wallet_balance,
+          data?.payload?.balance, data?.payload?.wallet_balance,
+          data?.info?.balance, data?.info?.wallet_balance,
+        ]
+        for (const c of candidates) {
+          if (c !== undefined && c !== null && c !== '') {
+            const n = Number(c); if (!isNaN(n)) return n
+          }
         }
-      } catch (e) {}
-
-      // Attempt 2: GET https://bigisub.ng/api/v2/user/ with Bearer token
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/user/', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
-          })
-          const data = await response.json()
-          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.data?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
+        return undefined
       }
 
-      // Attempt 3: GET https://api.bigisub.ng/api/v2/wallet/balance with Token header (alt subdomain + auth style)
-      if (!fetched) {
+      if (bigiHasCreds) {
+        // PRIMARY: Login with username+password to get JWT, then fetch balance
         try {
-          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/wallet/balance', {
+          const loginStart = Date.now()
+          const loginResp = await fetch('https://bigisub.ng/api/v2/token/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ username: bigiUsername.trim(), password: bigiPassword.trim() })
+          })
+          const loginData = await loginResp.json()
+          bigiDebugRaw = { loginStatus: loginResp.status, loginData }
+
+          const jwt = loginData?.access ?? loginData?.token ?? loginData?.access_token ??
+            loginData?.jwt ?? loginData?.data?.access ?? loginData?.data?.token
+
+          if (jwt) {
+            // Use JWT to fetch balance
+            const balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' }
+            })
+            const balData = await balResp.json()
+            bigiDebugRaw.balStatus = balResp.status
+            bigiDebugRaw.balData = balData
+            latencyMs = Date.now() - loginStart
+            const rawBal = extractBigiBalance(balData)
+            if (rawBal !== undefined) balance = rawBal
+            else bigiDebugError = `JWT ok but balance field unknown: ${JSON.stringify(balData).substring(0, 200)}`
+          } else {
+            bigiDebugError = `Login failed (status ${loginResp.status}): ${JSON.stringify(loginData).substring(0, 200)}`
+          }
+        } catch (e: any) {
+          bigiDebugError = `JWT login error: ${e?.message || 'fetch failed'}`
+        }
+      }
+
+      // Fallback: try direct token if no credentials OR if credentials failed
+      if (!bigiHasCreds || (balance === 0 && bigiHasToken)) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/wallet/balance/', {
             method: 'GET',
             headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
           })
           const data = await response.json()
-          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.data?.balance ?? data?.data?.wallet_balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
-      // Attempt 4: GET https://api.bigisub.ng/api/v2/user/ with Token header
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/', {
-            method: 'GET',
-            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
-          })
-          const data = await response.json()
-          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.data?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
+          if (!bigiDebugRaw) bigiDebugRaw = { tokenFallback: true, status: response.status, data }
+          latencyMs = latency
+          const rawBal = extractBigiBalance(data)
+          if (rawBal !== undefined) { balance = rawBal; bigiDebugError = '' }
+        } catch (e: any) { /* ignore fallback errors */ }
       }
 
       providerBalances.push({
@@ -780,9 +791,10 @@ serve(async (req: Request) => {
         currency: 'NGN',
         latencyMs,
         status: 'healthy',
-        error: undefined,
+        error: bigiDebugError || undefined,
         allowDeposit: true,
-        allowWithdrawal: false
+        allowWithdrawal: false,
+        _debug: bigiDebugRaw
       })
     } else {
       providerBalances.push({
@@ -792,7 +804,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Token not configured in Vault',
+        error: 'Set BIGISUB_USERNAME + BIGISUB_PASSWORD in Vault (JWT login required)',
         allowDeposit: true,
         allowWithdrawal: false
       })

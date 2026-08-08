@@ -88,6 +88,9 @@ export default function LiquidityVaultScreen() {
     // BilalSadaSub-specific: username + password
     const [bilalUsername, setBilalUsername] = useState('');
     const [bilalPassword, setBilalPassword] = useState('');
+    // BigiSub-specific: username + password
+    const [bigiUsername, setBigiUsername] = useState('');
+    const [bigiPassword, setBigiPassword] = useState('');
 
     // Withdrawal Form States
     const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -338,15 +341,34 @@ export default function LiquidityVaultScreen() {
             setBilalUsername('');
             setBilalPassword('');
         }
+
+        // Pre-fill BigiSub username & password from vault
+        if (p.id === 'bigi') {
+            setBigiUsername(
+                vaultSecrets['BIGISUB_USERNAME'] || vaultSecrets['BIGI_USERNAME'] || vaultSecrets['BIGI_USER'] || ''
+            );
+            setBigiPassword(
+                vaultSecrets['BIGISUB_PASSWORD'] || vaultSecrets['BIGI_PASSWORD'] || vaultSecrets['BIGI_PASS'] || ''
+            );
+        } else {
+            setBigiUsername('');
+            setBigiPassword('');
+        }
     };
 
     const handleSaveVaultToken = async () => {
         const isBilal = selectedTokenProvider?.id === 'bilalsadasub';
+        const isBigi = selectedTokenProvider?.id === 'bigi';
 
-        // For BilalSadaSub: require username + password (token is optional bonus)
+        // For BilalSadaSub / BigiSub: require username + password (token is optional bonus)
         if (isBilal) {
             if (!bilalUsername.trim() || !bilalPassword.trim()) {
                 Alert.alert("Invalid Input", "Please enter both Username and Password for BilalSadaSub.");
+                return;
+            }
+        } else if (isBigi) {
+            if (!bigiUsername.trim() || !bigiPassword.trim()) {
+                Alert.alert("Invalid Input", "Please enter both Username and Password for BigiSub.");
                 return;
             }
         } else {
@@ -380,7 +402,6 @@ export default function LiquidityVaultScreen() {
                     { key: 'BILALSADASUB_USERNAME', value: bilalUsername.trim() },
                     { key: 'BILALSADASUB_PASSWORD', value: bilalPassword.trim() },
                 ];
-                // Also save token if provided
                 if (tokenValue.trim()) {
                     credsToSave.push({ key: 'BILALSADASUB_TOKEN', value: tokenValue.trim() });
                 }
@@ -388,6 +409,27 @@ export default function LiquidityVaultScreen() {
                     await supabase.from('system_secrets').upsert({
                         key: cred.key, value: cred.value,
                         description: `BilalSadaSub credential - ${cred.key}`,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    await supabase.from('app_settings').upsert({
+                        key: cred.key, value: cred.value,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+                    setVaultSecrets(prev => ({ ...prev, [cred.key]: cred.value }));
+                }
+            } else if (isBigi) {
+                // Save username & password to vault
+                const credsToSave = [
+                    { key: 'BIGISUB_USERNAME', value: bigiUsername.trim() },
+                    { key: 'BIGISUB_PASSWORD', value: bigiPassword.trim() },
+                ];
+                if (tokenValue.trim()) {
+                    credsToSave.push({ key: 'BIGI_API_TOKEN', value: tokenValue.trim() });
+                }
+                for (const cred of credsToSave) {
+                    await supabase.from('system_secrets').upsert({
+                        key: cred.key, value: cred.value,
+                        description: `BigiSub credential - ${cred.key}`,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'key' });
                     await supabase.from('app_settings').upsert({
@@ -414,14 +456,16 @@ export default function LiquidityVaultScreen() {
 
             await supabase.functions.invoke('check-provider-balances', { body: {} });
 
-            Alert.alert("Success 🎉", isBilal
-                ? `BilalSadaSub credentials saved to Vault! Balance will update now.`
+            Alert.alert("Success 🎉", (isBilal || isBigi)
+                ? `${selectedTokenProvider?.name} credentials saved to Vault! Balance will update now.`
                 : `Saved ${secretKey} to Vault successfully!`
             );
             setSelectedTokenProvider(null);
             setTokenValue('');
             setBilalUsername('');
             setBilalPassword('');
+            setBigiUsername('');
+            setBigiPassword('');
             fetchProviderBalances();
         } catch (e: any) {
             Alert.alert("Error", e.message || "Failed to save secret key to Vault.");
@@ -807,15 +851,15 @@ export default function LiquidityVaultScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {selectedTokenProvider?.id === 'bilalsadasub' ? (
-                            // BilalSadaSub: needs Username + Password (Basic Auth)
+                        {selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi' ? (
+                            // BilalSadaSub & BigiSub: need Username + Password (Basic Auth / JWT)
                             <>
                                 <View style={{
                                     backgroundColor: '#fffbeb', borderRadius: 10, padding: 10,
                                     borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 14
                                 }}>
                                     <Text style={{ color: '#92400e', fontSize: 11.5, fontWeight: '700' }}>
-                                        🔐 BilalSadaSub uses Username + Password authentication.
+                                        🔐 {selectedTokenProvider?.name} uses Username + Password authentication.
                                         Enter your login credentials below — they are saved securely in Vault.
                                     </Text>
                                 </View>
@@ -823,24 +867,24 @@ export default function LiquidityVaultScreen() {
                                 <Text style={styles.inputLabel}>Username (Login)</Text>
                                 <TextInput
                                     style={styles.modalInput}
-                                    placeholder="Enter your BilalSadaSub username"
+                                    placeholder={`Enter your ${selectedTokenProvider?.name} username`}
                                     placeholderTextColor="#94a3b8"
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    value={bilalUsername}
-                                    onChangeText={setBilalUsername}
+                                    value={selectedTokenProvider?.id === 'bigi' ? bigiUsername : bilalUsername}
+                                    onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiUsername : setBilalUsername}
                                 />
 
                                 <Text style={styles.inputLabel}>Password</Text>
                                 <TextInput
                                     style={styles.modalInput}
-                                    placeholder="Enter your BilalSadaSub password"
+                                    placeholder={`Enter your ${selectedTokenProvider?.name} password`}
                                     placeholderTextColor="#94a3b8"
                                     secureTextEntry={true}
                                     autoCapitalize="none"
                                     autoCorrect={false}
-                                    value={bilalPassword}
-                                    onChangeText={setBilalPassword}
+                                    value={selectedTokenProvider?.id === 'bigi' ? bigiPassword : bilalPassword}
+                                    onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiPassword : setBilalPassword}
                                 />
 
                                 <Text style={[styles.inputLabel, { marginTop: 8 }]}>Access Token (Optional)</Text>
