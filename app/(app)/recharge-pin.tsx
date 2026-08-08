@@ -23,6 +23,19 @@ import { supabase } from '../../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 
+// Brand Colors
+const T = {
+    navy: '#0d1b3e',
+    navyMid: '#142258',
+    gold: '#f5a623',
+    goldDk: '#d4890e',
+    goldLight: '#fffdf5',
+    white: '#ffffff',
+    text: '#0d1b3e',
+    textSub: '#5a6890',
+    border: '#cbd5e1'
+};
+
 // Official Network Logos
 const NETWORK_LOGOS: Record<string, any> = {
     mtn: require('../../assets/images/mtn.png'),
@@ -238,12 +251,12 @@ export default function RechargePinScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#f8fafc', paddingTop: insets.top }}>
+        <View style={{ flex: 1, backgroundColor: '#f4f6fb', paddingTop: insets.top }}>
             
-            {/* Top Navigation */}
+            {/* Top Navigation - BRAND NAVY & GOLD */}
             <View style={s.topNav}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                    <Ionicons name="arrow-back" size={18} color="#0d1b3e" />
+                    <Ionicons name="arrow-back" size={18} color="#f5a623" />
                 </TouchableOpacity>
                 <Text style={s.topNavTitle}>Recharge Pin Printing</Text>
             </View>
@@ -272,7 +285,7 @@ export default function RechargePinScreen() {
                                     <View style={s.netLogoBoxCompact}>
                                         <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
                                     </View>
-                                    <Text style={s.netNameTxtCompact}>{net.name}</Text>
+                                    <Text style={[s.netNameTxtCompact, isSelected && { color: T.goldDk }]}>{net.name}</Text>
                                     <Text style={s.stockTxtCompact}>{net.stockDefault} available</Text>
                                 </TouchableOpacity>
                             );
@@ -286,7 +299,7 @@ export default function RechargePinScreen() {
 
                     {loadingPlans ? (
                         <View style={{ padding: 20, alignItems: 'center' }}>
-                            <ActivityIndicator size="small" color="#0d1b3e" />
+                            <ActivityIndicator size="small" color={T.navy} />
                             <Text style={{ marginTop: 6, color: '#64748b', fontSize: 12 }}>Fetching {selectedNetwork.toUpperCase()} pin denominations...</Text>
                         </View>
                     ) : (
@@ -307,7 +320,9 @@ export default function RechargePinScreen() {
                                             isSelected && s.denom2x2CardSelected
                                         ]}
                                     >
-                                        <Text style={s.denom2x2Val}>{plan.denomination || `₦${plan.size}`}</Text>
+                                        <Text style={[s.denom2x2Val, isSelected && { color: T.navy }]}>
+                                            {plan.denomination || `₦${plan.size}`}
+                                        </Text>
                                         <Text style={s.denom2x2UnitPrice}>₦{unitPriceVal} each</Text>
                                         <Text style={s.denom2x2Stock}>{stockCount} available</Text>
                                     </TouchableOpacity>
@@ -364,7 +379,7 @@ export default function RechargePinScreen() {
                         placeholderTextColor="#94a3b8"
                     />
 
-                    {/* Total Cost Display Box */}
+                    {/* Total Cost Display Box - BRAND NAVY & GOLD */}
                     <View style={s.totalBox}>
                         <Text style={s.totalBoxLabel}>Total</Text>
                         <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
@@ -376,7 +391,7 @@ export default function RechargePinScreen() {
                         <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
                     </View>
 
-                    {/* Purchase Button */}
+                    {/* Purchase Button - BRAND GOLD */}
                     <TouchableOpacity
                         onPress={handlePurchase}
                         disabled={purchasing || !selectedPlan}
@@ -387,7 +402,7 @@ export default function RechargePinScreen() {
                         ]}
                     >
                         {purchasing ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
+                            <ActivityIndicator size="small" color={T.navy} />
                         ) : (
                             <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
                         )}
@@ -406,10 +421,10 @@ export default function RechargePinScreen() {
                 <View style={s.resultModalOverlay}>
                     <View style={s.resultModalCard}>
                         
-                        {/* Top Buttons: Print Cards (Orange) & Buy More (White) */}
+                        {/* Top Buttons: Print Cards (Gold) & Buy More (White) */}
                         <View style={s.resultTopBtnRow}>
                             <TouchableOpacity onPress={handlePrintCards} style={s.printCardsBtn} activeOpacity={0.85}>
-                                <Ionicons name="print-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                <Ionicons name="print-outline" size={16} color={T.navy} style={{ marginRight: 6 }} />
                                 <Text style={s.printCardsBtnTxt}>Print Cards</Text>
                             </TouchableOpacity>
 
@@ -477,16 +492,16 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        backgroundColor: '#ffffff',
+        paddingVertical: 12,
+        backgroundColor: T.navy,
         borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0'
+        borderBottomColor: 'rgba(245,166,35,0.3)'
     },
     backBtn: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#f1f5f9',
+        backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 10
@@ -494,10 +509,10 @@ const s = StyleSheet.create({
     topNavTitle: {
         fontSize: 16,
         fontWeight: '800',
-        color: '#0d1b3e'
+        color: T.white
     },
     cardSection: {
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderRadius: 14,
         padding: 12,
         marginBottom: 12,
@@ -507,7 +522,7 @@ const s = StyleSheet.create({
     sectionHeader: {
         fontSize: 14,
         fontWeight: '800',
-        color: '#0d1b3e',
+        color: T.navy,
         marginBottom: 10
     },
     // 4-GRID COLUMN NETWORK ROW
@@ -517,7 +532,7 @@ const s = StyleSheet.create({
     },
     net4CardItem: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderRadius: 10,
         paddingVertical: 8,
         paddingHorizontal: 4,
@@ -527,9 +542,9 @@ const s = StyleSheet.create({
         borderColor: '#cbd5e1'
     },
     netCardItemSelected: {
-        borderColor: '#ea580c',
-        borderWidth: 2,
-        backgroundColor: '#ffffff'
+        borderColor: T.gold,
+        borderWidth: 2.5,
+        backgroundColor: T.goldLight
     },
     netLogoBoxCompact: {
         width: 32,
@@ -545,7 +560,7 @@ const s = StyleSheet.create({
     netNameTxtCompact: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#0d1b3e'
+        color: T.navy
     },
     stockTxtCompact: {
         fontSize: 9,
@@ -562,7 +577,7 @@ const s = StyleSheet.create({
     },
     denom2x2Card: {
         width: (W - 24 - 24 - 10) / 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderRadius: 12,
         paddingVertical: 14,
         paddingHorizontal: 10,
@@ -572,14 +587,14 @@ const s = StyleSheet.create({
         borderColor: '#cbd5e1'
     },
     denom2x2CardSelected: {
-        borderColor: '#ea580c',
-        borderWidth: 2,
-        backgroundColor: '#fff7ed'
+        borderColor: T.gold,
+        borderWidth: 2.5,
+        backgroundColor: T.goldLight
     },
     denom2x2Val: {
         fontSize: 20,
         fontWeight: '900',
-        color: '#0d1b3e'
+        color: T.navy
     },
     denom2x2UnitPrice: {
         fontSize: 11,
@@ -609,7 +624,7 @@ const s = StyleSheet.create({
     orderDetailVal: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#0d1b3e'
+        color: T.navy
     },
     qtyPillRow: {
         flexDirection: 'row',
@@ -619,16 +634,16 @@ const s = StyleSheet.create({
         flex: 1,
         height: 36,
         borderRadius: 8,
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderWidth: 1,
         borderColor: '#cbd5e1',
         alignItems: 'center',
         justifyContent: 'center'
     },
     qtyPillBtnSelected: {
-        borderColor: '#ea580c',
-        borderWidth: 2,
-        backgroundColor: '#fff7ed'
+        borderColor: T.gold,
+        borderWidth: 2.5,
+        backgroundColor: T.goldLight
     },
     qtyPillTxt: {
         fontSize: 12,
@@ -636,7 +651,7 @@ const s = StyleSheet.create({
         color: '#334155'
     },
     qtyPillTxtSelected: {
-        color: '#ea580c',
+        color: T.goldDk,
         fontWeight: '800'
     },
     nameInput: {
@@ -648,65 +663,67 @@ const s = StyleSheet.create({
         paddingHorizontal: 10,
         fontSize: 12,
         fontWeight: '600',
-        color: '#0d1b3e'
+        color: T.navy
     },
     totalBox: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#fff7ed',
+        backgroundColor: T.navy,
         borderWidth: 1,
-        borderColor: '#ffedd5',
+        borderColor: T.gold,
         borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         marginTop: 12
     },
     totalBoxLabel: {
-        fontSize: 14,
-        color: '#0d1b3e',
+        fontSize: 15,
+        color: T.white,
         fontWeight: '600'
     },
     totalBoxAmount: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '900',
-        color: '#ea580c'
+        color: T.gold
     },
     walletBox: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#fafaf9',
+        backgroundColor: T.goldLight,
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(245,166,35,0.3)',
         paddingHorizontal: 12,
         paddingVertical: 8,
         marginTop: 6
     },
     walletBoxLabel: {
         fontSize: 11,
-        color: '#64748b'
+        color: T.navy
     },
     walletBoxAmount: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#16a34a'
+        color: T.goldDk
     },
     purchaseBtn: {
-        height: 44,
-        backgroundColor: '#ea580c',
+        height: 46,
+        backgroundColor: T.gold,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 14
     },
     purchaseBtnTxt: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#ffffff'
+        fontSize: 15,
+        fontWeight: '900',
+        color: T.navy
     },
     resultModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backgroundColor: 'rgba(13, 27, 62, 0.75)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 12
@@ -726,21 +743,21 @@ const s = StyleSheet.create({
     printCardsBtn: {
         flex: 1.5,
         height: 40,
-        backgroundColor: '#ea580c',
+        backgroundColor: T.gold,
         borderRadius: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center'
     },
     printCardsBtnTxt: {
-        color: '#ffffff',
-        fontWeight: '800',
+        color: T.navy,
+        fontWeight: '900',
         fontSize: 14
     },
     buyMoreBtn: {
         flex: 1,
         height: 40,
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: '#cbd5e1',
@@ -748,7 +765,7 @@ const s = StyleSheet.create({
         justifyContent: 'center'
     },
     buyMoreBtnTxt: {
-        color: '#0d1b3e',
+        color: T.navy,
         fontWeight: '800',
         fontSize: 13
     },
@@ -759,7 +776,7 @@ const s = StyleSheet.create({
     },
     printedVoucherCard: {
         width: (W > 480 ? 250 : (W - 24 - 24)),
-        backgroundColor: '#ffffff',
+        backgroundColor: T.white,
         borderRadius: 8,
         padding: 8,
         borderWidth: 1.5,
@@ -783,7 +800,7 @@ const s = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 1,
         borderColor: '#cbd5e1',
-        backgroundColor: '#ffffff'
+        backgroundColor: T.white
     },
     vDashedLine: {
         height: 1,
