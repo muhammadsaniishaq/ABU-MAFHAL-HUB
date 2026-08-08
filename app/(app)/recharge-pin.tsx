@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -246,344 +246,489 @@ export default function RechargePinScreen() {
         showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
-    // Network logo URLs (hosted images for canvas use)
-    const NETWORK_LOGO_URLS: Record<string, string> = {
-        mtn: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/MTN_Logo.svg/512px-MTN_Logo.svg.png',
-        glo: 'https://upload.wikimedia.org/wikipedia/en/thumb/2/27/Glo_logo.svg/512px-Glo_logo.svg.png',
-        airtel: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Airtel_logo.svg/512px-Airtel_logo.svg.png',
-        '9mobile': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/9Mobile_new_logo.svg/512px-9Mobile_new_logo.svg.png',
+    // Inline SVG logos - NO external URLs, NO CORS issues
+    const NET_SVG: Record<string, string> = {
+        mtn: `data:image/svg+xml;base64,${typeof btoa !== 'undefined' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="120" height="60" fill="#FFCC00"/><text x="60" y="42" font-family="Arial Black,Arial" font-size="26" font-weight="900" text-anchor="middle" fill="#000000">MTN</text></svg>') : ''}`,
+        glo: `data:image/svg+xml;base64,${typeof btoa !== 'undefined' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="120" height="60" fill="#008751"/><text x="60" y="40" font-family="Arial Black,Arial" font-size="24" font-weight="900" text-anchor="middle" fill="#ffffff">glo</text><circle cx="60" cy="50" r="3" fill="#ffffff" opacity="0.6"/></svg>') : ''}`,
+        airtel: `data:image/svg+xml;base64,${typeof btoa !== 'undefined' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="120" height="60" fill="#E60000"/><text x="60" y="42" font-family="Arial Black,Arial" font-size="18" font-weight="900" text-anchor="middle" fill="#ffffff">airtel</text></svg>') : ''}`,
+        '9mobile': `data:image/svg+xml;base64,${typeof btoa !== 'undefined' ? btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><rect width="120" height="60" fill="#006837"/><text x="60" y="38" font-family="Arial Black,Arial" font-size="16" font-weight="900" text-anchor="middle" fill="#ffffff">9mobile</text></svg>') : ''}`,
     };
 
-    // 1. SAVE AS PNG IMAGE FILE (.png) - with real network logo
+    // Helper: safely parse pins from history item (may be JSON string from DB)
+    const safeParsePins = (item: any): any[] => {
+        if (!item) return [];
+        const raw = item.pins;
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') {
+            try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
+        }
+        return [];
+    };
+
+    // ─── 3. BLUETOOTH MINI PRINTER ─────────────────────────────────────
+    const handleBluetoothPrint = async (customTxData?: any) => {
+        const tx = customTxData || successModal.txData;
+        if (!tx) return;
+        const pins = safeParsePins(tx);
+        if (pins.length === 0) { showAlert('No PINs', 'No PIN data found to print.', 'error'); return; }
+
+        if (Platform.OS !== 'web' || typeof (navigator as any).bluetooth === 'undefined') {
+            showAlert('Not Supported ⚠️', 'Bluetooth printing is only available on Chrome/Edge on Android or Desktop with Web Bluetooth enabled.', 'warning');
+            return;
+        }
+
+        try {
+            showAlert('Connecting... 🔵', 'Searching for Bluetooth printer. Please select your mini printer from the list.', 'warning');
+            const bt = (navigator as any).bluetooth;
+            const device = await bt.requestDevice({
+                filters: [
+                    { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+                    { services: ['0000ff00-0000-1000-8000-00805f9b34fb'] },
+                    { services: ['e7810a71-73ae-499d-8c15-faa9aef0c3f2'] },
+                ],
+                optionalServices: [
+                    '000018f0-0000-1000-8000-00805f9b34fb',
+                    '0000ff00-0000-1000-8000-00805f9b34fb',
+                    'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+                    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                ]
+            });
+
+            const server = await device.gatt.connect();
+            // Try known service UUIDs for common mini BT printers
+            let characteristic: any = null;
+            const serviceUUIDs = [
+                '000018f0-0000-1000-8000-00805f9b34fb',
+                '0000ff00-0000-1000-8000-00805f9b34fb',
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+                '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+            ];
+            const charUUIDs = [
+                '00002af1-0000-1000-8000-00805f9b34fb',
+                '0000ff02-0000-1000-8000-00805f9b34fb',
+                'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+                '49535343-8841-43f4-a8d4-ecbe34729bb3',
+            ];
+            for (const svcId of serviceUUIDs) {
+                try {
+                    const svc = await server.getPrimaryService(svcId);
+                    for (const chId of charUUIDs) {
+                        try { characteristic = await svc.getCharacteristic(chId); break; } catch { /* try next */ }
+                    }
+                    if (!characteristic) {
+                        // Try getting all characteristics
+                        const chars = await svc.getCharacteristics();
+                        for (const ch of chars) {
+                            if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                                characteristic = ch; break;
+                            }
+                        }
+                    }
+                    if (characteristic) break;
+                } catch { /* try next service */ }
+            }
+
+            if (!characteristic) {
+                showAlert('Printer Error ❌', 'Could not find a writable characteristic on this printer. Try a different Bluetooth printer.', 'error');
+                return;
+            }
+
+            // Build ESC/POS receipt
+            const enc = new TextEncoder();
+            const ESC = 0x1B; const GS = 0x1D; const LF = 0x0A;
+            const initCmd = new Uint8Array([ESC, 0x40]); // Init
+            const centerCmd = new Uint8Array([ESC, 0x61, 0x01]);
+            const leftCmd = new Uint8Array([ESC, 0x61, 0x00]);
+            const boldOn = new Uint8Array([ESC, 0x45, 0x01]);
+            const boldOff = new Uint8Array([ESC, 0x45, 0x00]);
+            const dblHeight = new Uint8Array([ESC, 0x21, 0x10]);
+            const normalSize = new Uint8Array([ESC, 0x21, 0x00]);
+            const cutCmd = new Uint8Array([GS, 0x56, 0x41, 0x10]);
+
+            const writeLine = async (text: string, cmd?: Uint8Array) => {
+                if (cmd) await characteristic.writeValue(cmd);
+                await characteristic.writeValue(enc.encode(text + '\n'));
+            };
+
+            const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
+            const denom = tx.denomination || '\u20A6100';
+            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
+            const txRef = tx.transaction_id || tx.transactionId || 'RCP' + Date.now();
+            const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            await characteristic.writeValue(initCmd);
+            await characteristic.writeValue(centerCmd);
+            await writeLine('================================');
+            await characteristic.writeValue(boldOn);
+            await characteristic.writeValue(dblHeight);
+            await writeLine(bName);
+            await characteristic.writeValue(normalSize);
+            await characteristic.writeValue(boldOff);
+            await writeLine(`${netName} ${denom} RECHARGE CARD`);
+            await writeLine('================================');
+            await characteristic.writeValue(leftCmd);
+
+            for (let i = 0; i < pins.length; i++) {
+                const p = pins[i];
+                await characteristic.writeValue(centerCmd);
+                await writeLine(`--- CARD ${i + 1} OF ${pins.length} ---`);
+                await characteristic.writeValue(leftCmd);
+                await characteristic.writeValue(boldOn);
+                await characteristic.writeValue(dblHeight);
+                const rawPin = (p.pin || '').toString();
+                const groups = rawPin.match(/.{1,4}/g) || [rawPin];
+                await writeLine('PIN: ' + groups.join('-'));
+                await characteristic.writeValue(normalSize);
+                await characteristic.writeValue(boldOff);
+                await writeLine(`S/N: ${p.serial || (i + 1)}`);
+                await writeLine(`DIAL: ${p.load_code || tx.load_code || '*311*PIN#'}`);
+                await writeLine(`REF: ${txRef}`);
+                await writeLine(`DATE: ${dateStr}`);
+                await writeLine('--------------------------------');
+            }
+
+            await characteristic.writeValue(centerCmd);
+            await writeLine('Generated by ABU MAFHAL VTU');
+            await writeLine('Keep this receipt safe!');
+            await characteristic.writeValue(new Uint8Array([LF, LF, LF]));
+            await characteristic.writeValue(cutCmd);
+
+            showAlert('Printed! \u2705', `${pins.length} recharge card(s) sent to ${device.name || 'Bluetooth Printer'} successfully!`, 'success');
+        } catch (err: any) {
+            if (err.name === 'NotFoundError') {
+                showAlert('Cancelled', 'No printer was selected.', 'warning');
+            } else {
+                showAlert('Bluetooth Error \u274C', err.message || 'Could not connect to printer. Make sure it is on and paired.', 'error');
+            }
+        }
+    };
+
+    // ─── 1. SAVE AS PNG (80x50mm cards @ 200 DPI = 630x394px) ──────────
     const handleSaveAsPNG = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
-        if (!tx || !tx.pins) return;
-        const pins = tx.pins || [];
+        if (!tx) return;
+        const pins = safeParsePins(tx);
+        if (pins.length === 0) { showAlert('No PINs', 'No PIN data to save.', 'error'); return; }
 
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
             const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
+            const netTextCol = netKey === 'mtn' ? '#000000' : '#ffffff';
             const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
             const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
             const denom = tx.denomination || '₦100';
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
             const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
 
-            const cardW = 480;
-            const cardH = 180;
-            const gap = 16;
-            const padding = 24;
+            // 80mm x 50mm @ 200 DPI = 630 x 394 px per card
+            const CW = 630, CH = 394;
+            const COLS = 2, GAP = 20, PAD = 24;
+            const rows = Math.ceil(pins.length / COLS);
+            const canvasW = COLS * CW + (COLS - 1) * GAP + PAD * 2;
+            const canvasH = rows * CH + (rows - 1) * GAP + PAD * 2 + 32;
 
             const drawAllCards = (logoImg: HTMLImageElement | null) => {
                 const canvas = document.createElement('canvas');
-                canvas.width = cardW + (padding * 2);
-                canvas.height = (pins.length * (cardH + gap)) + (padding * 2) + 40;
+                canvas.width = canvasW;
+                canvas.height = canvasH;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
 
-                // Page background
-                const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                bgGrad.addColorStop(0, '#eef2ff');
-                bgGrad.addColorStop(1, '#f8fafc');
-                ctx.fillStyle = bgGrad;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // Page background gradient
+                const bg = ctx.createLinearGradient(0, 0, canvasW, canvasH);
+                bg.addColorStop(0, '#dce8ff');
+                bg.addColorStop(1, '#f0f4ff');
+                ctx.fillStyle = bg;
+                ctx.fillRect(0, 0, canvasW, canvasH);
 
-                // Header watermark text
-                ctx.fillStyle = 'rgba(13,27,62,0.06)';
-                ctx.font = 'bold 48px sans-serif';
+                // Watermark
+                ctx.save();
+                ctx.globalAlpha = 0.04;
+                ctx.font = 'bold 52px Arial';
+                ctx.fillStyle = '#0d1b3e';
                 ctx.textAlign = 'center';
-                ctx.fillText('ABU MAFHAL VTU', canvas.width / 2, canvas.height / 2 + 20);
-                ctx.textAlign = 'left';
+                ctx.fillText('ABU MAFHAL VTU', canvasW / 2, canvasH / 2);
+                ctx.restore();
 
                 pins.forEach((p: any, idx: number) => {
-                    const y = padding + (idx * (cardH + gap));
-                    const x = padding;
+                    const col = idx % COLS;
+                    const row = Math.floor(idx / COLS);
+                    const X = PAD + col * (CW + GAP);
+                    const Y = PAD + row * (CH + GAP);
 
-                    // Card shadow effect
-                    ctx.shadowColor = 'rgba(13,27,62,0.18)';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowOffsetX = 0;
-                    ctx.shadowOffsetY = 4;
-
-                    // Card background
+                    // ── Drop shadow ──
+                    ctx.shadowColor = 'rgba(13,27,62,0.22)';
+                    ctx.shadowBlur = 14;
+                    ctx.shadowOffsetY = 6;
                     ctx.fillStyle = '#ffffff';
-                    ctx.beginPath();
-                    ctx.roundRect(x, y, cardW, cardH, 12);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    ctx.shadowOffsetY = 0;
+                    ctx.beginPath(); ctx.roundRect(X, Y, CW, CH, 14); ctx.fill();
+                    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
-                    // Card border
-                    ctx.strokeStyle = '#0d1b3e';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.roundRect(x, y, cardW, cardH, 12);
-                    ctx.stroke();
+                    // ── Card border ──
+                    ctx.strokeStyle = '#0d1b3e'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.roundRect(X, Y, CW, CH, 14); ctx.stroke();
 
-                    // Header gradient banner (Navy)
-                    const headerGrad = ctx.createLinearGradient(x, y, x + cardW, y);
-                    headerGrad.addColorStop(0, '#0d1b3e');
-                    headerGrad.addColorStop(1, '#142258');
-                    ctx.fillStyle = headerGrad;
-                    ctx.beginPath();
-                    ctx.roundRect(x, y, cardW, 36, [12, 12, 0, 0]);
-                    ctx.fill();
+                    // ── Decorative circle top-right ──
+                    ctx.save(); ctx.globalAlpha = 0.08;
+                    ctx.fillStyle = netBg;
+                    ctx.beginPath(); ctx.arc(X + CW - 30, Y + 30, 60, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(X + CW, Y, 45, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
 
-                    // Gold left accent stripe
+                    // ── Header gradient banner ──
+                    const hGrad = ctx.createLinearGradient(X, Y, X + CW, Y);
+                    hGrad.addColorStop(0, '#0a1730'); hGrad.addColorStop(0.5, '#0d1b3e'); hGrad.addColorStop(1, '#162860');
+                    ctx.fillStyle = hGrad;
+                    ctx.beginPath(); ctx.roundRect(X, Y, CW, 46, [14, 14, 0, 0]); ctx.fill();
+
+                    // ── Gold accent line ──
                     ctx.fillStyle = '#f5a623';
-                    ctx.fillRect(x, y + 36, 4, cardH - 36);
+                    ctx.fillRect(X, Y + 46, CW, 3);
 
-                    // Business Name in header (Gold)
+                    // ── Gold left stripe ──
                     ctx.fillStyle = '#f5a623';
-                    ctx.font = 'bold 13px Arial, sans-serif';
-                    ctx.fillText(bName, x + 14, y + 24);
+                    ctx.fillRect(X, Y + 49, 5, CH - 49);
 
-                    // Denomination badge in header (white)
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 14px Arial, sans-serif';
+                    // ── Business name (header, gold) ──
+                    ctx.fillStyle = '#f5a623';
+                    ctx.font = 'bold 15px Arial, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(bName.length > 28 ? bName.slice(0, 26) + '…' : bName, X + 14, Y + 32);
+
+                    // ── Denomination (header, white right) ──
+                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px Arial, sans-serif';
                     ctx.textAlign = 'right';
-                    ctx.fillText(denom + ' RECHARGE CARD', x + cardW - 14, y + 24);
+                    ctx.fillText(denom, X + CW - 14, Y + 32);
                     ctx.textAlign = 'left';
 
-                    // Network logo image or colored badge
-                    const logoBoxX = x + cardW - 72;
-                    const logoBoxY = y + 46;
-                    const logoBoxW = 60;
-                    const logoBoxH = 52;
+                    // ── Network logo badge (right side) ──
+                    const LBX = X + CW - 84, LBY = Y + 58, LBW = 72, LBH = 62;
                     ctx.fillStyle = netBg;
-                    ctx.beginPath();
-                    ctx.roundRect(logoBoxX, logoBoxY, logoBoxW, logoBoxH, 8);
-                    ctx.fill();
-                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.roundRect(logoBoxX, logoBoxY, logoBoxW, logoBoxH, 8);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.roundRect(LBX, LBY, LBW, LBH, 10); ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.roundRect(LBX, LBY, LBW, LBH, 10); ctx.stroke();
 
-                    if (logoImg) {
-                        // Draw real logo image centered in badge
-                        const maxSize = 42;
-                        const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
-                        let iw = maxSize, ih = maxSize;
-                        if (aspectRatio > 1) ih = maxSize / aspectRatio;
-                        else iw = maxSize * aspectRatio;
-                        ctx.drawImage(logoImg,
-                            logoBoxX + (logoBoxW - iw) / 2,
-                            logoBoxY + (logoBoxH - ih) / 2,
-                            iw, ih
-                        );
+                    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+                        const mxS = 54;
+                        const ar = logoImg.naturalWidth / Math.max(logoImg.naturalHeight, 1);
+                        let iw = mxS, ih = mxS / ar;
+                        if (ih > mxS) { ih = mxS; iw = mxS * ar; }
+                        ctx.drawImage(logoImg, LBX + (LBW - iw) / 2, LBY + (LBH - ih) / 2, iw, ih);
                     } else {
-                        // Fallback text badge
-                        ctx.fillStyle = netKey === 'mtn' ? '#000000' : '#ffffff';
-                        ctx.font = 'bold 14px Arial, sans-serif';
+                        ctx.fillStyle = netTextCol; ctx.font = 'bold 16px Arial Black, Arial';
                         ctx.textAlign = 'center';
-                        ctx.fillText(netName, logoBoxX + logoBoxW / 2, logoBoxY + logoBoxH / 2 + 5);
+                        ctx.fillText(netName, LBX + LBW / 2, LBY + LBH / 2 + 6);
                         ctx.textAlign = 'left';
                     }
 
-                    // PIN Gold highlight box
-                    const pinBoxX = x + 14;
-                    const pinBoxY = y + 46;
-                    const pinBoxW = cardW - 92;
-                    const pinBoxH = 52;
-                    ctx.fillStyle = '#fffbef';
-                    ctx.strokeStyle = '#f5a623';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.roundRect(pinBoxX, pinBoxY, pinBoxW, pinBoxH, 8);
-                    ctx.fill();
-                    ctx.stroke();
+                    // ── PIN box (gold border) ──
+                    const PBX = X + 14, PBY = Y + 58, PBW = CW - 110, PBH = 62;
+                    ctx.fillStyle = '#fffbef'; ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.roundRect(PBX, PBY, PBW, PBH, 10); ctx.fill(); ctx.stroke();
 
                     // PIN label
-                    ctx.fillStyle = '#9a7000';
-                    ctx.font = '10px Arial, sans-serif';
-                    ctx.fillText('RECHARGE PIN', pinBoxX + 10, pinBoxY + 14);
+                    ctx.fillStyle = '#9a7000'; ctx.font = '11px Arial, sans-serif';
+                    ctx.fillText('RECHARGE PIN', PBX + 12, PBY + 17);
 
-                    // PIN digits - large bold monospace
+                    // PIN digits (large bold monospace)
                     const rawPin = (p.pin || '').toString();
                     const groups = rawPin.match(/.{1,4}/g) || [rawPin];
-                    const formattedPin = groups.join('  ');
                     ctx.fillStyle = '#0d1b3e';
-                    ctx.font = 'bold 20px Courier New, monospace';
-                    ctx.fillText(formattedPin, pinBoxX + 10, pinBoxY + 36);
+                    ctx.font = 'bold 26px Courier New, monospace';
+                    ctx.fillText(groups.join('  '), PBX + 12, PBY + 50);
 
-                    // Divider dashed line
-                    ctx.setLineDash([4, 4]);
-                    ctx.strokeStyle = '#cbd5e1';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(x + 14, y + 108);
-                    ctx.lineTo(x + cardW - 14, y + 108);
-                    ctx.stroke();
+                    // ── Dashed divider ──
+                    ctx.setLineDash([5, 5]); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(X + 12, Y + 132); ctx.lineTo(X + CW - 12, Y + 132); ctx.stroke();
                     ctx.setLineDash([]);
 
-                    // Card number badge
-                    ctx.fillStyle = '#0d1b3e';
-                    ctx.font = 'bold 10px Arial, sans-serif';
-                    ctx.fillText(`CARD ${idx + 1} OF ${pins.length}`, x + 14, y + 124);
+                    // ── Card number ──
+                    ctx.fillStyle = T.navy; ctx.font = 'bold 11px Arial, sans-serif';
+                    ctx.fillText(`CARD ${idx + 1} / ${pins.length}`, X + 14, Y + 150);
 
-                    // Meta info row
-                    ctx.fillStyle = '#64748b';
-                    ctx.font = '9px Courier New, monospace';
-                    ctx.fillText(`REF: ${txRef}`, x + 14, y + 140);
-                    ctx.fillText(`S/N: ${p.serial || (idx + 1)}  |  DATE: ${formattedDate}`, x + 14, y + 154);
+                    // ── Meta row ──
+                    ctx.fillStyle = '#64748b'; ctx.font = '10px Courier New, monospace';
+                    ctx.fillText(`S/N: ${p.serial || (idx + 1)}`, X + 14, Y + 168);
+                    ctx.fillText(`DATE: ${formattedDate}`, X + 180, Y + 168);
+                    ctx.fillStyle = '#94a3b8'; ctx.font = '9px Courier New, monospace';
+                    ctx.fillText(`REF: ${txRef}`, X + 14, Y + 184);
 
-                    // Dial code footer
-                    ctx.fillStyle = '#0d1b3e';
-                    ctx.font = 'bold 11px Courier New, monospace';
+                    // ── Decorative dot row ──
+                    for (let d = 0; d < 6; d++) {
+                        ctx.fillStyle = d % 2 === 0 ? '#f5a623' : '#0d1b3e';
+                        ctx.beginPath(); ctx.arc(X + 14 + d * 14, Y + 202, 3.5, 0, Math.PI * 2); ctx.fill();
+                    }
+
+                    // ── Dial code ──
+                    ctx.fillStyle = '#0d1b3e'; ctx.font = 'bold 13px Courier New, monospace';
                     ctx.textAlign = 'right';
-                    ctx.fillText(`DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`, x + cardW - 14, y + 168);
+                    ctx.fillText(`DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`, X + CW - 14, Y + 206);
+                    ctx.textAlign = 'left';
+
+                    // ── Bottom gold bar ──
+                    ctx.fillStyle = '#f5a623';
+                    ctx.beginPath(); ctx.roundRect(X, Y + CH - 20, CW, 20, [0, 0, 14, 14]); ctx.fill();
+                    ctx.fillStyle = T.navy; ctx.font = 'bold 9px Arial, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('ABU MAFHAL VTU \u2022 RECHARGE VOUCHER', X + CW / 2, Y + CH - 7);
                     ctx.textAlign = 'left';
                 });
 
-                // Footer text
-                ctx.fillStyle = '#94a3b8';
-                ctx.font = '10px Arial, sans-serif';
+                // Footer
+                ctx.fillStyle = '#94a3b8'; ctx.font = '10px Arial, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('Generated by ABU MAFHAL VTU • Keep this card safe', canvas.width / 2, canvas.height - 8);
-                ctx.textAlign = 'left';
+                ctx.fillText('Generated by ABU MAFHAL VTU \u2022 80mm\xd750mm Card Format', canvasW / 2, canvasH - 8);
 
-                const dataUrl = canvas.toDataURL('image/png');
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
                 const link = document.createElement('a');
                 link.href = dataUrl;
-                link.download = `Recharge_Cards_${txRef}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showAlert('Downloaded PNG ✅', 'Recharge cards saved as PNG Image to your device!', 'success');
+                link.download = `RechargeCards_${txRef}.png`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                showAlert('Downloaded PNG \u2705', `${pins.length} card(s) saved as high-quality PNG (80x50mm format)!`, 'success');
             };
 
-            // Load network logo image first, then draw
-            const logoUrl = NETWORK_LOGO_URLS[netKey];
-            if (logoUrl) {
+            // Load inline SVG logo (no CORS)
+            const svgLogoUrl = NET_SVG[netKey];
+            if (svgLogoUrl) {
                 const img = new Image();
-                img.crossOrigin = 'anonymous';
                 img.onload = () => drawAllCards(img);
-                img.onerror = () => drawAllCards(null); // fallback to text badge
-                img.src = logoUrl;
+                img.onerror = () => drawAllCards(null);
+                img.src = svgLogoUrl;
             } else {
                 drawAllCards(null);
             }
         } else {
-            const pinsList = tx.pins;
-            const textToShare = pinsList.map((p: any, idx: number) =>
-                `Card #${idx + 1} (${tx.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
+            const textToShare = pins.map((p: any, idx: number) =>
+                `Card #${idx + 1} (${tx.denomination || '\u20A6100'})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
             ).join('\n\n');
             Share.share({ message: textToShare }).catch(() => {});
         }
     };
 
-    // 2. SAVE AS PDF - auto-download real PDF file via html2canvas-style iframe blob
+    // ─── 2. SAVE AS PDF (A4, 80x50mm cards, 2-column) ─────────────────
     const handleSaveAsPDF = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
-        if (!tx || !tx.pins) return;
-        const pins = tx.pins || [];
+        if (!tx) return;
+        const pins = safeParsePins(tx);
+        if (pins.length === 0) { showAlert('No PINs', 'No PIN data to save.', 'error'); return; }
 
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
             const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
-            const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
             const netTextColor = netKey === 'mtn' ? '#000000' : '#ffffff';
+            const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
             const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
             const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
             const formattedTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-            const logoUrl = NETWORK_LOGO_URLS[netKey] || '';
+            // Use inline SVG logo (no CORS, no external requests)
+            const svgLogoSrc = NET_SVG[netKey] || '';
+            const logoHtml = svgLogoSrc
+                ? `<img src="${svgLogoSrc}" style="width:44px;height:44px;object-fit:contain;" />`
+                : `<span style="font-weight:900;font-size:13px;color:${netTextColor};">${netName}</span>`;
 
             const cardsHtml = pins.map((p: any, idx: number) => {
                 const rawPin = (p.pin || '').toString();
                 const groups = rawPin.match(/.{1,4}/g) || [rawPin];
                 const formattedPin = groups.join('&nbsp;&nbsp;');
+                const dialCode = p.load_code || tx.load_code || tx.loadCode || '*311*PIN#';
                 return `
-                <div class="card">
-                    <div class="card-header">
-                        <span class="biz-name">${bName}</span>
-                        <span class="denom">${tx.denomination || '&#x20A6;100'} RECHARGE CARD</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="pin-row">
-                            <div class="pin-box">
-                                <div class="pin-label">RECHARGE PIN</div>
-                                <div class="pin-number">${formattedPin}</div>
-                            </div>
-                            <div class="net-badge" style="background:${netBg};color:${netTextColor};">
-                                ${logoUrl ? `<img src="${logoUrl}" style="width:38px;height:38px;object-fit:contain;" crossorigin="anonymous" />` : `<span style="font-weight:bold;font-size:12px;">${netName}</span>`}
-                            </div>
-                        </div>
-                        <div class="divider"></div>
-                        <div class="meta-row">
-                            <span class="card-num">CARD ${idx + 1} OF ${pins.length}</span>
-                            <span>S/N: ${p.serial || (idx + 1)}</span>
-                        </div>
-                        <div class="ref-row">REF: ${txRef}</div>
-                        <div class="footer-row">
-                            <span class="dial">DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
-                            <span class="date">${formattedDate} ${formattedTime}</span>
-                        </div>
-                    </div>
-                </div>
-                `;
+<div class="card">
+  <div class="card-top">
+    <div class="card-top-inner">
+      <div class="card-dots"><div class="dot"></div><div class="dot dot2"></div><div class="dot dot3"></div></div>
+      <span class="biz-name">${bName.length > 22 ? bName.slice(0,20)+'\u2026' : bName}</span>
+      <span class="denom-badge">${tx.denomination || '\u20A6100'}</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="pin-section">
+      <div class="pin-box">
+        <div class="pin-lbl">RECHARGE PIN</div>
+        <div class="pin-num">${formattedPin}</div>
+      </div>
+      <div class="net-wrap" style="background:${netBg};">${logoHtml}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="meta">
+      <span class="card-no">CARD ${idx + 1}/${pins.length}</span>
+      <span class="sn">S/N: ${p.serial || (idx + 1)}</span>
+      <span class="dt">${formattedDate}</span>
+    </div>
+    <div class="ref">REF: ${txRef}</div>
+    <div class="card-footer">
+      <span class="dial">${dialCode}</span>
+      <div class="dots-row"><div class="sd"></div><div class="sd"></div><div class="sd"></div><div class="sd"></div></div>
+    </div>
+  </div>
+</div>`;
             }).join('');
 
             const htmlDoc = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Recharge_Cards_${txRef}</title>
+<title>RechargeCards_${txRef}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', Arial, sans-serif; background: #f0f4ff; padding: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  h1.page-title { text-align: center; color: #0d1b3e; font-size: 15px; margin-bottom: 12px; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f5a623; padding-bottom: 8px; }
-  .sub-title { text-align: center; color: #64748b; font-size: 10px; margin-bottom: 14px; }
-  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .card { background: #fff; border: 2px solid #0d1b3e; border-radius: 10px; overflow: hidden; page-break-inside: avoid; box-shadow: 0 2px 8px rgba(13,27,62,0.12); }
-  .card-header { background: linear-gradient(135deg, #0d1b3e 0%, #142258 100%); padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #f5a623; }
-  .biz-name { color: #f5a623; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
-  .denom { color: #ffffff; font-size: 10px; font-weight: 700; }
-  .card-body { padding: 10px 12px 8px; }
-  .pin-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .pin-box { flex: 1; border: 2px solid #f5a623; background: #fffbef; border-radius: 7px; padding: 7px 10px; }
-  .pin-label { font-size: 8px; color: #9a7000; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-  .pin-number { font-size: 18px; font-weight: 700; color: #0d1b3e; font-family: 'Courier New', monospace; letter-spacing: 2px; }
-  .net-badge { width: 56px; height: 52px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08); }
-  .divider { border-top: 1px dashed #cbd5e1; margin: 7px 0; }
-  .meta-row { display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-bottom: 3px; }
-  .card-num { font-weight: 700; color: #0d1b3e; }
-  .ref-row { font-size: 8px; color: #94a3b8; font-family: 'Courier New', monospace; margin-bottom: 5px; }
-  .footer-row { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #0d1b3e; padding-top: 5px; }
-  .dial { font-size: 10px; font-weight: 700; color: #0d1b3e; font-family: 'Courier New', monospace; }
-  .date { font-size: 8px; color: #64748b; }
-  .watermark { text-align: center; color: #cbd5e1; font-size: 9px; margin-top: 12px; }
+  body { font-family: Arial, sans-serif; background: #e8eeff; padding: 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page-header { text-align: center; margin-bottom: 10px; }
+  .page-title { font-size: 14px; font-weight: 900; color: #0d1b3e; letter-spacing: 1px; }
+  .page-sub { font-size: 9px; color: #64748b; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 80mm); gap: 6mm; justify-content: center; }
+  .card { width: 80mm; height: 50mm; background: #fff; border: 2px solid #0d1b3e; border-radius: 5mm; overflow: hidden; page-break-inside: avoid; position: relative; }
+  .card::before { content:''; position:absolute; top:-15mm; right:-10mm; width:30mm; height:30mm; border-radius:50%; background:${netBg}; opacity:0.08; }
+  .card-top { background: linear-gradient(90deg, #09122c 0%, #0d1b3e 60%, #162860 100%); border-left: 3px solid #f5a623; padding: 2.5mm 3mm; }
+  .card-top-inner { display: flex; align-items: center; gap: 2mm; }
+  .card-dots { display: flex; gap: 1mm; margin-right: 1mm; }
+  .dot { width: 2.5mm; height: 2.5mm; border-radius: 50%; background: #f5a623; }
+  .dot2 { background: #ffffff; opacity: 0.6; }
+  .dot3 { background: #f5a623; opacity: 0.4; }
+  .biz-name { flex: 1; font-size: 6.5pt; font-weight: 700; color: #f5a623; letter-spacing: 0.3px; }
+  .denom-badge { background: #f5a623; color: #0d1b3e; font-size: 7pt; font-weight: 900; padding: 1mm 2mm; border-radius: 2mm; }
+  .card-body { padding: 2mm 3mm; }
+  .pin-section { display: flex; align-items: center; gap: 2mm; margin-bottom: 1.5mm; }
+  .pin-box { flex: 1; border: 1.5px solid #f5a623; background: #fffbef; border-radius: 2mm; padding: 1.5mm 2mm; }
+  .pin-lbl { font-size: 5pt; color: #9a7000; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 0.5mm; }
+  .pin-num { font-size: 13pt; font-weight: 900; color: #0d1b3e; font-family: 'Courier New', monospace; letter-spacing: 2px; }
+  .net-wrap { width: 14mm; height: 13mm; border-radius: 2mm; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+  .divider { border-top: 1px dashed #cbd5e1; margin: 1mm 0; }
+  .meta { display: flex; align-items: center; gap: 2mm; font-size: 6pt; color: #64748b; margin-bottom: 0.8mm; }
+  .card-no { font-weight: 800; color: #0d1b3e; }
+  .sn { flex: 1; }
+  .ref { font-size: 5.5pt; color: #94a3b8; font-family: 'Courier New', monospace; margin-bottom: 1mm; }
+  .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1.5px solid #0d1b3e; padding-top: 1mm; }
+  .dial { font-size: 7pt; font-weight: 900; color: #0d1b3e; font-family: 'Courier New', monospace; }
+  .dots-row { display: flex; gap: 1mm; }
+  .sd { width: 2mm; height: 2mm; border-radius: 50%; background: #f5a623; }
+  .sd:nth-child(2) { background: #0d1b3e; }
+  .sd:nth-child(4) { background: #0d1b3e; }
+  .watermark { text-align: center; color: #cbd5e1; font-size: 7pt; margin-top: 8px; }
 </style>
 </head>
 <body>
-  <h1 class="page-title">&#127371; ABU MAFHAL VTU — RECHARGE CARDS</h1>
-  <div class="sub-title">${netName} ${tx.denomination || ''} &bull; Qty: ${pins.length} cards &bull; ${formattedDate}</div>
-  <div class="grid">${cardsHtml}</div>
-  <div class="watermark">Generated by ABU MAFHAL VTU &bull; Keep these cards safe &bull; ${txRef}</div>
+<div class="page-header">
+  <div class="page-title">&#127371; ABU MAFHAL VTU &#8212; RECHARGE CARDS</div>
+  <div class="page-sub">${netName} ${tx.denomination || ''} &bull; ${pins.length} card(s) &bull; ${formattedDate} ${formattedTime}</div>
+</div>
+<div class="grid">${cardsHtml}</div>
+<div class="watermark">Generated by ABU MAFHAL VTU &bull; Cards are 80mm&times;50mm standard size &bull; ${txRef}</div>
 </body>
 </html>`;
 
-            // Auto-download as .pdf file (browser saves via print-to-PDF internally)
             const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
             const blobUrl = URL.createObjectURL(blob);
             const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
+            iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
             document.body.appendChild(iframe);
             iframe.src = blobUrl;
             iframe.onload = () => {
-                try {
-                    iframe.contentWindow?.focus();
-                    iframe.contentWindow?.print();
-                } catch (_) {}
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                    URL.revokeObjectURL(blobUrl);
-                }, 2000);
+                try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch (_) {}
+                setTimeout(() => { try { document.body.removeChild(iframe); } catch(_){} URL.revokeObjectURL(blobUrl); }, 3000);
             };
-            showAlert('PDF Ready ✅', 'PDF print dialog is opening. Choose "Save as PDF" in your printer options.', 'success');
+            showAlert('PDF Ready', 'Print dialog opening. Choose Save as PDF. Cards 80x50mm on A4.', 'success');
         } else {
             handleSaveAsPNG(customTxData);
         }
@@ -827,32 +972,42 @@ export default function RechargePinScreen() {
                                 </View>
                             ) : (
                                 <View style={{ gap: 10 }}>
-                                    {historyList.map((item: any) => {
-                                        const netKey = (item.network || 'mtn').toLowerCase();
+                                    {historyList.map((item: any, hIdx: number) => {
+                                        if (!item) return null;
+                                        const netKey = ((item.network || 'mtn') + '').toLowerCase();
                                         const logoSrc = NETWORK_LOGOS[netKey] || NETWORK_LOGOS.mtn;
-                                        const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent';
+                                        const dateStr = item.created_at
+                                            ? new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                                            : 'Recent';
+                                        const parsedPins = safeParsePins(item);
+                                        const netBgColor = NETWORK_BG_COLORS[netKey] || '#ffcc00';
 
                                         return (
-                                            <View key={item.id || item.transaction_id} style={s.historyCardItem}>
-                                                <View style={s.historyLogoBox}>
+                                            <View key={item.id || item.transaction_id || hIdx} style={[s.historyCardItem, { borderLeftWidth: 4, borderLeftColor: netBgColor }]}>
+                                                <View style={[s.historyLogoBox, { backgroundColor: netBgColor }]}>
                                                     <Image source={logoSrc} style={{ width: 24, height: 24 }} resizeMode="contain" />
                                                 </View>
 
                                                 <View style={{ flex: 1, paddingHorizontal: 8 }}>
                                                     <Text style={{ fontSize: 13, fontWeight: '800', color: T.navy }}>
-                                                        {item.network || 'MTN'} {item.denomination} ({item.quantity}x)
+                                                        {(item.network || 'MTN') + ''} {item.denomination || ''} ({(item.quantity || parsedPins.length || 1)}x)
                                                     </Text>
                                                     <Text style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
-                                                        REF: {item.transaction_id} • {dateStr}
+                                                        REF: {(item.transaction_id || 'N/A') + ''} \u2022 {dateStr}
                                                     </Text>
+                                                    {parsedPins.length > 0 && (
+                                                        <Text style={{ fontSize: 9, color: T.gold, marginTop: 2, fontWeight: '700' }}>
+                                                            {parsedPins.length} PIN{parsedPins.length > 1 ? 's' : ''} saved
+                                                        </Text>
+                                                    )}
                                                 </View>
 
                                                 <TouchableOpacity
                                                     onPress={() => {
-                                                        setSuccessModal({
-                                                            visible: true,
-                                                            txData: item
-                                                        });
+                                                        try {
+                                                            const viewData = { ...item, pins: parsedPins };
+                                                            setSuccessModal({ visible: true, txData: viewData });
+                                                        } catch (_) {}
                                                     }}
                                                     style={s.historyPrintBtn}
                                                     activeOpacity={0.8}
@@ -926,16 +1081,21 @@ export default function RechargePinScreen() {
                 <View style={s.resultModalOverlay}>
                     <View style={s.resultModalCard}>
                         
-                        {/* Top Action Row: SAVE PNG / SAVE PDF / CLOSE */}
+                        {/* Top Action Row: PNG / PDF / BLUETOOTH / CLOSE */}
                         <View style={s.resultTopBtnRow}>
                             <TouchableOpacity onPress={() => handleSaveAsPNG()} style={s.downloadPngBtn} activeOpacity={0.85}>
-                                <Ionicons name="image-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
-                                <Text style={s.downloadPngBtnTxt}>Save PNG</Text>
+                                <Ionicons name="image-outline" size={13} color={T.navy} style={{ marginRight: 3 }} />
+                                <Text style={s.downloadPngBtnTxt}>PNG</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => handleSaveAsPDF()} style={s.downloadPdfBtn} activeOpacity={0.85}>
-                                <Ionicons name="document-text-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
-                                <Text style={s.downloadPdfBtnTxt}>Save PDF</Text>
+                                <Ionicons name="document-text-outline" size={13} color={T.navy} style={{ marginRight: 3 }} />
+                                <Text style={s.downloadPdfBtnTxt}>PDF</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => handleBluetoothPrint()} style={[s.downloadPdfBtn, { backgroundColor: '#e0f2fe', borderColor: '#0284c7' }]} activeOpacity={0.85}>
+                                <Ionicons name="bluetooth-outline" size={13} color="#0284c7" style={{ marginRight: 3 }} />
+                                <Text style={[s.downloadPdfBtnTxt, { color: '#0284c7' }]}>BT Print</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -1543,3 +1703,4 @@ const s = StyleSheet.create({
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
     }
 });
+
