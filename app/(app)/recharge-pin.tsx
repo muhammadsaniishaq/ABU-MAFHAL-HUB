@@ -27,6 +27,7 @@ const { width: W } = Dimensions.get('window');
 const T = {
     navy: '#0d1b3e',
     navyMid: '#142258',
+    navyDark: '#09122c',
     gold: '#f5a623',
     goldDk: '#d4890e',
     goldLight: '#fffdf5',
@@ -46,18 +47,18 @@ const NETWORK_LOGOS: Record<string, any> = {
 };
 
 const NETWORKS = [
-    { id: 'mtn', name: 'MTN', stockDefault: 475 },
-    { id: 'glo', name: 'GLO', stockDefault: 323 },
-    { id: 'airtel', name: 'Airtel', stockDefault: 211 },
-    { id: '9mobile', name: '9Mobile', stockDefault: 18 }
+    { id: 'mtn', name: 'MTN' },
+    { id: 'glo', name: 'GLO' },
+    { id: 'airtel', name: 'Airtel' },
+    { id: '9mobile', name: '9Mobile' }
 ];
 
-// Reliable Default Fallback Denominations (1 row, 4 items)
+// Default Fallback Denominations (1 row, 4 items)
 const DEFAULT_DENOMS = [
-    { id: 101, size: '100', denomination: '₦100', price: 98.9, stock: 200 },
-    { id: 103, size: '200', denomination: '₦200', price: 197.8, stock: 200 },
-    { id: 104, size: '500', denomination: '₦500', price: 494.5, stock: 50 },
-    { id: 102, size: '1000', denomination: '₦1,000', price: 989, stock: 25 }
+    { id: 101, size: '100', denomination: '₦100', price: 98.9 },
+    { id: 103, size: '200', denomination: '₦200', price: 197.8 },
+    { id: 104, size: '500', denomination: '₦500', price: 494.5 },
+    { id: 102, size: '1000', denomination: '₦1,000', price: 989 }
 ];
 
 export default function RechargePinScreen() {
@@ -275,19 +276,31 @@ export default function RechargePinScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: '#f4f6fb', paddingTop: insets.top }}>
             
-            {/* Top Navigation Bar */}
+            {/* Top Navigation Bar - BRAND NAVY & GOLD WITH DECORATIONS */}
             <View style={s.topNav}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                    <Ionicons name="arrow-back" size={18} color="#f5a623" />
+                    <Ionicons name="arrow-back" size={16} color="#f5a623" />
                 </TouchableOpacity>
-                <Text style={s.topNavTitle}>Recharge Pin Printing</Text>
+                
+                <View style={{ flex: 1 }}>
+                    <Text style={s.topNavTitle}>Recharge Pin Printing</Text>
+                    <Text style={s.topNavSubTitle}>Print instant vouchers for all networks</Text>
+                </View>
+
+                <View style={s.liveBadge}>
+                    <View style={s.greenDot} />
+                    <Text style={s.liveBadgeTxt}>Live Printing</Text>
+                </View>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 10, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ padding: 8, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
 
-                {/* 1. SELECT NETWORK SECTION (4-GRID COLUMN ROW) */}
+                {/* 1. SELECT NETWORK SECTION (4-GRID COLUMN ROW - NO AVAILABLE TEXT) */}
                 <View style={s.cardSection}>
-                    <Text style={s.sectionHeader}>Select Network</Text>
+                    <View style={s.stepHeaderRow}>
+                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 1</Text></View>
+                        <Text style={s.sectionHeader}>Select Network</Text>
+                    </View>
                     
                     <View style={s.grid4Row}>
                         {NETWORKS.map(net => {
@@ -304,27 +317,34 @@ export default function RechargePinScreen() {
                                         isSelected && s.grid4CardItemSelected
                                     ]}
                                 >
+                                    {isSelected && (
+                                        <View style={s.checkCornerBadge}>
+                                            <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                        </View>
+                                    )}
+
                                     <View style={s.netLogoBoxCompact}>
                                         <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
                                     </View>
-                                    <Text style={[s.netNameTxtCompact, isSelected && { color: T.goldDk }]}>{net.name}</Text>
-                                    <Text style={s.stockTxtCompact}>{net.stockDefault} available</Text>
+                                    <Text style={[s.netNameTxtCompact, isSelected && { color: T.navy, fontWeight: '900' }]}>{net.name}</Text>
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
                 </View>
 
-                {/* 2. DENOMINATIONS SECTION (4-GRID COLUMN ROW COMPACT) */}
+                {/* 2. DENOMINATIONS SECTION (4-GRID COLUMN ROW - NO AVAILABLE TEXT) */}
                 <View style={s.cardSection}>
-                    <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
+                    <View style={s.stepHeaderRow}>
+                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 2</Text></View>
+                        <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
+                    </View>
 
                     <View style={s.grid4Row}>
                         {activePlansToDisplay.map((plan: any) => {
                             const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
                             const sizeVal = parseFloat(plan.size || '100');
                             const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
-                            const stockCount = plan.stock || (sizeVal === 100 ? 200 : sizeVal === 1000 ? 25 : sizeVal === 200 ? 200 : 50);
 
                             return (
                                 <TouchableOpacity
@@ -336,11 +356,16 @@ export default function RechargePinScreen() {
                                         isSelected && s.grid4CardItemSelected
                                     ]}
                                 >
+                                    {isSelected && (
+                                        <View style={s.checkCornerBadge}>
+                                            <Ionicons name="checkmark-sharp" size={8} color={T.navy} />
+                                        </View>
+                                    )}
+
                                     <Text style={[s.denom4ValTxt, isSelected && { color: T.navy }]}>
                                         {plan.denomination || `₦${plan.size}`}
                                     </Text>
                                     <Text style={s.denom4UnitPriceTxt}>₦{unitPriceVal} each</Text>
-                                    <Text style={s.denom4StockTxt}>{stockCount} available</Text>
                                 </TouchableOpacity>
                             );
                         })}
@@ -349,7 +374,10 @@ export default function RechargePinScreen() {
 
                 {/* 3. ORDER DETAILS SECTION */}
                 <View style={s.cardSection}>
-                    <Text style={s.sectionHeader}>Order Details</Text>
+                    <View style={s.stepHeaderRow}>
+                        <View style={s.stepBadge}><Text style={s.stepBadgeTxt}>STEP 3</Text></View>
+                        <Text style={s.sectionHeader}>Order Details</Text>
+                    </View>
 
                     <View style={s.orderDetailRow}>
                         <Text style={s.orderDetailLabel}>Network</Text>
@@ -362,7 +390,7 @@ export default function RechargePinScreen() {
                     </View>
 
                     {/* Quantity Pills */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 5 }]}>Quantity</Text>
+                    <Text style={[s.orderDetailLabel, { marginTop: 8, marginBottom: 4 }]}>Quantity</Text>
                     <View style={s.qtyPillRow}>
                         {[1, 2, 5, 10].map(q => {
                             const isSelected = quantity === q;
@@ -385,7 +413,7 @@ export default function RechargePinScreen() {
                     </View>
 
                     {/* Name on Card Input */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 10, marginBottom: 4 }]}>Name on Card (optional)</Text>
+                    <Text style={[s.orderDetailLabel, { marginTop: 8, marginBottom: 3 }]}>Name on Card (optional)</Text>
                     <TextInput
                         style={s.nameInput}
                         value={nameOnCard}
@@ -396,7 +424,10 @@ export default function RechargePinScreen() {
 
                     {/* Total Cost Display Box */}
                     <View style={s.totalBox}>
-                        <Text style={s.totalBoxLabel}>Total</Text>
+                        <View>
+                            <Text style={s.totalBoxLabel}>Total Amount</Text>
+                            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>{qtyNumber} x {selectedPlan?.denomination || '₦100'}</Text>
+                        </View>
                         <Text style={s.totalBoxAmount}>₦{totalCost.toFixed(1)}</Text>
                     </View>
 
@@ -419,7 +450,10 @@ export default function RechargePinScreen() {
                         {purchasing ? (
                             <ActivityIndicator size="small" color={T.navy} />
                         ) : (
-                            <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="print-outline" size={14} color={T.navy} style={{ marginRight: 5 }} />
+                                <Text style={s.purchaseBtnTxt}>Purchase {qtyNumber} {qtyNumber === 1 ? 'Pin' : 'Pins'}</Text>
+                            </View>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -439,7 +473,7 @@ export default function RechargePinScreen() {
                         {/* Top Buttons */}
                         <View style={s.resultTopBtnRow}>
                             <TouchableOpacity onPress={handlePrintCards} style={s.printCardsBtn} activeOpacity={0.85}>
-                                <Ionicons name="print-outline" size={16} color={T.navy} style={{ marginRight: 6 }} />
+                                <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 5 }} />
                                 <Text style={s.printCardsBtnTxt}>Print Cards</Text>
                             </TouchableOpacity>
 
@@ -463,7 +497,7 @@ export default function RechargePinScreen() {
                                             {successModal.txData?.nameOnCard || userEmail || 'ABU MAFHAL VTU'}
                                         </Text>
                                         <TouchableOpacity onPress={() => copyPinToClipboard(pinObj.pin)} style={s.vCopyIconBtn}>
-                                            <Ionicons name="copy-outline" size={12} color="#334155" />
+                                            <Ionicons name="copy-outline" size={11} color="#334155" />
                                         </TouchableOpacity>
                                     </View>
 
@@ -473,7 +507,7 @@ export default function RechargePinScreen() {
                                     <View style={s.vBodyRow}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
-                                            <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 10, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
+                                            <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 9, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>S/N:</Text> {pinObj.serial || (idx + 1)}</Text>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}</Text>
                                         </View>
@@ -506,129 +540,171 @@ const s = StyleSheet.create({
     topNav: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
         backgroundColor: T.navy,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(245,166,35,0.3)'
     },
     backBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: 'rgba(255,255,255,0.12)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10
+        marginRight: 8
     },
     topNavTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '800',
         color: T.white
     },
+    topNavSubTitle: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.7)'
+    },
+    liveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(34,197,94,0.15)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(34,197,94,0.3)'
+    },
+    greenDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#22c55e',
+        marginRight: 4
+    },
+    liveBadgeTxt: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#4ade80'
+    },
     cardSection: {
         backgroundColor: T.white,
-        borderRadius: 12,
-        padding: 10,
-        marginBottom: 10,
+        borderRadius: 10,
+        padding: 8,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: '#e2e8f0'
     },
-    sectionHeader: {
-        fontSize: 13,
+    stepHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6
+    },
+    stepBadge: {
+        backgroundColor: T.navy,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        marginRight: 6
+    },
+    stepBadgeTxt: {
+        fontSize: 8,
         fontWeight: '800',
-        color: T.navy,
-        marginBottom: 8
+        color: T.gold
+    },
+    sectionHeader: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.navy
     },
 
     // 4-GRID COLUMN ROW (Shared for Networks & Denominations)
     grid4Row: {
         flexDirection: 'row',
-        gap: 6
+        gap: 5
     },
     grid4CardItem: {
         flex: 1,
         backgroundColor: T.white,
-        borderRadius: 8,
-        paddingVertical: 8,
-        paddingHorizontal: 3,
+        borderRadius: 7,
+        paddingVertical: 7,
+        paddingHorizontal: 2,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#cbd5e1'
+        borderColor: '#cbd5e1',
+        position: 'relative'
     },
     grid4CardItemSelected: {
         borderColor: T.gold,
         borderWidth: 2,
         backgroundColor: T.goldLight
     },
+    checkCornerBadge: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
     netLogoBoxCompact: {
-        width: 26,
-        height: 26,
+        width: 24,
+        height: 24,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 2
     },
     netLogoImgCompact: {
-        width: 22,
-        height: 22
+        width: 20,
+        height: 20
     },
     netNameTxtCompact: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: T.navy
-    },
-    stockTxtCompact: {
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '700',
-        color: '#16a34a',
-        marginTop: 2
+        color: T.navy
     },
 
     // DENOMINATION 4-GRID TEXT STYLES
     denom4ValTxt: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '900',
         color: T.navy
     },
     denom4UnitPriceTxt: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '600',
         color: '#64748b',
-        marginTop: 2
-    },
-    denom4StockTxt: {
-        fontSize: 9,
-        fontWeight: '700',
-        color: '#16a34a',
-        marginTop: 2
+        marginTop: 1
     },
 
     orderDetailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingVertical: 5,
+        paddingVertical: 4,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9'
     },
     orderDetailLabel: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#64748b',
         fontWeight: '500'
     },
     orderDetailVal: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         color: T.navy
     },
     qtyPillRow: {
         flexDirection: 'row',
-        gap: 6
+        gap: 5
     },
     qtyPillBtn: {
         flex: 1,
-        height: 34,
-        borderRadius: 8,
+        height: 30,
+        borderRadius: 6,
         backgroundColor: T.white,
         borderWidth: 1,
         borderColor: '#cbd5e1',
@@ -641,7 +717,7 @@ const s = StyleSheet.create({
         backgroundColor: T.goldLight
     },
     qtyPillTxt: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
         color: '#334155'
     },
@@ -650,13 +726,13 @@ const s = StyleSheet.create({
         fontWeight: '800'
     },
     nameInput: {
-        height: 36,
+        height: 32,
         backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#cbd5e1',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        fontSize: 11,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        fontSize: 10,
         fontWeight: '600',
         color: T.navy
     },
@@ -667,18 +743,18 @@ const s = StyleSheet.create({
         backgroundColor: T.navy,
         borderWidth: 1,
         borderColor: T.gold,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginTop: 10
+        borderRadius: 7,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginTop: 8
     },
     totalBoxLabel: {
-        fontSize: 13,
+        fontSize: 11,
         color: T.white,
-        fontWeight: '600'
+        fontWeight: '700'
     },
     totalBoxAmount: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
         color: T.gold
     },
@@ -687,32 +763,32 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: T.goldLight,
-        borderRadius: 8,
+        borderRadius: 6,
         borderWidth: 1,
         borderColor: 'rgba(245,166,35,0.3)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        marginTop: 5
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        marginTop: 4
     },
     walletBoxLabel: {
-        fontSize: 10,
+        fontSize: 9,
         color: T.navy
     },
     walletBoxAmount: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         color: T.goldDk
     },
     purchaseBtn: {
-        height: 42,
+        height: 36,
         backgroundColor: T.gold,
-        borderRadius: 8,
+        borderRadius: 7,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 12
+        marginTop: 10
     },
     purchaseBtnTxt: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '900',
         color: T.navy
     },
@@ -721,25 +797,25 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(13, 27, 62, 0.75)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 12
+        padding: 10
     },
     resultModalCard: {
         width: '100%',
-        maxWidth: 560,
+        maxWidth: 540,
         backgroundColor: '#f1f5f9',
-        borderRadius: 14,
+        borderRadius: 12,
         padding: 10
     },
     resultTopBtnRow: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 10
+        marginBottom: 8
     },
     printCardsBtn: {
         flex: 1.5,
-        height: 38,
+        height: 36,
         backgroundColor: T.gold,
-        borderRadius: 8,
+        borderRadius: 7,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center'
@@ -747,13 +823,13 @@ const s = StyleSheet.create({
     printCardsBtnTxt: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 13
+        fontSize: 12
     },
     buyMoreBtn: {
         flex: 1,
-        height: 38,
+        height: 36,
         backgroundColor: T.white,
-        borderRadius: 8,
+        borderRadius: 7,
         borderWidth: 1,
         borderColor: '#cbd5e1',
         alignItems: 'center',
@@ -762,7 +838,7 @@ const s = StyleSheet.create({
     buyMoreBtnTxt: {
         color: T.navy,
         fontWeight: '800',
-        fontSize: 12
+        fontSize: 11
     },
     voucherCardsGrid: {
         flexDirection: 'row',
@@ -770,10 +846,10 @@ const s = StyleSheet.create({
         gap: 8
     },
     printedVoucherCard: {
-        width: (W > 480 ? 240 : (W - 20 - 20)),
+        width: (W > 480 ? 230 : (W - 16 - 16)),
         backgroundColor: T.white,
-        borderRadius: 8,
-        padding: 8,
+        borderRadius: 7,
+        padding: 6,
         borderWidth: 1.5,
         borderColor: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
@@ -784,7 +860,7 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vNameTxt: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 'bold',
         color: '#000000',
         flex: 1,
@@ -802,7 +878,7 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#000000',
         borderStyle: 'dashed',
-        marginVertical: 4
+        marginVertical: 3
     },
     vBodyRow: {
         flexDirection: 'row',
@@ -810,21 +886,21 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vMetaTxt: {
-        fontSize: 9,
+        fontSize: 8,
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        lineHeight: 13
+        lineHeight: 11
     },
     vPinTxt: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        marginVertical: 2
+        marginVertical: 1
     },
     vLogoBox: {
-        width: 32,
-        height: 32,
+        width: 28,
+        height: 28,
         backgroundColor: '#ffcc00',
         borderRadius: 4,
         alignItems: 'center',
@@ -832,8 +908,8 @@ const s = StyleSheet.create({
         marginLeft: 4
     },
     vLogoImg: {
-        width: 26,
-        height: 26
+        width: 22,
+        height: 22
     },
     vFooterRow: {
         flexDirection: 'row',
@@ -841,13 +917,13 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vDialTxt: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
     },
     vDenomTxt: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
