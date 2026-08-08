@@ -230,7 +230,7 @@ export default function RechargePinScreen() {
                     nameOnCard: nameOnCard.trim() || userEmail || 'ABU MAFHAL VTU'
                 }
             });
-            loadHistory(); // Refresh History list!
+            loadHistory();
         } catch (e: any) {
             showAlert('Purchase Failed ⚠️', e.message || 'Could not complete recharge pin purchase. Please try again.', 'error');
         } finally {
@@ -243,7 +243,62 @@ export default function RechargePinScreen() {
         showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
-    const handlePrintCards = (customTxData?: any) => {
+    // 1. AUTO DIRECT DOWNLOAD (PDF / HTML File)
+    const handleAutoDownloadPDF = (customTxData?: any) => {
+        const tx = customTxData || successModal.txData;
+        if (!tx || !tx.pins) return;
+        const pins = tx.pins || [];
+
+        const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
+
+        const cardsHtml = pins.map((p: any, idx: number) => `
+            <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
+                    <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
+                </div>
+                <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 10px; line-height: 1.4;">
+                        <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}</div>
+                        <div style="font-size: 12px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
+                        <div><strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
+                        <div><strong>Date:</strong> ${formattedDate}</div>
+                    </div>
+                    <div style="width: 38px; height: 38px; background: #ffcc00; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; margin-left: 8px;">
+                        ${(tx.network || 'MTN').toUpperCase()}
+                    </div>
+                </div>
+                <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px;">
+                    <span>${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
+                    <span>${tx.denomination || '₦100'}</span>
+                </div>
+            </div>
+        `).join('');
+
+        const fullHtml = `<!DOCTYPE html><html><head><title>Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}</title><style>@page{size:A4 portrait;margin:10mm;}body{margin:0;padding:10px;background:#fff;font-family:monospace;}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}</style></head><body><div class="grid">${cardsHtml}</div></body></html>`;
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showAlert('Downloaded ✅', 'Recharge cards voucher file downloaded to your device!', 'success');
+        } else {
+            const pinsList = tx.pins;
+            const textToShare = pinsList.map((p: any, idx: number) => 
+                `Card #${idx + 1} (${tx.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
+            ).join('\n\n');
+            Share.share({ message: textToShare }).catch(() => {});
+        }
+    };
+
+    // 2. DIRECT BROWSER PRINT WINDOW
+    const handleDirectPrint = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
         if (!tx || !tx.pins) return;
         const pins = tx.pins || [];
@@ -260,7 +315,7 @@ export default function RechargePinScreen() {
             const cardsHtml = pins.map((p: any, idx: number) => `
                 <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif; word-break: break-all;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
+                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
                         <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
                     </div>
                     <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
@@ -308,12 +363,7 @@ export default function RechargePinScreen() {
             printWindow.document.write(htmlDoc);
             printWindow.document.close();
         } else {
-            const pinsList = tx.pins;
-            const textToShare = pinsList.map((p: any, idx: number) => 
-                `Card #${idx + 1} (${tx.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
-            ).join('\n\n');
-
-            Share.share({ message: textToShare }).catch(() => {});
+            handleAutoDownloadPDF(customTxData);
         }
     };
 
@@ -586,7 +636,7 @@ export default function RechargePinScreen() {
                                                     activeOpacity={0.8}
                                                 >
                                                     <Ionicons name="print-outline" size={12} color={T.navy} style={{ marginRight: 3 }} />
-                                                    <Text style={s.historyPrintBtnTxt}>Print</Text>
+                                                    <Text style={s.historyPrintBtnTxt}>View</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         );
@@ -644,7 +694,7 @@ export default function RechargePinScreen() {
                 </View>
             </Modal>
 
-            {/* GENERATED RECHARGE CARD RESULTS MODAL */}
+            {/* GENERATED RECHARGE CARD RESULTS MODAL WITH AUTO DOWNLOAD OPTIONS */}
             <Modal
                 visible={successModal.visible}
                 transparent
@@ -654,11 +704,16 @@ export default function RechargePinScreen() {
                 <View style={s.resultModalOverlay}>
                     <View style={s.resultModalCard}>
                         
-                        {/* Top Buttons */}
+                        {/* Top Action Options: AUTO DOWNLOAD PDF / DIRECT PRINT / CLOSE */}
                         <View style={s.resultTopBtnRow}>
-                            <TouchableOpacity onPress={() => handlePrintCards()} style={s.printCardsBtn} activeOpacity={0.85}>
-                                <Ionicons name="print-outline" size={15} color={T.navy} style={{ marginRight: 5 }} />
-                                <Text style={s.printCardsBtnTxt}>Print Cards</Text>
+                            <TouchableOpacity onPress={() => handleAutoDownloadPDF()} style={s.downloadPdfBtn} activeOpacity={0.85}>
+                                <Ionicons name="document-text-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
+                                <Text style={s.downloadPdfBtnTxt}>Save PDF / File</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => handleDirectPrint()} style={s.printCardsBtn} activeOpacity={0.85}>
+                                <Ionicons name="print-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
+                                <Text style={s.printCardsBtnTxt}>Print</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -1125,26 +1180,42 @@ const s = StyleSheet.create({
     },
     resultTopBtnRow: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
         marginBottom: 10
     },
-    printCardsBtn: {
+    downloadPdfBtn: {
         flex: 1.5,
-        height: 38,
+        height: 36,
         backgroundColor: T.gold,
         borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center'
     },
-    printCardsBtnTxt: {
+    downloadPdfBtnTxt: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 13
+        fontSize: 12
+    },
+    printCardsBtn: {
+        flex: 1,
+        height: 36,
+        backgroundColor: T.white,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.navy,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    printCardsBtnTxt: {
+        color: T.navy,
+        fontWeight: '800',
+        fontSize: 12
     },
     buyMoreBtn: {
-        flex: 1,
-        height: 38,
+        flex: 0.8,
+        height: 36,
         backgroundColor: T.white,
         borderRadius: 8,
         borderWidth: 1,

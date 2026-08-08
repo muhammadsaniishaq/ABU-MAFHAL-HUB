@@ -227,7 +227,6 @@ export const api = {
 
     rechargePin: {
         getPlans: async () => {
-        getPlans: async () => {
             // 1. Try bills-payment edge function
             try {
                 const { data, error } = await supabase.functions.invoke('bills-payment', {
