@@ -23,7 +23,7 @@ import { supabase } from '../../services/supabase';
 
 const { width: W } = Dimensions.get('window');
 
-// Brand Colors
+// Brand Colors (Navy & Gold)
 const T = {
     navy: '#0d1b3e',
     navyMid: '#142258',
@@ -52,6 +52,14 @@ const NETWORKS = [
     { id: '9mobile', name: '9Mobile', stockDefault: 18 }
 ];
 
+// Reliable Default Fallback Denominations matching User Image 5
+const DEFAULT_DENOMS = [
+    { id: 101, size: '100', denomination: '₦100', price: 98.9, stock: 200 },
+    { id: 102, size: '1000', denomination: '₦1,000', price: 989, stock: 25 },
+    { id: 103, size: '200', denomination: '₦200', price: 197.8, stock: 200 },
+    { id: 104, size: '500', denomination: '₦500', price: 494.5, stock: 50 }
+];
+
 export default function RechargePinScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -59,7 +67,7 @@ export default function RechargePinScreen() {
     const [selectedNetwork, setSelectedNetwork] = useState('mtn');
     const [allPlans, setAllPlans] = useState<any[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
-    const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
+    const [selectedPlan, setSelectedPlan] = useState<any | null>(DEFAULT_DENOMS[0]);
 
     const [quantity, setQuantity] = useState(2); // Default 2 pins like reference image
     const [nameOnCard, setNameOnCard] = useState('');
@@ -102,14 +110,27 @@ export default function RechargePinScreen() {
         } catch (_) {}
     };
 
+    const isPlanMatchNetwork = (plan: any, netId: string) => {
+        const netLower = netId.toLowerCase();
+        const planNetName = (plan.networkName || plan.network_name || '').toLowerCase();
+        if (planNetName === netLower) return true;
+        if (netLower === 'mtn' && (plan.network === 1 || plan.network === '1')) return true;
+        if (netLower === 'glo' && (plan.network === 2 || plan.network === '2')) return true;
+        if (netLower === 'airtel' && (plan.network === 3 || plan.network === '3')) return true;
+        if (netLower === '9mobile' && (plan.network === 4 || plan.network === '4')) return true;
+        return false;
+    };
+
     const loadRechargePlans = async () => {
         setLoadingPlans(true);
         try {
             const plans = await api.rechargePin.getPlans();
             setAllPlans(plans || []);
-            const mtnPlans = (plans || []).filter((p: any) => p.networkName === 'mtn');
+            const mtnPlans = (plans || []).filter((p: any) => isPlanMatchNetwork(p, 'mtn'));
             if (mtnPlans.length > 0) {
                 setSelectedPlan(mtnPlans[0]);
+            } else {
+                setSelectedPlan(DEFAULT_DENOMS[0]);
             }
         } catch (e: any) {
             console.error('Failed to load recharge pin plans', e);
@@ -118,21 +139,22 @@ export default function RechargePinScreen() {
         }
     };
 
-    // Filter plans for selected network
-    const networkPlans = allPlans.filter((p: any) => p.networkName === selectedNetwork);
+    // Filter plans for selected network with default fallback
+    const matchedPlans = allPlans.filter((p: any) => isPlanMatchNetwork(p, selectedNetwork));
+    const activePlansToDisplay = matchedPlans.length > 0 ? matchedPlans : DEFAULT_DENOMS;
 
     const handleSelectNetwork = (netId: string) => {
         setSelectedNetwork(netId);
-        const filtered = allPlans.filter((p: any) => p.networkName === netId);
+        const filtered = allPlans.filter((p: any) => isPlanMatchNetwork(p, netId));
         if (filtered.length > 0) {
             setSelectedPlan(filtered[0]);
         } else {
-            setSelectedPlan(null);
+            setSelectedPlan(DEFAULT_DENOMS[0]);
         }
     };
 
     const qtyNumber = Math.max(1, quantity);
-    const unitPrice = selectedPlan ? selectedPlan.price : 98.9;
+    const unitPrice = selectedPlan ? (selectedPlan.price || selectedPlan.regularPrice || 98.9) : 98.9;
     const totalCost = Math.round(unitPrice * qtyNumber * 10) / 10;
 
     const handlePurchase = async () => {
@@ -293,43 +315,36 @@ export default function RechargePinScreen() {
                     </View>
                 </View>
 
-                {/* 2. DENOMINATIONS SECTION (2x2 GRID MATCHING USER IMAGE 5) */}
+                {/* 2. DENOMINATIONS SECTION (2x2 GRID ALWAYS VISIBLE) */}
                 <View style={s.cardSection}>
                     <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
 
-                    {loadingPlans ? (
-                        <View style={{ padding: 20, alignItems: 'center' }}>
-                            <ActivityIndicator size="small" color={T.navy} />
-                            <Text style={{ marginTop: 6, color: '#64748b', fontSize: 12 }}>Fetching {selectedNetwork.toUpperCase()} pin denominations...</Text>
-                        </View>
-                    ) : (
-                        <View style={s.denom2x2GridRow}>
-                            {networkPlans.map((plan: any) => {
-                                const isSelected = selectedPlan?.id === plan.id;
-                                const sizeVal = parseFloat(plan.size || '100');
-                                const unitPriceVal = plan.price || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
-                                const stockCount = sizeVal === 100 ? 200 : sizeVal === 1000 ? 25 : sizeVal === 200 ? 200 : 50;
+                    <View style={s.denom2x2GridRow}>
+                        {activePlansToDisplay.map((plan: any) => {
+                            const isSelected = selectedPlan?.id === plan.id || selectedPlan?.size === plan.size;
+                            const sizeVal = parseFloat(plan.size || '100');
+                            const unitPriceVal = plan.price || plan.regularPrice || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
+                            const stockCount = plan.stock || (sizeVal === 100 ? 200 : sizeVal === 1000 ? 25 : sizeVal === 200 ? 200 : 50);
 
-                                return (
-                                    <TouchableOpacity
-                                        key={plan.id}
-                                        onPress={() => setSelectedPlan(plan)}
-                                        activeOpacity={0.85}
-                                        style={[
-                                            s.denom2x2Card,
-                                            isSelected && s.denom2x2CardSelected
-                                        ]}
-                                    >
-                                        <Text style={[s.denom2x2Val, isSelected && { color: T.navy }]}>
-                                            {plan.denomination || `₦${plan.size}`}
-                                        </Text>
-                                        <Text style={s.denom2x2UnitPrice}>₦{unitPriceVal} each</Text>
-                                        <Text style={s.denom2x2Stock}>{stockCount} available</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    )}
+                            return (
+                                <TouchableOpacity
+                                    key={plan.id || plan.size}
+                                    onPress={() => setSelectedPlan(plan)}
+                                    activeOpacity={0.85}
+                                    style={[
+                                        s.denom2x2Card,
+                                        isSelected && s.denom2x2CardSelected
+                                    ]}
+                                >
+                                    <Text style={[s.denom2x2Val, isSelected && { color: T.navy }]}>
+                                        {plan.denomination || `₦${plan.size}`}
+                                    </Text>
+                                    <Text style={s.denom2x2UnitPrice}>₦{unitPriceVal} each</Text>
+                                    <Text style={s.denom2x2Stock}>{stockCount} available</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </View>
 
                 {/* 3. ORDER DETAILS SECTION */}
