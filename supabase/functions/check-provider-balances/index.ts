@@ -83,6 +83,8 @@ serve(async (req: Request) => {
     // Resolve individual keys from Admin API Vault case-insensitively
     const agentHubKey = secrets['AGENTHUB_API_KEY'] || secrets['AGENTHUB_KEY'] || Deno.env.get('AGENTHUB_API_KEY') || ''
     const bilalToken = secrets['BILALSADASUB_TOKEN'] || secrets['BILAL_TOKEN'] || secrets['BILALSADASUB_API_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || ''
+    const bilalUsername = secrets['BILALSADASUB_USERNAME'] || secrets['BILAL_USERNAME'] || secrets['BILALSADASUB_USER'] || Deno.env.get('BILALSADASUB_USERNAME') || ''
+    const bilalPassword = secrets['BILALSADASUB_PASSWORD'] || secrets['BILAL_PASSWORD'] || secrets['BILALSADASUB_PASS'] || Deno.env.get('BILALSADASUB_PASSWORD') || ''
     const paystackSecret = secrets['PAYSTACK_SECRET_KEY'] || secrets['PAYSTACK_KEY'] || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
     const clubkonnectUserId = secrets['CLUBKONNECT_USER_ID'] || secrets['CLUBKONNECT_USER'] || ''
@@ -167,35 +169,72 @@ serve(async (req: Request) => {
       })
     }
 
-    // 2. BilalSadaSub (Data, Airtime, VTU) - Official Spec: POST https://bilalsadasub.com/api/user
-    if (bilalToken && bilalToken.trim() !== '') {
+    // 2. BilalSadaSub (Data, Airtime, VTU)
+    // Official Spec: POST https://bilalsadasub.com/api/user with Authorization: Basic base64(username:password)
+    // The login/token-generation response directly returns { "balance": "12345.00", "AccessToken": "...", ... }
+    const bilalHasCredentials = (bilalUsername.trim() !== '' && bilalPassword.trim() !== '')
+    const bilalHasToken = bilalToken.trim() !== ''
+    if (bilalHasCredentials || bilalHasToken) {
       let balance = 0
       let latencyMs = 210
       let fetched = false
 
-      // Attempt 1: POST https://bilalsadasub.com/api/user with Token header
-      try {
-        const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user', {
-          method: 'POST',
-          headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
-        })
-        const data = await response.json()
-        const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance ?? data?.user?.balance
-        if (rawBal !== undefined && rawBal !== null) {
-          balance = Number(rawBal)
-          latencyMs = latency
-          fetched = true
-        }
-      } catch (e) {}
-
-      // Attempt 2: GET https://bilalsadasub.com/api/user/ with Token header
-      if (!fetched) {
+      // Attempt 1 (PRIMARY): POST /api/user with Basic Auth (username:password) — official balance endpoint
+      if (bilalHasCredentials) {
         try {
-          const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
-            headers: { 'Authorization': `Token ${bilalToken.trim()}`, 'Accept': 'application/json' }
+          const basicCred = btoa(`${bilalUsername.trim()}:${bilalPassword.trim()}`)
+          const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${basicCred}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
           })
           const data = await response.json()
-          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          // Official response: { "status": "success", "AccessToken": "...", "balance": "12345.00", "username": "..." }
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null && data?.status === 'success') {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 2: POST /api/user with Token header (if we have a stored access token)
+      if (!fetched && bilalHasToken) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Token ${bilalToken.trim()}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          })
+          const data = await response.json()
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: GET /api/user/ with Token header (fallback)
+      if (!fetched && bilalHasToken) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bilalsadasub.com/api/user/', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Token ${bilalToken.trim()}`,
+              'Accept': 'application/json'
+            }
+          })
+          const data = await response.json()
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.user?.balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
@@ -230,7 +269,7 @@ serve(async (req: Request) => {
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
-        error: 'Token not configured in Vault',
+        error: 'Username/Password or Token not configured in Vault',
         allowDeposit: true,
         allowWithdrawal: false
       })
@@ -441,7 +480,7 @@ serve(async (req: Request) => {
       })
     }
 
-    // 7. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret, available_balance
+    // 7. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret
     if (payVesselKey && payVesselKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
@@ -455,12 +494,23 @@ serve(async (req: Request) => {
       if (payVesselSecret && payVesselSecret.trim() !== '') {
         headers['api-secret'] = payVesselSecret.trim()
       }
+      // Also try Authorization Bearer and x-api-key styles
+      const headersBearer: Record<string, string> = {
+        'Authorization': `Bearer ${payVesselKey.trim()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+      const headersXKey: Record<string, string> = {
+        'x-api-key': payVesselKey.trim(),
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
 
-      // Attempt 1: GET https://api.payvessel.com/api/v1/user/balance
+      // Attempt 1: GET https://api.payvessel.com/api/v1/user/balance (api-key header)
       try {
         const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers })
         const data = await response.json()
-        const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance
+        const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance ?? data?.data?.wallet_balance
         if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
@@ -468,12 +518,40 @@ serve(async (req: Request) => {
         }
       } catch (e) {}
 
-      // Attempt 2: GET https://api.payvessel.com/api/v1/wallet/balance
+      // Attempt 2: GET https://api.payvessel.com/api/v1/wallet/balance (api-key header)
       if (!fetched) {
         try {
           const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/wallet/balance', { headers })
           const data = await response.json()
           const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: Bearer token style
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers: headersBearer })
+          const data = await response.json()
+          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 4: x-api-key header style
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers: headersXKey })
+          const data = await response.json()
+          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
@@ -622,19 +700,20 @@ serve(async (req: Request) => {
       })
     }
 
-    // 10. Bigi VTU Portal (Bigisub.ng)
+    // 10. Bigi VTU Portal (api.bigisub.ng) - Correct base URL: https://api.bigisub.ng/api/v2
     if (bigiToken && bigiToken.trim() !== '') {
       let balance = 0
       let latencyMs = 230
       let fetched = false
 
-      // Attempt 1: GET https://bigisub.ng/api/v2/wallet/balance (Bearer header)
+      // Attempt 1: GET https://api.bigisub.ng/api/v2/user/ (Token header) - matches shared client base URL
       try {
-        const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/wallet/balance', {
-          headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
+        const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/', {
+          method: 'GET',
+          headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
         })
         const data = await response.json()
-        const rawBal = data?.balance ?? data?.data?.balance ?? data?.user?.wallet_balance ?? data?.wallet_balance
+        const rawBal = data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
         if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
@@ -642,14 +721,49 @@ serve(async (req: Request) => {
         }
       } catch (e) {}
 
-      // Attempt 2: GET https://bigisub.ng/api/user/ (Token header)
+      // Attempt 2: GET https://api.bigisub.ng/api/v2/wallet/balance (Token header)
       if (!fetched) {
         try {
-          const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/user/', {
+          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/wallet/balance', {
+            method: 'GET',
             headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
           })
           const data = await response.json()
-          const rawBal = data?.user?.wallet_balance ?? data?.wallet_balance ?? data?.balance
+          const rawBal = data?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: GET https://api.bigisub.ng/api/v2/user/balance/ (Token header)
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/balance/', {
+            method: 'GET',
+            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 4: Bearer token style fallback
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
