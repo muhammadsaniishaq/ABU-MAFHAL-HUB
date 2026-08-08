@@ -48,7 +48,7 @@ export default function RechargePinScreen() {
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
 
-    const [quantity, setQuantity] = useState(2); // Default 2 pins like image
+    const [quantity, setQuantity] = useState(2); // Default 2 pins like reference image
     const [nameOnCard, setNameOnCard] = useState('');
     const [userEmail, setUserEmail] = useState('');
 
@@ -166,17 +166,6 @@ export default function RechargePinScreen() {
         Alert.alert('Copied ✅', 'Recharge PIN copied to clipboard!');
     };
 
-    const copyAllPins = async () => {
-        if (!successModal.txData || !successModal.txData.pins) return;
-        const pinsList = successModal.txData.pins;
-        const formatted = pinsList.map((p: any, index: number) => 
-            `[${index + 1}] PIN: ${p.pin} | Serial: ${p.serial || (index + 1)} | Dial: ${p.load_code || successModal.txData.loadCode}`
-        ).join('\n');
-        
-        await Clipboard.setStringAsync(formatted);
-        Alert.alert('All PINs Copied ✅', 'All generated PINs copied to clipboard!');
-    };
-
     const handlePrintCards = () => {
         if (!successModal.txData || !successModal.txData.pins) return;
         const tx = successModal.txData;
@@ -189,28 +178,28 @@ export default function RechargePinScreen() {
                 return;
             }
 
-            const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+            const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
 
             const cardsHtml = pins.map((p: any, idx: number) => `
                 <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 12px; font-weight: bold; font-family: sans-serif; word-break: break-all;">${(tx.nameOnCard || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
+                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif; word-break: break-all;">${(tx.nameOnCard || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
                         <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
                     </div>
                     <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 11px; line-height: 1.5;">
+                        <div style="font-size: 10px; line-height: 1.4;">
                             <div><strong>REF:</strong> ${tx.transactionId || 'RCP' + Date.now()}</div>
-                            <div style="font-size: 13px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
+                            <div style="font-size: 12px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
                             <div><strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
                             <div><strong>Date:</strong> ${formattedDate}</div>
                         </div>
-                        <div style="width: 44px; height: 44px; background: #ffcc00; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; margin-left: 8px;">
+                        <div style="width: 38px; height: 38px; background: #ffcc00; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; margin-left: 8px;">
                             ${(tx.network || 'MTN').toUpperCase()}
                         </div>
                     </div>
                     <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px;">
                         <span>${p.load_code || tx.loadCode || '*311*PIN#'}</span>
                         <span>${tx.denomination || '₦100'}</span>
                     </div>
@@ -239,7 +228,6 @@ export default function RechargePinScreen() {
             printWindow.document.write(htmlDoc);
             printWindow.document.close();
         } else {
-            // Share on mobile
             const pinsList = successModal.txData.pins;
             const textToShare = pinsList.map((p: any, idx: number) => 
                 `Card #${idx + 1} (${successModal.txData.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || successModal.txData.loadCode}`
@@ -252,21 +240,21 @@ export default function RechargePinScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: '#f8fafc', paddingTop: insets.top }}>
             
-            {/* Header */}
+            {/* Top Navigation */}
             <View style={s.topNav}>
                 <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                    <Ionicons name="arrow-back" size={20} color="#0d1b3e" />
+                    <Ionicons name="arrow-back" size={18} color="#0d1b3e" />
                 </TouchableOpacity>
-                <Text style={s.topNavTitle}>Recharge PIN Printing</Text>
+                <Text style={s.topNavTitle}>Recharge Pin Printing</Text>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-                {/* 1. SELECT NETWORK SECTION */}
+                {/* 1. SELECT NETWORK SECTION (4-GRID COLUMN) */}
                 <View style={s.cardSection}>
                     <Text style={s.sectionHeader}>Select Network</Text>
                     
-                    <View style={s.networkGrid}>
+                    <View style={s.network4GridRow}>
                         {NETWORKS.map(net => {
                             const isSelected = selectedNetwork === net.id;
                             const logoSource = NETWORK_LOGOS[net.id];
@@ -277,50 +265,57 @@ export default function RechargePinScreen() {
                                     onPress={() => handleSelectNetwork(net.id)}
                                     activeOpacity={0.85}
                                     style={[
-                                        s.netCardItem,
+                                        s.net4CardItem,
                                         isSelected && s.netCardItemSelected
                                     ]}
                                 >
-                                    <View style={s.netLogoBox}>
-                                        <Image source={logoSource} style={s.netLogoImg} resizeMode="contain" />
+                                    <View style={s.netLogoBoxCompact}>
+                                        <Image source={logoSource} style={s.netLogoImgCompact} resizeMode="contain" />
                                     </View>
-                                    <Text style={s.netNameTxt}>{net.name}</Text>
-                                    <Text style={s.stockTxt}>{net.stockDefault} available</Text>
+                                    <Text style={s.netNameTxtCompact}>{net.name}</Text>
+                                    <Text style={s.stockTxtCompact}>{net.stockDefault} available</Text>
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
                 </View>
 
-                {/* 2. DENOMINATION SELECTION */}
-                {networkPlans.length > 0 && (
-                    <View style={s.cardSection}>
-                        <Text style={s.sectionHeader}>Select Pin Value</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {/* 2. DENOMINATIONS SECTION (2x2 GRID MATCHING USER IMAGE 5) */}
+                <View style={s.cardSection}>
+                    <Text style={s.sectionHeader}>{selectedNetwork.toUpperCase()} Pin Denominations</Text>
+
+                    {loadingPlans ? (
+                        <View style={{ padding: 20, alignItems: 'center' }}>
+                            <ActivityIndicator size="small" color="#0d1b3e" />
+                            <Text style={{ marginTop: 6, color: '#64748b', fontSize: 12 }}>Fetching {selectedNetwork.toUpperCase()} pin denominations...</Text>
+                        </View>
+                    ) : (
+                        <View style={s.denom2x2GridRow}>
                             {networkPlans.map((plan: any) => {
                                 const isSelected = selectedPlan?.id === plan.id;
+                                const sizeVal = parseFloat(plan.size || '100');
+                                const unitPriceVal = plan.price || (sizeVal === 100 ? 98.9 : sizeVal === 1000 ? 989 : sizeVal === 200 ? 197.8 : 494.5);
+                                const stockCount = sizeVal === 100 ? 200 : sizeVal === 1000 ? 25 : sizeVal === 200 ? 200 : 50;
+
                                 return (
                                     <TouchableOpacity
                                         key={plan.id}
                                         onPress={() => setSelectedPlan(plan)}
                                         activeOpacity={0.85}
                                         style={[
-                                            s.denomPill,
-                                            isSelected && s.denomPillSelected
+                                            s.denom2x2Card,
+                                            isSelected && s.denom2x2CardSelected
                                         ]}
                                     >
-                                        <Text style={[s.denomPillTxt, isSelected && s.denomPillTxtSelected]}>
-                                            {plan.denomination || `₦${plan.size}`}
-                                        </Text>
-                                        <Text style={{ fontSize: 11, color: isSelected ? '#f97316' : '#64748b', marginTop: 2 }}>
-                                            ₦{plan.price}
-                                        </Text>
+                                        <Text style={s.denom2x2Val}>{plan.denomination || `₦${plan.size}`}</Text>
+                                        <Text style={s.denom2x2UnitPrice}>₦{unitPriceVal} each</Text>
+                                        <Text style={s.denom2x2Stock}>{stockCount} available</Text>
                                     </TouchableOpacity>
                                 );
                             })}
                         </View>
-                    </View>
-                )}
+                    )}
+                </View>
 
                 {/* 3. ORDER DETAILS SECTION */}
                 <View style={s.cardSection}>
@@ -337,7 +332,7 @@ export default function RechargePinScreen() {
                     </View>
 
                     {/* Quantity Pills */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 14, marginBottom: 8 }]}>Quantity</Text>
+                    <Text style={[s.orderDetailLabel, { marginTop: 12, marginBottom: 6 }]}>Quantity</Text>
                     <View style={s.qtyPillRow}>
                         {[1, 2, 5, 10].map(q => {
                             const isSelected = quantity === q;
@@ -360,7 +355,7 @@ export default function RechargePinScreen() {
                     </View>
 
                     {/* Name on Card Input */}
-                    <Text style={[s.orderDetailLabel, { marginTop: 14, marginBottom: 6 }]}>Name on Card (optional)</Text>
+                    <Text style={[s.orderDetailLabel, { marginTop: 12, marginBottom: 4 }]}>Name on Card (optional)</Text>
                     <TextInput
                         style={s.nameInput}
                         value={nameOnCard}
@@ -381,7 +376,7 @@ export default function RechargePinScreen() {
                         <Text style={s.walletBoxAmount}>₦{userBalance.toFixed(2)}</Text>
                     </View>
 
-                    {/* Big Orange Purchase Button */}
+                    {/* Purchase Button */}
                     <TouchableOpacity
                         onPress={handlePurchase}
                         disabled={purchasing || !selectedPlan}
@@ -414,7 +409,7 @@ export default function RechargePinScreen() {
                         {/* Top Buttons: Print Cards (Orange) & Buy More (White) */}
                         <View style={s.resultTopBtnRow}>
                             <TouchableOpacity onPress={handlePrintCards} style={s.printCardsBtn} activeOpacity={0.85}>
-                                <Ionicons name="print-outline" size={18} color="#ffffff" style={{ marginRight: 6 }} />
+                                <Ionicons name="print-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
                                 <Text style={s.printCardsBtnTxt}>Print Cards</Text>
                             </TouchableOpacity>
 
@@ -428,7 +423,7 @@ export default function RechargePinScreen() {
                         </View>
 
                         {/* Generated Voucher Cards Container */}
-                        <ScrollView contentContainerStyle={s.voucherCardsGrid} style={{ maxHeight: 450 }}>
+                        <ScrollView contentContainerStyle={s.voucherCardsGrid} style={{ maxHeight: 420 }}>
                             {successModal.txData?.pins?.map((pinObj: any, idx: number) => (
                                 <View key={idx} style={s.printedVoucherCard}>
                                     
@@ -438,7 +433,7 @@ export default function RechargePinScreen() {
                                             {successModal.txData?.nameOnCard || userEmail || 'ABU MAFHAL VTU'}
                                         </Text>
                                         <TouchableOpacity onPress={() => copyPinToClipboard(pinObj.pin)} style={s.vCopyIconBtn}>
-                                            <Ionicons name="copy-outline" size={14} color="#334155" />
+                                            <Ionicons name="copy-outline" size={12} color="#334155" />
                                         </TouchableOpacity>
                                     </View>
 
@@ -448,7 +443,7 @@ export default function RechargePinScreen() {
                                     <View style={s.vBodyRow}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
-                                            <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 11, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
+                                            <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 10, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>S/N:</Text> {pinObj.serial || (idx + 1)}</Text>
                                             <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}</Text>
                                         </View>
@@ -481,134 +476,149 @@ const s = StyleSheet.create({
     topNav: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0'
     },
     backBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: '#f1f5f9',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12
+        marginRight: 10
     },
     topNavTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '800',
         color: '#0d1b3e'
     },
     cardSection: {
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1
+        borderColor: '#e2e8f0'
     },
     sectionHeader: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '800',
         color: '#0d1b3e',
-        marginBottom: 14
+        marginBottom: 10
     },
-    networkGrid: {
+    // 4-GRID COLUMN NETWORK ROW
+    network4GridRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12
+        gap: 6
     },
-    netCardItem: {
-        width: (W - 32 - 32 - 12) / 2,
+    net4CardItem: {
+        flex: 1,
         backgroundColor: '#ffffff',
-        borderRadius: 14,
-        padding: 14,
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#cbd5e1'
     },
     netCardItemSelected: {
-        borderColor: '#f97316',
+        borderColor: '#ea580c',
         borderWidth: 2,
         backgroundColor: '#ffffff'
     },
-    netLogoBox: {
-        width: 44,
-        height: 44,
+    netLogoBoxCompact: {
+        width: 32,
+        height: 32,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8
+        marginBottom: 4
     },
-    netLogoImg: {
-        width: 40,
-        height: 40
+    netLogoImgCompact: {
+        width: 28,
+        height: 28
     },
-    netNameTxt: {
-        fontSize: 14,
+    netNameTxtCompact: {
+        fontSize: 12,
         fontWeight: '800',
         color: '#0d1b3e'
     },
-    stockTxt: {
-        fontSize: 11,
+    stockTxtCompact: {
+        fontSize: 9,
         fontWeight: '700',
         color: '#16a34a',
-        marginTop: 4
+        marginTop: 2
     },
-    denomPill: {
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 10,
-        backgroundColor: '#f8fafc',
+
+    // 2x2 GRID DENOMINATIONS MATCHING USER IMAGE 5
+    denom2x2GridRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10
+    },
+    denom2x2Card: {
+        width: (W - 24 - 24 - 10) / 2,
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#cbd5e1',
-        alignItems: 'center'
+        borderColor: '#cbd5e1'
     },
-    denomPillSelected: {
-        backgroundColor: '#fff7ed',
-        borderColor: '#f97316',
-        borderWidth: 2
+    denom2x2CardSelected: {
+        borderColor: '#ea580c',
+        borderWidth: 2,
+        backgroundColor: '#fff7ed'
     },
-    denomPillTxt: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#334155'
+    denom2x2Val: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#0d1b3e'
     },
-    denomPillTxtSelected: {
-        color: '#ea580c'
+    denom2x2UnitPrice: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#64748b',
+        marginTop: 2
     },
+    denom2x2Stock: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#16a34a',
+        marginTop: 2
+    },
+
     orderDetailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingVertical: 8,
+        paddingVertical: 6,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9'
     },
     orderDetailLabel: {
-        fontSize: 13,
+        fontSize: 12,
         color: '#64748b',
         fontWeight: '500'
     },
     orderDetailVal: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '800',
         color: '#0d1b3e'
     },
     qtyPillRow: {
         flexDirection: 'row',
-        gap: 8
+        gap: 6
     },
     qtyPillBtn: {
         flex: 1,
-        height: 40,
-        borderRadius: 10,
+        height: 36,
+        borderRadius: 8,
         backgroundColor: '#ffffff',
         borderWidth: 1,
         borderColor: '#cbd5e1',
@@ -616,12 +626,12 @@ const s = StyleSheet.create({
         justifyContent: 'center'
     },
     qtyPillBtnSelected: {
-        borderColor: '#f97316',
+        borderColor: '#ea580c',
         borderWidth: 2,
         backgroundColor: '#fff7ed'
     },
     qtyPillTxt: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
         color: '#334155'
     },
@@ -630,13 +640,13 @@ const s = StyleSheet.create({
         fontWeight: '800'
     },
     nameInput: {
-        height: 42,
+        height: 38,
         backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#cbd5e1',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        fontSize: 13,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        fontSize: 12,
         fontWeight: '600',
         color: '#0d1b3e'
     },
@@ -647,18 +657,18 @@ const s = StyleSheet.create({
         backgroundColor: '#fff7ed',
         borderWidth: 1,
         borderColor: '#ffedd5',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        marginTop: 16
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginTop: 12
     },
     totalBoxLabel: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#0d1b3e',
         fontWeight: '600'
     },
     totalBoxAmount: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '900',
         color: '#ea580c'
     },
@@ -667,30 +677,30 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: '#fafaf9',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        marginTop: 8
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: 6
     },
     walletBoxLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#64748b'
     },
     walletBoxAmount: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
         color: '#16a34a'
     },
     purchaseBtn: {
-        height: 48,
+        height: 44,
         backgroundColor: '#ea580c',
-        borderRadius: 12,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 16
+        marginTop: 14
     },
     purchaseBtnTxt: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '800',
         color: '#ffffff'
     },
@@ -699,25 +709,25 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(15, 23, 42, 0.65)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 16
+        padding: 12
     },
     resultModalCard: {
         width: '100%',
-        maxWidth: 580,
+        maxWidth: 560,
         backgroundColor: '#f1f5f9',
-        borderRadius: 20,
-        padding: 16
+        borderRadius: 16,
+        padding: 12
     },
     resultTopBtnRow: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16
+        gap: 10,
+        marginBottom: 12
     },
     printCardsBtn: {
         flex: 1.5,
-        height: 44,
+        height: 40,
         backgroundColor: '#ea580c',
-        borderRadius: 12,
+        borderRadius: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center'
@@ -725,13 +735,13 @@ const s = StyleSheet.create({
     printCardsBtnTxt: {
         color: '#ffffff',
         fontWeight: '800',
-        fontSize: 15
+        fontSize: 14
     },
     buyMoreBtn: {
         flex: 1,
-        height: 44,
+        height: 40,
         backgroundColor: '#ffffff',
-        borderRadius: 12,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: '#cbd5e1',
         alignItems: 'center',
@@ -740,18 +750,18 @@ const s = StyleSheet.create({
     buyMoreBtnTxt: {
         color: '#0d1b3e',
         fontWeight: '800',
-        fontSize: 14
+        fontSize: 13
     },
     voucherCardsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12
+        gap: 10
     },
     printedVoucherCard: {
-        width: (W > 500 ? 260 : (W - 32 - 32)),
+        width: (W > 480 ? 250 : (W - 24 - 24)),
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 10,
+        borderRadius: 8,
+        padding: 8,
         borderWidth: 1.5,
         borderColor: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
@@ -762,7 +772,7 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vNameTxt: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: 'bold',
         color: '#000000',
         flex: 1,
@@ -780,7 +790,7 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#000000',
         borderStyle: 'dashed',
-        marginVertical: 6
+        marginVertical: 4
     },
     vBodyRow: {
         flexDirection: 'row',
@@ -788,30 +798,30 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vMetaTxt: {
-        fontSize: 10,
+        fontSize: 9,
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        lineHeight: 14
+        lineHeight: 13
     },
     vPinTxt: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
         marginVertical: 2
     },
     vLogoBox: {
-        width: 38,
-        height: 38,
+        width: 32,
+        height: 32,
         backgroundColor: '#ffcc00',
         borderRadius: 4,
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 6
+        marginLeft: 4
     },
     vLogoImg: {
-        width: 32,
-        height: 32
+        width: 26,
+        height: 26
     },
     vFooterRow: {
         flexDirection: 'row',
@@ -819,13 +829,13 @@ const s = StyleSheet.create({
         alignItems: 'center'
     },
     vDialTxt: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
     },
     vDenomTxt: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 'bold',
         color: '#000000',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
