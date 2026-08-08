@@ -380,10 +380,10 @@ export default function RechargePinScreen() {
                 return;
             }
 
-            // Build ESC/POS receipt
+            // ESC/POS thermal receipt formatting (Strict 32-character width for 58mm/80mm mini printers)
             const enc = new TextEncoder();
             const ESC = 0x1B; const GS = 0x1D; const LF = 0x0A;
-            const initCmd = new Uint8Array([ESC, 0x40]); // Init
+            const initCmd = new Uint8Array([ESC, 0x40]);
             const centerCmd = new Uint8Array([ESC, 0x61, 0x01]);
             const leftCmd = new Uint8Array([ESC, 0x61, 0x00]);
             const boldOn = new Uint8Array([ESC, 0x45, 0x01]);
@@ -398,9 +398,9 @@ export default function RechargePinScreen() {
             };
 
             const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
-            const denom = tx.denomination || '\u20A6100';
+            const denom = tx.denomination || '₦100';
             const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
-            const txRef = tx.transaction_id || tx.transactionId || 'RCP' + Date.now();
+            const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now().toString(36).toUpperCase());
             const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
             await characteristic.writeValue(initCmd);
@@ -408,7 +408,7 @@ export default function RechargePinScreen() {
             await writeLine('================================');
             await characteristic.writeValue(boldOn);
             await characteristic.writeValue(dblHeight);
-            await writeLine(bName);
+            await writeLine(bName.length > 20 ? bName.slice(0, 18) + '..' : bName);
             await characteristic.writeValue(normalSize);
             await characteristic.writeValue(boldOff);
             await writeLine(`${netName} ${denom} RECHARGE CARD`);
@@ -418,19 +418,21 @@ export default function RechargePinScreen() {
             for (let i = 0; i < pins.length; i++) {
                 const p = pins[i];
                 await characteristic.writeValue(centerCmd);
-                await writeLine(`--- CARD ${i + 1} OF ${pins.length} ---`);
+                await writeLine(`[ CARD ${i + 1} OF ${pins.length} ]`);
                 await characteristic.writeValue(leftCmd);
-                await characteristic.writeValue(boldOn);
-                await characteristic.writeValue(dblHeight);
+
                 const rawPin = (p.pin || '').toString();
                 const groups = rawPin.match(/.{1,4}/g) || [rawPin];
-                await writeLine('PIN: ' + groups.join('-'));
-                await characteristic.writeValue(normalSize);
+                const formattedPin = groups.join(' ');
+
+                await characteristic.writeValue(boldOn);
+                await writeLine('PIN: ' + formattedPin);
                 await characteristic.writeValue(boldOff);
-                await writeLine(`S/N: ${p.serial || (i + 1)}`);
-                await writeLine(`DIAL: ${p.load_code || tx.load_code || '*311*PIN#'}`);
-                await writeLine(`REF: ${txRef}`);
-                await writeLine(`DATE: ${dateStr}`);
+
+                await writeLine('S/N:  ' + (p.serial || (i + 1)));
+                await writeLine('DIAL: ' + (p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'));
+                await writeLine('REF:  ' + txRef);
+                await writeLine('DATE: ' + dateStr);
                 await writeLine('--------------------------------');
             }
 
@@ -468,14 +470,14 @@ export default function RechargePinScreen() {
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
             const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
 
-            // A4 Canvas Dimensions (1240px x 1754px @ 150 DPI)
+            // Compact A4 Canvas Dimensions (960px width, tight margins, 80x50mm cards)
             const COLS = 2;
-            const CW = 520, CH = 325; // Exact 80:50 = 1.6:1 card ratio
-            const GAP_X = 40, GAP_Y = 30;
-            const PAD_X = 80, HEADER_H = 140, FOOTER_H = 80;
+            const CW = 420, CH = 262.5; // Exact 80:50 = 1.6:1 card ratio
+            const GAP_X = 24, GAP_Y = 20;
+            const PAD_X = 48, HEADER_H = 110, FOOTER_H = 60;
             const rows = Math.ceil(pins.length / COLS);
-            const canvasW = 1240;
-            const canvasH = Math.max(1754, HEADER_H + rows * (CH + GAP_Y) + FOOTER_H);
+            const canvasW = 960;
+            const canvasH = HEADER_H + rows * (CH + GAP_Y) + FOOTER_H;
 
             const drawAllCards = (logoImg: HTMLImageElement | null) => {
                 const canvas = document.createElement('canvas');
@@ -695,13 +697,13 @@ export default function RechargePinScreen() {
 <meta charset="UTF-8">
 <title>RechargeCards_${txRef}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm; }
+  @page { size: A4 portrait; margin: 6mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; background: #ffffff; padding: 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page-header { text-align: center; margin-bottom: 6mm; border-bottom: 2px solid #0d1b3e; padding-bottom: 3mm; }
-  .page-title { font-size: 13pt; font-weight: bold; color: #0d1b3e; letter-spacing: 0.5px; }
-  .page-sub { font-size: 8pt; color: #64748b; margin-top: 1mm; }
-  .grid { display: grid; grid-template-columns: repeat(2, 80mm); gap: 4mm 5mm; justify-content: center; }
+  body { font-family: Arial, sans-serif; background: #ffffff; padding: 4mm 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page-header { text-align: center; margin-bottom: 4mm; border-bottom: 2px solid #0d1b3e; padding-bottom: 2mm; width: 172mm; margin-left: auto; margin-right: auto; }
+  .page-title { font-size: 12pt; font-weight: bold; color: #0d1b3e; letter-spacing: 0.5px; }
+  .page-sub { font-size: 7.5pt; color: #64748b; margin-top: 1mm; }
+  .grid { display: grid; grid-template-columns: repeat(2, 80mm); gap: 4mm 6mm; justify-content: center; width: 172mm; margin: 0 auto; }
   .card { width: 80mm; height: 50mm; background: #ffffff; border: 1.5px solid #0d1b3e; border-radius: 2.5mm; overflow: hidden; page-break-inside: avoid; position: relative; font-size: 7.5pt; }
   .card-top { height: 7.5mm; background: linear-gradient(90deg, #09122c 0%, #0d1b3e 60%, #162860 100%); border-left: 2.5mm solid #f5a623; padding: 1mm 2mm; display: flex; align-items: center; justify-content: space-between; }
   .biz-name { font-size: 7pt; font-weight: bold; color: #f5a623; }
@@ -716,7 +718,7 @@ export default function RechargePinScreen() {
   .meta { display: flex; align-items: center; justify-content: space-between; font-size: 5.5pt; color: #475569; }
   .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #0d1b3e; padding-top: 0.8mm; }
   .dial { font-size: 6.5pt; font-weight: bold; color: #0d1b3e; font-family: 'Courier New', monospace; }
-  .watermark { text-align: center; color: #94a3b8; font-size: 7pt; margin-top: 6mm; }
+  .watermark { text-align: center; color: #94a3b8; font-size: 7pt; margin-top: 4mm; }
 </style>
 </head>
 <body>
