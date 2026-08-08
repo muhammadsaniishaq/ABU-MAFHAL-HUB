@@ -700,20 +700,20 @@ serve(async (req: Request) => {
       })
     }
 
-    // 10. Bigi VTU Portal (api.bigisub.ng) - Correct base URL: https://api.bigisub.ng/api/v2
+    // 10. Bigi VTU Portal - Official: GET https://bigisub.ng/api/v2/wallet/balance (Bearer token)
     if (bigiToken && bigiToken.trim() !== '') {
       let balance = 0
       let latencyMs = 230
       let fetched = false
 
-      // Attempt 1: GET https://api.bigisub.ng/api/v2/user/ (Token header) - matches shared client base URL
+      // Attempt 1 (PRIMARY): GET https://bigisub.ng/api/v2/wallet/balance with Bearer — OFFICIAL endpoint per docs
       try {
-        const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/', {
+        const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/wallet/balance', {
           method: 'GET',
-          headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+          headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
         })
         const data = await response.json()
-        const rawBal = data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
+        const rawBal = data?.balance ?? data?.wallet_balance ?? data?.data?.balance ?? data?.data?.wallet_balance
         if (rawBal !== undefined && rawBal !== null) {
           balance = Number(rawBal)
           latencyMs = latency
@@ -721,7 +721,24 @@ serve(async (req: Request) => {
         }
       } catch (e) {}
 
-      // Attempt 2: GET https://api.bigisub.ng/api/v2/wallet/balance (Token header)
+      // Attempt 2: GET https://bigisub.ng/api/v2/user/ with Bearer token
+      if (!fetched) {
+        try {
+          const { response, latency } = await fetchWithTimeout('https://bigisub.ng/api/v2/user/', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
+          })
+          const data = await response.json()
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.data?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+          }
+        } catch (e) {}
+      }
+
+      // Attempt 3: GET https://api.bigisub.ng/api/v2/wallet/balance with Token header (alt subdomain + auth style)
       if (!fetched) {
         try {
           const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/wallet/balance', {
@@ -729,7 +746,7 @@ serve(async (req: Request) => {
             headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
           })
           const data = await response.json()
-          const rawBal = data?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.data?.balance ?? data?.data?.wallet_balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
@@ -738,32 +755,15 @@ serve(async (req: Request) => {
         } catch (e) {}
       }
 
-      // Attempt 3: GET https://api.bigisub.ng/api/v2/user/balance/ (Token header)
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/balance/', {
-            method: 'GET',
-            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
-          })
-          const data = await response.json()
-          const rawBal = data?.wallet_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
-      // Attempt 4: Bearer token style fallback
+      // Attempt 4: GET https://api.bigisub.ng/api/v2/user/ with Token header
       if (!fetched) {
         try {
           const { response, latency } = await fetchWithTimeout('https://api.bigisub.ng/api/v2/user/', {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${bigiToken.trim()}`, 'Accept': 'application/json' }
+            headers: { 'Authorization': `Token ${bigiToken.trim()}`, 'Accept': 'application/json' }
           })
           const data = await response.json()
-          const rawBal = data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.balance ?? data?.data?.balance
+          const rawBal = data?.balance ?? data?.wallet_balance ?? data?.user?.wallet_balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
