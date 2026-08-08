@@ -711,22 +711,35 @@ serve(async (req: Request) => {
       let bigiDebugRaw: any = null
       let bigiDebugError: string = ''
 
-      const extractBigiBalance = (data: any): number | undefined => {
-        if (!data) return undefined
-        const candidates = [
-          data?.balance, data?.wallet_balance, data?.walletBalance,
-          data?.available_balance, data?.availableBalance,
-          data?.data?.balance, data?.data?.wallet_balance, data?.data?.walletBalance,
-          data?.data?.available_balance, data?.data?.availableBalance,
-          data?.user?.balance, data?.user?.wallet_balance, data?.user?.walletBalance,
-          data?.wallet?.balance, data?.wallet?.available,
-          data?.result?.balance, data?.result?.wallet_balance,
-          data?.payload?.balance, data?.payload?.wallet_balance,
-          data?.info?.balance, data?.info?.wallet_balance,
+      const extractBigiBalance = (data: any, depth = 0): number | undefined => {
+        if (!data || depth > 5) return undefined
+        const explicitCandidates = [
+          data?.balance, data?.wallet_balance, data?.walletBalance, data?.available_balance, data?.availableBalance, data?.account_balance, data?.main_balance,
+          data?.data?.balance, data?.data?.wallet_balance, data?.data?.walletBalance, data?.data?.available_balance, data?.data?.account_balance,
+          data?.data?.user?.balance, data?.data?.user?.wallet_balance, data?.data?.user?.walletBalance, data?.data?.user?.available_balance, data?.data?.user?.account_balance, data?.data?.user?.main_balance, data?.data?.user?.cash_balance,
+          data?.user?.balance, data?.user?.wallet_balance, data?.user?.walletBalance, data?.user?.available_balance, data?.user?.account_balance,
+          data?.wallet?.balance, data?.wallet?.available, data?.result?.balance, data?.result?.wallet_balance, data?.payload?.balance, data?.info?.balance,
         ]
-        for (const c of candidates) {
+        for (const c of explicitCandidates) {
           if (c !== undefined && c !== null && c !== '') {
-            const n = Number(c); if (!isNaN(n)) return n
+            const n = Number(c)
+            if (!isNaN(n)) return n
+          }
+        }
+        if (typeof data === 'object') {
+          for (const key of Object.keys(data)) {
+            const val = data[key]
+            const lowerKey = key.toLowerCase()
+            if (typeof val === 'number' && (lowerKey.includes('balance') || lowerKey.includes('wallet') || lowerKey.includes('fund') || lowerKey.includes('money'))) {
+              return val
+            }
+            if (typeof val === 'string' && (lowerKey.includes('balance') || lowerKey.includes('wallet')) && !isNaN(Number(val))) {
+              return Number(val)
+            }
+            if (typeof val === 'object' && val !== null) {
+              const subRes = extractBigiBalance(val, depth + 1)
+              if (subRes !== undefined) return subRes
+            }
           }
         }
         return undefined
