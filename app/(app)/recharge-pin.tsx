@@ -960,6 +960,12 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.15)',
         marginVertical: 12
     },
+    orderTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10
+    },
     orderTotalLabel: {
         fontSize: 16,
         fontWeight: 'bold',
