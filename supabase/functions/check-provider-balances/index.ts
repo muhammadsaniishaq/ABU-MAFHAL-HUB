@@ -733,27 +733,60 @@ serve(async (req: Request) => {
       }
 
       if (bigiHasCreds) {
-        // PRIMARY: Login with username+password to get JWT, then fetch balance
+        // PRIMARY: Login to /api/v2/auth/login/ with email_or_username + password
         try {
           const loginStart = Date.now()
-          const loginResp = await fetch('https://bigisub.ng/api/v2/token/', {
+          let loginResp = await fetch('https://bigisub.ng/api/v2/auth/login/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ username: bigiUsername.trim(), password: bigiPassword.trim() })
+            body: JSON.stringify({
+              email_or_username: bigiUsername.trim(),
+              username: bigiUsername.trim(),
+              password: bigiPassword.trim()
+            })
           })
+          
+          if (!loginResp.ok) {
+            // Fallback: try /api/v2/token/
+            loginResp = await fetch('https://bigisub.ng/api/v2/token/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({
+                email_or_username: bigiUsername.trim(),
+                username: bigiUsername.trim(),
+                password: bigiPassword.trim()
+              })
+            })
+          }
+
           const loginData = await loginResp.json()
           bigiDebugRaw = { loginStatus: loginResp.status, loginData }
 
-          const jwt = loginData?.access ?? loginData?.token ?? loginData?.access_token ??
-            loginData?.jwt ?? loginData?.data?.access ?? loginData?.data?.token
+          const jwt = loginData?.data?.token ?? loginData?.data?.access_token ?? loginData?.data?.access ??
+            loginData?.token ?? loginData?.access ?? loginData?.access_token ?? loginData?.jwt ??
+            loginData?.key ?? loginData?.data?.key ?? loginData?.user?.token
 
           if (jwt) {
-            // Use JWT to fetch balance
-            const balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
+            // Use JWT to fetch balance - try Bearer first, then Token
+            let balData: any = null
+            let balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
               method: 'GET',
               headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' }
             })
-            const balData = await balResp.json()
+            if (!balResp.ok) {
+              balResp = await fetch('https://bigisub.ng/api/v2/wallet/balance/', {
+                method: 'GET',
+                headers: { 'Authorization': `Token ${jwt}`, 'Accept': 'application/json' }
+              })
+            }
+            if (!balResp.ok) {
+              balResp = await fetch('https://bigisub.ng/api/v2/user/', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${jwt}`, 'Accept': 'application/json' }
+              })
+            }
+
+            balData = await balResp.json()
             bigiDebugRaw.balStatus = balResp.status
             bigiDebugRaw.balData = balData
             latencyMs = Date.now() - loginStart
