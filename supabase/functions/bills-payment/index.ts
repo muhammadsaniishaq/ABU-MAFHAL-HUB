@@ -213,15 +213,24 @@ Deno.serve(async (req: Request) => {
              amountToCharge = Number(data.amount) * (Number(data.quantity) || 1);
              if (amountToCharge < 500) throw new Error("Invalid Education Amount");
              providerParams = { examType: data.examType, phone: data.phone, profileId: data.profileId, quantity: data.quantity || 1 };
+        } else if (type === 'recharge_pin_purchase') {
+             const planPrices: Record<number, number> = { 1: 98.9, 2: 197.8, 3: 494.5, 4: 989 };
+             const pId = typeof data.planId === 'number' ? data.planId : parseInt(data.planId || 1, 10);
+             const unitCost = planPrices[pId] || 98.9;
+             const qty = Math.max(1, Number(data.quantity || 1));
+             amountToCharge = Math.round(unitCost * qty * 10) / 10;
+             providerParams = { planId: pId, quantity: qty, businessName: data.businessName || 'ABU MAFHAL VTU' };
+        } else if (type === 'recharge_pin_plans') {
+             // Pass through without balance deduction
         } else if (type === 'get_plans') {
              // Just pass through
         } else {
              throw new Error(`Unsupported service type: ${type}`);
         }
 
-        console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone}`);
+        console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone || 'N/A'}`);
 
-        if (type !== 'get_plans') {
+        if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
             const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
                 user_id: userId,
                 amount: amountToCharge

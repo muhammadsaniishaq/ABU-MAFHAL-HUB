@@ -37,13 +37,20 @@ const T = {
     border: '#cbd5e1'
 };
 
-// Official Network Logos
+// Official Network Logos & Colors
 const NETWORK_LOGOS: Record<string, any> = {
     mtn: require('../../assets/images/mtn.png'),
     glo: require('../../assets/images/glo.png'),
     airtel: require('../../assets/images/airtel.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
     vitel: require('../../assets/images/vitel.png'),
+};
+
+const NETWORK_BG_COLORS: Record<string, string> = {
+    mtn: '#ffcc00',
+    glo: '#008751',
+    airtel: '#e60000',
+    '9mobile': '#006837'
 };
 
 const NETWORKS = [
@@ -243,51 +250,114 @@ export default function RechargePinScreen() {
         showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
-    // 1. AUTO DIRECT DOWNLOAD (PDF / HTML File)
-    const handleAutoDownloadPDF = (customTxData?: any) => {
+    // 1. SAVE AS PNG IMAGE FILE (.png)
+    const handleSaveAsPNG = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
         if (!tx || !tx.pins) return;
         const pins = tx.pins || [];
 
-        const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
-
-        const cardsHtml = pins.map((p: any, idx: number) => `
-            <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
-                    <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
-                </div>
-                <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 10px; line-height: 1.4;">
-                        <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}</div>
-                        <div style="font-size: 12px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
-                        <div><strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
-                        <div><strong>Date:</strong> ${formattedDate}</div>
-                    </div>
-                    <div style="width: 38px; height: 38px; background: #ffcc00; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; margin-left: 8px;">
-                        ${(tx.network || 'MTN').toUpperCase()}
-                    </div>
-                </div>
-                <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px;">
-                    <span>${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
-                    <span>${tx.denomination || '₦100'}</span>
-                </div>
-            </div>
-        `).join('');
-
-        const fullHtml = `<!DOCTYPE html><html><head><title>Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}</title><style>@page{size:A4 portrait;margin:10mm;}body{margin:0;padding:10px;background:#fff;font-family:monospace;}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}</style></head><body><div class="grid">${cardsHtml}</div></body></html>`;
-
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
+            const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
+            const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
+            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || userEmail || 'ABU MAFHAL VTU').toUpperCase();
+            const denom = tx.denomination || '₦100';
+            const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            const canvas = document.createElement('canvas');
+            const cardW = 440;
+            const cardH = 170;
+            const gap = 14;
+            const padding = 20;
+            
+            canvas.width = cardW + (padding * 2);
+            canvas.height = (pins.length * (cardH + gap)) + (padding * 2);
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Fill Canvas Background
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            pins.forEach((p: any, idx: number) => {
+                const y = padding + (idx * (cardH + gap));
+                const x = padding;
+
+                // Card Box Container
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#0d1b3e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, y, cardW, cardH, 10);
+                ctx.fill();
+                ctx.stroke();
+
+                // Header Banner (Navy)
+                ctx.fillStyle = '#0d1b3e';
+                ctx.beginPath();
+                ctx.roundRect(x, y, cardW, 30, [10, 10, 0, 0]);
+                ctx.fill();
+
+                // Header Business Name
+                ctx.fillStyle = '#f5a623';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(bName, x + 12, y + 20);
+
+                // Header Denomination Badge
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(denom, x + cardW - 12, y + 20);
+                ctx.textAlign = 'left';
+
+                // Network Logo Badge Box
+                ctx.fillStyle = netBg;
+                ctx.beginPath();
+                ctx.roundRect(x + cardW - 65, y + 42, 53, 40, 6);
+                ctx.fill();
+                ctx.fillStyle = netKey === 'mtn' ? '#000' : '#fff';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(netName, x + cardW - 38, y + 66);
+                ctx.textAlign = 'left';
+
+                // PIN Block (Gold Box)
+                ctx.fillStyle = '#fffdf5';
+                ctx.strokeStyle = '#f5a623';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.roundRect(x + 12, y + 40, 350, 42, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                // PIN Code Text (Large Monospace)
+                ctx.fillStyle = '#0d1b3e';
+                ctx.font = 'bold 17px monospace';
+                const formattedPin = (p.pin || '').replace(/(.{4})/g, '$1 ').trim();
+                ctx.fillText(`PIN: ${formattedPin}`, x + 22, y + 66);
+
+                // Meta Details
+                ctx.fillStyle = '#475569';
+                ctx.font = '10px monospace';
+                ctx.fillText(`REF: ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}`, x + 12, y + 102);
+                ctx.fillText(`S/N: ${p.serial || (idx + 1)}`, x + 12, y + 118);
+                ctx.fillText(`DATE: ${formattedDate}`, x + 240, y + 102);
+
+                // Footer Dial Code
+                ctx.fillStyle = '#0d1b3e';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(`DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`, x + 12, y + 148);
+            });
+
+            const dataUrl = canvas.toDataURL('image/png');
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}.html`;
+            link.href = dataUrl;
+            link.download = `Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showAlert('Downloaded ✅', 'Recharge cards voucher file downloaded to your device!', 'success');
+            showAlert('Downloaded PNG ✅', 'Recharge cards saved as PNG Image file to your device!', 'success');
         } else {
             const pinsList = tx.pins;
             const textToShare = pinsList.map((p: any, idx: number) => 
@@ -297,8 +367,8 @@ export default function RechargePinScreen() {
         }
     };
 
-    // 2. DIRECT BROWSER PRINT WINDOW
-    const handleDirectPrint = (customTxData?: any) => {
+    // 2. SAVE AS PDF DOCUMENT / PRINT TO PDF (.pdf)
+    const handleSaveAsPDF = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
         if (!tx || !tx.pins) return;
         const pins = tx.pins || [];
@@ -306,34 +376,39 @@ export default function RechargePinScreen() {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                showAlert('Popup Blocked ⚠️', 'Please allow popups in your browser to print cards.', 'warning');
+                showAlert('Popup Blocked ⚠️', 'Please allow popups in your browser to download PDF.', 'warning');
                 return;
             }
 
+            const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
+            const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
+            const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
+            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || userEmail || 'ABU MAFHAL VTU').toUpperCase();
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
 
             const cardsHtml = pins.map((p: any, idx: number) => `
-                <div style="border: 1.5px solid #000; border-radius: 8px; padding: 10px; background: #fff; page-break-inside: avoid; font-family: monospace;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${(tx.nameOnCard || tx.business_name || tx.businessName || 'ABU MAFHAL VTU').toLowerCase()}</span>
-                        <span style="border: 1px solid #ccc; border-radius: 4px; padding: 1px 4px; font-size: 10px;">📋</span>
+                <div style="border: 2px solid #0d1b3e; border-radius: 8px; overflow: hidden; background: #fff; page-break-inside: avoid; font-family: monospace;">
+                    <div style="background: #0d1b3e; color: #f5a623; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${bName}</span>
+                        <span style="font-size: 12px; font-weight: bold; color: #fff;">${tx.denomination || '₦100'}</span>
                     </div>
-                    <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 10px; line-height: 1.4;">
-                            <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}</div>
-                            <div style="font-size: 12px; font-weight: bold; margin: 2px 0;"><strong>PIN:</strong> ${p.pin}</div>
-                            <div><strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
-                            <div><strong>Date:</strong> ${formattedDate}</div>
+                    <div style="padding: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="border: 1.5px solid #f5a623; background: #fffdf5; padding: 8px 12px; border-radius: 6px; flex: 1; margin-right: 10px;">
+                                <div style="font-size: 14px; font-weight: bold; color: #0d1b3e; font-family: monospace;">PIN: ${(p.pin || '').replace(/(.{4})/g, '$1 ').trim()}</div>
+                            </div>
+                            <div style="width: 44px; height: 36px; background: ${netBg}; color: ${netKey === 'mtn' ? '#000' : '#fff'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; font-family: sans-serif;">
+                                ${netName}
+                            </div>
                         </div>
-                        <div style="width: 38px; height: 38px; background: #ffcc00; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; margin-left: 8px;">
-                            ${(tx.network || 'MTN').toUpperCase()}
+                        <div style="font-size: 9px; color: #475569; line-height: 1.4; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                            <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()} | <strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
+                            <div><strong>DATE:</strong> ${formattedDate}</div>
                         </div>
-                    </div>
-                    <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px;">
-                        <span>${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
-                        <span>${tx.denomination || '₦100'}</span>
+                        <div style="font-size: 11px; font-weight: bold; color: #0d1b3e; margin-top: 6px; border-top: 1px solid #0d1b3e; padding-top: 4px; display: flex; justify-content: space-between;">
+                            <span>DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
+                            <span>${tx.denomination || '₦100'}</span>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -344,9 +419,9 @@ export default function RechargePinScreen() {
                 <head>
                     <title>Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}</title>
                     <style>
-                        @page { size: A4 portrait; margin: 10mm; }
+                        @page { size: A4 portrait; margin: 8mm; }
                         body { margin: 0; padding: 10px; background: #fff; font-family: monospace; }
-                        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+                        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
                         @media print {
                             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         }
@@ -363,7 +438,7 @@ export default function RechargePinScreen() {
             printWindow.document.write(htmlDoc);
             printWindow.document.close();
         } else {
-            handleAutoDownloadPDF(customTxData);
+            handleSaveAsPNG(customTxData);
         }
     };
 
@@ -635,7 +710,7 @@ export default function RechargePinScreen() {
                                                     style={s.historyPrintBtn}
                                                     activeOpacity={0.8}
                                                 >
-                                                    <Ionicons name="print-outline" size={12} color={T.navy} style={{ marginRight: 3 }} />
+                                                    <Ionicons name="eye-outline" size={12} color={T.navy} style={{ marginRight: 3 }} />
                                                     <Text style={s.historyPrintBtnTxt}>View</Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -650,7 +725,7 @@ export default function RechargePinScreen() {
 
             </ScrollView>
 
-            {/* INTERACTIVE ALERT POPUP MODAL (FOR WEB & MOBILE) */}
+            {/* INTERACTIVE ALERT POPUP MODAL */}
             <Modal
                 transparent
                 visible={alertModal.visible}
@@ -694,7 +769,7 @@ export default function RechargePinScreen() {
                 </View>
             </Modal>
 
-            {/* GENERATED RECHARGE CARD RESULTS MODAL WITH AUTO DOWNLOAD OPTIONS */}
+            {/* GENERATED RECHARGE CARD RESULTS MODAL WITH REAL PNG & PDF OPTIONS */}
             <Modal
                 visible={successModal.visible}
                 transparent
@@ -704,16 +779,16 @@ export default function RechargePinScreen() {
                 <View style={s.resultModalOverlay}>
                     <View style={s.resultModalCard}>
                         
-                        {/* Top Action Options: AUTO DOWNLOAD PDF / DIRECT PRINT / CLOSE */}
+                        {/* Top Action Row: SAVE PNG / SAVE PDF / CLOSE */}
                         <View style={s.resultTopBtnRow}>
-                            <TouchableOpacity onPress={() => handleAutoDownloadPDF()} style={s.downloadPdfBtn} activeOpacity={0.85}>
-                                <Ionicons name="document-text-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
-                                <Text style={s.downloadPdfBtnTxt}>Save PDF / File</Text>
+                            <TouchableOpacity onPress={() => handleSaveAsPNG()} style={s.downloadPngBtn} activeOpacity={0.85}>
+                                <Ionicons name="image-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
+                                <Text style={s.downloadPngBtnTxt}>Save PNG</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => handleDirectPrint()} style={s.printCardsBtn} activeOpacity={0.85}>
-                                <Ionicons name="print-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
-                                <Text style={s.printCardsBtnTxt}>Print</Text>
+                            <TouchableOpacity onPress={() => handleSaveAsPDF()} style={s.downloadPdfBtn} activeOpacity={0.85}>
+                                <Ionicons name="document-text-outline" size={14} color={T.navy} style={{ marginRight: 4 }} />
+                                <Text style={s.downloadPdfBtnTxt}>Save PDF</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -727,44 +802,49 @@ export default function RechargePinScreen() {
 
                         {/* Generated Voucher Cards Container */}
                         <ScrollView contentContainerStyle={s.voucherCardsGrid} style={{ maxHeight: 420 }}>
-                            {successModal.txData?.pins?.map((pinObj: any, idx: number) => (
-                                <View key={idx} style={s.printedVoucherCard}>
-                                    
-                                    {/* Header Row */}
-                                    <View style={s.vHeaderRow}>
-                                        <Text style={s.vNameTxt} numberOfLines={1}>
-                                            {successModal.txData?.nameOnCard || successModal.txData?.business_name || successModal.txData?.businessName || userEmail || 'ABU MAFHAL VTU'}
-                                        </Text>
-                                        <TouchableOpacity onPress={() => copyPinToClipboard(pinObj.pin)} style={s.vCopyIconBtn}>
-                                            <Ionicons name="copy-outline" size={11} color="#334155" />
-                                        </TouchableOpacity>
-                                    </View>
+                            {successModal.txData?.pins?.map((pinObj: any, idx: number) => {
+                                const netKey = (successModal.txData?.network || selectedNetwork || 'mtn').toLowerCase();
+                                const netLogo = NETWORK_LOGOS[netKey] || NETWORK_LOGOS.mtn;
 
-                                    <View style={s.vDashedLine} />
-
-                                    {/* Body Row */}
-                                    <View style={s.vBodyRow}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transaction_id || successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
-                                            <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 9, color: '#000' }}>PIN: </Text>{pinObj.pin}</Text>
-                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>S/N:</Text> {pinObj.serial || (idx + 1)}</Text>
-                                            <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                                return (
+                                    <View key={idx} style={s.printedVoucherCard}>
+                                        
+                                        {/* Header Row */}
+                                        <View style={s.vHeaderRow}>
+                                            <Text style={s.vNameTxt} numberOfLines={1}>
+                                                {successModal.txData?.nameOnCard || successModal.txData?.business_name || successModal.txData?.businessName || userEmail || 'ABU MAFHAL VTU'}
+                                            </Text>
+                                            <TouchableOpacity onPress={() => copyPinToClipboard(pinObj.pin)} style={s.vCopyIconBtn}>
+                                                <Ionicons name="copy-outline" size={11} color="#334155" />
+                                            </TouchableOpacity>
                                         </View>
 
-                                        <View style={s.vLogoBox}>
-                                            <Image source={NETWORK_LOGOS[(successModal.txData?.network || selectedNetwork || 'mtn').toLowerCase()] || NETWORK_LOGOS.mtn} style={s.vLogoImg} resizeMode="contain" />
+                                        <View style={s.vDashedLine} />
+
+                                        {/* Body Row */}
+                                        <View style={s.vBodyRow}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>REF:</Text> {successModal.txData?.transaction_id || successModal.txData?.transactionId || 'RCP' + Date.now()}</Text>
+                                                <Text style={s.vPinTxt}><Text style={{ fontWeight: 'normal', fontSize: 9, color: '#000' }}>PIN: </Text>{(pinObj.pin || '').replace(/(.{4})/g, '$1 ').trim()}</Text>
+                                                <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>S/N:</Text> {pinObj.serial || (idx + 1)}</Text>
+                                                <Text style={s.vMetaTxt}><Text style={{ fontWeight: 'bold' }}>Date:</Text> {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                                            </View>
+
+                                            <View style={[s.vLogoBox, { backgroundColor: NETWORK_BG_COLORS[netKey] || '#ffcc00' }]}>
+                                                <Image source={netLogo} style={s.vLogoImg} resizeMode="contain" />
+                                            </View>
+                                        </View>
+
+                                        <View style={s.vDashedLine} />
+
+                                        {/* Footer Row */}
+                                        <View style={s.vFooterRow}>
+                                            <Text style={s.vDialTxt}>{pinObj.load_code || successModal.txData?.load_code || successModal.txData?.loadCode || '*311*PIN#'}</Text>
+                                            <Text style={s.vDenomTxt}>{successModal.txData?.denomination || '₦100'}</Text>
                                         </View>
                                     </View>
-
-                                    <View style={s.vDashedLine} />
-
-                                    {/* Footer Row */}
-                                    <View style={s.vFooterRow}>
-                                        <Text style={s.vDialTxt}>{pinObj.load_code || successModal.txData?.load_code || successModal.txData?.loadCode || '*311*PIN#'}</Text>
-                                        <Text style={s.vDenomTxt}>{successModal.txData?.denomination || '₦100'}</Text>
-                                    </View>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </ScrollView>
 
                     </View>
@@ -1183,8 +1263,8 @@ const s = StyleSheet.create({
         gap: 6,
         marginBottom: 10
     },
-    downloadPdfBtn: {
-        flex: 1.5,
+    downloadPngBtn: {
+        flex: 1,
         height: 36,
         backgroundColor: T.gold,
         borderRadius: 8,
@@ -1192,12 +1272,12 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center'
     },
-    downloadPdfBtnTxt: {
+    downloadPngBtnTxt: {
         color: T.navy,
         fontWeight: '900',
         fontSize: 12
     },
-    printCardsBtn: {
+    downloadPdfBtn: {
         flex: 1,
         height: 36,
         backgroundColor: T.white,
@@ -1208,13 +1288,13 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center'
     },
-    printCardsBtnTxt: {
+    downloadPdfBtnTxt: {
         color: T.navy,
         fontWeight: '800',
         fontSize: 12
     },
     buyMoreBtn: {
-        flex: 0.8,
+        flex: 0.7,
         height: 36,
         backgroundColor: T.white,
         borderRadius: 8,
@@ -1287,17 +1367,16 @@ const s = StyleSheet.create({
         marginVertical: 1
     },
     vLogoBox: {
-        width: 30,
-        height: 30,
-        backgroundColor: '#ffcc00',
-        borderRadius: 4,
+        width: 34,
+        height: 34,
+        borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
         marginLeft: 4
     },
     vLogoImg: {
-        width: 24,
-        height: 24
+        width: 26,
+        height: 26
     },
     vFooterRow: {
         flexDirection: 'row',
