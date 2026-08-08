@@ -370,7 +370,74 @@ Deno.serve(async (req: Request) => {
             console.log(`[Bills] Provider Result: ${JSON.stringify(result)}`);
 
             if (result && (result.status === 'ORDER_RECEIVED' || result.status === 'ORDER_COMPLETED' || result.status === 'SUCCESS')) {
-                // All good
+                // All good - save to history tables for recharge pin purchases
+                if (type === 'recharge_pin_purchase') {
+                    const txId = result.orderid || requestId;
+                    const pinsList = result.pins || [];
+                    const planId = providerParams.planId || 1;
+                    const qty = providerParams.quantity || 1;
+                    const bName = providerParams.businessName || 'ABU MAFHAL VTU';
+                    
+                    // Determine network and denomination from planId
+                    const pinPlanInfo: Record<number, { network: string; denom: string; size: string }> = {
+                        1: { network: 'MTN', denom: '₦100', size: '100' },
+                        2: { network: 'MTN', denom: '₦200', size: '200' },
+                        3: { network: 'MTN', denom: '₦500', size: '500' },
+                        4: { network: 'MTN', denom: '₦1,000', size: '1000' }
+                    };
+                    const planInfo = pinPlanInfo[Number(planId)] || { network: 'MTN', denom: '₦100', size: '100' };
+
+                    // Save to wallet_transactions (main history)
+                    try {
+                        await rpcClient.from('wallet_transactions').insert({
+                            user_id: userId,
+                            type: 'debit',
+                            amount: amountToCharge,
+                            status: 'completed',
+                            reference: txId,
+                            description: `${planInfo.network} ${planInfo.denom} Recharge PIN x${qty} - ${bName}`
+                        });
+                    } catch (histErr) {
+                        console.warn('[Bills] wallet_transactions insert note:', histErr);
+                    }
+
+                    // Save to recharge_pins table (pin-specific history)
+                    try {
+                        await rpcClient.from('recharge_pins').insert({
+                            user_id: userId,
+                            transaction_id: txId,
+                            network: planInfo.network,
+                            denomination: planInfo.denom,
+                            amount: amountToCharge,
+                            quantity: Number(qty),
+                            business_name: bName,
+                            pins: pinsList,
+                            load_code: pinsList[0]?.load_code || '*311*PIN#',
+                            created_at: new Date().toISOString()
+                        });
+                    } catch (pinErr) {
+                        console.warn('[Bills] recharge_pins insert note:', pinErr);
+                    }
+
+                    // Return full data including pins to frontend
+                    return new Response(JSON.stringify({
+                        success: true,
+                        data: {
+                            transaction_id: txId,
+                            orderid: txId,
+                            pins: pinsList,
+                            load_code: pinsList[0]?.load_code || '*311*PIN#',
+                            network: planInfo.network,
+                            denomination: planInfo.denom,
+                            quantity: Number(qty),
+                            business_name: bName
+                        },
+                        requestId
+                    }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        status: 200
+                    });
+                }
             } else {
                  throw new Error(result?.message || result?.status || "Provider API Failure");
             }

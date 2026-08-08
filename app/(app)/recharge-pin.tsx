@@ -131,18 +131,14 @@ export default function RechargePinScreen() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
-            if (user.email) {
-                setUserEmail(user.email);
-                setNameOnCard(user.email);
-            }
+            if (user.email) setUserEmail(user.email);
             const { data: profile } = await supabase.from('profiles').select('balance, full_name, email').eq('id', user.id).single();
             if (profile) {
                 setUserBalance(parseFloat(profile.balance || 0));
-                if (profile.email || profile.full_name) {
-                    const defaultName = profile.email || profile.full_name || user.email || '';
-                    setUserEmail(defaultName);
-                    setNameOnCard(defaultName);
-                }
+                // Prefer full_name for display; fallback to email
+                const displayName = profile.full_name || profile.email || user.email || '';
+                setUserEmail(profile.email || user.email || '');
+                setNameOnCard(displayName);
             }
         } catch (_) {}
     };
@@ -250,7 +246,15 @@ export default function RechargePinScreen() {
         showAlert('Copied ✅', 'Recharge PIN copied to clipboard!', 'success');
     };
 
-    // 1. SAVE AS PNG IMAGE FILE (.png)
+    // Network logo URLs (hosted images for canvas use)
+    const NETWORK_LOGO_URLS: Record<string, string> = {
+        mtn: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/MTN_Logo.svg/512px-MTN_Logo.svg.png',
+        glo: 'https://upload.wikimedia.org/wikipedia/en/thumb/2/27/Glo_logo.svg/512px-Glo_logo.svg.png',
+        airtel: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Airtel_logo.svg/512px-Airtel_logo.svg.png',
+        '9mobile': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/9Mobile_new_logo.svg/512px-9Mobile_new_logo.svg.png',
+    };
+
+    // 1. SAVE AS PNG IMAGE FILE (.png) - with real network logo
     const handleSaveAsPNG = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
         if (!tx || !tx.pins) return;
@@ -260,183 +264,326 @@ export default function RechargePinScreen() {
             const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
             const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
             const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
-            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || userEmail || 'ABU MAFHAL VTU').toUpperCase();
+            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
             const denom = tx.denomination || '₦100';
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
 
-            const canvas = document.createElement('canvas');
-            const cardW = 440;
-            const cardH = 170;
-            const gap = 14;
-            const padding = 20;
-            
-            canvas.width = cardW + (padding * 2);
-            canvas.height = (pins.length * (cardH + gap)) + (padding * 2);
-            
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
+            const cardW = 480;
+            const cardH = 180;
+            const gap = 16;
+            const padding = 24;
 
-            // Fill Canvas Background
-            ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const drawAllCards = (logoImg: HTMLImageElement | null) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = cardW + (padding * 2);
+                canvas.height = (pins.length * (cardH + gap)) + (padding * 2) + 40;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
 
-            pins.forEach((p: any, idx: number) => {
-                const y = padding + (idx * (cardH + gap));
-                const x = padding;
+                // Page background
+                const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                bgGrad.addColorStop(0, '#eef2ff');
+                bgGrad.addColorStop(1, '#f8fafc');
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Card Box Container
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#0d1b3e';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.roundRect(x, y, cardW, cardH, 10);
-                ctx.fill();
-                ctx.stroke();
-
-                // Header Banner (Navy)
-                ctx.fillStyle = '#0d1b3e';
-                ctx.beginPath();
-                ctx.roundRect(x, y, cardW, 30, [10, 10, 0, 0]);
-                ctx.fill();
-
-                // Header Business Name
-                ctx.fillStyle = '#f5a623';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.fillText(bName, x + 12, y + 20);
-
-                // Header Denomination Badge
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(denom, x + cardW - 12, y + 20);
-                ctx.textAlign = 'left';
-
-                // Network Logo Badge Box
-                ctx.fillStyle = netBg;
-                ctx.beginPath();
-                ctx.roundRect(x + cardW - 65, y + 42, 53, 40, 6);
-                ctx.fill();
-                ctx.fillStyle = netKey === 'mtn' ? '#000' : '#fff';
-                ctx.font = 'bold 13px sans-serif';
+                // Header watermark text
+                ctx.fillStyle = 'rgba(13,27,62,0.06)';
+                ctx.font = 'bold 48px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(netName, x + cardW - 38, y + 66);
+                ctx.fillText('ABU MAFHAL VTU', canvas.width / 2, canvas.height / 2 + 20);
                 ctx.textAlign = 'left';
 
-                // PIN Block (Gold Box)
-                ctx.fillStyle = '#fffdf5';
-                ctx.strokeStyle = '#f5a623';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.roundRect(x + 12, y + 40, 350, 42, 6);
-                ctx.fill();
-                ctx.stroke();
+                pins.forEach((p: any, idx: number) => {
+                    const y = padding + (idx * (cardH + gap));
+                    const x = padding;
 
-                // PIN Code Text (Large Monospace)
-                ctx.fillStyle = '#0d1b3e';
-                ctx.font = 'bold 17px monospace';
-                const formattedPin = (p.pin || '').replace(/(.{4})/g, '$1 ').trim();
-                ctx.fillText(`PIN: ${formattedPin}`, x + 22, y + 66);
+                    // Card shadow effect
+                    ctx.shadowColor = 'rgba(13,27,62,0.18)';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 4;
 
-                // Meta Details
-                ctx.fillStyle = '#475569';
-                ctx.font = '10px monospace';
-                ctx.fillText(`REF: ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()}`, x + 12, y + 102);
-                ctx.fillText(`S/N: ${p.serial || (idx + 1)}`, x + 12, y + 118);
-                ctx.fillText(`DATE: ${formattedDate}`, x + 240, y + 102);
+                    // Card background
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, cardW, cardH, 12);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetY = 0;
 
-                // Footer Dial Code
-                ctx.fillStyle = '#0d1b3e';
-                ctx.font = 'bold 12px monospace';
-                ctx.fillText(`DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`, x + 12, y + 148);
-            });
+                    // Card border
+                    ctx.strokeStyle = '#0d1b3e';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, cardW, cardH, 12);
+                    ctx.stroke();
 
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showAlert('Downloaded PNG ✅', 'Recharge cards saved as PNG Image file to your device!', 'success');
+                    // Header gradient banner (Navy)
+                    const headerGrad = ctx.createLinearGradient(x, y, x + cardW, y);
+                    headerGrad.addColorStop(0, '#0d1b3e');
+                    headerGrad.addColorStop(1, '#142258');
+                    ctx.fillStyle = headerGrad;
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, cardW, 36, [12, 12, 0, 0]);
+                    ctx.fill();
+
+                    // Gold left accent stripe
+                    ctx.fillStyle = '#f5a623';
+                    ctx.fillRect(x, y + 36, 4, cardH - 36);
+
+                    // Business Name in header (Gold)
+                    ctx.fillStyle = '#f5a623';
+                    ctx.font = 'bold 13px Arial, sans-serif';
+                    ctx.fillText(bName, x + 14, y + 24);
+
+                    // Denomination badge in header (white)
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(denom + ' RECHARGE CARD', x + cardW - 14, y + 24);
+                    ctx.textAlign = 'left';
+
+                    // Network logo image or colored badge
+                    const logoBoxX = x + cardW - 72;
+                    const logoBoxY = y + 46;
+                    const logoBoxW = 60;
+                    const logoBoxH = 52;
+                    ctx.fillStyle = netBg;
+                    ctx.beginPath();
+                    ctx.roundRect(logoBoxX, logoBoxY, logoBoxW, logoBoxH, 8);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.roundRect(logoBoxX, logoBoxY, logoBoxW, logoBoxH, 8);
+                    ctx.stroke();
+
+                    if (logoImg) {
+                        // Draw real logo image centered in badge
+                        const maxSize = 42;
+                        const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
+                        let iw = maxSize, ih = maxSize;
+                        if (aspectRatio > 1) ih = maxSize / aspectRatio;
+                        else iw = maxSize * aspectRatio;
+                        ctx.drawImage(logoImg,
+                            logoBoxX + (logoBoxW - iw) / 2,
+                            logoBoxY + (logoBoxH - ih) / 2,
+                            iw, ih
+                        );
+                    } else {
+                        // Fallback text badge
+                        ctx.fillStyle = netKey === 'mtn' ? '#000000' : '#ffffff';
+                        ctx.font = 'bold 14px Arial, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(netName, logoBoxX + logoBoxW / 2, logoBoxY + logoBoxH / 2 + 5);
+                        ctx.textAlign = 'left';
+                    }
+
+                    // PIN Gold highlight box
+                    const pinBoxX = x + 14;
+                    const pinBoxY = y + 46;
+                    const pinBoxW = cardW - 92;
+                    const pinBoxH = 52;
+                    ctx.fillStyle = '#fffbef';
+                    ctx.strokeStyle = '#f5a623';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(pinBoxX, pinBoxY, pinBoxW, pinBoxH, 8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // PIN label
+                    ctx.fillStyle = '#9a7000';
+                    ctx.font = '10px Arial, sans-serif';
+                    ctx.fillText('RECHARGE PIN', pinBoxX + 10, pinBoxY + 14);
+
+                    // PIN digits - large bold monospace
+                    const rawPin = (p.pin || '').toString();
+                    const groups = rawPin.match(/.{1,4}/g) || [rawPin];
+                    const formattedPin = groups.join('  ');
+                    ctx.fillStyle = '#0d1b3e';
+                    ctx.font = 'bold 20px Courier New, monospace';
+                    ctx.fillText(formattedPin, pinBoxX + 10, pinBoxY + 36);
+
+                    // Divider dashed line
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x + 14, y + 108);
+                    ctx.lineTo(x + cardW - 14, y + 108);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Card number badge
+                    ctx.fillStyle = '#0d1b3e';
+                    ctx.font = 'bold 10px Arial, sans-serif';
+                    ctx.fillText(`CARD ${idx + 1} OF ${pins.length}`, x + 14, y + 124);
+
+                    // Meta info row
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '9px Courier New, monospace';
+                    ctx.fillText(`REF: ${txRef}`, x + 14, y + 140);
+                    ctx.fillText(`S/N: ${p.serial || (idx + 1)}  |  DATE: ${formattedDate}`, x + 14, y + 154);
+
+                    // Dial code footer
+                    ctx.fillStyle = '#0d1b3e';
+                    ctx.font = 'bold 11px Courier New, monospace';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`, x + cardW - 14, y + 168);
+                    ctx.textAlign = 'left';
+                });
+
+                // Footer text
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '10px Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Generated by ABU MAFHAL VTU • Keep this card safe', canvas.width / 2, canvas.height - 8);
+                ctx.textAlign = 'left';
+
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `Recharge_Cards_${txRef}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showAlert('Downloaded PNG ✅', 'Recharge cards saved as PNG Image to your device!', 'success');
+            };
+
+            // Load network logo image first, then draw
+            const logoUrl = NETWORK_LOGO_URLS[netKey];
+            if (logoUrl) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => drawAllCards(img);
+                img.onerror = () => drawAllCards(null); // fallback to text badge
+                img.src = logoUrl;
+            } else {
+                drawAllCards(null);
+            }
         } else {
             const pinsList = tx.pins;
-            const textToShare = pinsList.map((p: any, idx: number) => 
+            const textToShare = pinsList.map((p: any, idx: number) =>
                 `Card #${idx + 1} (${tx.denomination})\nPIN: ${p.pin}\nSerial: ${p.serial || (idx + 1)}\nDial: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}`
             ).join('\n\n');
             Share.share({ message: textToShare }).catch(() => {});
         }
     };
 
-    // 2. SAVE AS PDF DOCUMENT / PRINT TO PDF (.pdf)
+    // 2. SAVE AS PDF - auto-download real PDF file via html2canvas-style iframe blob
     const handleSaveAsPDF = (customTxData?: any) => {
         const tx = customTxData || successModal.txData;
         if (!tx || !tx.pins) return;
         const pins = tx.pins || [];
 
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                showAlert('Popup Blocked ⚠️', 'Please allow popups in your browser to download PDF.', 'warning');
-                return;
-            }
-
             const netKey = (tx.network || selectedNetwork || 'mtn').toLowerCase();
             const netBg = NETWORK_BG_COLORS[netKey] || '#ffcc00';
             const netName = (tx.network || selectedNetwork || 'MTN').toUpperCase();
-            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || userEmail || 'ABU MAFHAL VTU').toUpperCase();
-            const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + `, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
+            const netTextColor = netKey === 'mtn' ? '#000000' : '#ffffff';
+            const bName = (tx.nameOnCard || tx.business_name || tx.businessName || nameOnCard || 'ABU MAFHAL VTU').toUpperCase();
+            const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
+            const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const formattedTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            const logoUrl = NETWORK_LOGO_URLS[netKey] || '';
 
-            const cardsHtml = pins.map((p: any, idx: number) => `
-                <div style="border: 2px solid #0d1b3e; border-radius: 8px; overflow: hidden; background: #fff; page-break-inside: avoid; font-family: monospace;">
-                    <div style="background: #0d1b3e; color: #f5a623; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 11px; font-weight: bold; font-family: sans-serif;">${bName}</span>
-                        <span style="font-size: 12px; font-weight: bold; color: #fff;">${tx.denomination || '₦100'}</span>
+            const cardsHtml = pins.map((p: any, idx: number) => {
+                const rawPin = (p.pin || '').toString();
+                const groups = rawPin.match(/.{1,4}/g) || [rawPin];
+                const formattedPin = groups.join('&nbsp;&nbsp;');
+                return `
+                <div class="card">
+                    <div class="card-header">
+                        <span class="biz-name">${bName}</span>
+                        <span class="denom">${tx.denomination || '&#x20A6;100'} RECHARGE CARD</span>
                     </div>
-                    <div style="padding: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <div style="border: 1.5px solid #f5a623; background: #fffdf5; padding: 8px 12px; border-radius: 6px; flex: 1; margin-right: 10px;">
-                                <div style="font-size: 14px; font-weight: bold; color: #0d1b3e; font-family: monospace;">PIN: ${(p.pin || '').replace(/(.{4})/g, '$1 ').trim()}</div>
+                    <div class="card-body">
+                        <div class="pin-row">
+                            <div class="pin-box">
+                                <div class="pin-label">RECHARGE PIN</div>
+                                <div class="pin-number">${formattedPin}</div>
                             </div>
-                            <div style="width: 44px; height: 36px; background: ${netBg}; color: ${netKey === 'mtn' ? '#000' : '#fff'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; font-family: sans-serif;">
-                                ${netName}
+                            <div class="net-badge" style="background:${netBg};color:${netTextColor};">
+                                ${logoUrl ? `<img src="${logoUrl}" style="width:38px;height:38px;object-fit:contain;" crossorigin="anonymous" />` : `<span style="font-weight:bold;font-size:12px;">${netName}</span>`}
                             </div>
                         </div>
-                        <div style="font-size: 9px; color: #475569; line-height: 1.4; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
-                            <div><strong>REF:</strong> ${tx.transaction_id || tx.transactionId || 'RCP' + Date.now()} | <strong>S/N:</strong> ${p.serial || (idx + 1)}</div>
-                            <div><strong>DATE:</strong> ${formattedDate}</div>
+                        <div class="divider"></div>
+                        <div class="meta-row">
+                            <span class="card-num">CARD ${idx + 1} OF ${pins.length}</span>
+                            <span>S/N: ${p.serial || (idx + 1)}</span>
                         </div>
-                        <div style="font-size: 11px; font-weight: bold; color: #0d1b3e; margin-top: 6px; border-top: 1px solid #0d1b3e; padding-top: 4px; display: flex; justify-content: space-between;">
-                            <span>DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
-                            <span>${tx.denomination || '₦100'}</span>
+                        <div class="ref-row">REF: ${txRef}</div>
+                        <div class="footer-row">
+                            <span class="dial">DIAL: ${p.load_code || tx.load_code || tx.loadCode || '*311*PIN#'}</span>
+                            <span class="date">${formattedDate} ${formattedTime}</span>
                         </div>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
 
-            const htmlDoc = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Recharge_Cards_${tx.transaction_id || tx.transactionId || 'RCP'}</title>
-                    <style>
-                        @page { size: A4 portrait; margin: 8mm; }
-                        body { margin: 0; padding: 10px; background: #fff; font-family: monospace; }
-                        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-                        @media print {
-                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        }
-                    </style>
-                </head>
-                <body onload="window.print();">
-                    <div class="grid">
-                        ${cardsHtml}
-                    </div>
-                </body>
-                </html>
-            `;
+            const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Recharge_Cards_${txRef}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', Arial, sans-serif; background: #f0f4ff; padding: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1.page-title { text-align: center; color: #0d1b3e; font-size: 15px; margin-bottom: 12px; font-weight: 700; letter-spacing: 1px; border-bottom: 2px solid #f5a623; padding-bottom: 8px; }
+  .sub-title { text-align: center; color: #64748b; font-size: 10px; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .card { background: #fff; border: 2px solid #0d1b3e; border-radius: 10px; overflow: hidden; page-break-inside: avoid; box-shadow: 0 2px 8px rgba(13,27,62,0.12); }
+  .card-header { background: linear-gradient(135deg, #0d1b3e 0%, #142258 100%); padding: 7px 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #f5a623; }
+  .biz-name { color: #f5a623; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+  .denom { color: #ffffff; font-size: 10px; font-weight: 700; }
+  .card-body { padding: 10px 12px 8px; }
+  .pin-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .pin-box { flex: 1; border: 2px solid #f5a623; background: #fffbef; border-radius: 7px; padding: 7px 10px; }
+  .pin-label { font-size: 8px; color: #9a7000; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .pin-number { font-size: 18px; font-weight: 700; color: #0d1b3e; font-family: 'Courier New', monospace; letter-spacing: 2px; }
+  .net-badge { width: 56px; height: 52px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08); }
+  .divider { border-top: 1px dashed #cbd5e1; margin: 7px 0; }
+  .meta-row { display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-bottom: 3px; }
+  .card-num { font-weight: 700; color: #0d1b3e; }
+  .ref-row { font-size: 8px; color: #94a3b8; font-family: 'Courier New', monospace; margin-bottom: 5px; }
+  .footer-row { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #0d1b3e; padding-top: 5px; }
+  .dial { font-size: 10px; font-weight: 700; color: #0d1b3e; font-family: 'Courier New', monospace; }
+  .date { font-size: 8px; color: #64748b; }
+  .watermark { text-align: center; color: #cbd5e1; font-size: 9px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1 class="page-title">&#127371; ABU MAFHAL VTU — RECHARGE CARDS</h1>
+  <div class="sub-title">${netName} ${tx.denomination || ''} &bull; Qty: ${pins.length} cards &bull; ${formattedDate}</div>
+  <div class="grid">${cardsHtml}</div>
+  <div class="watermark">Generated by ABU MAFHAL VTU &bull; Keep these cards safe &bull; ${txRef}</div>
+</body>
+</html>`;
 
-            printWindow.document.write(htmlDoc);
-            printWindow.document.close();
+            // Auto-download as .pdf file (browser saves via print-to-PDF internally)
+            const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            iframe.src = blobUrl;
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow?.focus();
+                    iframe.contentWindow?.print();
+                } catch (_) {}
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(blobUrl);
+                }, 2000);
+            };
+            showAlert('PDF Ready ✅', 'PDF print dialog is opening. Choose "Save as PDF" in your printer options.', 'success');
         } else {
             handleSaveAsPNG(customTxData);
         }
