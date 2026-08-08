@@ -75,4 +75,42 @@ export class BigiClient {
             throw new Error(data.message || 'Failed to buy data via Bigi');
         }
     }
+
+    async getRechargePinPlans() {
+        const res = await fetch(`${this.baseUrl}/vtu/recharge-pin/plans/`, {
+            headers: {
+                'Authorization': `Token ${this.token}`,
+                'Accept': 'application/json'
+            }
+        });
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.data)) {
+            return data.data;
+        }
+        throw new Error(data.message || 'Failed to fetch recharge pin plans');
+    }
+
+    async buyRechargePin(planId: string | number, quantity: number, businessName: string, requestId: string) {
+        const res = await fetch(`${this.baseUrl}/vtu/recharge-pin/purchase/`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                plan: typeof planId === 'number' ? planId : parseInt(planId, 10),
+                quantity: quantity,
+                business_name: businessName || 'ABU MAFHAL VTU',
+                pin: this.pin
+            })
+        });
+        const data = await res.json();
+        if (data && (data.success || res.status === 201)) {
+            return {
+                status: 'ORDER_COMPLETED',
+                orderid: data.data?.transaction_id || requestId,
+                data: data.data || data,
+                pins: data.data?.pins || (data.data?.pin ? [{ pin: data.data.pin, serial: data.data.serial || '1' }] : [])
+            };
+        } else {
+            throw new Error(data.message || data.detail || data.error || 'Failed to purchase recharge pin via Bigi');
+        }
+    }
 }

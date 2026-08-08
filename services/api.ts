@@ -227,6 +227,28 @@ export const api = {
 
     rechargePin: {
         getPlans: async () => {
+        getPlans: async () => {
+            // 1. Try bills-payment edge function
+            try {
+                const { data, error } = await supabase.functions.invoke('bills-payment', {
+                    body: { type: 'recharge_pin_plans' }
+                });
+                if (!error && data?.success && Array.isArray(data.data)) {
+                    return data.data.map((p: any) => ({
+                        id: p.id,
+                        network: p.network,
+                        networkName: (p.network_name || '').toLowerCase(),
+                        size: p.size,
+                        denomination: `₦${p.size}`,
+                        regularPrice: p.regular_price || p.corporate_price || parseFloat(p.size),
+                        corporatePrice: p.corporate_price || p.regular_price || parseFloat(p.size),
+                        price: p.regular_price || p.corporate_price || parseFloat(p.size),
+                        info: p.info || ''
+                    }));
+                }
+            } catch (_) {}
+
+            // 2. Try recharge-pin edge function
             try {
                 const { data, error } = await supabase.functions.invoke('recharge-pin', {
                     body: { action: 'get-plans' }
@@ -236,30 +258,13 @@ export const api = {
                 }
             } catch (_) {}
 
-            const { data: secrets } = await supabase.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
-            const token = secrets?.value || '';
-
-            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/plans/', {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Accept': 'application/json'
-                }
-            });
-            const json = await res.json();
-            if (json.success && Array.isArray(json.data)) {
-                return json.data.map((p: any) => ({
-                    id: p.id,
-                    network: p.network,
-                    networkName: (p.network_name || '').toLowerCase(),
-                    size: p.size,
-                    denomination: `₦${p.size}`,
-                    regularPrice: p.regular_price || p.corporate_price || parseFloat(p.size),
-                    corporatePrice: p.corporate_price || p.regular_price || parseFloat(p.size),
-                    price: p.regular_price || p.corporate_price || parseFloat(p.size),
-                    info: p.info || ''
-                }));
-            }
-            throw new Error(json.message || 'Failed to fetch recharge pin plans');
+            // Default fallback plans
+            return [
+                { id: 1, network: 1, networkName: 'mtn', size: '100', denomination: '₦100', price: 98.9, regularPrice: 98.9 },
+                { id: 2, network: 1, networkName: 'mtn', size: '200', denomination: '₦200', price: 197.8, regularPrice: 197.8 },
+                { id: 3, network: 1, networkName: 'mtn', size: '500', denomination: '₦500', price: 494.5, regularPrice: 494.5 },
+                { id: 4, network: 1, networkName: 'mtn', size: '1000', denomination: '₦1,000', price: 989, regularPrice: 989 }
+            ];
         },
 
         getHistory: async () => {
@@ -285,7 +290,36 @@ export const api = {
                 validPlanId = planMap[validPlanId] || 1;
             }
 
-            // 1. Try Supabase Edge Function first
+            // 1. Try bills-payment Edge Function first (which is deployed and active)
+            try {
+                const { data, error } = await supabase.functions.invoke('bills-payment', {
+                    body: {
+                        type: 'recharge_pin_purchase',
+                        planId: validPlanId,
+                        quantity: params.quantity,
+                        businessName: params.businessName
+                    }
+                });
+
+                if (!error && data && data.success !== false) {
+                    const resData = data.data || data;
+                    const pinsList = resData.pins || (resData.pin ? [{ pin: resData.pin, serial: resData.serial || '1' }] : []);
+                    return {
+                        transactionId: resData.orderid || resData.transaction_id || ('RCP' + Date.now().toString(36).toUpperCase()),
+                        pins: pinsList,
+                        loadCode: resData.load_code || '*311*PIN#'
+                    };
+                }
+                if (data && data.error && !error) {
+                    throw new Error(data.error);
+                }
+            } catch (err: any) {
+                if (err.message && !err.message.includes('Edge Function') && !err.message.includes('Failed to send') && !err.message.includes('FunctionsFetchError')) {
+                    throw err;
+                }
+            }
+
+            // 2. Try recharge-pin Edge Function next
             try {
                 const { data, error } = await supabase.functions.invoke('recharge-pin', {
                     body: {
@@ -302,109 +336,13 @@ export const api = {
                 if (data && data.error && !error) {
                     throw new Error(data.error);
                 }
-            } catch (edgeErr: any) {
-                if (edgeErr.message && !edgeErr.message.includes('Edge Function') && !edgeErr.message.includes('Failed to send') && !edgeErr.message.includes('FunctionsFetchError')) {
-                    throw edgeErr;
+            } catch (err: any) {
+                if (err.message && !err.message.includes('Edge Function') && !err.message.includes('Failed to send') && !err.message.includes('FunctionsFetchError')) {
+                    throw err;
                 }
             }
 
-            // 2. Client-side Fail-Safe Purchase Execution (if Edge Function is not deployed)
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                throw new Error('Please log in to complete recharge pin purchase');
-            }
-
-            const qty = Math.max(1, params.quantity || 1);
-
-            // Fetch user profile and check balance
-            const { data: profile, error: profErr } = await supabase
-                .from('profiles')
-                .select('balance, full_name, email')
-                .eq('id', user.id)
-                .single();
-
-            if (profErr || !profile) {
-                throw new Error('User profile not found');
-            }
-
-            // Fetch secrets dynamically
-            const { data: secrets } = await supabase.from('system_secrets').select('key, value').in('key', ['BIGI_API_TOKEN', 'BIGI_API_PIN']);
-            const secretMap = new Map(secrets?.map((s: any) => [s.key, s.value]) || []);
-            const token = secretMap.get('BIGI_API_TOKEN') || '1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e';
-            const pin = secretMap.get('BIGI_API_PIN') || '0018';
-
-            const priceMap: Record<number, { denom: string; net: string; price: number }> = {
-                1: { denom: '₦100', net: 'MTN', price: 98.9 },
-                2: { denom: '₦200', net: 'MTN', price: 197.8 },
-                3: { denom: '₦500', net: 'MTN', price: 494.5 },
-                4: { denom: '₦1,000', net: 'MTN', price: 989 }
-            };
-            const planInfo = priceMap[validPlanId as number] || { denom: '₦100', net: 'MTN', price: 98.9 };
-            const totalCost = Math.round(planInfo.price * qty * 10) / 10;
-            const currentBal = parseFloat(profile.balance || 0);
-
-            if (currentBal < totalCost) {
-                throw new Error(`Insufficient wallet balance. Total cost is ₦${totalCost.toFixed(2)}, but your balance is ₦${currentBal.toFixed(2)}.`);
-            }
-
-            // Execute real live purchase API call to Bigi API
-            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/purchase/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token.trim()}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    plan: validPlanId,
-                    quantity: qty,
-                    business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
-                    pin: pin.trim()
-                })
-            });
-
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || json.success === false) {
-                throw new Error(json.message || json.detail || json.error || 'Recharge pin purchase failed at provider');
-            }
-
-            const pData = json.data || json;
-            const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);
-
-            if (!pinsList || pinsList.length === 0) {
-                throw new Error('No valid PIN returned from provider. Purchase was cancelled.');
-            }
-
-            // Deduct balance and record transaction
-            const newBal = Math.max(0, currentBal - totalCost);
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', user.id);
-
-            const txId = 'RCP' + Date.now().toString(36).toUpperCase();
-
-            try {
-                await supabase.from('recharge_pins').insert({
-                    user_id: user.id,
-                    transaction_id: txId,
-                    network: planInfo.net,
-                    denomination: planInfo.denom,
-                    amount: totalCost,
-                    quantity: qty,
-                    business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
-                    pins: pinsList,
-                    load_code: pData.load_code || '*311*PIN#'
-                });
-            } catch (_) {}
-
-            return {
-                transactionId: txId,
-                network: planInfo.net,
-                denomination: planInfo.denom,
-                quantity: qty,
-                totalCost: totalCost,
-                businessName: params.businessName || profile.email || 'ABU MAFHAL VTU',
-                pins: pinsList,
-                loadCode: pData.load_code || '*311*PIN#',
-                newBalance: newBal
-            };
+            throw new Error('Recharge Pin service provider is currently busy. Please try again in a moment.');
         }
     },
 

@@ -336,6 +336,24 @@ Deno.serve(async (req: Request) => {
                 result = await client.buySmile(providerParams.network as string, providerParams.planId as string, providerParams.phone as string, requestId);
             } else if (type === 'education') {
                 result = await client.buyEPin(providerParams.examType as string, providerParams.phone as string, requestId, providerParams.profileId as string);
+            } else if (type === 'recharge_pin_purchase') {
+                if (bigiToken && bigiPin) {
+                    const bigiClient = new BigiClient(bigiToken, bigiPin);
+                    result = await bigiClient.buyRechargePin(providerParams.planId || 1, providerParams.quantity || 1, providerParams.businessName || 'ABU MAFHAL VTU', requestId);
+                } else {
+                    throw new Error("Bigi API credentials not configured for recharge pins");
+                }
+            } else if (type === 'recharge_pin_plans') {
+                if (bigiToken && bigiPin) {
+                    const bigiClient = new BigiClient(bigiToken, bigiPin);
+                    const plansData = await bigiClient.getRechargePinPlans();
+                    return new Response(JSON.stringify({ success: true, data: plansData }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        status: 200
+                    });
+                } else {
+                    throw new Error("Bigi API credentials not configured");
+                }
             } else {
                 throw new Error("Invalid service type reached execution");
             }
