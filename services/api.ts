@@ -372,17 +372,19 @@ export const api = {
             const txId = 'RCP' + Date.now().toString(36).toUpperCase();
             const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);
 
-            await supabase.from('recharge_pins').insert({
-                user_id: user.id,
-                transaction_id: txId,
-                network: planInfo.net,
-                denomination: planInfo.denom,
-                amount: totalCost,
-                quantity: qty,
-                business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
-                pins: pinsList,
-                load_code: pData.load_code || '*311*PIN#'
-            }).catch(() => {});
+            try {
+                await supabase.from('recharge_pins').insert({
+                    user_id: user.id,
+                    transaction_id: txId,
+                    network: planInfo.net,
+                    denomination: planInfo.denom,
+                    amount: totalCost,
+                    quantity: qty,
+                    business_name: params.businessName || profile.email || 'ABU MAFHAL VTU',
+                    pins: pinsList,
+                    load_code: pData.load_code || '*311*PIN#'
+                });
+            } catch (_) {}
 
             return {
                 transactionId: txId,

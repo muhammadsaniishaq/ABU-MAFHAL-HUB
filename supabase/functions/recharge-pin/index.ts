@@ -158,17 +158,19 @@ Deno.serve(async (req) => {
             const pinsList = pData.pins || (pData.pin ? [{ pin: pData.pin, serial: pData.serial || '1' }] : []);
 
             const txId = 'RCP' + Date.now().toString(36).toUpperCase();
-            await supabaseAdmin.from('recharge_pins').insert({
-                user_id: user.id,
-                transaction_id: txId,
-                network: targetPlan.network_name?.toUpperCase() || 'MTN',
-                denomination: `₦${targetPlan.size || '100'}`,
-                amount: totalCost,
-                quantity: qty,
-                business_name: businessName || 'ABU MAFHAL VTU',
-                pins: pinsList,
-                load_code: pData.load_code || '*311*PIN#'
-            }).catch(() => {});
+            try {
+                await supabaseAdmin.from('recharge_pins').insert({
+                    user_id: user.id,
+                    transaction_id: txId,
+                    network: targetPlan.network_name?.toUpperCase() || 'MTN',
+                    denomination: `₦${targetPlan.size || '100'}`,
+                    amount: totalCost,
+                    quantity: qty,
+                    business_name: businessName || 'ABU MAFHAL VTU',
+                    pins: pinsList,
+                    load_code: pData.load_code || '*311*PIN#'
+                });
+            } catch (_) {}
 
             return new Response(JSON.stringify({
                 success: true,
