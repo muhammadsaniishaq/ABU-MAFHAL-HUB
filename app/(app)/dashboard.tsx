@@ -286,6 +286,7 @@ export default function Dashboard() {
 
   const allActions = [
     { icon: 'phone-portrait-outline', label: 'Airtime',      color: '#f97316', route: '/airtime' },
+    { icon: 'key-outline',            label: 'Recharge PIN', color: '#10b981', route: '/recharge-pin' },
     { icon: 'cash-outline',           label: 'Airtime ➔ Cash', color: '#16a34a', route: '/airtime-to-cash' },
     { icon: 'wifi-outline',           label: 'Data',         color: '#22c55e', route: '/data' },
     { icon: 'chevron-forward',        label: 'Transfer',     color: '#2563eb', route: '/transfer' },

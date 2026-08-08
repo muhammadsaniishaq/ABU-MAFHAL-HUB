@@ -225,6 +225,56 @@ export const api = {
         }
     },
 
+    rechargePin: {
+        getPlans: async () => {
+            try {
+                const { data, error } = await supabase.functions.invoke('recharge-pin', {
+                    body: { action: 'get-plans' }
+                });
+                if (!error && data?.success && Array.isArray(data.data)) {
+                    return data.data;
+                }
+            } catch (_) {}
+
+            const res = await fetch('https://api.bigisub.ng/api/v2/vtu/recharge-pin/plans/', {
+                headers: {
+                    'Authorization': 'Token 1a01da07f4ffc4dd87e1fa5908b096dc3be9ee0e',
+                    'Accept': 'application/json'
+                }
+            });
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+                return json.data.map((p: any) => ({
+                    id: p.id,
+                    network: p.network,
+                    networkName: (p.network_name || '').toLowerCase(),
+                    size: p.size,
+                    denomination: `₦${p.size}`,
+                    regularPrice: p.regular_price || p.corporate_price || parseFloat(p.size),
+                    corporatePrice: p.corporate_price || p.regular_price || parseFloat(p.size),
+                    price: p.regular_price || p.corporate_price || parseFloat(p.size),
+                    info: p.info || ''
+                }));
+            }
+            throw new Error('Failed to fetch recharge pin plans');
+        },
+
+        purchase: async (params: { planId: string | number; quantity: number; businessName?: string }) => {
+            const { data, error } = await supabase.functions.invoke('recharge-pin', {
+                body: {
+                    action: 'purchase',
+                    planId: params.planId,
+                    quantity: params.quantity,
+                    businessName: params.businessName
+                }
+            });
+
+            if (error) throw new Error(error.message || 'Recharge pin purchase failed');
+            if (data && data.success === false) throw new Error(data.error || 'Recharge pin purchase failed');
+            return data.data || data;
+        }
+    },
+
     smile: {
         getPackages: async () => {
             try {
