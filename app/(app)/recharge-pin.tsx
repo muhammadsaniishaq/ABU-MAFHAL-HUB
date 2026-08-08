@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -588,10 +588,10 @@ export default function RechargePinScreen() {
                 showAlert('Downloaded PNG \u2705', `${pins.length} card(s) saved as high-quality PNG (80x50mm format)!`, 'success');
             };
 
-            // Load inline SVG logo (no CORS)
+            // Load inline SVG logo (no CORS) - use document.createElement to avoid RN type conflict
             const svgLogoUrl = NET_SVG[netKey];
-            if (svgLogoUrl) {
-                const img = new Image();
+            if (svgLogoUrl && typeof document !== 'undefined') {
+                const img = document.createElement('img') as HTMLImageElement;
                 img.onload = () => drawAllCards(img);
                 img.onerror = () => drawAllCards(null);
                 img.src = svgLogoUrl;
