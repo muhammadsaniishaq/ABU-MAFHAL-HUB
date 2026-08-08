@@ -118,13 +118,19 @@ export default function RechargePinScreen() {
         loadHistory();
     }, []);
 
+    // Bluetooth searching state modal
+    const [btSearchingModal, setBtSearchingModal] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+    }>({
+        visible: false,
+        title: '',
+        message: ''
+    });
+
     const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'warning') => {
         setAlertModal({ visible: true, title, message, type });
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            try { window.alert(`${title}\n\n${message}`); } catch (_) {}
-        } else {
-            Alert.alert(title, message);
-        }
     };
 
     const fetchUserData = async () => {
@@ -279,7 +285,11 @@ export default function RechargePinScreen() {
         }
 
         try {
-            showAlert('Connecting... 🔵', 'Searching for paired Bluetooth printer...', 'warning');
+            setBtSearchingModal({
+                visible: true,
+                title: 'Bluetooth Scanner',
+                message: 'Auto-detecting active mini printer...'
+            });
             const bt = (navigator as any).bluetooth;
             let device: any = null;
 
@@ -288,26 +298,33 @@ export default function RechargePinScreen() {
                 try {
                     const pairedDevices = await bt.getDevices();
                     if (pairedDevices && pairedDevices.length > 0) {
-                        // Find first connected or available device
                         for (const dev of pairedDevices) {
                             if (dev.gatt) {
                                 try {
+                                    setBtSearchingModal({
+                                        visible: true,
+                                        title: 'Connecting Printer',
+                                        message: `Connecting to ${dev.name || 'mini printer'}...`
+                                    });
                                     if (!dev.gatt.connected) {
                                         await dev.gatt.connect();
                                     }
                                     device = dev;
                                     break;
-                                } catch (_) {
-                                    // Connection failed, try next paired device
-                                }
+                                } catch (_) {}
                             }
                         }
                     }
                 } catch (_) {}
             }
 
-            // 2. If no paired device connected automatically, prompt user to select printer
+            // 2. Prompt user to select printer if not auto-connected
             if (!device) {
+                setBtSearchingModal({
+                    visible: true,
+                    title: 'Select Printer',
+                    message: 'Please choose your mini Bluetooth printer...'
+                });
                 device = await bt.requestDevice({
                     filters: [
                         { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
@@ -422,12 +439,14 @@ export default function RechargePinScreen() {
             await characteristic.writeValue(new Uint8Array([LF, LF, LF]));
             await characteristic.writeValue(cutCmd);
 
-            showAlert('Printed! \u2705', `${pins.length} recharge card(s) sent to ${device.name || 'Bluetooth Printer'} successfully!`, 'success');
+            setBtSearchingModal({ visible: false, title: '', message: '' });
+            showAlert('Printed! ✅', `${pins.length} recharge card(s) sent to ${device.name || 'Bluetooth Printer'} successfully!`, 'success');
         } catch (err: any) {
+            setBtSearchingModal({ visible: false, title: '', message: '' });
             if (err.name === 'NotFoundError') {
                 showAlert('Cancelled', 'No printer was selected.', 'warning');
             } else {
-                showAlert('Bluetooth Error \u274C', err.message || 'Could not connect to printer. Make sure it is on and paired.', 'error');
+                showAlert('Bluetooth Error ❌', err.message || 'Could not connect to printer. Make sure it is turned on.', 'error');
             }
         }
     };
@@ -449,12 +468,12 @@ export default function RechargePinScreen() {
             const formattedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
             const txRef = tx.transaction_id || tx.transactionId || ('RCP' + Date.now());
 
-            // 80mm x 50mm @ 200 DPI = 630 x 394 px per card
-            const CW = 630, CH = 394;
-            const COLS = 2, GAP = 20, PAD = 24;
+            // 80mm x 50mm proportion (aspect ratio 1.6:1 -> 480px x 300px per card)
+            const CW = 480, CH = 300;
+            const COLS = 2, GAP = 16, PAD = 20;
             const rows = Math.ceil(pins.length / COLS);
             const canvasW = COLS * CW + (COLS - 1) * GAP + PAD * 2;
-            const canvasH = rows * CH + (rows - 1) * GAP + PAD * 2 + 32;
+            const canvasH = rows * CH + (rows - 1) * GAP + PAD * 2 + 28;
 
             const drawAllCards = (logoImg: HTMLImageElement | null) => {
                 const canvas = document.createElement('canvas');
@@ -1055,7 +1074,7 @@ export default function RechargePinScreen() {
 
             </ScrollView>
 
-            {/* INTERACTIVE ALERT POPUP MODAL */}
+            {/* MODERN DECORATED INTERACTIVE ALERT MODAL */}
             <Modal
                 transparent
                 visible={alertModal.visible}
@@ -1067,13 +1086,17 @@ export default function RechargePinScreen() {
                         s.alertModalCard,
                         { borderColor: alertModal.type === 'success' ? '#22c55e' : alertModal.type === 'error' ? '#ef4444' : T.gold }
                     ]}>
+                        <View style={s.alertDecorStripe} />
+
                         <View style={[
                             s.alertIconBox,
                             { backgroundColor: alertModal.type === 'success' ? '#dcfce7' : alertModal.type === 'error' ? '#fee2e2' : '#fef3c7' }
                         ]}>
-                            <Text style={{ fontSize: 24 }}>
-                                {alertModal.type === 'success' ? '✅' : alertModal.type === 'error' ? '❌' : '⚠️'}
-                            </Text>
+                            <Ionicons
+                                name={alertModal.type === 'success' ? 'checkmark-circle' : alertModal.type === 'error' ? 'close-circle' : 'alert-circle'}
+                                size={36}
+                                color={alertModal.type === 'success' ? '#16a34a' : alertModal.type === 'error' ? '#dc2626' : T.goldDk}
+                            />
                         </View>
 
                         <Text style={[
@@ -1093,7 +1116,38 @@ export default function RechargePinScreen() {
                             ]}
                             activeOpacity={0.85}
                         >
-                            <Text style={s.alertCloseBtnTxt}>OK</Text>
+                            <Text style={s.alertCloseBtnTxt}>Continue</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* MODERN BLUETOOTH SEARCHING / CONNECTING MODAL */}
+            <Modal
+                transparent
+                visible={btSearchingModal.visible}
+                animationType="fade"
+                onRequestClose={() => setBtSearchingModal(prev => ({ ...prev, visible: false }))}
+            >
+                <View style={s.alertModalOverlay}>
+                    <View style={s.btSearchModalCard}>
+                        <View style={s.btRadarCircle}>
+                            <Ionicons name="bluetooth" size={32} color="#0284c7" />
+                        </View>
+
+                        <Text style={s.btSearchTitle}>{btSearchingModal.title || 'Bluetooth Scanner'}</Text>
+                        <Text style={s.btSearchMsg}>{btSearchingModal.message || 'Connecting to printer...'}</Text>
+
+                        <View style={s.btLoadingBarWrap}>
+                            <ActivityIndicator size="small" color="#0284c7" />
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => setBtSearchingModal({ visible: false, title: '', message: '' })}
+                            style={s.btCancelBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={s.btCancelBtnTxt}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1531,52 +1585,113 @@ const s = StyleSheet.create({
     // INTERACTIVE ALERT MODAL STYLES
     alertModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(13, 27, 62, 0.75)',
+        backgroundColor: 'rgba(13, 27, 62, 0.8)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20
     },
     alertModalCard: {
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 380,
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: 20,
+        padding: 24,
         borderWidth: 2,
-        alignItems: 'center'
+        alignItems: 'center',
+        overflow: 'hidden',
+        boxShadow: '0 12px 32px rgba(13,27,62,0.3)'
+    },
+    alertDecorStripe: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 6,
+        backgroundColor: T.gold
     },
     alertIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12
+        marginBottom: 14
     },
     alertTitleTxt: {
-        fontSize: 16,
-        fontWeight: '800',
+        fontSize: 17,
+        fontWeight: '900',
         textAlign: 'center',
         marginBottom: 8
     },
     alertMsgTxt: {
-        fontSize: 12,
-        color: '#334155',
+        fontSize: 13,
+        color: '#475569',
         textAlign: 'center',
-        lineHeight: 18,
-        marginBottom: 18
+        lineHeight: 20,
+        marginBottom: 20
     },
     alertCloseBtn: {
         width: '100%',
-        height: 38,
-        borderRadius: 8,
+        height: 42,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center'
     },
     alertCloseBtnTxt: {
         color: '#ffffff',
-        fontWeight: '800',
-        fontSize: 13
+        fontWeight: '900',
+        fontSize: 14
+    },
+
+    // BLUETOOTH SEARCHING MODAL STYLES
+    btSearchModalCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#ffffff',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#0284c7',
+        boxShadow: '0 12px 32px rgba(2,132,199,0.25)'
+    },
+    btRadarCircle: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: '#e0f2fe',
+        borderWidth: 2,
+        borderColor: '#38bdf8',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14
+    },
+    btSearchTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: T.navy,
+        marginBottom: 6
+    },
+    btSearchMsg: {
+        fontSize: 12,
+        color: '#64748b',
+        textAlign: 'center',
+        marginBottom: 16
+    },
+    btLoadingBarWrap: {
+        marginVertical: 8
+    },
+    btCancelBtn: {
+        marginTop: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#f1f5f9'
+    },
+    btCancelBtnTxt: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#64748b'
     },
 
     resultModalOverlay: {
