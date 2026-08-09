@@ -46,7 +46,8 @@ export const sendEmail = async (
     // METHOD 1: SMTP / Nodemailer (Zoho, Google, Custom SMTP) - Prioritized if configured
     if (zohoUser && zohoPass) {
         try {
-            console.log(`[sendEmail] Sending email via Zoho/SMTP (${smtpHost}) to ${to}...`);
+            const senderAddress = `"Abu Mafhal Sub" <${zohoUser.trim()}>`;
+            console.log(`[sendEmail] Sending email via Zoho/SMTP (${smtpHost}) from ${senderAddress} to ${to}...`);
             const portNum = parseInt(smtpPort, 10);
             const transporter = nodemailer.createTransport({
                 host: smtpHost,
@@ -59,11 +60,19 @@ export const sendEmail = async (
             });
 
             const info = await transporter.sendMail({
-                from: `Abu Mafhal Sub <${zohoUser.trim()}>`,
+                from: senderAddress,
+                replyTo: zohoUser.trim(),
                 to,
                 subject,
                 text,
                 html: html || text,
+                headers: {
+                    'X-Priority': '3',
+                    'X-MSMail-Priority': 'Normal',
+                    'Importance': 'Normal',
+                    'X-Mailer': 'AbuMafhalMailer v2.0',
+                    'Auto-Submitted': 'auto-generated'
+                }
             });
 
             console.log("[sendEmail] Email successfully sent via Zoho/SMTP to %s (ID: %s)", to, info.messageId);
@@ -76,7 +85,11 @@ export const sendEmail = async (
     // METHOD 2: Resend HTTP API (Fallback or standalone)
     if (resendApiKey) {
         try {
-            console.log(`[sendEmail] Sending email via Resend API to ${to}...`);
+            const resendFrom = (zohoUser && zohoUser.includes('@')) 
+                ? `"Abu Mafhal Sub" <${zohoUser.trim()}>`
+                : 'Abu Mafhal Sub <onboarding@resend.dev>';
+
+            console.log(`[sendEmail] Sending email via Resend API from ${resendFrom} to ${to}...`);
             const resendRes = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
@@ -84,11 +97,15 @@ export const sendEmail = async (
                     'Authorization': `Bearer ${resendApiKey.trim()}`
                 },
                 body: JSON.stringify({
-                    from: 'Abu Mafhal Sub <onboarding@resend.dev>',
+                    from: resendFrom,
                     to: [to],
+                    reply_to: zohoUser ? zohoUser.trim() : undefined,
                     subject,
                     text,
-                    html: html || text
+                    html: html || text,
+                    headers: {
+                        'X-Entity-Ref-ID': `${Date.now()}`
+                    }
                 })
             });
 

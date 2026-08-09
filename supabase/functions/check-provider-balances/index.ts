@@ -929,54 +929,54 @@ serve(async (req: Request) => {
 
             if (lowProviders.length === 1) {
               const p = lowProviders[0]
-              subject = `⚠️ Low Float Alert: ${p.name} Balance is ₦${Number(p.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-              text = `LOW FLOAT ALERT\n\nVendor: ${p.name}\nCurrent Balance: ₦${Number(p.balance).toLocaleString()}\nMinimum Threshold: ₦${alertThreshold.toLocaleString()}\nStatus: LOW FLOAT\n\nPlease top up this API wallet immediately in the Liquidity Vault to ensure continuous service availability.`
+              subject = `Abu Mafhal Sub: Low Balance Notice — ${p.name}`
+              text = `Abu Mafhal Sub Liquidity Notice\n\nVendor: ${p.name}\nCurrent Balance: ₦${Number(p.balance).toLocaleString()}\nMinimum Threshold: ₦${alertThreshold.toLocaleString()}\n\nPlease top up this wallet in the Liquidity Vault.`
             } else {
-              subject = `⚠️ Low Float Alert: ${lowProviders.length} API Vendors Are Low on Float`
-              text = `LOW FLOAT ALERT\n\nThe following ${lowProviders.length} API vendors have dropped below your configured threshold of ₦${alertThreshold.toLocaleString()}:\n\n` +
+              subject = `Abu Mafhal Sub: Low Balance Notice (${lowProviders.length} Vendors)`
+              text = `Abu Mafhal Sub Liquidity Notice\n\nThe following ${lowProviders.length} API vendors are below threshold (₦${alertThreshold.toLocaleString()}):\n\n` +
                 lowProviders.map(p => `• ${p.name}: ₦${Number(p.balance).toLocaleString()}`).join('\n') +
-                `\n\nPlease top up these API wallets in the Liquidity Vault immediately.`
+                `\n\nPlease top up your API wallets in the Liquidity Vault.`
             }
 
             const rowsHtml = lowProviders.map(p => `
               <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px; font-weight: bold; color: #0d1b3e;">${p.name}</td>
-                <td style="padding: 10px; color: #dc2626; font-weight: bold; text-align: right;">₦${Number(p.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td style="padding: 10px; font-weight: 600; color: #0d1b3e;">${p.name}</td>
+                <td style="padding: 10px; color: #b91c1c; font-weight: bold; text-align: right;">₦${Number(p.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                 <td style="padding: 10px; color: #64748b; text-align: right;">₦${alertThreshold.toLocaleString()}</td>
               </tr>
             `).join('')
 
             html = `
-              <div style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #0f172a;">
-                <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 2px solid #f5a623;">
-                  <div style="background: #0d1b3e; padding: 20px; text-align: center;">
-                    <h2 style="color: #f5a623; margin: 0; font-size: 20px;">⚠️ API LOW FLOAT ALERT</h2>
-                    <p style="color: #ffffff; font-size: 12px; margin-top: 5px;">ABU MAFHAL HUB — LIQUIDITY MONITOR</p>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 24px; color: #0f172a;">
+                <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.04);">
+                  <div style="background: #0d1b3e; padding: 24px; text-align: center;">
+                    <h2 style="color: #f5a623; margin: 0; font-size: 19px; font-weight: 700;">Abu Mafhal Sub — Liquidity Vault</h2>
+                    <p style="color: #94a3b8; font-size: 12px; margin: 6px 0 0 0;">Official System Balance Notification</p>
                   </div>
-                  <div style="padding: 20px;">
-                    <p style="font-size: 14px; color: #334155; line-height: 1.5;">
-                      Attention Admin, the following API vendor wallet(s) have dropped below your configured minimum threshold of <strong>₦${alertThreshold.toLocaleString()}</strong>:
+                  <div style="padding: 24px;">
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin-top: 0;">
+                      Hello Admin,<br><br>This is an automated notification from your Liquidity Vault. The following API vendor account balance(s) are currently below your configured minimum threshold of <strong>₦${alertThreshold.toLocaleString()}</strong>:
                     </p>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px;">
+                    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
                       <thead>
-                        <tr style="background: #f1f5f9; text-align: left;">
-                          <th style="padding: 8px;">Vendor Name</th>
-                          <th style="padding: 8px; text-align: right;">Current Balance</th>
-                          <th style="padding: 8px; text-align: right;">Threshold</th>
+                        <tr style="background: #f1f5f9; text-align: left; color: #475569;">
+                          <th style="padding: 10px;">Vendor Name</th>
+                          <th style="padding: 10px; text-align: right;">Current Balance</th>
+                          <th style="padding: 10px; text-align: right;">Threshold</th>
                         </tr>
                       </thead>
                       <tbody>
                         ${rowsHtml}
                       </tbody>
                     </table>
-                    <div style="margin-top: 25px; text-align: center;">
-                      <a href="https://abumafhal.com/manage/liquidity" style="background: #f5a623; color: #0d1b3e; padding: 12px 24px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
-                        Top Up Wallets in Liquidity Vault →
+                    <div style="margin: 28px 0 12px 0; text-align: center;">
+                      <a href="https://abumafhal.com.ng/manage/liquidity" style="background: #0d1b3e; color: #ffffff; padding: 12px 28px; font-weight: 600; font-size: 13px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                        Open Liquidity Vault & Top Up →
                       </a>
                     </div>
                   </div>
-                  <div style="background: #f1f5f9; padding: 12px; text-align: center; font-size: 11px; color: #64748b;">
-                    Sent automatically by Abu Mafhal Hub Automated Liquidity Vault Monitor.
+                  <div style="background: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
+                    Abu Mafhal Sub System Automation • Safe & Secured Digital Portal
                   </div>
                 </div>
               </div>
