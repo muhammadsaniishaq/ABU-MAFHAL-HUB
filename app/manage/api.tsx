@@ -50,9 +50,6 @@ export default function APIVaultScreen() {
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
                     if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
-                    if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
-                    if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
-                    if (k === 'VITAL_API_TOKEN' || k === 'VITAL_TOKEN' || k === 'VITAL_KEY') setVitalToken(s.value);
                 });
             }
 
@@ -74,9 +71,6 @@ export default function APIVaultScreen() {
                     if (k === 'BIGI_API_TOKEN' || k === 'BIGI_TOKEN') setBigiToken(s.value);
                     if (k === 'BIGI_API_PIN' || k === 'BIGI_PIN') setBigiPin(s.value);
                     if (k === 'TERMII_API_KEY' || k === 'TERMII_KEY') setTermiiApiKey(s.value);
-                    if (k === 'MONNIFY_API_KEY' || k === 'MONNIFY_KEY') setMonnifyApiKey(s.value);
-                    if (k === 'MONNIFY_SECRET_KEY' || k === 'MONNIFY_SECRET') setMonnifySecretKey(s.value);
-                    if (k === 'VITAL_API_TOKEN' || k === 'VITAL_TOKEN' || k === 'VITAL_KEY') setVitalToken(s.value);
                 });
             }
         } catch (e: any) {
