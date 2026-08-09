@@ -985,7 +985,7 @@ serve(async (req: Request) => {
             alertReport = await sendEmail(alertEmail, subject, text, html, supabaseAdmin)
 
             // Optional Termii Instant Phone SMS Alert
-            const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || ''
+            const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
             const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'N-Alert'
             let smsReport: any = null
@@ -1027,6 +1027,7 @@ serve(async (req: Request) => {
       secrets: secrets,
       totalBalance: totalAggregatedBalance,
       alertReport,
+      smsReport,
       providers: providerBalances
     })
 
