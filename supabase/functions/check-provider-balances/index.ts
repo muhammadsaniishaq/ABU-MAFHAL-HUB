@@ -423,6 +423,7 @@ serve(async (req: Request) => {
       let balance = 0
       let latencyMs = 170
       let fetched = false
+      let payvesselDebug: any[] = []
 
       const baseHeaders: Record<string, string> = {
         'api-key': payVesselKey.trim(),
@@ -445,7 +446,9 @@ serve(async (req: Request) => {
         'https://api.payvessel.com/pms/api/external/request/balance',
         'https://api.payvessel.com/api/v1/user/balance',
         'https://api.payvessel.com/api/v1/wallet/balance',
-        'https://api.payvessel.com/api/v1/balance'
+        'https://api.payvessel.com/api/v1/balance',
+        'https://api.payvessel.com/api/v1/wallet',
+        'https://api.payvessel.com/api/v1/merchant'
       ]
 
       for (const endpoint of endpointsToTry) {
@@ -453,13 +456,17 @@ serve(async (req: Request) => {
         try {
           const { response, latency } = await fetchWithTimeout(endpoint, { headers: baseHeaders })
           const data = await response.json().catch(() => ({}))
+          payvesselDebug.push({ endpoint, status: response.status, data })
+          
           const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance ?? data?.data?.wallet_balance ?? data?.ledger_balance ?? data?.data?.ledger_balance ?? data?.banks?.[0]?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
             fetched = true
           }
-        } catch (e) {}
+        } catch (e: any) {
+          payvesselDebug.push({ endpoint, error: e?.message || 'Network error' })
+        }
       }
 
       // Fallback attempt: POST to /pms/api/external/request/balance
@@ -471,13 +478,16 @@ serve(async (req: Request) => {
             body: JSON.stringify({ businessid: payVesselBusinessId.trim(), business_id: payVesselBusinessId.trim() })
           })
           const data = await response.json().catch(() => ({}))
+          payvesselDebug.push({ endpoint: 'POST /pms/.../balance', status: response.status, data })
           const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
             fetched = true
           }
-        } catch (e) {}
+        } catch (e: any) {
+          payvesselDebug.push({ endpoint: 'POST /pms/.../balance', error: e?.message })
+        }
       }
 
       providerBalances.push({
@@ -488,9 +498,10 @@ serve(async (req: Request) => {
         currency: 'NGN',
         latencyMs,
         status: 'healthy',
-        error: undefined,
+        error: fetched ? undefined : `Payvessel response (${payvesselDebug.map(d => d.status || d.error).join(', ')})`,
         allowDeposit: true,
-        allowWithdrawal: true
+        allowWithdrawal: true,
+        _debug: payvesselDebug
       })
     } else {
       providerBalances.push({
