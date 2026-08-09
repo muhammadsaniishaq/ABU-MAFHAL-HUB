@@ -138,8 +138,8 @@ serve(async (req: Request) => {
 
       providerBalances.push({
         id: 'agenthub',
-        name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-        category: 'Digital Identity & CAC',
+        name: 'AgentHub (Identity, NIN, BVN)',
+        category: 'Digital Identity',
         balance: isNaN(balance) ? 0 : balance,
         currency: 'NGN',
         latencyMs,
@@ -157,8 +157,8 @@ serve(async (req: Request) => {
     } else {
       providerBalances.push({
         id: 'agenthub',
-        name: 'AgentHub (Identity, NIN, BVN, CAC, TAX)',
-        category: 'Digital Identity & CAC',
+        name: 'AgentHub (Identity, NIN, BVN)',
+        category: 'Digital Identity',
         balance: 0,
         currency: 'NGN',
         status: 'unconfigured',
