@@ -912,7 +912,7 @@ serve(async (req: Request) => {
     let alertReport: any = null
 
     if (alertEnabled && alertEmail && alertEmail.includes('@')) {
-      const lowProviders = providerBalances.filter(p => p.currency === 'NGN' && p.status === 'healthy' && Number(p.balance) < alertThreshold)
+      const lowProviders = providerBalances.filter(p => p.currency === 'NGN' && p.status !== 'unconfigured' && Number(p.balance) < alertThreshold)
 
       if (lowProviders.length > 0) {
         const lastSentStr = secrets['LAST_LOW_BALANCE_ALERT_SENT'] || ''

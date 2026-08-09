@@ -145,9 +145,9 @@ export default function LiquidityVaultScreen() {
                 await supabase.from('app_settings').upsert({ key: u.key, value: u.value });
             }
 
-            // Force check and send test alert
+            // Force check and send test alert immediately
             await supabase.functions.invoke('check-provider-balances', {
-                body: { triggerAlertCheck: true }
+                body: { triggerAlertCheck: true, force: true }
             });
 
             Alert.alert(
@@ -162,6 +162,14 @@ export default function LiquidityVaultScreen() {
             setSavingAlerts(false);
         }
     };
+
+    useEffect(() => {
+        fetchProviderBalances();
+        const autoPoll = setInterval(() => {
+            fetchProviderBalances();
+        }, 30000); // Auto-check balances & email alerts every 30 seconds
+        return () => clearInterval(autoPoll);
+    }, []);
 
     useEffect(() => {
         if (selectedDepositProvider) {
