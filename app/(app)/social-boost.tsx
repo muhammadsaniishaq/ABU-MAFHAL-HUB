@@ -324,7 +324,8 @@ export default function SocialBoostScreen() {
                                         setSelectedService(null);
                                     }}
                                     activeOpacity={0.7}
-                                    className={`w-[23%] aspect-square items-center justify-center rounded-2xl border ${isSelected ? 'bg-[#0F172A] border-[#0F172A]' : 'bg-white border-slate-200 shadow-sm shadow-slate-200/50'}`}
+                                    className={`w-[23%] items-center justify-center rounded-2xl border ${isSelected ? 'bg-[#0F172A] border-[#0F172A]' : 'bg-white border-slate-200 shadow-sm shadow-slate-200/50'}`}
+                                    style={{ aspectRatio: 1 }}
                                 >
                                     <View className={`w-8 h-8 rounded-full items-center justify-center mb-1.5 ${isSelected ? 'bg-white/10' : 'bg-slate-50'}`}>
                                         <Ionicons name={icon.name as any} size={16} color={isSelected ? '#fff' : icon.color} />

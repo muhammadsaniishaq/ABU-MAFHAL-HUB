@@ -145,16 +145,18 @@ export default function OTP() {
                 {/* Large Gradient Blobs */}
                 <LinearGradient
                     colors={['rgba(59, 130, 246, 0.08)', 'rgba(139, 92, 246, 0.08)']}
-                    className="absolute -top-[5%] -left-[10%] w-[90%] aspect-square rounded-full"
+                    className="absolute -top-[5%] -left-[10%] w-[90%] rounded-full"
+                    style={{ aspectRatio: 1 }}
                 />
                 <LinearGradient
                     colors={['rgba(236, 72, 153, 0.04)', 'transparent']}
-                    className="absolute bottom-[20%] -right-[20%] w-[80%] aspect-square rounded-full"
+                    className="absolute bottom-[20%] -right-[20%] w-[80%] rounded-full"
+                    style={{ aspectRatio: 1 }}
                 />
                 <LinearGradient
                     colors={['rgba(16, 185, 129, 0.06)', 'rgba(59, 130, 246, 0.04)']}
-                    className="absolute bottom-[-15%] -left-[15%] w-[70%] aspect-square rounded-full"
-                    style={{ transform: [{ rotate: '-15deg' }] }}
+                    className="absolute bottom-[-15%] -left-[15%] w-[70%] rounded-full"
+                    style={{ aspectRatio: 1, transform: [{ rotate: '-15deg' }] }}
                 />
 
                 {/* Geometric Patterns */}
@@ -238,7 +240,8 @@ export default function OTP() {
                                 {otp.map((digit, index) => (
                                     <View
                                         key={index}
-                                        className={`w-[14%] aspect-[2/3] rounded-2xl border-2 items-center justify-center bg-slate-50 ${digit ? 'border-blue-500 shadow-md shadow-blue-500/20' : 'border-slate-100'}`}
+                                        className={`w-[14%] rounded-2xl border-2 items-center justify-center bg-slate-50 ${digit ? 'border-blue-500 shadow-md shadow-blue-500/20' : 'border-slate-100'}`}
+                                        style={{ aspectRatio: 0.666 }}
                                     >
                                         <TextInput
                                             ref={(ref) => { inputRefs.current[index] = ref as TextInput; }}

@@ -35,7 +35,7 @@ export default function InfrastructureGrid() {
 
                 <View className="flex-row flex-wrap justify-between gap-y-4">
                     {nodes.map(node => (
-                        <View key={node.id} className="w-[31%] aspect-square bg-slate-900 rounded-xl p-3 border border-slate-800 justify-between">
+                        <View key={node.id} className="w-[31%] bg-slate-900 rounded-xl p-3 border border-slate-800 justify-between" style={{ aspectRatio: 1 }}>
                             <View className="flex-row justify-between">
                                 <Text className="text-slate-500 font-mono text-xs">{node.id}</Text>
                                 <View className={`w-1.5 h-1.5 rounded-full ${node.status === 'online' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />

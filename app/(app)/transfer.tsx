@@ -179,8 +179,9 @@ export default function TransferScreen() {
                     {banks.map((b) => (
                         <TouchableOpacity
                             key={b.id}
-                            className={`w-[23%] aspect-square rounded-2xl items-center justify-center border ${bank === b.id ? 'bg-blue-50/50 border-primary' : 'bg-white border-gray-100'
+                            className={`w-[23%] rounded-2xl items-center justify-center border ${bank === b.id ? 'bg-blue-50/50 border-primary' : 'bg-white border-gray-100'
                                 }`}
+                            style={{ aspectRatio: 1 }}
                             onPress={() => setBank(b.id)}
                         >
                             <View className="w-8 h-8 rounded-full items-center justify-center mb-1" style={{ backgroundColor: b.color }}>
