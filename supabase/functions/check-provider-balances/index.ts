@@ -987,6 +987,7 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || ''
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
+            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'N-Alert'
             let smsReport: any = null
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
@@ -997,7 +998,7 @@ serve(async (req: Request) => {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     to: formattedPhone,
-                    from: 'Abu Mafhal',
+                    from: termiiSender,
                     sms: smsMsg,
                     type: 'plain',
                     channel: 'generic',
