@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, ActivityIndicator, 
-    Alert, Modal, TextInput, StyleSheet, useWindowDimensions, Platform 
+    Alert, Modal, TextInput, StyleSheet, useWindowDimensions, Platform, Switch 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -92,6 +92,13 @@ export default function LiquidityVaultScreen() {
     const [bigiUsername, setBigiUsername] = useState('');
     const [bigiPassword, setBigiPassword] = useState('');
 
+    // Low Float Email Alert States
+    const [alertEmail, setAlertEmail] = useState('');
+    const [alertThreshold, setAlertThreshold] = useState('5000');
+    const [alertEnabled, setAlertEnabled] = useState(true);
+    const [savingAlerts, setSavingAlerts] = useState(false);
+    const [showAlertCard, setShowAlertCard] = useState(false);
+
     // Deposit Bank Account Form States
     const [editingDepositBank, setEditingDepositBank] = useState(false);
     const [fundBankName, setFundBankName] = useState('');
@@ -106,6 +113,52 @@ export default function LiquidityVaultScreen() {
     const [withdrawReason, setWithdrawReason] = useState('');
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [copiedText, setCopiedText] = useState(false);
+
+    useEffect(() => {
+        if (vaultSecrets) {
+            if (vaultSecrets['LOW_BALANCE_ALERT_EMAIL']) setAlertEmail(vaultSecrets['LOW_BALANCE_ALERT_EMAIL']);
+            if (vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']) setAlertThreshold(vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']);
+            if (vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] !== undefined) {
+                setAlertEnabled(vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] === 'true');
+            }
+        }
+    }, [vaultSecrets]);
+
+    const handleSaveAlertSettings = async () => {
+        if (!alertEmail.trim()) {
+            Alert.alert("Email Required", "Please enter a valid email address to receive low float alerts.");
+            return;
+        }
+        setSavingAlerts(true);
+        try {
+            const updates = [
+                { key: 'LOW_BALANCE_ALERT_EMAIL', value: alertEmail.trim(), description: 'Admin Email for Low Balance Alerts' },
+                { key: 'LOW_BALANCE_ALERT_THRESHOLD', value: alertThreshold.trim() || '5000', description: 'Minimum API Balance Threshold in NGN' },
+                { key: 'LOW_BALANCE_ALERT_ENABLED', value: alertEnabled ? 'true' : 'false', description: 'Enable Auto Low Balance Email Alerts' }
+            ];
+
+            for (const u of updates) {
+                await supabase.from('system_secrets').upsert(u);
+                await supabase.from('app_settings').upsert({ key: u.key, value: u.value });
+            }
+
+            // Force check and send test alert
+            await supabase.functions.invoke('check-provider-balances', {
+                body: { triggerAlertCheck: true }
+            });
+
+            Alert.alert(
+                "Alert Settings Saved! ⚡",
+                `Low Float Email Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, an automated email notification will be dispatched.`
+            );
+            setShowAlertCard(false);
+            fetchProviderBalances();
+        } catch (e: any) {
+            Alert.alert("Save Error", e.message || "Failed to save alert settings.");
+        } finally {
+            setSavingAlerts(false);
+        }
+    };
 
     useEffect(() => {
         if (selectedDepositProvider) {
@@ -644,6 +697,81 @@ export default function LiquidityVaultScreen() {
                         </View>
                     </View>
                 </LinearGradient>
+
+                {/* Automated Low Float Email Alert Settings Banner/Card */}
+                <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: T.border }}>
+                    <TouchableOpacity 
+                        onPress={() => setShowAlertCard(!showAlertCard)}
+                        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                            <View style={{ backgroundColor: '#fff7ed', padding: 6, borderRadius: 8, marginRight: 8 }}>
+                                <Ionicons name="mail-unread-outline" size={16} color="#d97706" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: T.navy, fontWeight: '700', fontSize: 11.5 }}>
+                                    ⚡ Low Float Auto Email Alerts
+                                </Text>
+                                <Text style={{ color: T.textSub, fontSize: 9.5 }} numberOfLines={1}>
+                                    {alertEnabled && alertEmail ? `Alerts active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()})` : 'Configure email & minimum balance threshold'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons name={showAlertCard ? "chevron-up" : "chevron-down"} size={16} color={T.navy} />
+                    </TouchableOpacity>
+
+                    {showAlertCard && (
+                        <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                            <Text style={{ color: T.textSub, fontSize: 10, marginBottom: 10, lineHeight: 14 }}>
+                                Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Single or grouped reports dispatched automatically!
+                            </Text>
+
+                            <Text style={styles.inputLabel}>Notification Email Address</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="e.g. admin@abumafhal.com"
+                                placeholderTextColor="#94a3b8"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={alertEmail}
+                                onChangeText={setAlertEmail}
+                            />
+
+                            <Text style={styles.inputLabel}>Minimum Float Threshold (₦)</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="e.g. 5000"
+                                placeholderTextColor="#94a3b8"
+                                keyboardType="numeric"
+                                value={alertThreshold}
+                                onChangeText={setAlertThreshold}
+                            />
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
+                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email Alerts</Text>
+                                <Switch
+                                    value={alertEnabled}
+                                    onValueChange={setAlertEnabled}
+                                    trackColor={{ false: '#cbd5e1', true: T.gold }}
+                                    thumbColor={alertEnabled ? T.navy : '#f1f5f9'}
+                                />
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={handleSaveAlertSettings}
+                                disabled={savingAlerts}
+                                style={[styles.executeWithdrawBtn, { marginTop: 6 }]}
+                                activeOpacity={0.85}
+                            >
+                                {savingAlerts ? (
+                                    <ActivityIndicator color={T.navy} size="small" />
+                                ) : (
+                                    <Text style={styles.executeWithdrawBtnText}>Save & Enable Low Float Alerts</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
 
                 {/* Search Bar Input */}
                 <View style={styles.searchBarBox}>

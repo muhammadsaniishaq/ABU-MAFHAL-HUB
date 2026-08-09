@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -900,11 +901,103 @@ serve(async (req: Request) => {
       .filter(p => p.currency === 'NGN')
       .reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0)
 
+    // -------------------------------------------------------------------------
+    // AUTOMATED LOW FLOAT EMAIL ALERT DISPATCHER
+    // -------------------------------------------------------------------------
+    const alertEmail = secrets['LOW_BALANCE_ALERT_EMAIL'] || secrets['ALERT_EMAIL'] || Deno.env.get('ADMIN_ALERT_EMAIL') || ''
+    const alertThreshold = Number(secrets['LOW_BALANCE_ALERT_THRESHOLD'] || '5000')
+    const alertEnabled = (secrets['LOW_BALANCE_ALERT_ENABLED'] || 'true') === 'true'
+    let alertReport: any = null
+
+    if (alertEnabled && alertEmail && alertEmail.includes('@')) {
+      const lowProviders = providerBalances.filter(p => p.currency === 'NGN' && p.status === 'healthy' && Number(p.balance) < alertThreshold)
+
+      if (lowProviders.length > 0) {
+        const lastSentStr = secrets['LAST_LOW_BALANCE_ALERT_SENT'] || ''
+        const lastSentTime = lastSentStr ? new Date(lastSentStr).getTime() : 0
+        const nowMs = Date.now()
+        const isForceTrigger = reqData?.triggerAlertCheck === true
+
+        // Cooldown: 30 minutes between automatic emails (unless force trigger from UI button)
+        if (isForceTrigger || (nowMs - lastSentTime > 30 * 60 * 1000)) {
+          try {
+            let subject = ''
+            let text = ''
+            let html = ''
+
+            if (lowProviders.length === 1) {
+              const p = lowProviders[0]
+              subject = `⚠️ Low Float Alert: ${p.name} Balance is ₦${Number(p.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+              text = `LOW FLOAT ALERT\n\nVendor: ${p.name}\nCurrent Balance: ₦${Number(p.balance).toLocaleString()}\nMinimum Threshold: ₦${alertThreshold.toLocaleString()}\nStatus: LOW FLOAT\n\nPlease top up this API wallet immediately in the Liquidity Vault to ensure continuous service availability.`
+            } else {
+              subject = `⚠️ Low Float Alert: ${lowProviders.length} API Vendors Are Low on Float`
+              text = `LOW FLOAT ALERT\n\nThe following ${lowProviders.length} API vendors have dropped below your configured threshold of ₦${alertThreshold.toLocaleString()}:\n\n` +
+                lowProviders.map(p => `• ${p.name}: ₦${Number(p.balance).toLocaleString()}`).join('\n') +
+                `\n\nPlease top up these API wallets in the Liquidity Vault immediately.`
+            }
+
+            const rowsHtml = lowProviders.map(p => `
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px; font-weight: bold; color: #0d1b3e;">${p.name}</td>
+                <td style="padding: 10px; color: #dc2626; font-weight: bold; text-align: right;">₦${Number(p.balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td style="padding: 10px; color: #64748b; text-align: right;">₦${alertThreshold.toLocaleString()}</td>
+              </tr>
+            `).join('')
+
+            html = `
+              <div style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; color: #0f172a;">
+                <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 2px solid #f5a623;">
+                  <div style="background: #0d1b3e; padding: 20px; text-align: center;">
+                    <h2 style="color: #f5a623; margin: 0; font-size: 20px;">⚠️ API LOW FLOAT ALERT</h2>
+                    <p style="color: #ffffff; font-size: 12px; margin-top: 5px;">ABU MAFHAL HUB — LIQUIDITY MONITOR</p>
+                  </div>
+                  <div style="padding: 20px;">
+                    <p style="font-size: 14px; color: #334155; line-height: 1.5;">
+                      Attention Admin, the following API vendor wallet(s) have dropped below your configured minimum threshold of <strong>₦${alertThreshold.toLocaleString()}</strong>:
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px;">
+                      <thead>
+                        <tr style="background: #f1f5f9; text-align: left;">
+                          <th style="padding: 8px;">Vendor Name</th>
+                          <th style="padding: 8px; text-align: right;">Current Balance</th>
+                          <th style="padding: 8px; text-align: right;">Threshold</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${rowsHtml}
+                      </tbody>
+                    </table>
+                    <div style="margin-top: 25px; text-align: center;">
+                      <a href="https://abumafhal.com/manage/liquidity" style="background: #f5a623; color: #0d1b3e; padding: 12px 24px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
+                        Top Up Wallets in Liquidity Vault →
+                      </a>
+                    </div>
+                  </div>
+                  <div style="background: #f1f5f9; padding: 12px; text-align: center; font-size: 11px; color: #64748b;">
+                    Sent automatically by Abu Mafhal Hub Automated Liquidity Vault Monitor.
+                  </div>
+                </div>
+              </div>
+            `
+
+            alertReport = await sendEmail(alertEmail, subject, text, html, supabaseAdmin)
+
+            const nowIso = new Date().toISOString()
+            await supabaseAdmin.from('app_settings').upsert({ key: 'LAST_LOW_BALANCE_ALERT_SENT', value: nowIso })
+            await supabaseAdmin.from('system_secrets').upsert({ key: 'LAST_LOW_BALANCE_ALERT_SENT', value: nowIso, description: 'Last Low Float Email Alert Timestamp' })
+          } catch (e: any) {
+            console.error('Low float alert email error:', e)
+          }
+        }
+      }
+    }
+
     return jsonOk({
       success: true,
       timestamp: new Date().toISOString(),
       secrets: secrets,
       totalBalance: totalAggregatedBalance,
+      alertReport,
       providers: providerBalances
     })
 
