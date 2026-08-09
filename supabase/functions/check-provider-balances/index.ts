@@ -1022,15 +1022,16 @@ serve(async (req: Request) => {
                 })
                 smsReport = await smsRes.json().catch(() => ({}))
 
-                // Fallback to DND channel if generic returns 422 or SENDER_ID_NOT_APPROVED
-                if (smsReport && (smsReport.error?.includes('SENDER_ID') || smsReport.status === 422 || smsReport.status === '400')) {
-                  console.log('Termii generic channel failed, retrying with DND channel...')
+                // Fallback to DND channel with 'N-Alert' if generic returns 422 or SENDER_ID_NOT_APPROVED
+                const isSenderErr = JSON.stringify(smsReport).includes('SENDER_ID') || smsReport.status === 422 || `${smsReport.status}` === '422' || `${smsReport.status}` === '400'
+                if (smsReport && isSenderErr) {
+                  console.log('Termii generic channel failed, retrying with N-Alert on DND channel...')
                   smsRes = await fetch('https://api.ng.termii.com/api/sms/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       to: formattedPhone,
-                      from: termiiSender,
+                      from: 'N-Alert',
                       sms: smsMsg,
                       type: 'plain',
                       channel: 'dnd',
