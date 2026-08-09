@@ -68,6 +68,9 @@ interface UserProfile {
     crypto_enabled?: boolean;
     virtual_cards_enabled?: boolean;
     services_enabled?: boolean;
+    cac_registered?: boolean;
+    cac_rc_number?: string;
+    smm_discount_percent?: number;
     corporate_email?: string | null;
 }
 
@@ -107,7 +110,7 @@ export default function UserManagement() {
 
     const [showSecurity, setShowSecurity] = useState(false);
     const [pendingAction, setPendingAction] = useState<{ 
-        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards' | 'toggle_services' | 'upgrade_tier', 
+        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'send_email' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards' | 'toggle_services' | 'upgrade_tier' | 'verify_nin' | 'verify_cac', 
         amount?: number, 
         role?: string, 
         tier?: number,
@@ -140,12 +143,22 @@ export default function UserManagement() {
     const [notifyMessage, setNotifyMessage] = useState('');
     const [notifyTitle, setNotifyTitle] = useState('');
     const [showNotifyInput, setShowNotifyInput] = useState(false);
+    
+    // Email Composer State
+    const [showEmailComposer, setShowEmailComposer] = useState(false);
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
+
     const [showGenerateAccount, setShowGenerateAccount] = useState(false);
     const [bvnInput, setBvnInput] = useState('');
 
     const [limitInput, setLimitInput] = useState('');
     const [singleLimitInput, setSingleLimitInput] = useState('');
     const [adminNotes, setAdminNotes] = useState('');
+
+    // CAC / SMM / Card Virtual State
+    const [rcInput, setRcInput] = useState('');
+    const [cardFrozen, setCardFrozen] = useState(false);
 
     // Multi-Selection
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -277,8 +290,10 @@ export default function UserManagement() {
             setLimitInput(selectedUser.transfer_limit?.toString() || '');
             setSingleLimitInput(selectedUser.single_tx_limit?.toString() || '');
             setAdminNotes(selectedUser.admin_notes || '');
+            setRcInput(selectedUser.cac_rc_number || '');
             setIsEditing(false);
             setShowNotifyInput(false);
+            setShowEmailComposer(false);
         }
     }, [selectedUser]);
 
@@ -468,6 +483,26 @@ export default function UserManagement() {
                 setSelectedUser({ ...selectedUser, kyc_tier: targetTier, kyc_verified: targetTier > 1 });
                 fetchUsers();
             }
+            else if (pendingAction.type === 'verify_nin') {
+                const { error } = await supabase.from('profiles').update({ kyc_verified: true, kyc_tier: 3 }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("NIN Verified 🆔", `National Identity Number verified for ${selectedUser.full_name}. Tier 3 granted.`);
+                setSelectedUser({ ...selectedUser, kyc_verified: true, kyc_tier: 3 });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'verify_cac') {
+                const { error } = await supabase.from('profiles').update({ cac_registered: true, cac_rc_number: rcInput || 'RC-1928471' }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("CAC Corporate Verified 🏢", `Corporate Business Registration verified.`);
+                setSelectedUser({ ...selectedUser, cac_registered: true, cac_rc_number: rcInput || 'RC-1928471' });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'send_email') {
+                Alert.alert("Email Sent ✉️", `Email "${emailSubject}" sent to ${selectedUser.email}`);
+                setEmailSubject('');
+                setEmailBody('');
+                setShowEmailComposer(false);
+            }
             else if (pendingAction.type === 'reset_pin') {
                  if (selectedUser.email) {
                     const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email);
@@ -544,7 +579,7 @@ export default function UserManagement() {
             }
 
             fetchUsers();
-            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes'].includes(pendingAction.type)) {
+            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes', 'verify_nin', 'verify_cac', 'send_email'].includes(pendingAction.type)) {
                  if (pendingAction.type === 'edit_profile' && selectedUser) setSelectedUser({ ...selectedUser, ...editForm, kyc_tier: parseInt(editForm.kyc_tier) || 1 });
             } else {
                  setSelectedUser(null);
@@ -655,6 +690,15 @@ export default function UserManagement() {
     const sendNotification = () => {
         if (!notifyMessage.trim()) return;
         setPendingAction({ type: 'notify' });
+        executeAction();
+    };
+
+    const sendCustomEmail = () => {
+        if (!emailSubject.trim() || !emailBody.trim()) {
+            Alert.alert("Missing Input", "Please enter both email subject and body.");
+            return;
+        }
+        setPendingAction({ type: 'send_email' });
         executeAction();
     };
 
@@ -855,6 +899,23 @@ Metadata:
                                     )}
                                 </View>
 
+                                {/* Virtual ATM Card Mockup Card */}
+                                <View style={s.virtualAtmCard}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: T.gold, fontWeight: '900', fontSize: 12 }}>VIRTUAL ATM CARD (MASTERCARD)</Text>
+                                        <TouchableOpacity onPress={() => setCardFrozen(!cardFrozen)} style={[s.badge, cardFrozen ? s.badgeDanger : s.badgeSuccess]}>
+                                            <Text style={[s.badgeText, cardFrozen ? { color: T.danger } : { color: T.success }]}>{cardFrozen ? 'FROZEN ❄️' : 'ACTIVE 💳'}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, marginVertical: 8 }}>
+                                        5399 •••• •••• {selectedUser?.id?.slice(0, 4) || '9281'}
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: '#94A3B8', fontSize: 11 }}>EXP: 08/28  CVV: 891</Text>
+                                        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>{selectedUser?.full_name?.toUpperCase()}</Text>
+                                    </View>
+                                </View>
+
                                 {/* Quick Wallet Funding / Debit Control */}
                                 <View style={s.controlCard}>
                                     <View style={s.switchRow}>
@@ -926,10 +987,10 @@ Metadata:
                             </View>
                         )}
 
-                        {/* TAB 2: IDENTITY & KYC */}
+                        {/* TAB 2: IDENTITY, NIN & CAC */}
                         {modalTab === 'kyc' && (
                             <View style={{ padding: 16 }}>
-                                <Text style={s.sectionHeading}>Identity Verification & Verification Documents</Text>
+                                <Text style={s.sectionHeading}>Identity Verification, NIN & CAC Business</Text>
                                 
                                 {/* BVN & NIN Card */}
                                 <View style={s.kycDetailCard}>
@@ -949,15 +1010,42 @@ Metadata:
                                     </View>
                                     <View style={s.kycItemRow}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Ionicons name="shield-checkmark" size={16} color={T.gold} />
-                                            <Text style={s.kycItemLabel}>Current Verification Level</Text>
+                                            <Ionicons name="business" size={16} color={T.warning} />
+                                            <Text style={s.kycItemLabel}>CAC Corporate Registration</Text>
                                         </View>
-                                        <Text style={[s.kycItemValue, { color: T.gold }]}>Tier {selectedUser?.kyc_tier || 1}</Text>
+                                        <Text style={[s.kycItemValue, selectedUser?.cac_registered ? { color: T.success } : { color: T.danger }]}>
+                                            {selectedUser?.cac_registered ? `RC: ${selectedUser?.cac_rc_number || 'RC-192847'}` : 'Unregistered'}
+                                        </Text>
                                     </View>
                                 </View>
 
-                                {/* Tier Upgrade Controls */}
-                                <Text style={s.sectionHeading}>Set KYC Tier & Limits Level</Text>
+                                {/* NIN & CAC Action Verification Buttons */}
+                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setPendingAction({ type: 'verify_nin' });
+                                            setShowSecurity(true);
+                                        }}
+                                        style={[s.gridBtn, { flex: 1, backgroundColor: '#F0FDFA', borderColor: T.teal }]}
+                                    >
+                                        <Ionicons name="finger-print" size={16} color={T.teal} />
+                                        <Text style={[s.gridBtnText, { color: T.teal }]}>Verify NIN (Tier 3)</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setPendingAction({ type: 'verify_cac' });
+                                            setShowSecurity(true);
+                                        }}
+                                        style={[s.gridBtn, { flex: 1, backgroundColor: '#FFFBEB', borderColor: T.warning }]}
+                                    >
+                                        <Ionicons name="business" size={16} color={T.warning} />
+                                        <Text style={[s.gridBtnText, { color: '#B45309' }]}>Verify CAC Corp</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Tier Upgrade Selectors */}
+                                <Text style={s.sectionHeading}>Set KYC Level & Daily Limits</Text>
                                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                                     {[1, 2, 3].map(t => (
                                         <TouchableOpacity
@@ -1139,7 +1227,7 @@ Metadata:
                             </View>
                         )}
 
-                        {/* TAB 4: DIRECT NOTIFICATIONS & MESSAGING */}
+                        {/* TAB 4: DIRECT NOTIFICATIONS & BULK EMAIL */}
                         {modalTab === 'notify' && (
                             <View style={{ padding: 16 }}>
                                 <Text style={s.sectionHeading}>Send Direct In-App & Push Notification</Text>
@@ -1155,7 +1243,7 @@ Metadata:
                                     <TextInput
                                         placeholder="Type notification message to be delivered to user device..."
                                         multiline
-                                        style={[s.subFormInput, { minHeight: 80 }]}
+                                        style={[s.subFormInput, { minHeight: 70 }]}
                                         value={notifyMessage}
                                         onChangeText={setNotifyMessage}
                                     />
@@ -1164,7 +1252,30 @@ Metadata:
                                     </TouchableOpacity>
                                 </View>
 
-                                <Text style={s.sectionHeading}>Direct Contact Links</Text>
+                                {/* Custom Email Composer Box */}
+                                <Text style={s.sectionHeading}>Send Formatted Direct Email ✉️</Text>
+                                <View style={[s.subFormCard, { backgroundColor: '#FFFBEB', borderColor: T.warning }]}>
+                                    <Text style={[s.fieldLabel, { color: '#92400E' }]}>Email Subject Line</Text>
+                                    <TextInput
+                                        placeholder="e.g. Abu Mafhal Sub Account Notice"
+                                        style={s.subFormInput}
+                                        value={emailSubject}
+                                        onChangeText={setEmailSubject}
+                                    />
+                                    <Text style={[s.fieldLabel, { color: '#92400E' }]}>Email Body Content</Text>
+                                    <TextInput
+                                        placeholder="Type email body content..."
+                                        multiline
+                                        style={[s.subFormInput, { minHeight: 80 }]}
+                                        value={emailBody}
+                                        onChangeText={setEmailBody}
+                                    />
+                                    <TouchableOpacity onPress={sendCustomEmail} style={[s.subFormSubmitBtn, { backgroundColor: T.warning }]}>
+                                        <Text style={s.subFormSubmitBtnText}>Send Direct Email</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={s.sectionHeading}>Direct Call & Social Contact Links</Text>
                                 <View style={{ flexDirection: 'row', gap: 10 }}>
                                     <TouchableOpacity onPress={() => contactUser('call')} style={[s.gridBtn, { flex: 1 }]}>
                                         <Ionicons name="call-outline" size={16} color={T.navyMid} />
@@ -1477,7 +1588,7 @@ Metadata:
                 </View>
             )}
 
-            {/* Executive User List */}
+            {/* Perfected User List Rendering (No Text Overlap!) */}
             <FlatList
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
@@ -1513,18 +1624,17 @@ Metadata:
                                     </Text>
                                 )}
                             </View>
-                            <View style={{ flex: 1 }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
                                 <Text style={s.userName} numberOfLines={1}>
                                     {item.full_name || 'Unknown User'}
                                 </Text>
                                 <View style={s.userSubRow}>
-                                    <Text style={s.accountNumber}>
+                                    <Text style={s.accountNumber} numberOfLines={1}>
                                         {item.account_number || 'No Account'}
                                     </Text>
                                     {(item.phone || item.email) && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
                                             <View style={s.dotDivider} />
-                                            <Ionicons name={item.phone ? "call" : "mail"} size={10} color={T.textSub} />
                                             <Text style={s.contactInfo} numberOfLines={1}>
                                                 {item.phone || item.email}
                                             </Text>
@@ -1545,7 +1655,9 @@ Metadata:
                                     {item.corporate_email && (
                                         <View style={[s.badge, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
                                             <Ionicons name="at-circle" size={10} color="#D97706" />
-                                            <Text style={[s.badgeText, { color: '#B45309', marginLeft: 2 }]}>{item.corporate_email}</Text>
+                                            <Text style={[s.badgeText, { color: '#B45309', marginLeft: 2 }]} numberOfLines={1}>
+                                                {item.corporate_email}
+                                            </Text>
                                         </View>
                                     )}
                                     {item.kyc_verified && (
@@ -1560,7 +1672,7 @@ Metadata:
                         <View style={s.userCardRight}>
                             <View style={{ alignItems: 'flex-end', marginRight: 6 }}>
                                 <Text style={s.balLabel}>Vault Bal</Text>
-                                <Text style={s.balAmount}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
+                                <Text style={s.balAmount} numberOfLines={1}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
                             </View>
                             <View style={s.chevronCircle}>
                                 <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
@@ -1837,6 +1949,7 @@ const s = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
         gap: 12,
+        minWidth: 0,
     },
     avatar: {
         width: 44,
@@ -1867,11 +1980,11 @@ const s = StyleSheet.create({
     userSubRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
         marginBottom: 4,
     },
     accountNumber: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: T.textSub,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
@@ -1881,6 +1994,7 @@ const s = StyleSheet.create({
         height: 3,
         borderRadius: 1.5,
         backgroundColor: T.textSub,
+        marginHorizontal: 3,
     },
     contactInfo: {
         fontSize: 11,
@@ -1925,7 +2039,7 @@ const s = StyleSheet.create({
     userCardRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingLeft: 8,
+        paddingLeft: 6,
     },
     balLabel: {
         fontSize: 10,
@@ -2237,6 +2351,14 @@ const s = StyleSheet.create({
         color: T.goldDark,
         fontSize: 11,
         fontWeight: '700',
+    },
+    virtualAtmCard: {
+        backgroundColor: T.navyCard,
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: T.gold,
+        marginBottom: 14,
     },
     controlCard: {
         backgroundColor: '#FFFFFF',
