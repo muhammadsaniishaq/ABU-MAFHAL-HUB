@@ -99,7 +99,7 @@ export default function LiquidityVaultScreen() {
     const [termiiSenderId, setTermiiSenderId] = useState('AbuMafhal');
     const [alertThreshold, setAlertThreshold] = useState('5000');
     const [alertIntervalMins, setAlertIntervalMins] = useState('30');
-    const [alertEnabled, setAlertEnabled] = useState(true);
+    const [alertEnabled, setAlertEnabled] = useState(false);
     const [savingAlerts, setSavingAlerts] = useState(false);
     const [showAlertCard, setShowAlertCard] = useState(false);
 
@@ -126,14 +126,15 @@ export default function LiquidityVaultScreen() {
     const hasLoadedAlertConfig = useRef(false);
 
     useEffect(() => {
-        if (vaultSecrets && !hasLoadedAlertConfig.current) {
+        if (vaultSecrets && Object.keys(vaultSecrets).length > 0 && !hasLoadedAlertConfig.current) {
             hasLoadedAlertConfig.current = true;
             if (vaultSecrets['LOW_BALANCE_ALERT_EMAIL']) setAlertEmail(vaultSecrets['LOW_BALANCE_ALERT_EMAIL']);
             if (vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']) setAlertThreshold(vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']);
             if (vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']) setAlertIntervalMins(vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']);
-            if (vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] !== undefined) {
-                setAlertEnabled(vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] === 'true');
-            }
+            
+            const isEnabled = vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] === 'true' || vaultSecrets['LOW_BALANCE_ALERT_ENABLE'] === 'true';
+            setAlertEnabled(isEnabled);
+
             if (vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP']) {
                 setAlertPhone(vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP'] || '');
             }

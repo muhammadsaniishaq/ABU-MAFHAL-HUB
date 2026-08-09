@@ -909,7 +909,7 @@ serve(async (req: Request) => {
     const alertIntervalMins = Math.max(1, Number(secrets['LOW_BALANCE_ALERT_INTERVAL_MINS'] || '30'))
     const cooldownMs = alertIntervalMins * 60 * 1000
 
-    const rawEnabledStr = (secrets['LOW_BALANCE_ALERT_ENABLED'] || secrets['LOW_BALANCE_ALERT_ENABLE'] || 'true').toLowerCase().trim()
+    const rawEnabledStr = (secrets['LOW_BALANCE_ALERT_ENABLED'] || secrets['LOW_BALANCE_ALERT_ENABLE'] || 'false').toLowerCase().trim()
     const alertEnabled = rawEnabledStr === 'true' || rawEnabledStr === '1' || rawEnabledStr === 'on' || rawEnabledStr === 'enabled'
 
     let alertReport: any = null
