@@ -984,6 +984,32 @@ serve(async (req: Request) => {
 
             alertReport = await sendEmail(alertEmail, subject, text, html, supabaseAdmin)
 
+            // Optional Termii Instant Phone SMS Alert
+            const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || ''
+            const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
+            let smsReport: any = null
+            if (termiiKey && alertPhone && alertPhone.length >= 10) {
+              try {
+                const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
+                const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
+                const smsRes = await fetch('https://api.ng.termii.com/api/sms/send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    to: formattedPhone,
+                    from: 'Abu Mafhal',
+                    sms: smsMsg,
+                    type: 'plain',
+                    channel: 'generic',
+                    api_key: termiiKey
+                  })
+                })
+                smsReport = await smsRes.json().catch(() => ({}))
+              } catch (smsErr: any) {
+                console.error('Termii SMS Alert Exception:', smsErr)
+              }
+            }
+
             const nowIso = new Date().toISOString()
             await supabaseAdmin.from('app_settings').upsert({ key: 'LAST_LOW_BALANCE_ALERT_SENT', value: nowIso })
             await supabaseAdmin.from('system_secrets').upsert({ key: 'LAST_LOW_BALANCE_ALERT_SENT', value: nowIso, description: 'Last Low Float Email Alert Timestamp' })

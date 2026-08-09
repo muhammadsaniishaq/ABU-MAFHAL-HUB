@@ -92,13 +92,19 @@ export default function LiquidityVaultScreen() {
     const [bigiUsername, setBigiUsername] = useState('');
     const [bigiPassword, setBigiPassword] = useState('');
 
-    // Low Float Email Alert States
+    // Low Float Email & SMS Alert States
     const [alertEmail, setAlertEmail] = useState('');
+    const [alertPhone, setAlertPhone] = useState('');
     const [alertThreshold, setAlertThreshold] = useState('5000');
     const [alertIntervalMins, setAlertIntervalMins] = useState('30');
     const [alertEnabled, setAlertEnabled] = useState(true);
     const [savingAlerts, setSavingAlerts] = useState(false);
     const [showAlertCard, setShowAlertCard] = useState(false);
+
+    // SMTP Sender Credentials for Direct Inbox Delivery
+    const [smtpEmail, setSmtpEmail] = useState('');
+    const [smtpPass, setSmtpPass] = useState('');
+    const [showSmtpConfig, setShowSmtpConfig] = useState(false);
 
     // Deposit Bank Account Form States
     const [editingDepositBank, setEditingDepositBank] = useState(false);
@@ -123,6 +129,15 @@ export default function LiquidityVaultScreen() {
             if (vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] !== undefined) {
                 setAlertEnabled(vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] === 'true');
             }
+            if (vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP']) {
+                setAlertPhone(vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP'] || '');
+            }
+            if (vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER']) {
+                setSmtpEmail(vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER'] || '');
+            }
+            if (vaultSecrets['ZOHO_PASSWORD'] || vaultSecrets['SMTP_PASS']) {
+                setSmtpPass(vaultSecrets['ZOHO_PASSWORD'] || vaultSecrets['SMTP_PASS'] || '');
+            }
         }
     }, [vaultSecrets]);
 
@@ -140,6 +155,20 @@ export default function LiquidityVaultScreen() {
                 { key: 'LOW_BALANCE_ALERT_ENABLED', value: alertEnabled ? 'true' : 'false', description: 'Enable Auto Low Balance Email Alerts' }
             ];
 
+            if (alertPhone.trim()) {
+                updates.push({ key: 'ALERT_PHONE', value: alertPhone.trim(), description: 'Admin Phone Number for Low Balance SMS Alerts' });
+            }
+            if (smtpEmail.trim()) {
+                updates.push({ key: 'ZOHO_EMAIL', value: smtpEmail.trim(), description: 'SMTP Sender Email' });
+                updates.push({ key: 'SMTP_USER', value: smtpEmail.trim(), description: 'SMTP User' });
+            }
+            if (smtpPass.trim()) {
+                updates.push({ key: 'ZOHO_PASSWORD', value: smtpPass.trim(), description: 'SMTP Password' });
+                updates.push({ key: 'SMTP_PASS', value: smtpPass.trim(), description: 'SMTP Password' });
+                updates.push({ key: 'SMTP_HOST', value: 'smtp.zoho.com', description: 'SMTP Host' });
+                updates.push({ key: 'SMTP_PORT', value: '465', description: 'SMTP Port' });
+            }
+
             for (const u of updates) {
                 await supabase.from('system_secrets').upsert(u);
                 await supabase.from('app_settings').upsert({ key: u.key, value: u.value });
@@ -152,7 +181,7 @@ export default function LiquidityVaultScreen() {
 
             Alert.alert(
                 "Alert Settings Saved! ⚡",
-                `Low Float Email Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, an automated email alert will be sent every ${alertIntervalMins.trim() || 30} minutes.`
+                `Low Float Email & SMS Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, automated email & SMS alerts will be sent every ${alertIntervalMins.trim() || 30} minutes.`
             );
             setShowAlertCard(false);
             fetchProviderBalances();
@@ -737,16 +766,31 @@ export default function LiquidityVaultScreen() {
                                 Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Set your preferred check frequency in minutes!
                             </Text>
 
-                            <Text style={styles.inputLabel}>Notification Email Address</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="e.g. admin@abumafhal.com"
-                                placeholderTextColor="#94a3b8"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={alertEmail}
-                                onChangeText={setAlertEmail}
-                            />
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Notification Email</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. admin@abumafhal.com"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={alertEmail}
+                                        onChangeText={setAlertEmail}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>SMS Phone (Optional)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. 08145853539"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="phone-pad"
+                                        value={alertPhone}
+                                        onChangeText={setAlertPhone}
+                                    />
+                                </View>
+                            </View>
 
                             <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <View style={{ flex: 1 }}>
@@ -773,8 +817,53 @@ export default function LiquidityVaultScreen() {
                                 </View>
                             </View>
 
+                            {/* SMTP Sender Setup for Direct Inbox Delivery */}
+                            <TouchableOpacity 
+                                onPress={() => setShowSmtpConfig(!showSmtpConfig)}
+                                style={{
+                                    backgroundColor: '#fffbeb', borderRadius: 8, padding: 8,
+                                    borderWidth: 1, borderColor: '#fef08a', marginVertical: 8,
+                                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+                                }}
+                            >
+                                <Text style={{ color: '#92400e', fontSize: 10, fontWeight: '700' }}>
+                                    🔐 Configure Custom SMTP / Zoho Email (100% Direct Inbox)
+                                </Text>
+                                <Ionicons name={showSmtpConfig ? "chevron-up" : "chevron-down"} size={14} color="#92400e" />
+                            </TouchableOpacity>
+
+                            {showSmtpConfig && (
+                                <View style={{ backgroundColor: '#f8fafc', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
+                                    <Text style={{ color: T.textSub, fontSize: 9.5, marginBottom: 8 }}>
+                                        Enter your official Zoho or domain email credentials below to send alerts directly from your own domain and guarantee Inbox delivery without hitting Spam.
+                                    </Text>
+
+                                    <Text style={styles.inputLabel}>Sender Email (Zoho / Domain)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. admin@abumafhal.com.ng"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={smtpEmail}
+                                        onChangeText={setSmtpEmail}
+                                    />
+
+                                    <Text style={styles.inputLabel}>SMTP / App Password</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter Zoho / SMTP App Password"
+                                        placeholderTextColor="#94a3b8"
+                                        secureTextEntry={true}
+                                        autoCapitalize="none"
+                                        value={smtpPass}
+                                        onChangeText={setSmtpPass}
+                                    />
+                                </View>
+                            )}
+
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
-                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email Alerts</Text>
+                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email & SMS Alerts</Text>
                                 <Switch
                                     value={alertEnabled}
                                     onValueChange={setAlertEnabled}
