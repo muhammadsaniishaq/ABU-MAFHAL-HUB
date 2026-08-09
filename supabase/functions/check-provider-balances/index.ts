@@ -910,6 +910,7 @@ serve(async (req: Request) => {
     const cooldownMs = Math.max(1, alertIntervalMins) * 60 * 1000
     const alertEnabled = (secrets['LOW_BALANCE_ALERT_ENABLED'] || 'true') === 'true'
     let alertReport: any = null
+    let smsReport: any = null
 
     if (alertEnabled && alertEmail && alertEmail.includes('@')) {
       const lowProviders = providerBalances.filter(p => p.currency === 'NGN' && p.status !== 'unconfigured' && Number(p.balance) < alertThreshold)
@@ -988,7 +989,6 @@ serve(async (req: Request) => {
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
             const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'N-Alert'
-            let smsReport: any = null
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
