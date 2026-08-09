@@ -988,48 +988,49 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
-            let termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || ''
+            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'ABU-MAFHAL'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
-                // Fetch approved sender IDs from Termii v3 API
-                let sendersData: any = null
-                try {
-                  const sRes = await fetch(`https://v3.api.termii.com/api/sender-id?api_key=${termiiKey.trim()}`)
-                  sendersData = await sRes.json().catch(() => ({}))
-                  if (sendersData?.data && Array.isArray(sendersData.data) && sendersData.data.length > 0) {
-                    const approved = sendersData.data.find((item: any) => item.status === 'unblock' || item.status === 'approved' || item.status === 'active')
-                    if (approved?.sender_id) {
-                      termiiSender = approved.sender_id
-                    }
-                  }
-                } catch (sErr) {
-                  console.warn('Sender list error:', sErr)
-                }
-
-                if (!termiiSender) termiiSender = 'ABUMAFHAL'
-
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
                 
-                let smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    api_key: termiiKey,
-                    to: formattedPhone,
-                    from: termiiSender,
-                    sms: smsMsg,
-                    type: 'plain',
-                    channel: 'generic'
-                  })
-                })
-                smsReport = await smsRes.json().catch(() => ({}))
-                if (smsReport) {
-                  smsReport._senderIdsLookup = sendersData
-                  smsReport._usedSender = termiiSender
-                  if (smsReport.message && smsReport.message.includes('SENDER_ID_NOT_APPROVED')) {
-                    smsReport.solution = "Go to https://dashboard.termii.com -> Sender ID tab, click 'Request Sender ID' and register 'ABUMAFHAL' (without hyphen)."
+                const attempts = [
+                  { url: 'https://v3.api.termii.com/api/sms/send', channel: 'generic', from: termiiSender },
+                  { url: 'https://v3.api.termii.com/api/sms/send', channel: 'dnd', from: termiiSender },
+                  { url: 'https://api.ng.termii.com/api/sms/send', channel: 'generic', from: termiiSender },
+                  { url: 'https://api.ng.termii.com/api/sms/send', channel: 'dnd', from: termiiSender },
+                  { url: 'https://v3.api.termii.com/api/sms/send', channel: 'dnd', from: 'N-Alert' }
+                ]
+
+                let lastReport: any = null
+                for (const attempt of attempts) {
+                  try {
+                    const smsRes = await fetch(attempt.url, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        api_key: termiiKey.trim(),
+                        to: formattedPhone,
+                        from: attempt.from,
+                        sms: smsMsg,
+                        type: 'plain',
+                        channel: attempt.channel
+                      })
+                    })
+                    const resJson = await smsRes.json().catch(() => ({}))
+                    lastReport = { ...resJson, _attemptUrl: attempt.url, _attemptChannel: attempt.channel, _attemptFrom: attempt.from }
+                    
+                    // If successful, stop trying further fallbacks
+                    if (smsRes.ok && (resJson.message_id || resJson.code === 'ok' || resJson.status === 'success' || `${resJson.message}`.toLowerCase().includes('successfully'))) {
+                      smsReport = lastReport
+                      break
+                    }
+                  } catch (attErr) {
+                    console.warn(`[Termii Attempt Failed] ${attempt.url} (${attempt.channel}/${attempt.from}):`, attErr)
                   }
+                }
+                if (!smsReport) {
+                  smsReport = lastReport
                 }
               } catch (smsErr: any) {
                 console.error('Termii SMS Alert Exception:', smsErr)
