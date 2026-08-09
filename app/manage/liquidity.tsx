@@ -92,6 +92,13 @@ export default function LiquidityVaultScreen() {
     const [bigiUsername, setBigiUsername] = useState('');
     const [bigiPassword, setBigiPassword] = useState('');
 
+    // Deposit Bank Account Form States
+    const [editingDepositBank, setEditingDepositBank] = useState(false);
+    const [fundBankName, setFundBankName] = useState('');
+    const [fundAccountNumber, setFundAccountNumber] = useState('');
+    const [fundAccountName, setFundAccountName] = useState('');
+    const [fundSaving, setFundSaving] = useState(false);
+
     // Withdrawal Form States
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawAccount, setWithdrawAccount] = useState('');
@@ -99,6 +106,44 @@ export default function LiquidityVaultScreen() {
     const [withdrawReason, setWithdrawReason] = useState('');
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [copiedText, setCopiedText] = useState(false);
+
+    useEffect(() => {
+        if (selectedDepositProvider) {
+            const pId = selectedDepositProvider.id.toUpperCase();
+            setFundBankName(vaultSecrets[`${pId}_BANK_NAME`] || vaultSecrets[`${pId}_BANK`] || selectedDepositProvider.depositAccount?.bankName || '');
+            setFundAccountNumber(vaultSecrets[`${pId}_ACCOUNT_NUMBER`] || vaultSecrets[`${pId}_ACCOUNT`] || selectedDepositProvider.depositAccount?.accountNumber || '');
+            setFundAccountName(vaultSecrets[`${pId}_ACCOUNT_NAME`] || selectedDepositProvider.depositAccount?.accountName || '');
+            setEditingDepositBank(false);
+        }
+    }, [selectedDepositProvider, vaultSecrets]);
+
+    const handleSaveDepositAccount = async () => {
+        if (!selectedDepositProvider) return;
+        setFundSaving(true);
+        try {
+            const pId = selectedDepositProvider.id.toUpperCase();
+            const updates = [
+                { key: `${pId}_BANK_NAME`, value: fundBankName.trim(), description: `${selectedDepositProvider.name} Top-up Bank Name` },
+                { key: `${pId}_ACCOUNT_NUMBER`, value: fundAccountNumber.trim(), description: `${selectedDepositProvider.name} Top-up Account Number` },
+                { key: `${pId}_ACCOUNT_NAME`, value: fundAccountName.trim(), description: `${selectedDepositProvider.name} Top-up Account Name` },
+            ];
+
+            for (const item of updates) {
+                if (item.value) {
+                    await supabase.from('system_secrets').upsert({ key: item.key, value: item.value, description: item.description });
+                    await supabase.from('app_settings').upsert({ key: item.key, value: item.value });
+                }
+            }
+
+            Alert.alert("Account Saved! 🎉", `Top-up bank account details for ${selectedDepositProvider.name} saved to Vault successfully.`);
+            setEditingDepositBank(false);
+            fetchProviderBalances();
+        } catch (e: any) {
+            Alert.alert("Save Error", e.message || "Failed to save bank account details.");
+        } finally {
+            setFundSaving(false);
+        }
+    };
 
     useEffect(() => {
         fetchProviderBalances();
@@ -775,48 +820,105 @@ export default function LiquidityVaultScreen() {
                             </View>
 
                             <Text style={styles.modalSubText}>
-                                Transfer funds to the dedicated bank account details below to instantly top up your API vendor balance.
+                                Transfer funds directly to the dedicated bank account details below to top up your {selectedDepositProvider?.name} merchant balance.
                             </Text>
 
-                            {selectedDepositProvider?.depositAccount ? (
-                                <View style={styles.bankDetailCard}>
-                                    <View style={styles.bankDetailRow}>
-                                        <Text style={styles.bankLabel}>Bank Name:</Text>
-                                        <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.bankName}</Text>
-                                    </View>
+                            <View style={styles.bankDetailCard}>
+                                <View style={styles.bankDetailRow}>
+                                    <Text style={styles.bankLabel}>Bank Name:</Text>
+                                    <Text style={styles.bankValue}>{fundBankName || selectedDepositProvider?.depositAccount?.bankName || 'Not Set'}</Text>
+                                </View>
 
-                                    <View style={styles.bankDetailRow}>
-                                        <Text style={styles.bankLabel}>Account Number:</Text>
-                                        <TouchableOpacity 
-                                            onPress={() => copyToClipboard(selectedDepositProvider.depositAccount!.accountNumber)}
-                                            style={{ flexDirection: 'row', alignItems: 'center' }}
-                                        >
-                                            <Text style={[styles.bankValue, { color: T.navy, marginRight: 5 }]}>
-                                                {selectedDepositProvider.depositAccount.accountNumber}
-                                            </Text>
-                                            <Ionicons name="copy-outline" size={13} color={T.goldDk} />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={styles.bankDetailRow}>
-                                        <Text style={styles.bankLabel}>Account Name:</Text>
-                                        <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.accountName}</Text>
-                                    </View>
-
-                                    {copiedText && (
-                                        <Text style={styles.copySuccessToast}>
-                                            ✓ Account number copied to clipboard!
+                                <View style={styles.bankDetailRow}>
+                                    <Text style={styles.bankLabel}>Account Number:</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => copyToClipboard(fundAccountNumber || selectedDepositProvider?.depositAccount?.accountNumber || '')}
+                                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                                    >
+                                        <Text style={[styles.bankValue, { color: T.navy, marginRight: 5 }]}>
+                                            {fundAccountNumber || selectedDepositProvider?.depositAccount?.accountNumber || 'Not Set'}
                                         </Text>
-                                    )}
+                                        <Ionicons name="copy-outline" size={13} color={T.goldDk} />
+                                    </TouchableOpacity>
+                                </View>
 
-                                    <Text style={styles.bankInstructions}>
-                                        💡 {selectedDepositProvider.depositAccount.instructions}
+                                <View style={styles.bankDetailRow}>
+                                    <Text style={styles.bankLabel}>Account Name:</Text>
+                                    <Text style={styles.bankValue}>{fundAccountName || selectedDepositProvider?.depositAccount?.accountName || 'Not Set'}</Text>
+                                </View>
+
+                                {copiedText && (
+                                    <Text style={styles.copySuccessToast}>
+                                        ✓ Account number copied to clipboard!
                                     </Text>
+                                )}
+
+                                <Text style={styles.bankInstructions}>
+                                    💡 Transfer funds directly to this bank account number to top up your API balance.
+                                </Text>
+                            </View>
+
+                            {/* Inline Bank Details Customiser / Editor */}
+                            {editingDepositBank ? (
+                                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: T.border, marginBottom: 12 }}>
+                                    <Text style={{ color: T.navy, fontWeight: '700', fontSize: 11, marginBottom: 8 }}>
+                                        ✏️ Edit Top-Up Bank Account (Saved in Vault)
+                                    </Text>
+
+                                    <Text style={styles.inputLabel}>Bank Name</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. Sterling Bank, Wema, Monnify, etc."
+                                        placeholderTextColor="#94a3b8"
+                                        value={fundBankName}
+                                        onChangeText={setFundBankName}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Account Number</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter 10-digit Top-Up Account Number"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="numeric"
+                                        value={fundAccountNumber}
+                                        onChangeText={setFundAccountNumber}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Account Name</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Enter Account Name"
+                                        placeholderTextColor="#94a3b8"
+                                        value={fundAccountName}
+                                        onChangeText={setFundAccountName}
+                                    />
+
+                                    <TouchableOpacity
+                                        onPress={handleSaveDepositAccount}
+                                        disabled={fundSaving}
+                                        style={styles.executeWithdrawBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        {fundSaving ? (
+                                            <ActivityIndicator color={T.navy} size="small" />
+                                        ) : (
+                                            <Text style={styles.executeWithdrawBtnText}>Save Account to Vault</Text>
+                                        )}
+                                    </TouchableOpacity>
                                 </View>
                             ) : (
-                                <Text style={{ color: T.textSub, marginVertical: 12, textAlign: 'center', fontSize: 11.5 }}>
-                                    Direct bank funding accounts are managed via the provider merchant portal.
-                                </Text>
+                                <TouchableOpacity 
+                                    onPress={() => setEditingDepositBank(true)}
+                                    style={{
+                                        paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8,
+                                        borderWidth: 1, borderColor: T.gold, backgroundColor: T.goldBg,
+                                        alignItems: 'center', marginBottom: 10
+                                    }}
+                                >
+                                    <Text style={{ color: T.navy, fontSize: 10.5, fontWeight: '700' }}>
+                                        ✏️ Edit / Update Top-Up Bank Account Details
+                                    </Text>
+                                </TouchableOpacity>
                             )}
 
                             <TouchableOpacity onPress={() => setSelectedDepositProvider(null)} style={styles.modalCloseBtn}>

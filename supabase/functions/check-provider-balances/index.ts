@@ -27,6 +27,17 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     const latency = Date.now() - startTime
     throw { error, latency }
   }
+function resolveDepositAccount(secrets: Record<string, string>, pId: string, defaultBank: string, defaultAccount: string, defaultName: string, defaultInstructions: string) {
+  const u = pId.toUpperCase()
+  const bankName = secrets[`${u}_BANK_NAME`] || secrets[`${u}_BANK`] || defaultBank
+  const accountNumber = secrets[`${u}_ACCOUNT_NUMBER`] || secrets[`${u}_ACCOUNT`] || secrets[`${u}_ACCT`] || defaultAccount
+  const accountName = secrets[`${u}_ACCOUNT_NAME`] || defaultName
+  return {
+    bankName,
+    accountNumber: accountNumber || 'Not set in Vault',
+    accountName,
+    instructions: defaultInstructions
+  }
 }
 
 serve(async (req: Request) => {
@@ -148,12 +159,7 @@ serve(async (req: Request) => {
         error: undefined,
         allowDeposit: true,
         allowWithdrawal: false,
-        depositAccount: {
-          bankName: 'Sterling Bank / Monnify (AgentHub)',
-          accountNumber: '9081234567',
-          accountName: 'AgentHub Corporate / ABUMAFHAL',
-          instructions: 'Transfer to this virtual account to top up AgentHub balance.'
-        }
+        depositAccount: resolveDepositAccount(secrets, 'agenthub', 'Monnify / Sterling Bank', '9081234567', 'AgentHub Corporate / ABUMAFHAL', 'Transfer to this virtual account to top up AgentHub balance.')
       })
     } else {
       providerBalances.push({
@@ -254,12 +260,7 @@ serve(async (req: Request) => {
         error: undefined,
         allowDeposit: true,
         allowWithdrawal: false,
-        depositAccount: {
-          bankName: 'Sterling / Monnify (BilalSadaSub)',
-          accountNumber: '8910293841',
-          accountName: 'BilalSadaSub Telecom',
-          instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'
-        }
+        depositAccount: resolveDepositAccount(secrets, 'bilalsadasub', 'Sterling / Monnify', '8910293841', 'BilalSadaSub Telecom', 'Auto-funding bank account for BilalSadaSub VTU portal.')
       })
     } else {
       providerBalances.push({
@@ -499,6 +500,7 @@ serve(async (req: Request) => {
         latencyMs,
         status: 'healthy',
         error: undefined,
+        depositAccount: resolveDepositAccount(secrets, 'payvessel', 'PayVessel Settlement Bank', '', 'PayVessel Merchant Account', 'Transfer to this virtual account to top up PayVessel balance.'),
         allowDeposit: true,
         allowWithdrawal: true,
         _debug: payvesselDebug
