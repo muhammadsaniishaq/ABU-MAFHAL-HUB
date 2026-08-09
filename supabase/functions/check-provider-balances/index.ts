@@ -27,6 +27,8 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     const latency = Date.now() - startTime
     throw { error, latency }
   }
+}
+
 function resolveDepositAccount(secrets: Record<string, string>, pId: string, defaultBank: string, defaultAccount: string, defaultName: string, defaultInstructions: string) {
   const u = pId.toUpperCase()
   const bankName = secrets[`${u}_BANK_NAME`] || secrets[`${u}_BANK`] || defaultBank
