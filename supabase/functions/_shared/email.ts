@@ -15,16 +15,23 @@ export const sendEmail = async (
     let smtpHost = Deno.env.get("SMTP_HOST") || "smtp.zoho.com";
     let smtpPort = Deno.env.get("SMTP_PORT") || "465";
 
-    // 1. Fetch credentials from DB system_secrets if supabaseAdmin is provided
+    // 1. Fetch credentials from DB system_secrets and app_settings if supabaseAdmin is provided
     if (supabaseAdmin) {
         try {
+            const targetKeys = ['RESEND_API_KEY', 'ZOHO_EMAIL', 'ZOHO_PASSWORD', 'SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'SMTP_PORT'];
             const { data: dbSecrets } = await supabaseAdmin
                 .from('system_secrets')
                 .select('key, value')
-                .in('key', ['RESEND_API_KEY', 'ZOHO_EMAIL', 'ZOHO_PASSWORD', 'SMTP_USER', 'SMTP_PASS', 'SMTP_HOST', 'SMTP_PORT']);
+                .in('key', targetKeys);
 
-            if (dbSecrets && dbSecrets.length > 0) {
-                const getVal = (k: string) => dbSecrets.find(s => s.key === k)?.value?.trim();
+            const { data: appSettings } = await supabaseAdmin
+                .from('app_settings')
+                .select('key, value')
+                .in('key', targetKeys);
+
+            const combined = [...(dbSecrets || []), ...(appSettings || [])];
+            if (combined.length > 0) {
+                const getVal = (k: string) => combined.find(s => s.key === k && s.value && s.value.trim() !== '')?.value?.trim();
                 if (!resendApiKey) resendApiKey = getVal('RESEND_API_KEY');
                 if (!zohoUser) zohoUser = getVal('ZOHO_EMAIL') || getVal('SMTP_USER');
                 if (!zohoPass) zohoPass = getVal('ZOHO_PASSWORD') || getVal('SMTP_PASS');
