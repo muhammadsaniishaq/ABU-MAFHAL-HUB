@@ -988,13 +988,13 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
-            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'Termii'
+            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'ABU-MAFHAL'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
                 
-                // Attempt 1: Try v3 API with DND channel
+                // Attempt 1: Try v3 API with generic channel & ABU-MAFHAL
                 let smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -1004,25 +1004,25 @@ serve(async (req: Request) => {
                     from: termiiSender,
                     sms: smsMsg,
                     type: 'plain',
-                    channel: 'dnd'
+                    channel: 'generic'
                   })
                 })
                 smsReport = await smsRes.json().catch(() => ({}))
 
-                // Attempt 2: Fallback to generic channel with talert if dnd fails or returns error
+                // Attempt 2: Fallback to dnd channel if generic fails
                 const isErr = smsReport?.code !== 'ok' && (smsReport?.error || `${smsReport?.status}` === '422' || JSON.stringify(smsReport).includes('SENDER_ID'))
                 if (smsReport && isErr) {
-                  console.log('Termii DND channel failed, retrying on generic channel with talert...')
+                  console.log('Termii generic channel failed, retrying on DND channel with ABU-MAFHAL...')
                   smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       api_key: termiiKey,
                       to: formattedPhone,
-                      from: 'talert',
+                      from: termiiSender,
                       sms: smsMsg,
                       type: 'plain',
-                      channel: 'generic'
+                      channel: 'dnd'
                     })
                   })
                   smsReport = await smsRes.json().catch(() => ({}))
