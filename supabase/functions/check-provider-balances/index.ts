@@ -89,9 +89,9 @@ serve(async (req: Request) => {
     const clubkonnectKey = secrets['CLUBKONNECT_API_KEY'] || secrets['CLUBKONNECT_KEY'] || Deno.env.get('CLUBKONNECT_API_KEY') || ''
     const clubkonnectUserId = secrets['CLUBKONNECT_USER_ID'] || secrets['CLUBKONNECT_USER'] || ''
     const idProKey = secrets['IDPRO_API_KEY'] || secrets['IDPRO_KEY'] || Deno.env.get('IDPRO_API_KEY') || ''
-    const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
-    const payVesselSecret = secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_SECRET'] || secrets['PAYVESSEL_API_SECRET'] || ''
-    const nineBoostKey = secrets['NINEBOOST_API_KEY'] || secrets['NINEBOOST_KEY'] || secrets['NINEBOOST_TOKEN'] || secrets['NINE_BOOST_API_KEY'] || Deno.env.get('NINEBOOST_API_KEY') || ''
+    const payVesselKey = secrets['PAYVESSEL_API_KEY'] || secrets['PAYVESSEL_KEY'] || secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_API_SECRET'] || secrets['PAYBESSEL_API_KEY'] || secrets['PAYBESSEL_KEY'] || Deno.env.get('PAYVESSEL_API_KEY') || ''
+    const payVesselSecret = secrets['PAYVESSEL_API_SECRET'] || secrets['PAYVESSEL_SECRET_KEY'] || secrets['PAYVESSEL_SECRET'] || secrets['PAYVESSEL_API_KEY'] || ''
+    const payVesselBusinessId = secrets['PAYVESSEL_BUSINESS_ID'] || secrets['PAYVESSEL_BUSINESS'] || ''
     const nowPaymentsKey = secrets['NOWPAYMENTS_API_KEY'] || secrets['NOWPAYMENTS_KEY'] || Deno.env.get('NOWPAYMENTS_API_KEY') || ''
     const bigiToken = secrets['BIGI_API_TOKEN'] || secrets['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || ''
     const bigiUsername = secrets['BIGISUB_USERNAME'] || secrets['BIGI_USERNAME'] || secrets['BIGI_USER'] || Deno.env.get('BIGISUB_USERNAME') || ''
@@ -417,98 +417,102 @@ serve(async (req: Request) => {
       })
     }
 
-    // 7. PayVessel (Payment & Payout Gateway) - Official Spec: GET /api/v1/user/balance with api-key & api-secret
+    // 7. PayVessel (Payment & Payout Gateway)
     if (payVesselKey && payVesselKey.trim() !== '') {
       let balance = 0
       let latencyMs = 170
       let fetched = false
+      let apiErrorMsg = ''
 
-      const headers: Record<string, string> = {
+      const baseHeaders: Record<string, string> = {
         'api-key': payVesselKey.trim(),
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-      if (payVesselSecret && payVesselSecret.trim() !== '') {
-        headers['api-secret'] = payVesselSecret.trim()
-      }
-      // Also try Authorization Bearer and x-api-key styles
-      const headersBearer: Record<string, string> = {
-        'Authorization': `Bearer ${payVesselKey.trim()}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-      const headersXKey: Record<string, string> = {
         'x-api-key': payVesselKey.trim(),
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
+      if (payVesselSecret && payVesselSecret.trim() !== '') {
+        baseHeaders['api-secret'] = payVesselSecret.trim()
+        baseHeaders['secret-key'] = payVesselSecret.trim()
+        baseHeaders['api-secret-key'] = payVesselSecret.trim()
+      }
+      if (payVesselBusinessId && payVesselBusinessId.trim() !== '') {
+        baseHeaders['api-business-id'] = payVesselBusinessId.trim()
+        baseHeaders['business-id'] = payVesselBusinessId.trim()
+      }
 
-      // Attempt 1: GET https://api.payvessel.com/api/v1/user/balance (api-key header)
-      try {
-        const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers })
-        const data = await response.json()
-        const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance ?? data?.data?.wallet_balance
-        if (rawBal !== undefined && rawBal !== null) {
-          balance = Number(rawBal)
-          latencyMs = latency
-          fetched = true
+      const endpointsToTry = [
+        'https://api.payvessel.com/api/v1/merchant/balance',
+        'https://api.payvessel.com/pms/api/external/request/balance',
+        'https://api.payvessel.com/api/v1/user/balance',
+        'https://api.payvessel.com/api/v1/wallet/balance',
+        'https://api.payvessel.com/api/v1/balance'
+      ]
+
+      for (const endpoint of endpointsToTry) {
+        if (fetched) break;
+        try {
+          const { response, latency } = await fetchWithTimeout(endpoint, { headers: baseHeaders })
+          const data = await response.json().catch(() => ({}))
+          if (data?.message && !data?.status && data?.status !== 'success') {
+            apiErrorMsg = String(data.message);
+          }
+          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.wallet_balance ?? data?.data?.wallet_balance ?? data?.ledger_balance ?? data?.data?.ledger_balance ?? data?.banks?.[0]?.balance
+          if (rawBal !== undefined && rawBal !== null) {
+            balance = Number(rawBal)
+            latencyMs = latency
+            fetched = true
+            apiErrorMsg = ''
+          }
+        } catch (e: any) {
+          if (!apiErrorMsg) apiErrorMsg = e?.error?.message || e?.message || 'Network timeout'
         }
-      } catch (e) {}
-
-      // Attempt 2: GET https://api.payvessel.com/api/v1/wallet/balance (api-key header)
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/wallet/balance', { headers })
-          const data = await response.json()
-          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.payload?.available_balance ?? data?.balance ?? data?.data?.balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
       }
 
-      // Attempt 3: Bearer token style
-      if (!fetched) {
+      // Fallback attempt: POST to /pms/api/external/request/balance
+      if (!fetched && payVesselBusinessId) {
         try {
-          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers: headersBearer })
-          const data = await response.json()
-          const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.balance ?? data?.data?.balance ?? data?.data?.wallet_balance
-          if (rawBal !== undefined && rawBal !== null) {
-            balance = Number(rawBal)
-            latencyMs = latency
-            fetched = true
-          }
-        } catch (e) {}
-      }
-
-      // Attempt 4: x-api-key header style
-      if (!fetched) {
-        try {
-          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/api/v1/user/balance', { headers: headersXKey })
-          const data = await response.json()
+          const { response, latency } = await fetchWithTimeout('https://api.payvessel.com/pms/api/external/request/balance', {
+            method: 'POST',
+            headers: baseHeaders,
+            body: JSON.stringify({ businessid: payVesselBusinessId.trim(), business_id: payVesselBusinessId.trim() })
+          })
+          const data = await response.json().catch(() => ({}))
           const rawBal = data?.available_balance ?? data?.data?.available_balance ?? data?.balance ?? data?.data?.balance
           if (rawBal !== undefined && rawBal !== null) {
             balance = Number(rawBal)
             latencyMs = latency
             fetched = true
+            apiErrorMsg = ''
           }
         } catch (e) {}
       }
 
-      providerBalances.push({
-        id: 'payvessel',
-        name: 'PayVessel (Payment & Payout Gateway)',
-        category: 'Payment Gateway',
-        balance: isNaN(balance) ? 0 : balance,
-        currency: 'NGN',
-        latencyMs,
-        status: 'healthy',
-        error: undefined,
-        allowDeposit: true,
-        allowWithdrawal: true
-      })
+      if (fetched) {
+        providerBalances.push({
+          id: 'payvessel',
+          name: 'PayVessel (Payment & Payout Gateway)',
+          category: 'Payment Gateway',
+          balance: isNaN(balance) ? 0 : balance,
+          currency: 'NGN',
+          latencyMs,
+          status: 'healthy',
+          error: undefined,
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      } else {
+        providerBalances.push({
+          id: 'payvessel',
+          name: 'PayVessel (Payment & Payout Gateway)',
+          category: 'Payment Gateway',
+          balance: 0,
+          currency: 'NGN',
+          status: payVesselSecret ? 'critical' : 'unconfigured',
+          error: apiErrorMsg || 'Unable to fetch balance. Check API Key & Secret in Vault.',
+          allowDeposit: true,
+          allowWithdrawal: true
+        })
+      }
     } else {
       providerBalances.push({
         id: 'payvessel',
