@@ -1001,6 +1001,8 @@ export default function LiquidityVaultScreen() {
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
             </Modal>
         </View>
     );
