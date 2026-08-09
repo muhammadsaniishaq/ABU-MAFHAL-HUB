@@ -988,12 +988,13 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
-            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'N-Alert'
+            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'AbuMafhal'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
-                const smsRes = await fetch('https://api.ng.termii.com/api/sms/send', {
+                
+                let smsRes = await fetch('https://api.ng.termii.com/api/sms/send', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1006,6 +1007,24 @@ serve(async (req: Request) => {
                   })
                 })
                 smsReport = await smsRes.json().catch(() => ({}))
+
+                // Fallback to DND channel if generic returns 422 or SENDER_ID_NOT_APPROVED
+                if (smsReport && (smsReport.error?.includes('SENDER_ID') || smsReport.status === 422 || smsReport.status === '400')) {
+                  console.log('Termii generic channel failed, retrying with DND channel...')
+                  smsRes = await fetch('https://api.ng.termii.com/api/sms/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      to: formattedPhone,
+                      from: termiiSender,
+                      sms: smsMsg,
+                      type: 'plain',
+                      channel: 'dnd',
+                      api_key: termiiKey
+                    })
+                  })
+                  smsReport = await smsRes.json().catch(() => ({}))
+                }
               } catch (smsErr: any) {
                 console.error('Termii SMS Alert Exception:', smsErr)
               }

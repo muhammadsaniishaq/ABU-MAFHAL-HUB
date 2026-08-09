@@ -96,6 +96,7 @@ export default function LiquidityVaultScreen() {
     const [alertEmail, setAlertEmail] = useState('');
     const [alertPhone, setAlertPhone] = useState('');
     const [termiiApiKey, setTermiiApiKey] = useState('');
+    const [termiiSenderId, setTermiiSenderId] = useState('AbuMafhal');
     const [alertThreshold, setAlertThreshold] = useState('5000');
     const [alertIntervalMins, setAlertIntervalMins] = useState('30');
     const [alertEnabled, setAlertEnabled] = useState(true);
@@ -136,6 +137,9 @@ export default function LiquidityVaultScreen() {
             if (vaultSecrets['TERMII_API_KEY'] || vaultSecrets['TERMII_KEY']) {
                 setTermiiApiKey(vaultSecrets['TERMII_API_KEY'] || vaultSecrets['TERMII_KEY'] || '');
             }
+            if (vaultSecrets['TERMII_SENDER_ID'] || vaultSecrets['TERMII_SENDER']) {
+                setTermiiSenderId(vaultSecrets['TERMII_SENDER_ID'] || vaultSecrets['TERMII_SENDER'] || 'AbuMafhal');
+            }
             if (vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER']) {
                 setSmtpEmail(vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER'] || '');
             }
@@ -165,6 +169,9 @@ export default function LiquidityVaultScreen() {
             if (termiiApiKey.trim()) {
                 updates.push({ key: 'TERMII_API_KEY', value: termiiApiKey.trim(), description: 'Termii SMS Gateway API Key' });
                 updates.push({ key: 'TERMII_KEY', value: termiiApiKey.trim(), description: 'Termii SMS Gateway API Key' });
+            }
+            if (termiiSenderId.trim()) {
+                updates.push({ key: 'TERMII_SENDER_ID', value: termiiSenderId.trim(), description: 'Termii SMS Sender ID' });
             }
             if (smtpEmail.trim()) {
                 updates.push({ key: 'ZOHO_EMAIL', value: smtpEmail.trim(), description: 'SMTP Sender Email' });
@@ -800,15 +807,30 @@ export default function LiquidityVaultScreen() {
                                 </View>
                             </View>
 
-                            <Text style={styles.inputLabel}>Termii SMS API Key (For Phone SMS Alerts)</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="Paste your Termii API Key here..."
-                                placeholderTextColor="#94a3b8"
-                                autoCapitalize="none"
-                                value={termiiApiKey}
-                                onChangeText={setTermiiApiKey}
-                            />
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1.5 }}>
+                                    <Text style={styles.inputLabel}>Termii SMS API Key</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Termii API Key"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={termiiApiKey}
+                                        onChangeText={setTermiiApiKey}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Sender ID</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. AbuMafhal"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={termiiSenderId}
+                                        onChangeText={setTermiiSenderId}
+                                    />
+                                </View>
+                            </View>
 
                             <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <View style={{ flex: 1 }}>
