@@ -906,9 +906,12 @@ serve(async (req: Request) => {
     // -------------------------------------------------------------------------
     const alertEmail = secrets['LOW_BALANCE_ALERT_EMAIL'] || secrets['ALERT_EMAIL'] || Deno.env.get('ADMIN_ALERT_EMAIL') || ''
     const alertThreshold = Number(secrets['LOW_BALANCE_ALERT_THRESHOLD'] || '5000')
-    const alertIntervalMins = Number(secrets['LOW_BALANCE_ALERT_INTERVAL_MINS'] || '30')
-    const cooldownMs = Math.max(1, alertIntervalMins) * 60 * 1000
-    const alertEnabled = (secrets['LOW_BALANCE_ALERT_ENABLED'] || 'true') === 'true'
+    const alertIntervalMins = Math.max(1, Number(secrets['LOW_BALANCE_ALERT_INTERVAL_MINS'] || '30'))
+    const cooldownMs = alertIntervalMins * 60 * 1000
+
+    const rawEnabledStr = (secrets['LOW_BALANCE_ALERT_ENABLED'] || secrets['LOW_BALANCE_ALERT_ENABLE'] || 'true').toLowerCase().trim()
+    const alertEnabled = rawEnabledStr === 'true' || rawEnabledStr === '1' || rawEnabledStr === 'on' || rawEnabledStr === 'enabled'
+
     let alertReport: any = null
     let smsReport: any = null
 
@@ -917,9 +920,9 @@ serve(async (req: Request) => {
 
       if (lowProviders.length > 0) {
         const lastSentStr = secrets['LAST_LOW_BALANCE_ALERT_SENT'] || ''
-        const lastSentTime = lastSentStr ? new Date(lastSentStr).getTime() : 0
         const nowMs = Date.now()
         const isForceTrigger = reqData?.triggerAlertCheck === true || reqData?.force === true
+        const lastSentTime = lastSentStr ? new Date(lastSentStr).getTime() : (isForceTrigger ? 0 : nowMs)
 
         // Cooldown: Dynamic interval configured by user in minutes (default 30 mins)
         if (isForceTrigger || (nowMs - lastSentTime >= cooldownMs)) {

@@ -156,20 +156,27 @@ export default function LiquidityVaultScreen() {
         setAlertEnabled(newValue);
         const strVal = newValue ? 'true' : 'false';
         try {
-            await supabase.from('system_secrets').upsert({
-                key: 'LOW_BALANCE_ALERT_ENABLED',
-                value: strVal,
-                description: 'Enable Auto Low Balance Email Alerts',
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            const keysToUpdate = ['LOW_BALANCE_ALERT_ENABLED', 'low_balance_alert_enabled'];
+            for (const k of keysToUpdate) {
+                await supabase.from('system_secrets').upsert({
+                    key: k,
+                    value: strVal,
+                    description: 'Enable Auto Low Balance Email Alerts',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
 
-            await supabase.from('app_settings').upsert({
-                key: 'LOW_BALANCE_ALERT_ENABLED',
-                value: strVal,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+                await supabase.from('app_settings').upsert({
+                    key: k,
+                    value: strVal,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'key' });
+            }
 
-            setVaultSecrets(prev => ({ ...prev, 'LOW_BALANCE_ALERT_ENABLED': strVal }));
+            setVaultSecrets(prev => ({
+                ...prev,
+                'LOW_BALANCE_ALERT_ENABLED': strVal,
+                'low_balance_alert_enabled': strVal
+            }));
 
             if (newValue) {
                 if (alertEmail.trim()) {
