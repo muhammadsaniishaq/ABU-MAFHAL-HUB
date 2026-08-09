@@ -988,13 +988,13 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
-            let termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'ABU-MAFHAL'
+            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'Termii'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
                 
-                // Attempt 1: Try with configured sender ID
+                // Try v3 API on DND route (bypasses custom sender ID restrictions)
                 let smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -1004,29 +1004,10 @@ serve(async (req: Request) => {
                     from: termiiSender,
                     sms: smsMsg,
                     type: 'plain',
-                    channel: 'generic'
+                    channel: 'dnd'
                   })
                 })
                 smsReport = await smsRes.json().catch(() => ({}))
-
-                // Attempt 2: Fallback to pre-approved 'N-Alert' if custom sender ID is DECLINED or NOT APPROVED
-                const isDeclined = JSON.stringify(smsReport).includes('SENDER_ID') || JSON.stringify(smsReport).includes('DECLINED') || smsReport?.status === 422
-                if (smsReport && isDeclined) {
-                  console.log('Termii custom sender ID declined, falling back to pre-approved N-Alert...')
-                  smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      api_key: termiiKey,
-                      to: formattedPhone,
-                      from: 'N-Alert',
-                      sms: smsMsg,
-                      type: 'plain',
-                      channel: 'generic'
-                    })
-                  })
-                  smsReport = await smsRes.json().catch(() => ({}))
-                }
               } catch (smsErr: any) {
                 console.error('Termii SMS Alert Exception:', smsErr)
               }
