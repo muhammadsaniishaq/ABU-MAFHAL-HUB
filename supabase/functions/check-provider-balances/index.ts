@@ -991,27 +991,10 @@ serve(async (req: Request) => {
             let termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'ABU-MAFHAL'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
-                // Query all registered Sender IDs on Termii workspace
-                let registeredSenders: any = []
-                try {
-                  const sRes = await fetch(`https://api.ng.termii.com/api/sender-id?api_key=${termiiKey.trim()}`)
-                  const sData = await sRes.json().catch(() => ({}))
-                  registeredSenders = sData?.data || sData || []
-                  if (Array.isArray(sData?.data)) {
-                    const approvedItem = sData.data.find((item: any) => 
-                      item.status === 'unblock' || item.status === 'approved' || item.status === 'active' || item.status === 'success'
-                    )
-                    if (approvedItem?.sender_id) {
-                      termiiSender = approvedItem.sender_id
-                    }
-                  }
-                } catch (eSender) {
-                  console.warn('Sender lookup err:', eSender)
-                }
-
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
                 
+                // Attempt 1: Try with configured sender ID
                 let smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -1025,25 +1008,21 @@ serve(async (req: Request) => {
                   })
                 })
                 smsReport = await smsRes.json().catch(() => ({}))
-                if (smsReport) {
-                  smsReport._registeredSenders = registeredSenders
-                  smsReport._activeSenderUsed = termiiSender
-                }
 
-                // Attempt 2: Fallback to dnd channel if generic fails
-                const isErr = smsReport?.code !== 'ok' && (smsReport?.error || `${smsReport?.status}` === '422' || JSON.stringify(smsReport).includes('SENDER_ID'))
-                if (smsReport && isErr) {
-                  console.log('Termii generic channel failed, retrying on DND channel with ABU-MAFHAL...')
+                // Attempt 2: Fallback to pre-approved 'N-Alert' if custom sender ID is DECLINED or NOT APPROVED
+                const isDeclined = JSON.stringify(smsReport).includes('SENDER_ID') || JSON.stringify(smsReport).includes('DECLINED') || smsReport?.status === 422
+                if (smsReport && isDeclined) {
+                  console.log('Termii custom sender ID declined, falling back to pre-approved N-Alert...')
                   smsRes = await fetch('https://v3.api.termii.com/api/sms/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       api_key: termiiKey,
                       to: formattedPhone,
-                      from: termiiSender,
+                      from: 'N-Alert',
                       sms: smsMsg,
                       type: 'plain',
-                      channel: 'dnd'
+                      channel: 'generic'
                     })
                   })
                   smsReport = await smsRes.json().catch(() => ({}))
