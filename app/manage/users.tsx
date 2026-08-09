@@ -8,7 +8,7 @@ import SecurityModal from '../../components/SecurityModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-// Design Theme Tokens (Embedded CSS)
+// Executive Theme Tokens (Embedded CSS)
 const T = {
     navyDark: '#0A1128',
     navyMid: '#111D3B',
@@ -35,7 +35,7 @@ const T = {
     teal: '#0D9488',
 };
 
-// Define User Interface matching Schema
+// Complete Schema Interface
 interface UserProfile {
     id: string;
     full_name: string;
@@ -50,8 +50,10 @@ interface UserProfile {
     last_login?: string;
     kyc_verified?: boolean;
     transfer_limit?: number;
+    single_tx_limit?: number;
     admin_notes?: string;
     account_number?: string;
+    bank_name?: string;
     bvn?: string;
     nin?: string;
     kyc_tier?: number;
@@ -65,6 +67,7 @@ interface UserProfile {
     credit_balance?: number;
     crypto_enabled?: boolean;
     virtual_cards_enabled?: boolean;
+    services_enabled?: boolean;
     corporate_email?: string | null;
 }
 
@@ -75,6 +78,7 @@ interface Transaction {
     status: string;
     created_at: string;
     description?: string;
+    reference?: string;
 }
 
 interface LoginLog {
@@ -91,28 +95,29 @@ export default function UserManagement() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal'>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'balance_high' | 'balance_low'>('newest');
     
-    // Selection & Actions
+    // Selection & Modal States
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [modalTab, setModalTab] = useState<'overview' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
     const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
     const [userLogs, setUserLogs] = useState<LoginLog[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const [showSecurity, setShowSecurity] = useState(false);
     const [pendingAction, setPendingAction] = useState<{ 
-        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards', 
+        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards' | 'toggle_services' | 'upgrade_tier', 
         amount?: number, 
         role?: string, 
+        tier?: number,
         payload?: any 
     } | null>(null);
     
-    // Fund/Debit Input
+    // Inputs & Forms
     const [fundAmount, setFundAmount] = useState('');
     const [isDebit, setIsDebit] = useState(false);
 
-    // Edit Profile Loading
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ 
         full_name: '', 
@@ -132,21 +137,21 @@ export default function UserManagement() {
         kyc_tier: '1'
     });
 
-    // Notification Input
     const [notifyMessage, setNotifyMessage] = useState('');
+    const [notifyTitle, setNotifyTitle] = useState('');
     const [showNotifyInput, setShowNotifyInput] = useState(false);
     const [showGenerateAccount, setShowGenerateAccount] = useState(false);
     const [bvnInput, setBvnInput] = useState('');
 
-    // Governance Inputs
     const [limitInput, setLimitInput] = useState('');
+    const [singleLimitInput, setSingleLimitInput] = useState('');
     const [adminNotes, setAdminNotes] = useState('');
 
-    // Bulk Selection & Modern UI
+    // Multi-Selection
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-    // Create User State
+    // Create User Modal
     const [showCreateUser, setShowCreateUser] = useState(false);
     const [newUserForm, setNewUserForm] = useState({ 
         fullName: '', 
@@ -164,15 +169,17 @@ export default function UserManagement() {
     });
     const [creatingUser, setCreatingUser] = useState(false);
 
-    // AI & Polish
-    const [aiInsight, setAiInsight] = useState<{ risk: 'Low' | 'Medium' | 'High', loyalty: 'Bronze' | 'Silver' | 'Gold', nextAction: string } | null>(null);
+    // AI & Intelligence
+    const [aiInsight, setAiInsight] = useState<{ risk: 'Low' | 'Medium' | 'High', loyalty: 'Bronze' | 'Silver' | 'Gold', nextAction: string, score: number } | null>(null);
 
-    // Stats
+    // Dynamic Executive KPIs
     const stats = {
         totalUsers: users.length,
         totalBalance: users.reduce((acc, u) => acc + (u.balance || u.credit_balance || 0), 0),
         activeUsers: users.filter(u => u.status === 'active').length,
-        verifiedUsers: users.filter(u => u.kyc_verified).length
+        verifiedUsers: users.filter(u => u.kyc_verified).length,
+        corporateAdmins: users.filter(u => u.corporate_email).length,
+        highRiskCount: users.filter(u => u.status === 'suspended').length
     };
 
     useEffect(() => {
@@ -210,12 +217,14 @@ export default function UserManagement() {
         const balance = user.balance || user.credit_balance || 0;
         const risk = user.status === 'suspended' ? 'High' : (balance > 1000000 ? 'Medium' : 'Low');
         const loyalty = balance > 500000 ? 'Gold' : (balance > 50000 ? 'Silver' : 'Bronze');
-        let next = 'None';
-        if (risk === 'High') next = 'Review Activity';
-        else if (loyalty === 'Gold') next = 'Send Reward';
-        else if (!user.kyc_verified) next = 'Request KYC';
+        const score = Math.min(100, Math.max(20, Math.floor((balance / 10000) + (user.kyc_verified ? 30 : 0) + (user.status === 'active' ? 20 : 0))));
+        
+        let next = 'All Systems Normal';
+        if (risk === 'High') next = 'Review Security Activity';
+        else if (loyalty === 'Gold') next = 'Eligible for VIP Cashback';
+        else if (!user.kyc_verified) next = 'Request BVN/NIN Verification';
 
-        setAiInsight({ risk, loyalty, nextAction: next });
+        setAiInsight({ risk, loyalty, nextAction: next, score });
     };
 
     const executeBulkAction = async (action: 'block' | 'unblock' | 'verify') => {
@@ -247,6 +256,7 @@ export default function UserManagement() {
             fetchUserHistory(selectedUser.id);
             generateForensics(selectedUser.id);
             runSmartScan(selectedUser);
+            setModalTab('overview');
             setEditForm({
                 full_name: selectedUser.full_name || '',
                 phone: selectedUser.phone || '',
@@ -265,6 +275,7 @@ export default function UserManagement() {
                 kyc_tier: selectedUser.kyc_tier?.toString() || '1'
             });
             setLimitInput(selectedUser.transfer_limit?.toString() || '');
+            setSingleLimitInput(selectedUser.single_tx_limit?.toString() || '');
             setAdminNotes(selectedUser.admin_notes || '');
             setIsEditing(false);
             setShowNotifyInput(false);
@@ -297,6 +308,7 @@ export default function UserManagement() {
             const enrichedData = (data || []).map((u: any) => ({
                 ...u,
                 account_number: u.virtual_accounts?.[0]?.account_number || u.virtual_accounts?.account_number || null,
+                bank_name: u.virtual_accounts?.[0]?.bank_name || u.virtual_accounts?.bank_name || 'Wema Bank',
                 corporate_email: corpMap.get(u.id) || (u.email?.endsWith('@abumafhal.com.ng') ? u.email : null)
             }));
             setUsers(enrichedData);
@@ -315,7 +327,7 @@ export default function UserManagement() {
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(5);
+                .limit(10);
             
             if (!error && data) {
                 setUserTransactions(data);
@@ -330,14 +342,14 @@ export default function UserManagement() {
     };
 
     const generateForensics = (userId: string) => {
-        const devices = ['iPhone 15 Pro', 'Samsung S24 Ultra', 'Windows PC', 'MacBook Air M3'];
-        const locations = ['Kano, NG', 'Abuja, NG', 'Lagos, NG', 'Kaduna, NG'];
-        const logs: LoginLog[] = Array.from({ length: 3 }).map((_, i) => ({
+        const devices = ['iPhone 15 Pro Max', 'Samsung S24 Ultra', 'MacBook Air M3', 'Windows 11 PC', 'Google Pixel 8'];
+        const locations = ['Kano, NG', 'Abuja, NG', 'Lagos, NG', 'Kaduna, NG', 'Port Harcourt, NG'];
+        const logs: LoginLog[] = Array.from({ length: 5 }).map((_, i) => ({
             id: `log-${i}`,
             device: devices[Math.floor(Math.random() * devices.length)],
             ip: `102.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
             location: locations[Math.floor(Math.random() * locations.length)],
-            timestamp: new Date(Date.now() - Math.floor(Math.random() * 1000000000)).toISOString()
+            timestamp: new Date(Date.now() - Math.floor(Math.random() * 800000000)).toISOString()
         })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         
         setUserLogs(logs);
@@ -352,17 +364,26 @@ export default function UserManagement() {
             const matchesSearch = u.full_name?.toLowerCase().includes(search.toLowerCase()) || 
                                   u.email?.toLowerCase().includes(search.toLowerCase()) ||
                                   u.phone?.includes(search) ||
-                                  u.custom_id?.toLowerCase().includes(search.toLowerCase());
-            const matchesStatus = filterStatus === 'all' ? true : u.status === filterStatus;
+                                  u.custom_id?.toLowerCase().includes(search.toLowerCase()) ||
+                                  u.account_number?.includes(search);
+            
+            let matchesStatus = true;
+            if (filterStatus === 'active') matchesStatus = u.status === 'active';
+            if (filterStatus === 'suspended') matchesStatus = u.status === 'suspended';
+            if (filterStatus === 'admin') matchesStatus = u.role === 'admin' || u.role === 'super_admin';
+            if (filterStatus === 'verified') matchesStatus = !!u.kyc_verified;
+            if (filterStatus === 'corporate') matchesStatus = !!u.corporate_email;
+            if (filterStatus === 'high_bal') matchesStatus = (u.balance || u.credit_balance || 0) >= 100000;
+
             return matchesSearch && matchesStatus;
         });
 
         if (sortBy === 'newest') {
             result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         } else if (sortBy === 'balance_high') {
-            result.sort((a, b) => (b.credit_balance || 0) - (a.credit_balance || 0));
+            result.sort((a, b) => (b.credit_balance || b.balance || 0) - (a.credit_balance || a.balance || 0));
         } else if (sortBy === 'balance_low') {
-            result.sort((a, b) => (a.credit_balance || 0) - (b.credit_balance || 0));
+            result.sort((a, b) => (a.credit_balance || a.balance || 0) - (b.credit_balance || b.balance || 0));
         }
 
         return result;
@@ -403,7 +424,7 @@ export default function UserManagement() {
                 const newStatus = selectedUser.status === 'active' ? 'suspended' : 'active';
                 const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', selectedUser.id);
                 if (error) throw error;
-                Alert.alert("Updated", `User status is now ${newStatus.toUpperCase()}`);
+                Alert.alert("Status Updated", `User status is now ${newStatus.toUpperCase()}`);
                 setSelectedUser({ ...selectedUser, status: newStatus });
                 fetchUsers();
             }
@@ -429,6 +450,22 @@ export default function UserManagement() {
                 if (error) throw error;
                 Alert.alert("Virtual Cards 💳", `Virtual Cards are now ${newStatus ? 'ENABLED' : 'DISABLED'} for this user`);
                 setSelectedUser({ ...selectedUser, virtual_cards_enabled: newStatus });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'toggle_services') {
+                const newStatus = !(selectedUser.services_enabled ?? true);
+                const { error } = await supabase.from('profiles').update({ services_enabled: newStatus }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("VTU Services 📱", `Airtime & Data Purchases are now ${newStatus ? 'ENABLED' : 'DISABLED'} for this user`);
+                setSelectedUser({ ...selectedUser, services_enabled: newStatus });
+                fetchUsers();
+            }
+            else if (pendingAction.type === 'upgrade_tier') {
+                const targetTier = pendingAction.tier || 2;
+                const { error } = await supabase.from('profiles').update({ kyc_tier: targetTier, kyc_verified: targetTier > 1 }).eq('id', selectedUser.id);
+                if (error) throw error;
+                Alert.alert("KYC Tier Upgraded 🛡️", `User KYC is now Tier ${targetTier}`);
+                setSelectedUser({ ...selectedUser, kyc_tier: targetTier, kyc_verified: targetTier > 1 });
                 fetchUsers();
             }
             else if (pendingAction.type === 'reset_pin') {
@@ -492,8 +529,18 @@ export default function UserManagement() {
                 if (error) throw error;
                 Alert.alert("Device Cleared", `Push token/device unlinked from ${selectedUser.full_name}.`);
             }
-            else if (pendingAction.type === 'impersonate') {
-                 Alert.alert("Impersonating", `Switching view to ${selectedUser.full_name}... (Simulation)`);
+            else if (pendingAction.type === 'notify') {
+                await supabase.from('notifications').insert({
+                    user_id: selectedUser.id,
+                    title: notifyTitle || 'System Notice',
+                    body: notifyMessage,
+                    type: 'admin_push',
+                    created_at: new Date().toISOString()
+                });
+                Alert.alert("Message Delivered", `Notification sent to ${selectedUser.full_name}`);
+                setNotifyMessage('');
+                setNotifyTitle('');
+                setShowNotifyInput(false);
             }
 
             fetchUsers();
@@ -607,13 +654,8 @@ export default function UserManagement() {
 
     const sendNotification = () => {
         if (!notifyMessage.trim()) return;
-        Alert.alert("Send Message", "Send this notification directly to the user?", [
-            { text: "Cancel" },
-            { text: "Send", onPress: () => { 
-                setPendingAction({ type: 'notify' }); 
-                setTimeout(executeAction, 100); 
-            }}
-        ]);
+        setPendingAction({ type: 'notify' });
+        executeAction();
     };
 
     const exportProfile = async () => {
@@ -646,7 +688,7 @@ Role: ${selectedUser.role}
 
 Financials:
 - Balance: ₦${(selectedUser.credit_balance || 0).toLocaleString()}
-- Account: ${selectedUser.account_number || 'N/A'}
+- Account: ${selectedUser.account_number || 'N/A'} [${selectedUser.bank_name || 'Wema'}]
 - Limit: ${selectedUser.transfer_limit ? '₦'+selectedUser.transfer_limit : 'Unlimited'}
 
 Metadata:
@@ -700,18 +742,21 @@ Metadata:
         });
     };
 
-    // User Profile Modal Render
+    // User Detail & Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
             <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
                 <View style={s.modalCard}>
                     
-                    {/* Header Controls (Navy) */}
+                    {/* Executive Header Bar */}
                     <View style={s.modalHeader}>
                         <TouchableOpacity onPress={() => setSelectedUser(null)} style={s.iconCircleBtn}>
                             <Ionicons name="close" size={18} color="#94A3B8" />
                         </TouchableOpacity>
-                        <Text style={s.modalHeaderTitle}>User Profile</Text>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={s.modalHeaderTitle}>User Command Center</Text>
+                            <Text style={{ fontSize: 10, color: T.gold, fontWeight: '700' }}>ID: {selectedUser?.id?.slice(0, 8)}...</Text>
+                        </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity onPress={exportProfile} style={s.iconCircleBtn}>
                                 <Ionicons name="share-outline" size={16} color={T.gold} />
@@ -722,142 +767,95 @@ Metadata:
                         </View>
                     </View>
 
-                    <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        {/* Profile Banner */}
-                        <LinearGradient colors={[T.navyMid, T.navyDark]} style={s.modalHeroBanner}>
-                            <View style={s.modalAvatarWrapper}>
-                                {selectedUser?.avatar_url ? (
-                                    <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
-                                ) : (
-                                    <Text style={s.modalAvatarText}>{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
+                    {/* Executive Hero Banner */}
+                    <LinearGradient colors={[T.navyMid, T.navyDark]} style={s.modalHeroBanner}>
+                        <View style={s.modalAvatarWrapper}>
+                            {selectedUser?.avatar_url ? (
+                                <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
+                            ) : (
+                                <Text style={s.modalAvatarText}>{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
+                            )}
+                        </View>
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={s.modalUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
+                                {selectedUser?.role === 'admin' && <Text style={{ fontSize: 14 }}>👑</Text>}
+                            </View>
+                            <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                    <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: '#34D399' } : { color: '#F87171' }]}>{selectedUser?.status}</Text>
+                                </View>
+                                <View style={s.kycBadge}>
+                                    <Ionicons name="shield-checkmark" size={10} color="#60A5FA" />
+                                    <Text style={s.kycBadgeText}>Tier {selectedUser?.kyc_tier || 1}</Text>
+                                </View>
+                                {selectedUser?.corporate_email && (
+                                    <View style={[s.kycBadge, { backgroundColor: 'rgba(245,158,11,0.2)', borderColor: T.warning }]}>
+                                        <Ionicons name="at-circle" size={10} color={T.warning} />
+                                        <Text style={[s.kycBadgeText, { color: '#FCD34D' }]}>Corp</Text>
+                                    </View>
                                 )}
                             </View>
-                            <View style={{ marginLeft: 14, flex: 1 }}>
-                                <Text style={s.modalUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
-                                <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                    <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
-                                        <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: '#34D399' } : { color: '#F87171' }]}>{selectedUser?.status}</Text>
-                                    </View>
-                                    {selectedUser?.kyc_verified && (
-                                        <View style={s.kycBadge}>
-                                            <Ionicons name="shield-checkmark" size={10} color="#60A5FA" />
-                                            <Text style={s.kycBadgeText}>Verified</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                            <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
-                                <Ionicons name="call" size={16} color="#E2E8F0" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: 'rgba(16,185,129,0.2)', borderColor: T.success }]}>
-                                <Ionicons name="logo-whatsapp" size={18} color={T.success} />
-                            </TouchableOpacity>
-                        </LinearGradient>
+                        </View>
+                        <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
+                            <Ionicons name="call" size={16} color="#E2E8F0" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: 'rgba(16,185,129,0.2)', borderColor: T.success }]}>
+                            <Ionicons name="logo-whatsapp" size={18} color={T.success} />
+                        </TouchableOpacity>
+                    </LinearGradient>
 
-                        {isEditing ? (
-                            <View style={{ padding: 16, gap: 12 }}>
-                                <Text style={s.sectionHeading}>Edit Profile Details</Text>
-                                <View style={s.formRow}>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>Full Name</Text>
-                                        <TextInput value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} style={s.formInput} />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>Username</Text>
-                                        <TextInput value={editForm.username} onChangeText={(t) => setEditForm({...editForm, username: t})} style={s.formInput} />
-                                    </View>
-                                </View>
-                                <View style={s.formRow}>
-                                    <View style={[s.formCol, { flex: 1.5 }]}>
-                                        <Text style={s.fieldLabel}>Phone</Text>
-                                        <TextInput value={editForm.phone} onChangeText={(t) => setEditForm({...editForm, phone: t})} style={s.formInput} keyboardType="phone-pad" />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>Gender</Text>
-                                        <TextInput value={editForm.gender} onChangeText={(t) => setEditForm({...editForm, gender: t})} style={s.formInput} />
-                                    </View>
-                                </View>
-                                <View style={s.formRow}>
-                                    <View style={[s.formCol, { flex: 2 }]}>
-                                        <Text style={s.fieldLabel}>Address</Text>
-                                        <TextInput value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} style={s.formInput} />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>State</Text>
-                                        <TextInput value={editForm.state} onChangeText={(t) => setEditForm({...editForm, state: t})} style={s.formInput} />
-                                    </View>
-                                </View>
-                                <View style={s.formRow}>
-                                    <View style={[s.formCol, { flex: 1.5 }]}>
-                                        <Text style={s.fieldLabel}>Email</Text>
-                                        <TextInput value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} style={s.formInput} keyboardType="email-address" />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>DOB</Text>
-                                        <TextInput placeholder="YYYY-MM-DD" value={editForm.dob} onChangeText={(t) => setEditForm({...editForm, dob: t})} style={s.formInput} />
-                                    </View>
-                                </View>
-                                <Text style={s.sectionHeading}>Next of Kin</Text>
-                                <View style={s.formRow}>
-                                    <View style={s.formCol}>
-                                        <TextInput placeholder="Name" value={editForm.next_of_kin_name} onChangeText={(t) => setEditForm({...editForm, next_of_kin_name: t})} style={s.formInput} />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <TextInput placeholder="Phone" value={editForm.next_of_kin_phone} onChangeText={(t) => setEditForm({...editForm, next_of_kin_phone: t})} style={s.formInput} keyboardType="phone-pad" />
-                                    </View>
-                                </View>
-                                <Text style={s.sectionHeading}>Admin Controls (Identity & KYC)</Text>
-                                <View style={s.formRow}>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>BVN</Text>
-                                        <TextInput value={editForm.bvn} onChangeText={(t) => setEditForm({...editForm, bvn: t})} style={s.formInput} keyboardType="numeric" />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>NIN</Text>
-                                        <TextInput value={editForm.nin} onChangeText={(t) => setEditForm({...editForm, nin: t})} style={s.formInput} keyboardType="numeric" />
-                                    </View>
-                                </View>
-                                <View style={s.formRow}>
-                                    <View style={[s.formCol, { flex: 1.5 }]}>
-                                        <Text style={s.fieldLabel}>Custom ID</Text>
-                                        <TextInput value={editForm.custom_id} onChangeText={(t) => setEditForm({...editForm, custom_id: t})} style={s.formInput} />
-                                    </View>
-                                    <View style={s.formCol}>
-                                        <Text style={s.fieldLabel}>KYC Tier (1-3)</Text>
-                                        <TextInput value={editForm.kyc_tier} onChangeText={(t) => setEditForm({...editForm, kyc_tier: t})} style={s.formInput} keyboardType="numeric" />
-                                    </View>
-                                </View>
-                                <TouchableOpacity onPress={saveProfileChanges} style={s.saveBtn}>
-                                    <Text style={s.saveBtnText}>Save Changes</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
+                    {/* Executive Navigation Tabs */}
+                    <View style={s.modalTabBar}>
+                        {[
+                            { key: 'overview', label: 'Overview', icon: 'wallet-outline' },
+                            { key: 'kyc', label: 'Identity & KYC', icon: 'finger-print-outline' },
+                            { key: 'controls', label: 'Controls', icon: 'options-outline' },
+                            { key: 'notify', label: 'Notify', icon: 'chatbubble-ellipses-outline' },
+                            { key: 'logs', label: 'Audit Logs', icon: 'list-outline' },
+                        ].map(t => (
+                            <TouchableOpacity
+                                key={t.key}
+                                onPress={() => setModalTab(t.key as any)}
+                                style={[s.modalTabItem, modalTab === t.key ? s.modalTabItemActive : null]}
+                            >
+                                <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.gold : '#94A3B8'} />
+                                <Text style={[s.modalTabText, modalTab === t.key ? { color: T.gold } : null]}>{t.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+                        {/* TAB 1: OVERVIEW & WALLET */}
+                        {modalTab === 'overview' && (
                             <View style={{ padding: 16 }}>
-                                {/* Metrics Cards */}
-                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                {/* Wallet & Account Card */}
+                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                                     <View style={s.walletCard}>
-                                        <Text style={s.walletLabel}>Wallet Balance</Text>
-                                        <Text style={s.walletValue}>₦{(selectedUser?.balance || 0).toLocaleString()}</Text>
+                                        <Text style={s.walletLabel}>Vault Balance</Text>
+                                        <Text style={s.walletValue}>₦{(selectedUser?.balance || selectedUser?.credit_balance || 0).toLocaleString()}</Text>
                                         <View style={s.accountChip}>
                                             <Ionicons name="card" size={12} color="#E2E8F0" />
-                                            <Text style={s.accountChipText}>{selectedUser?.account_number || 'N/A'}</Text>
+                                            <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
                                         </View>
+                                        <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
                                     </View>
 
                                     {aiInsight && (
                                         <View style={s.aiInsightCard}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <Text style={s.aiTitle}>AI Scan</Text>
+                                                <Text style={s.aiTitle}>AI Intelligence</Text>
                                                 <Ionicons name="sparkles" size={14} color={T.gold} />
                                             </View>
                                             <Text style={[s.aiRisk, aiInsight.risk === 'High' ? { color: T.danger } : { color: T.success }]}>{aiInsight.risk} Risk</Text>
+                                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyMid }}>Score: {aiInsight.score}/100</Text>
                                             <Text style={s.aiNextAction} numberOfLines={2}>{aiInsight.nextAction}</Text>
                                         </View>
                                     )}
                                 </View>
 
-                                {/* Admin Financial Control */}
+                                {/* Quick Wallet Funding / Debit Control */}
                                 <View style={s.controlCard}>
                                     <View style={s.switchRow}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -868,7 +866,7 @@ Metadata:
                                                 thumbColor="#fff"
                                             />
                                             <Text style={[s.switchLabel, isDebit ? { color: T.danger } : { color: T.success }]}>
-                                                {isDebit ? 'Debit Wallet' : 'Fund Wallet'}
+                                                {isDebit ? 'Debit User Wallet' : 'Fund User Wallet'}
                                             </Text>
                                         </View>
                                         <View style={s.customAmountInputWrapper}>
@@ -886,9 +884,9 @@ Metadata:
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* Presets */}
+                                    {/* Funding Presets */}
                                     <View style={s.presetRow}>
-                                        {['5000', '10000', '25000', '50000', '100000'].map(val => (
+                                        {['1000', '5000', '10000', '25000', '50000', '100000', '500000'].map(val => (
                                             <TouchableOpacity
                                                 key={val}
                                                 onPress={() => {
@@ -897,58 +895,123 @@ Metadata:
                                                 }}
                                                 style={[s.presetChip, fundAmount === val ? s.presetChipActive : null]}
                                             >
-                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.gold } : null]}>+₦{Number(val)/1000}k</Text>
+                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.gold } : null]}>
+                                                    +₦{Number(val) >= 1000 ? (Number(val)/1000) + 'k' : val}
+                                                </Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
                                 </View>
 
-                                {/* Limits & Private Notes */}
-                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                                    <View style={s.limitCard}>
-                                        <Text style={s.limitTitle}>Daily Limit (₦)</Text>
-                                        <TextInput 
-                                            placeholder="No Limit" 
-                                            keyboardType="numeric"
-                                            style={s.limitInput}
-                                            value={limitInput}
-                                            onChangeText={setLimitInput}
-                                            onBlur={() => {
-                                                if (limitInput !== (selectedUser?.transfer_limit?.toString() || '')) {
-                                                   setPendingAction({ type: 'set_limit' });
-                                                   setShowSecurity(true);
-                                                }
-                                            }}
-                                        />
+                                {/* Quick Info Card */}
+                                <Text style={s.sectionHeading}>Account Quick Summary</Text>
+                                <View style={s.infoListCard}>
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Custom User ID</Text>
+                                        <Text style={s.infoValue}>{selectedUser?.custom_id || selectedUser?.id?.slice(0, 12)}</Text>
                                     </View>
-                                    <View style={s.notesCard}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                            <Text style={s.notesTitle}>Private Notes</Text>
-                                            <Ionicons name="lock-closed" size={12} color="#D97706" />
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Phone Number</Text>
+                                        <Text style={s.infoValue}>{selectedUser?.phone || 'Not Provided'}</Text>
+                                    </View>
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Account Status</Text>
+                                        <Text style={[s.infoValue, selectedUser?.status === 'active' ? { color: T.success } : { color: T.danger }]}>{selectedUser?.status?.toUpperCase()}</Text>
+                                    </View>
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Joined Date</Text>
+                                        <Text style={s.infoValue}>{new Date(selectedUser?.created_at || '').toLocaleDateString()}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TAB 2: IDENTITY & KYC */}
+                        {modalTab === 'kyc' && (
+                            <View style={{ padding: 16 }}>
+                                <Text style={s.sectionHeading}>Identity Verification & Verification Documents</Text>
+                                
+                                {/* BVN & NIN Card */}
+                                <View style={s.kycDetailCard}>
+                                    <View style={s.kycItemRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Ionicons name="card" size={16} color={T.indigo} />
+                                            <Text style={s.kycItemLabel}>Bank Verification Number (BVN)</Text>
                                         </View>
-                                        <TextInput 
-                                            placeholder="Add private notes..." 
-                                            multiline
-                                            style={s.notesInput}
-                                            value={adminNotes}
-                                            onChangeText={setAdminNotes}
-                                            onBlur={() => {
-                                                if (adminNotes !== (selectedUser?.admin_notes || '')) {
-                                                    setPendingAction({ type: 'save_notes' });
-                                                    executeAction(); 
-                                                }
-                                            }}
-                                        />
+                                        <Text style={s.kycItemValue}>{selectedUser?.bvn || 'Not Linked'}</Text>
+                                    </View>
+                                    <View style={s.kycItemRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Ionicons name="person" size={16} color={T.teal} />
+                                            <Text style={s.kycItemLabel}>National Identity Number (NIN)</Text>
+                                        </View>
+                                        <Text style={s.kycItemValue}>{selectedUser?.nin || 'Not Linked'}</Text>
+                                    </View>
+                                    <View style={s.kycItemRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Ionicons name="shield-checkmark" size={16} color={T.gold} />
+                                            <Text style={s.kycItemLabel}>Current Verification Level</Text>
+                                        </View>
+                                        <Text style={[s.kycItemValue, { color: T.gold }]}>Tier {selectedUser?.kyc_tier || 1}</Text>
                                     </View>
                                 </View>
 
-                                {/* Quick Actions Grid */}
-                                <Text style={s.sectionHeading}>Admin Controls & Feature Toggles</Text>
+                                {/* Tier Upgrade Controls */}
+                                <Text style={s.sectionHeading}>Set KYC Tier & Limits Level</Text>
+                                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                                    {[1, 2, 3].map(t => (
+                                        <TouchableOpacity
+                                            key={t}
+                                            onPress={() => {
+                                                setPendingAction({ type: 'upgrade_tier', tier: t });
+                                                setShowSecurity(true);
+                                            }}
+                                            style={[s.tierBtn, (selectedUser?.kyc_tier || 1) === t ? s.tierBtnActive : null]}
+                                        >
+                                            <Text style={[s.tierBtnText, (selectedUser?.kyc_tier || 1) === t ? { color: T.gold } : null]}>Tier {t}</Text>
+                                            <Text style={{ fontSize: 10, color: '#94A3B8' }}>{t === 1 ? '₦50k Limit' : t === 2 ? '₦500k Limit' : 'Unlimited'}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                {/* Virtual Account Generator Box */}
+                                <View style={s.subFormCard}>
+                                    <Text style={[s.sectionHeading, { color: T.teal }]}>Generate Virtual Account API Trigger</Text>
+                                    <TextInput
+                                        placeholder="Enter BVN/NIN for account generation"
+                                        style={s.subFormInput}
+                                        value={bvnInput}
+                                        onChangeText={setBvnInput}
+                                        keyboardType="numeric"
+                                    />
+                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'generate_account' }); setShowSecurity(true); }} style={[s.subFormSubmitBtn, { backgroundColor: T.teal }]}>
+                                        <Text style={s.subFormSubmitBtnText}>Generate Account Now</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Bio Details Form */}
+                                <Text style={s.sectionHeading}>Bio & Address Information</Text>
+                                <View style={s.infoListCard}>
+                                    <View style={s.infoRow}><Text style={s.infoLabel}>Gender</Text><Text style={s.infoValue}>{selectedUser?.gender || 'N/A'}</Text></View>
+                                    <View style={s.infoRow}><Text style={s.infoLabel}>Date of Birth</Text><Text style={s.infoValue}>{selectedUser?.dob || 'N/A'}</Text></View>
+                                    <View style={s.infoRow}><Text style={s.infoLabel}>Address</Text><Text style={s.infoValue}>{selectedUser?.address || 'N/A'}</Text></View>
+                                    <View style={s.infoRow}><Text style={s.infoLabel}>State</Text><Text style={s.infoValue}>{selectedUser?.state || 'N/A'}</Text></View>
+                                    <View style={s.infoRow}><Text style={s.infoLabel}>Next of Kin</Text><Text style={s.infoValue}>{selectedUser?.next_of_kin_name || 'N/A'} ({selectedUser?.next_of_kin_phone || 'N/A'})</Text></View>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TAB 3: GOVERNANCE & FEATURE CONTROLS */}
+                        {modalTab === 'controls' && (
+                            <View style={{ padding: 16 }}>
+                                <Text style={s.sectionHeading}>System Feature Locks & Permissions</Text>
+                                
+                                {/* Feature Toggles Grid */}
                                 <View style={s.actionsGrid}>
                                     <TouchableOpacity onPress={initiateBlock} style={[s.gridBtn, selectedUser?.status === 'active' ? s.gridBtnDanger : s.gridBtnSuccess]}>
                                         <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={16} color={selectedUser?.status === 'active' ? T.danger : T.success} />
                                         <Text style={[s.gridBtnText, selectedUser?.status === 'active' ? { color: T.danger } : { color: T.success }]}>
-                                            {selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}
+                                            {selectedUser?.status === 'active' ? 'Suspend User' : 'Activate User'}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -992,39 +1055,22 @@ Metadata:
                                         </Text>
                                     </TouchableOpacity>
 
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            setPendingAction({ type: 'toggle_services' });
+                                            executeAction();
+                                        }} 
+                                        style={[s.gridBtn, (selectedUser?.services_enabled ?? true) ? { backgroundColor: '#F0FDFA', borderColor: T.teal } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
+                                    >
+                                        <Ionicons name="phone-portrait-outline" size={16} color={(selectedUser?.services_enabled ?? true) ? T.teal : T.textSub} />
+                                        <Text style={[s.gridBtnText, (selectedUser?.services_enabled ?? true) ? { color: T.teal } : { color: T.textSub }]}>
+                                            VTU Bills: {(selectedUser?.services_enabled ?? true) ? 'ON 📱' : 'OFF 🚫'}
+                                        </Text>
+                                    </TouchableOpacity>
+
                                     <TouchableOpacity onPress={initiateResetPin} style={s.gridBtn}>
                                         <MaterialCommunityIcons name="lock-reset" size={16} color={T.textSub} />
-                                        <Text style={s.gridBtnText}>Reset PIN</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} style={[s.gridBtn, { backgroundColor: '#F3E8FF', borderColor: '#C084FC' }]}>
-                                        <MaterialCommunityIcons name="incognito" size={16} color={T.purple} />
-                                        <Text style={[s.gridBtnText, { color: T.purple }]}>View As</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={toggleKyc} style={[s.gridBtn, { backgroundColor: T.infoBg, borderColor: T.info }]}>
-                                        <Ionicons name={selectedUser?.kyc_verified ? "checkmark-done-circle" : "shield-checkmark-outline"} size={16} color={T.info} />
-                                        <Text style={[s.gridBtnText, { color: T.info }]}>{selectedUser?.kyc_verified ? 'Revoke KYC' : 'Verify KYC'}</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.id || '', 'User ID')} style={s.gridBtn}>
-                                        <Ionicons name="copy-outline" size={16} color={T.textSub} />
-                                        <Text style={s.gridBtnText}>Copy ID</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={() => setShowNotifyInput(!showNotifyInput)} style={[s.gridBtn, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
-                                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={T.indigo} />
-                                        <Text style={[s.gridBtnText, { color: T.indigo }]}>Message</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={initiateDelete} style={[s.gridBtn, { backgroundColor: T.dangerBg, borderColor: T.danger }]}>
-                                        <Ionicons name="trash-outline" size={16} color={T.danger} />
-                                        <Text style={[s.gridBtnText, { color: T.danger }]}>Delete</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={() => setShowGenerateAccount(!showGenerateAccount)} style={[s.gridBtn, { backgroundColor: '#F0FDFA', borderColor: T.teal }]}>
-                                        <Ionicons name="card-outline" size={16} color={T.teal} />
-                                        <Text style={[s.gridBtnText, { color: T.teal }]}>Gen Account</Text>
+                                        <Text style={s.gridBtnText}>Reset Auth PIN</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateResetTxPin} style={[s.gridBtn, { backgroundColor: '#FFF7ED', borderColor: '#F97316' }]}>
@@ -1038,57 +1084,121 @@ Metadata:
                                     </TouchableOpacity>
                                 </View>
 
-                                {showGenerateAccount && (
-                                    <View style={s.subFormCard}>
-                                        <Text style={[s.sectionHeading, { color: T.teal }]}>Generate Virtual Account (KYC)</Text>
-                                        <TextInput
-                                            placeholder="Enter BVN/NIN (Optional if in DB)"
-                                            style={s.subFormInput}
-                                            value={bvnInput}
-                                            onChangeText={setBvnInput}
+                                {/* Limits & Private Notes */}
+                                <Text style={s.sectionHeading}>Transaction Limits & Governance Notes</Text>
+                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                                    <View style={s.limitCard}>
+                                        <Text style={s.limitTitle}>Daily Limit (₦)</Text>
+                                        <TextInput 
+                                            placeholder="No Limit" 
                                             keyboardType="numeric"
+                                            style={s.limitInput}
+                                            value={limitInput}
+                                            onChangeText={setLimitInput}
+                                            onBlur={() => {
+                                                if (limitInput !== (selectedUser?.transfer_limit?.toString() || '')) {
+                                                   setPendingAction({ type: 'set_limit' });
+                                                   setShowSecurity(true);
+                                                }
+                                            }}
                                         />
-                                        <TouchableOpacity onPress={() => { setPendingAction({ type: 'generate_account' }); setShowSecurity(true); }} style={[s.subFormSubmitBtn, { backgroundColor: T.teal }]}>
-                                            <Text style={s.subFormSubmitBtnText}>Generate Now</Text>
-                                        </TouchableOpacity>
                                     </View>
-                                )}
-
-                                {showNotifyInput && (
-                                    <View style={[s.subFormCard, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
-                                        <Text style={[s.sectionHeading, { color: T.indigo }]}>Send Push Notification</Text>
-                                        <TextInput
-                                            placeholder="Type message here..."
+                                    <View style={s.notesCard}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={s.notesTitle}>Admin Audit Notes</Text>
+                                            <Ionicons name="lock-closed" size={12} color="#D97706" />
+                                        </View>
+                                        <TextInput 
+                                            placeholder="Add confidential notes..." 
                                             multiline
-                                            style={[s.subFormInput, { minHeight: 60 }]}
-                                            value={notifyMessage}
-                                            onChangeText={setNotifyMessage}
+                                            style={s.notesInput}
+                                            value={adminNotes}
+                                            onChangeText={setAdminNotes}
+                                            onBlur={() => {
+                                                if (adminNotes !== (selectedUser?.admin_notes || '')) {
+                                                    setPendingAction({ type: 'save_notes' });
+                                                    executeAction(); 
+                                                }
+                                            }}
                                         />
-                                        <TouchableOpacity onPress={sendNotification} style={[s.subFormSubmitBtn, { backgroundColor: T.indigo }]}>
-                                            <Text style={s.subFormSubmitBtnText}>Send Now</Text>
-                                        </TouchableOpacity>
                                     </View>
-                                )}
+                                </View>
 
-                                {/* Compact Transactions */}
-                                <Text style={s.sectionHeading}>Recent Transactions</Text>
+                                {/* Danger Zone */}
+                                <Text style={[s.sectionHeading, { color: T.danger }]}>Danger Zone & Advanced Actions</Text>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} style={[s.gridBtn, { flex: 1, backgroundColor: '#F3E8FF', borderColor: '#C084FC' }]}>
+                                        <MaterialCommunityIcons name="incognito" size={16} color={T.purple} />
+                                        <Text style={[s.gridBtnText, { color: T.purple }]}>Impersonate View</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={initiateDelete} style={[s.gridBtn, { flex: 1, backgroundColor: T.dangerBg, borderColor: T.danger }]}>
+                                        <Ionicons name="trash-outline" size={16} color={T.danger} />
+                                        <Text style={[s.gridBtnText, { color: T.danger }]}>Soft Delete User</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TAB 4: DIRECT NOTIFICATIONS & MESSAGING */}
+                        {modalTab === 'notify' && (
+                            <View style={{ padding: 16 }}>
+                                <Text style={s.sectionHeading}>Send Direct In-App & Push Notification</Text>
+                                <View style={[s.subFormCard, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
+                                    <Text style={[s.fieldLabel, { color: T.indigo }]}>Notification Title</Text>
+                                    <TextInput
+                                        placeholder="e.g. Account Security Alert"
+                                        style={s.subFormInput}
+                                        value={notifyTitle}
+                                        onChangeText={setNotifyTitle}
+                                    />
+                                    <Text style={[s.fieldLabel, { color: T.indigo }]}>Notification Body Message</Text>
+                                    <TextInput
+                                        placeholder="Type notification message to be delivered to user device..."
+                                        multiline
+                                        style={[s.subFormInput, { minHeight: 80 }]}
+                                        value={notifyMessage}
+                                        onChangeText={setNotifyMessage}
+                                    />
+                                    <TouchableOpacity onPress={sendNotification} style={[s.subFormSubmitBtn, { backgroundColor: T.indigo }]}>
+                                        <Text style={s.subFormSubmitBtnText}>Send Push Notification Now</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={s.sectionHeading}>Direct Contact Links</Text>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity onPress={() => contactUser('call')} style={[s.gridBtn, { flex: 1 }]}>
+                                        <Ionicons name="call-outline" size={16} color={T.navyMid} />
+                                        <Text style={s.gridBtnText}>Direct Phone Call</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.gridBtn, { flex: 1, backgroundColor: '#ECFDF5', borderColor: T.success }]}>
+                                        <Ionicons name="logo-whatsapp" size={16} color={T.success} />
+                                        <Text style={[s.gridBtnText, { color: T.success }]}>WhatsApp Chat</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* TAB 5: AUDIT LOGS & TRANSACTIONS */}
+                        {modalTab === 'logs' && (
+                            <View style={{ padding: 16 }}>
+                                <Text style={s.sectionHeading}>Recent Financial Transactions</Text>
                                 <View style={s.txCard}>
                                     {loadingHistory ? (
                                         <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
                                     ) : userTransactions.length === 0 ? (
                                         <View style={{ padding: 16, alignItems: 'center' }}>
-                                            <Text style={s.noHistoryText}>No transaction history</Text>
+                                            <Text style={s.noHistoryText}>No transaction history recorded</Text>
                                         </View>
                                     ) : (
-                                        userTransactions.slice(0,3).map((tx, i) => (
-                                            <View key={tx.id} style={[s.txRow, i !== Math.min(userTransactions.length, 3) - 1 ? { borderBottomWidth: 1, borderBottomColor: T.border } : null]}>
+                                        userTransactions.map((tx, i) => (
+                                            <View key={tx.id} style={[s.txRow, i !== userTransactions.length - 1 ? { borderBottomWidth: 1, borderBottomColor: T.border } : null]}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                                     <View style={[s.txIconWrapper, tx.type === 'topup' ? { backgroundColor: T.successBg } : { backgroundColor: '#F1F5F9' }]}>
                                                         <Ionicons name={tx.type === 'topup' ? 'arrow-down' : 'arrow-up'} size={12} color={tx.type === 'topup' ? T.success : T.textSub} />
                                                     </View>
                                                     <View>
                                                         <Text style={s.txTitle}>{tx.type || 'Txn'}</Text>
-                                                        <Text style={s.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
+                                                        <Text style={s.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
                                                     </View>
                                                 </View>
                                                 <Text style={[s.txAmount, tx.type === 'topup' ? { color: T.success } : { color: T.textMain }]}>
@@ -1098,6 +1208,19 @@ Metadata:
                                         ))
                                     )}
                                 </View>
+
+                                <Text style={s.sectionHeading}>Login Forensics & Security Logs</Text>
+                                <View style={s.infoListCard}>
+                                    {userLogs.map((log) => (
+                                        <View key={log.id} style={s.infoRow}>
+                                            <View>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: T.navyMid }}>{log.device}</Text>
+                                                <Text style={{ fontSize: 10, color: T.textSub }}>{log.ip} • {log.location}</Text>
+                                            </View>
+                                            <Text style={{ fontSize: 10, fontWeight: '600', color: T.textSub }}>{new Date(log.timestamp).toLocaleTimeString()}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         )}
                     </ScrollView>
@@ -1106,13 +1229,13 @@ Metadata:
         </Modal>
     );
 
-    // Create User Modal Render
+    // Create User Account Modal
     const renderCreateUserModal = () => (
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
             <BlurView intensity={90} tint="dark" style={s.modalOverlay}>
                  <View style={s.createUserCard}>
                     <View style={s.createUserHeader}>
-                        <Text style={s.createUserTitle}>Create User Account</Text>
+                        <Text style={s.createUserTitle}>Create New Account</Text>
                         <TouchableOpacity onPress={() => setShowCreateUser(false)} style={s.iconCircleBtn}>
                             <Ionicons name="close" size={20} color="#94A3B8" />
                         </TouchableOpacity>
@@ -1124,7 +1247,7 @@ Metadata:
                                 <Text style={s.fieldLabel}>Full Name</Text>
                                 <TextInput 
                                     style={s.createInput}
-                                    placeholder="e.g. John Doe"
+                                    placeholder="e.g. Abubakar Sadiq"
                                     placeholderTextColor="#94A3B8"
                                     value={newUserForm.fullName}
                                     onChangeText={t => setNewUserForm({...newUserForm, fullName: t})}
@@ -1134,7 +1257,7 @@ Metadata:
                                 <Text style={s.fieldLabel}>Username</Text>
                                 <TextInput 
                                     style={s.createInput}
-                                    placeholder="e.g. johndoe123"
+                                    placeholder="e.g. abubakar123"
                                     placeholderTextColor="#94A3B8"
                                     value={newUserForm.username}
                                     onChangeText={t => setNewUserForm({...newUserForm, username: t})}
@@ -1145,7 +1268,7 @@ Metadata:
                                 <Text style={s.fieldLabel}>Email Address</Text>
                                 <TextInput 
                                     style={s.createInput}
-                                    placeholder="john@example.com"
+                                    placeholder="user@abumafhal.com.ng"
                                     placeholderTextColor="#94A3B8"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
@@ -1154,38 +1277,15 @@ Metadata:
                                 />
                             </View>
                              <View>
-                                <Text style={s.fieldLabel}>Phone (Optional)</Text>
+                                <Text style={s.fieldLabel}>Phone Number</Text>
                                 <TextInput 
                                     style={s.createInput}
-                                    placeholder="+234..."
+                                    placeholder="+2348000000000"
                                     placeholderTextColor="#94A3B8"
                                     keyboardType="phone-pad"
                                     value={newUserForm.phone}
                                     onChangeText={t => setNewUserForm({...newUserForm, phone: t})}
                                 />
-                            </View>
-                            
-                             <View style={s.formRow}>
-                                <View style={s.formCol}>
-                                    <Text style={s.fieldLabel}>Gender</Text>
-                                    <TextInput 
-                                        style={s.createInput}
-                                        placeholder="M/F"
-                                        placeholderTextColor="#94A3B8"
-                                        value={newUserForm.gender}
-                                        onChangeText={t => setNewUserForm({...newUserForm, gender: t})}
-                                    />
-                                </View>
-                                <View style={s.formCol}>
-                                    <Text style={s.fieldLabel}>DOB</Text>
-                                    <TextInput 
-                                        style={s.createInput}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor="#94A3B8"
-                                        value={newUserForm.dob}
-                                        onChangeText={t => setNewUserForm({...newUserForm, dob: t})}
-                                    />
-                                </View>
                             </View>
 
                             <View>
@@ -1196,13 +1296,12 @@ Metadata:
                                     onChangeText={t => setNewUserForm({...newUserForm, password: t})}
                                     secureTextEntry
                                 />
-                                 <Text style={s.fieldSubNote}>User can update password after first login.</Text>
                             </View>
                             
                              <View style={s.adminRoleSwitchRow}>
                                  <View>
-                                    <Text style={{ fontWeight: '700', color: '#F8FAFC', fontSize: 14 }}>Admin Privileges</Text>
-                                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>Grant full manager dashboard access</Text>
+                                    <Text style={{ fontWeight: '700', color: '#F8FAFC', fontSize: 14 }}>Grant Admin Privileges</Text>
+                                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>Access manager dashboard & controls</Text>
                                  </View>
                                  <Switch 
                                     value={newUserForm.role === 'admin'}
@@ -1220,7 +1319,7 @@ Metadata:
                                 {creatingUser ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
-                                    <Text style={s.createUserBtnText}>Create Account</Text>
+                                    <Text style={s.createUserBtnText}>Create Account Now</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -1234,10 +1333,10 @@ Metadata:
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
 
-            {/* Header Command Center */}
+            {/* Command Center Executive Header */}
             <View style={s.headerContainer}>
                 <LinearGradient colors={[T.navyDark, T.navyMid, T.navyCard]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.headerGradient}>
-                    {/* Top Bar */}
+                    {/* Top Header Row */}
                     <View style={s.headerTopRow}>
                         {isSelectionMode ? (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1248,7 +1347,8 @@ Metadata:
                             </View>
                         ) : (
                             <View>
-                                <Text style={s.headerTitle}>User Manager</Text>
+                                <Text style={s.headerTitle}>User Governance</Text>
+                                <Text style={{ color: T.gold, fontSize: 11, fontWeight: '700' }}>Executive Control Hub • {stats.totalUsers} Profiles</Text>
                             </View>
                         )}
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1258,7 +1358,7 @@ Metadata:
                         </View>
                     </View>
 
-                    {/* Stats Row */}
+                    {/* Executive Stats Badges */}
                     {!isSelectionMode && (
                         <View style={s.statsRow}>
                             <View style={s.statBox}>
@@ -1266,7 +1366,7 @@ Metadata:
                                     <Ionicons name="wallet" size={12} color={T.success} />
                                 </View>
                                 <View>
-                                    <Text style={s.statLabel}>Vault</Text>
+                                    <Text style={s.statLabel}>Total Vault</Text>
                                     <Text style={s.statValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
                                 </View>
                             </View>
@@ -1284,8 +1384,17 @@ Metadata:
                                     <Ionicons name="shield-checkmark" size={12} color="#C084FC" />
                                 </View>
                                 <View>
-                                    <Text style={s.statLabel}>KYC</Text>
+                                    <Text style={s.statLabel}>Verified</Text>
                                     <Text style={s.statValue}>{stats.verifiedUsers}</Text>
+                                </View>
+                            </View>
+                            <View style={s.statBox}>
+                                <View style={[s.statIcon, { backgroundColor: 'rgba(245,158,11,0.2)' }]}>
+                                    <Ionicons name="briefcase" size={12} color={T.warning} />
+                                </View>
+                                <View>
+                                    <Text style={s.statLabel}>Corp</Text>
+                                    <Text style={s.statValue}>{stats.corporateAdmins}</Text>
                                 </View>
                             </View>
                         </View>
@@ -1296,7 +1405,7 @@ Metadata:
                         <View style={s.searchBar}>
                             <Ionicons name="search" size={16} color="#94A3B8" />
                             <TextInput
-                                placeholder="Search users..."
+                                placeholder="Search by name, email, phone, account, ID..."
                                 placeholderTextColor="#64748B"
                                 style={s.searchInput}
                                 value={search}
@@ -1311,14 +1420,22 @@ Metadata:
                         
                         <View style={s.filterRow}>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, marginRight: 8 }}>
-                                {['all', 'active', 'suspended'].map((status) => (
+                                {[
+                                    { key: 'all', label: 'All Users' },
+                                    { key: 'active', label: 'Active' },
+                                    { key: 'suspended', label: 'Suspended' },
+                                    { key: 'admin', label: 'Admins 👑' },
+                                    { key: 'verified', label: 'Verified 🛡️' },
+                                    { key: 'corporate', label: 'Corporate' },
+                                    { key: 'high_bal', label: 'High Vault' }
+                                ].map((f) => (
                                     <TouchableOpacity 
-                                        key={status} 
-                                        onPress={() => setFilterStatus(status)}
-                                        style={[s.filterChip, filterStatus === status ? s.filterChipActive : null]}
+                                        key={f.key} 
+                                        onPress={() => setFilterStatus(f.key as any)}
+                                        style={[s.filterChip, filterStatus === f.key ? s.filterChipActive : null]}
                                     >
-                                        <Text style={[s.filterChipText, filterStatus === status ? { color: T.navyDark } : { color: '#94A3B8' }]}>
-                                            {status}
+                                        <Text style={[s.filterChipText, filterStatus === f.key ? { color: T.navyDark } : { color: '#94A3B8' }]}>
+                                            {f.label}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -1334,7 +1451,7 @@ Metadata:
                             >
                                 <Ionicons name="filter" size={12} color="#CBD5E1" style={{ marginRight: 4 }} />
                                 <Text style={s.sortBtnText}>
-                                    {sortBy === 'newest' ? 'New' : (sortBy === 'balance_high' ? 'High' : 'Low')}
+                                    {sortBy === 'newest' ? 'Newest' : (sortBy === 'balance_high' ? 'High Bal' : 'Low Bal')}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1342,7 +1459,7 @@ Metadata:
                 </LinearGradient>
             </View>
 
-            {/* Bulk Action Sticky Bar */}
+            {/* Sticky Bulk Selection Control Bar */}
             {isSelectionMode && (
                 <View style={s.bulkBar}>
                     <TouchableOpacity onPress={() => executeBulkAction('block')} style={s.bulkBtn}>
@@ -1360,7 +1477,7 @@ Metadata:
                 </View>
             )}
 
-            {/* User List */}
+            {/* Executive User List */}
             <FlatList
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
@@ -1470,19 +1587,19 @@ Metadata:
                                 <View style={s.emptyIconCircle}>
                                     <Ionicons name="people-outline" size={40} color="#94A3B8" />
                                 </View>
-                                <Text style={s.emptyTitle}>No Users Found</Text>
-                                <Text style={s.emptySubText}>Try adjusting your filters or searching with different terms.</Text>
+                                <Text style={s.emptyTitle}>No Matching Users</Text>
+                                <Text style={s.emptySubText}>Try adjusting your search criteria or filter options.</Text>
                             </View>
                         )}
                     </View>
                 }
             />
             
-            {/* Details Modal */}
+            {/* Render Modals */}
             {renderUserModal()}
             {renderCreateUserModal()}
 
-            {/* Security Check Modal */}
+            {/* Admin Verification Modal */}
             <SecurityModal 
                 visible={showSecurity}
                 onClose={() => setShowSecurity(false)}
@@ -1892,19 +2009,19 @@ const s = StyleSheet.create({
         fontSize: 13,
         textAlign: 'center',
     },
-    // Modals
+    // Modals & Tabs
     modalOverlay: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 12,
+        padding: 10,
     },
     modalCard: {
         backgroundColor: T.bg,
         borderRadius: 24,
-        height: '92%',
+        height: '94%',
         width: '98%',
-        maxWidth: 500,
+        maxWidth: 520,
         overflow: 'hidden',
         borderWidth: 1.5,
         borderColor: T.gold,
@@ -1926,7 +2043,7 @@ const s = StyleSheet.create({
     },
     modalHeaderTitle: {
         color: '#FFFFFF',
-        fontWeight: '800',
+        fontWeight: '900',
         fontSize: 14,
         textTransform: 'uppercase',
         letterSpacing: 1,
@@ -1992,7 +2109,7 @@ const s = StyleSheet.create({
         borderColor: T.danger,
     },
     statusBadgeText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
@@ -2008,7 +2125,7 @@ const s = StyleSheet.create({
     },
     kycBadgeText: {
         color: '#93C5FD',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
         marginLeft: 4,
@@ -2024,6 +2141,31 @@ const s = StyleSheet.create({
         justifyContent: 'center',
         marginLeft: 4,
     },
+    modalTabBar: {
+        flexDirection: 'row',
+        backgroundColor: T.navyDark,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        paddingHorizontal: 4,
+    },
+    modalTabItem: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    modalTabItemActive: {
+        borderBottomColor: T.gold,
+    },
+    modalTabText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+    },
     sectionHeading: {
         fontSize: 12,
         fontWeight: '900',
@@ -2033,55 +2175,13 @@ const s = StyleSheet.create({
         marginBottom: 8,
         marginTop: 6,
     },
-    formRow: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    formCol: {
-        flex: 1,
-    },
-    fieldLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: T.navyMid,
-        textTransform: 'uppercase',
-        marginBottom: 4,
-    },
-    formInput: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        height: 38,
-        fontSize: 13,
-        fontWeight: '600',
-        color: T.textMain,
-    },
-    saveBtn: {
-        backgroundColor: T.gold,
-        paddingVertical: 12,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 10,
-        borderWidth: 1,
-        borderColor: T.goldDark,
-    },
-    saveBtnText: {
-        color: T.navyDark,
-        fontWeight: '900',
-        fontSize: 13,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
     walletCard: {
-        flex: 1.5,
+        flex: 1.4,
         backgroundColor: T.navyDark,
         padding: 14,
         borderRadius: 16,
         borderWidth: 1,
         borderColor: T.gold,
-        position: 'relative',
     },
     walletLabel: {
         color: T.gold,
@@ -2164,7 +2264,7 @@ const s = StyleSheet.create({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: T.border,
-        width: 140,
+        width: 130,
         height: 36,
         paddingHorizontal: 8,
     },
@@ -2189,7 +2289,7 @@ const s = StyleSheet.create({
     },
     presetRow: {
         flexDirection: 'row',
-        gap: 6,
+        gap: 4,
         justifyContent: 'space-between',
     },
     presetChip: {
@@ -2206,8 +2306,116 @@ const s = StyleSheet.create({
         borderColor: T.navyDark,
     },
     presetChipText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: T.textMain,
+    },
+    infoListCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 12,
+        gap: 10,
+        marginBottom: 12,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    infoLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: T.textSub,
+    },
+    infoValue: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.navyMid,
+    },
+    // KYC Styles
+    kycDetailCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 14,
+        gap: 12,
+        marginBottom: 14,
+    },
+    kycItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    kycItemLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: T.navyMid,
+    },
+    kycItemValue: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.textSub,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    tierBtn: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+    },
+    tierBtnActive: {
+        backgroundColor: T.navyDark,
+        borderColor: T.gold,
+    },
+    tierBtnText: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: T.navyMid,
+    },
+    // Controls Grid
+    actionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 14,
+    },
+    gridBtn: {
+        width: '48%',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: '#FFFFFF',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    gridBtnDanger: {
+        backgroundColor: T.dangerBg,
+        borderColor: '#FECACA',
+    },
+    gridBtnSuccess: {
+        backgroundColor: T.successBg,
+        borderColor: '#A7F3D0',
+    },
+    gridBtnText: {
         fontSize: 11,
         fontWeight: '800',
+        textTransform: 'uppercase',
         color: T.textMain,
     },
     limitCard: {
@@ -2260,39 +2468,6 @@ const s = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         minHeight: 42,
-    },
-    actionsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 16,
-    },
-    gridBtn: {
-        width: '48%',
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: T.border,
-        backgroundColor: '#FFFFFF',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-    },
-    gridBtnDanger: {
-        backgroundColor: T.dangerBg,
-        borderColor: '#FECACA',
-    },
-    gridBtnSuccess: {
-        backgroundColor: T.successBg,
-        borderColor: '#A7F3D0',
-    },
-    gridBtnText: {
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-        color: T.textMain,
     },
     subFormCard: {
         backgroundColor: '#F0FDFA',
@@ -2367,6 +2542,13 @@ const s = StyleSheet.create({
         fontSize: 13,
         fontWeight: '900',
     },
+    fieldLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: T.navyMid,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
     // Create User Modal
     createUserCard: {
         backgroundColor: T.navyMid,
@@ -2403,12 +2585,6 @@ const s = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '700',
-    },
-    fieldSubNote: {
-        fontSize: 11,
-        color: '#94A3B8',
-        marginTop: 4,
-        marginLeft: 4,
     },
     adminRoleSwitchRow: {
         flexDirection: 'row',
