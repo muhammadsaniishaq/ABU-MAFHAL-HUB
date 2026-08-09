@@ -10,18 +10,7 @@ import { View, ActivityIndicator, LogBox, Text, TextInput } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Global text scaling override: caps max font scale at 1.0 so text is compact & neat app-wide
-if ((Text as any).defaultProps) {
-  (Text as any).defaultProps.maxFontSizeMultiplier = 1.0;
-} else {
-  (Text as any).defaultProps = { maxFontSizeMultiplier: 1.0 };
-}
 
-if ((TextInput as any).defaultProps) {
-  (TextInput as any).defaultProps.maxFontSizeMultiplier = 1.0;
-} else {
-  (TextInput as any).defaultProps = { maxFontSizeMultiplier: 1.0 };
-}
 
 
 // Configure Reanimated Logger to be less chatty about render phase value access
