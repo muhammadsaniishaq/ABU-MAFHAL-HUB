@@ -988,9 +988,23 @@ serve(async (req: Request) => {
             // Optional Termii Instant Phone SMS Alert
             const alertPhone = secrets['ALERT_PHONE'] || secrets['ADMIN_PHONE'] || secrets['SUPPORT_WHATSAPP'] || secrets['PHONE'] || '08145853539'
             const termiiKey = secrets['TERMII_API_KEY'] || secrets['TERMII_KEY'] || ''
-            const termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'AbuMafhal'
+            let termiiSender = secrets['TERMII_SENDER_ID'] || secrets['TERMII_SENDER'] || 'AbuMafhal'
             if (termiiKey && alertPhone && alertPhone.length >= 10) {
               try {
+                // Dynamically lookup approved Sender IDs on user's Termii workspace
+                try {
+                  const sRes = await fetch(`https://api.ng.termii.com/api/sender-id?api_key=${termiiKey.trim()}`)
+                  const sData = await sRes.json().catch(() => ({}))
+                  if (sData?.data && Array.isArray(sData.data) && sData.data.length > 0) {
+                    const approvedObj = sData.data.find((s: any) => s.status === 'unblock' || s.status === 'approved' || s.status === 'active') || sData.data[0]
+                    if (approvedObj?.sender_id) {
+                      termiiSender = approvedObj.sender_id
+                    }
+                  }
+                } catch (sLookupErr) {
+                  console.warn('Termii Sender ID lookup warning:', sLookupErr)
+                }
+
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
                 
