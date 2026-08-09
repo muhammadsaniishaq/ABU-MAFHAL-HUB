@@ -150,7 +150,7 @@ export default function LiquidityVaultScreen() {
     }, [vaultSecrets]);
 
     const handleSaveAlertSettings = async () => {
-        if (!alertEmail.trim()) {
+        if (alertEnabled && !alertEmail.trim()) {
             Alert.alert("Email Required", "Please enter a valid email address to receive low float alerts.");
             return;
         }
@@ -189,15 +189,29 @@ export default function LiquidityVaultScreen() {
                 await supabase.from('app_settings').upsert({ key: u.key, value: u.value });
             }
 
-            // Force check and send test alert immediately
-            await supabase.functions.invoke('check-provider-balances', {
-                body: { triggerAlertCheck: true, force: true }
-            });
+            setVaultSecrets(prev => ({
+                ...prev,
+                'LOW_BALANCE_ALERT_ENABLED': alertEnabled ? 'true' : 'false',
+                'LOW_BALANCE_ALERT_EMAIL': alertEmail.trim(),
+                'LOW_BALANCE_ALERT_THRESHOLD': alertThreshold.trim() || '5000',
+                'LOW_BALANCE_ALERT_INTERVAL_MINS': alertIntervalMins.trim() || '30'
+            }));
 
-            Alert.alert(
-                "Alert Settings Saved! ⚡",
-                `Low Float Email & SMS Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, automated email & SMS alerts will be sent every ${alertIntervalMins.trim() || 30} minutes.`
-            );
+            if (alertEnabled) {
+                // Force check and send test alert immediately when enabled
+                await supabase.functions.invoke('check-provider-balances', {
+                    body: { triggerAlertCheck: true, force: true }
+                });
+                Alert.alert(
+                    "Alert Settings Saved! ⚡",
+                    `Low Float Email & SMS Alerts are active for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, automated alerts will be sent every ${alertIntervalMins.trim() || 30} minutes.`
+                );
+            } else {
+                Alert.alert(
+                    "Alerts Disabled 🔕",
+                    "Automated low balance email & SMS notifications have been turned OFF successfully."
+                );
+            }
             setShowAlertCard(false);
             fetchProviderBalances();
         } catch (e: any) {
@@ -223,7 +237,7 @@ export default function LiquidityVaultScreen() {
             setFundAccountName(vaultSecrets[`${pId}_ACCOUNT_NAME`] || selectedDepositProvider.depositAccount?.accountName || '');
             setEditingDepositBank(false);
         }
-    }, [selectedDepositProvider, vaultSecrets]);
+    }, [selectedDepositProvider?.id]);
 
     const handleSaveDepositAccount = async () => {
         if (!selectedDepositProvider) return;
