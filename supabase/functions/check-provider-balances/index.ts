@@ -997,7 +997,7 @@ serve(async (req: Request) => {
                   const sRes = await fetch(`https://v3.api.termii.com/api/sender-id?api_key=${termiiKey.trim()}`)
                   sendersData = await sRes.json().catch(() => ({}))
                   if (sendersData?.data && Array.isArray(sendersData.data) && sendersData.data.length > 0) {
-                    const approved = sendersData.data.find((item: any) => item.status === 'unblock' || item.status === 'approved' || item.status === 'active') || sendersData.data[0]
+                    const approved = sendersData.data.find((item: any) => item.status === 'unblock' || item.status === 'approved' || item.status === 'active')
                     if (approved?.sender_id) {
                       termiiSender = approved.sender_id
                     }
@@ -1006,7 +1006,7 @@ serve(async (req: Request) => {
                   console.warn('Sender list error:', sErr)
                 }
 
-                if (!termiiSender) termiiSender = 'Termii'
+                if (!termiiSender) termiiSender = 'ABUMAFHAL'
 
                 const formattedPhone = alertPhone.startsWith('0') ? '234' + alertPhone.substring(1) : alertPhone
                 const smsMsg = `[ABU MAFHAL SUB] LOW FLOAT ALERT: ${lowProviders.map(p => `${p.name}: N${p.balance}`).join(', ')}. Please top up in Liquidity Vault.`
@@ -1027,6 +1027,9 @@ serve(async (req: Request) => {
                 if (smsReport) {
                   smsReport._senderIdsLookup = sendersData
                   smsReport._usedSender = termiiSender
+                  if (smsReport.message && smsReport.message.includes('SENDER_ID_NOT_APPROVED')) {
+                    smsReport.solution = "Go to https://dashboard.termii.com -> Sender ID tab, click 'Request Sender ID' and register 'ABUMAFHAL' (without hyphen)."
+                  }
                 }
               } catch (smsErr: any) {
                 console.error('Termii SMS Alert Exception:', smsErr)

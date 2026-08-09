@@ -278,7 +278,7 @@ serve(async (req) => {
                     const smsBody = {
                         api_key: termiiApiKey,
                         to: formattedContact,
-                        from: "ABU-MAFHAL",
+                        from: "ABUMAFHAL",
                         sms: body,
                         type: "plain",
                         channel: "generic" 
