@@ -738,7 +738,7 @@ export default function LiquidityVaultScreen() {
                 headerTintColor: T.white,
                 headerTitleStyle: { fontWeight: '900', fontSize: 16 },
                 headerRight: () => (
-                    <TouchableOpacity onPress={fetchProviderBalances} style={{ paddingRight: 12 }}>
+                    <TouchableOpacity onPress={() => fetchProviderBalances(false)} style={{ paddingRight: 12 }}>
                         <Ionicons name="sync-outline" size={19} color={T.gold} />
                     </TouchableOpacity>
                 )
@@ -770,7 +770,7 @@ export default function LiquidityVaultScreen() {
                         </View>
 
                         <TouchableOpacity 
-                            onPress={fetchProviderBalances} 
+                            onPress={() => fetchProviderBalances(false)} 
                             disabled={refreshing}
                             style={styles.refreshBtn}
                             activeOpacity={0.85}
