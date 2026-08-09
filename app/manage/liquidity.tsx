@@ -525,9 +525,10 @@ export default function LiquidityVaultScreen() {
                 title: 'API Wallet & Finance Hub',
                 headerStyle: { backgroundColor: T.navyDark },
                 headerTintColor: T.white,
+                headerTitleStyle: { fontWeight: '900', fontSize: 16 },
                 headerRight: () => (
                     <TouchableOpacity onPress={fetchProviderBalances} style={{ paddingRight: 12 }}>
-                        <Ionicons name="sync-outline" size={20} color={T.gold} />
+                        <Ionicons name="sync-outline" size={19} color={T.gold} />
                     </TouchableOpacity>
                 )
             }} />
@@ -547,12 +548,12 @@ export default function LiquidityVaultScreen() {
                     <View style={styles.heroAccentStripe} />
 
                     <View style={styles.heroTopRow}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <View style={styles.heroBadgeRow}>
                                 <Ionicons name="wallet-outline" size={12} color={T.gold} />
-                                <Text style={styles.heroSubTitle}>REAL-TIME API AGGREGATE FLOAT BALANCE</Text>
+                                <Text style={styles.heroSubTitle}>REAL-TIME AGGREGATE API FLOAT</Text>
                             </View>
-                            <Text style={styles.heroBalanceText}>
+                            <Text style={styles.heroBalanceText} numberOfLines={1} adjustsFontSizeToFit>
                                 ₦ {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                         </View>
@@ -567,8 +568,8 @@ export default function LiquidityVaultScreen() {
                                 <ActivityIndicator size="small" color={T.gold} />
                             ) : (
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="sync" size={13} color={T.gold} style={{ marginRight: 5 }} />
-                                    <Text style={styles.refreshBtnText}>Sync Balances</Text>
+                                    <Ionicons name="sync" size={12} color={T.gold} style={{ marginRight: 4 }} />
+                                    <Text style={styles.refreshBtnText}>Sync</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
@@ -577,23 +578,23 @@ export default function LiquidityVaultScreen() {
                     {/* Stat Badges Grid */}
                     <View style={styles.badgeGridRow}>
                         <View style={styles.statBadge}>
-                            <Ionicons name="checkmark-circle" size={13} color={T.success} />
+                            <Ionicons name="checkmark-circle" size={12} color={T.success} />
                             <Text style={styles.statBadgeText}>
-                                {healthyCount} Healthy Vendors
+                                {healthyCount} Active Vendors
                             </Text>
                         </View>
 
                         <View style={styles.statBadge}>
-                            <Ionicons name="alert-circle-outline" size={13} color={unconfiguredCount > 0 ? T.warning : T.gold} />
+                            <Ionicons name="alert-circle-outline" size={12} color={unconfiguredCount > 0 ? T.warning : T.gold} />
                             <Text style={styles.statBadgeText}>
                                 {unconfiguredCount} Unconfigured
                             </Text>
                         </View>
 
                         <View style={styles.statBadge}>
-                            <Ionicons name="key-outline" size={13} color={T.gold} />
+                            <Ionicons name="key-outline" size={12} color={T.gold} />
                             <Text style={styles.statBadgeText}>
-                                {providers.length} Active API Integrations
+                                {providers.length} Integrations
                             </Text>
                         </View>
                     </View>
@@ -601,10 +602,10 @@ export default function LiquidityVaultScreen() {
 
                 {/* Search Bar Input */}
                 <View style={styles.searchBarBox}>
-                    <Ionicons name="search-outline" size={16} color={T.textSub} style={{ marginRight: 8 }} />
+                    <Ionicons name="search-outline" size={15} color={T.textSub} style={{ marginRight: 6 }} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search API vendors by name or category..."
+                        placeholder="Search vendors by name or category..."
                         placeholderTextColor="#94a3b8"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -639,7 +640,7 @@ export default function LiquidityVaultScreen() {
 
                 {/* Section Header */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>API Vendor Balances & Deposit Vault</Text>
+                    <Text style={styles.sectionTitle}>API Vendor Float & Vault</Text>
                     <TouchableOpacity onPress={() => router.push('/manage/api')}>
                         <Text style={styles.manageVaultLink}>Manage Credentials →</Text>
                     </TouchableOpacity>
@@ -652,7 +653,7 @@ export default function LiquidityVaultScreen() {
                     </View>
                 ) : filteredProviders.length === 0 ? (
                     <View style={styles.emptyBox}>
-                        <Ionicons name="search-outline" size={32} color={T.textSub} />
+                        <Ionicons name="search-outline" size={28} color={T.textSub} />
                         <Text style={styles.emptyTitle}>No API Providers Found</Text>
                         <Text style={styles.emptySub}>No vendor matched your search criteria.</Text>
                     </View>
@@ -673,14 +674,14 @@ export default function LiquidityVaultScreen() {
                                     ]} />
 
                                     <View style={styles.providerCardHeader}>
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{ flex: 1, paddingRight: 6 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                                                 <Text style={styles.providerCategory}>{p.category || 'API Vendor'}</Text>
                                                 {p.latencyMs && (
                                                     <Text style={styles.latencyTag}>⚡ {p.latencyMs}ms</Text>
                                                 )}
                                             </View>
-                                            <Text style={styles.providerName}>{p.name}</Text>
+                                            <Text style={styles.providerName} numberOfLines={1}>{p.name}</Text>
                                         </View>
 
                                         {/* Status Badge */}
@@ -706,13 +707,13 @@ export default function LiquidityVaultScreen() {
                                     {/* Balance Value */}
                                     <View style={styles.balanceContainer}>
                                         <Text style={styles.currencySymbol}>{p.currency === 'USD' ? '$' : '₦'}</Text>
-                                        <Text style={styles.providerBalance}>
+                                        <Text style={styles.providerBalance} numberOfLines={1} adjustsFontSizeToFit>
                                             {p.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </Text>
                                     </View>
 
                                     {p.error && (
-                                        <Text style={styles.providerErrorText}>
+                                        <Text style={styles.providerErrorText} numberOfLines={2}>
                                             💡 {p.error}
                                         </Text>
                                     )}
@@ -725,8 +726,8 @@ export default function LiquidityVaultScreen() {
                                                 style={[styles.actionBtn, styles.depositBtn]}
                                                 activeOpacity={0.85}
                                             >
-                                                <Ionicons name="wallet-outline" size={13} color={T.navy} style={{ marginRight: 4 }} />
-                                                <Text style={[styles.actionBtnText, { color: T.navy }]}>Fund Wallet</Text>
+                                                <Ionicons name="wallet-outline" size={12} color={T.navy} style={{ marginRight: 3 }} />
+                                                <Text style={[styles.actionBtnText, { color: T.navy }]} numberOfLines={1}>Fund Wallet</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -736,8 +737,8 @@ export default function LiquidityVaultScreen() {
                                                 style={[styles.actionBtn, styles.withdrawBtn]}
                                                 activeOpacity={0.85}
                                             >
-                                                <Ionicons name="arrow-up-circle-outline" size={13} color={T.goldDk} style={{ marginRight: 4 }} />
-                                                <Text style={[styles.actionBtnText, { color: T.goldDk }]}>Withdraw</Text>
+                                                <Ionicons name="arrow-up-circle-outline" size={12} color={T.goldDk} style={{ marginRight: 3 }} />
+                                                <Text style={[styles.actionBtnText, { color: T.goldDk }]} numberOfLines={1}>Withdraw</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -746,8 +747,8 @@ export default function LiquidityVaultScreen() {
                                             style={[styles.actionBtn, styles.tokenBtn, isUnconfigured && styles.tokenBtnHighlight]}
                                             activeOpacity={0.85}
                                         >
-                                            <Ionicons name="key-outline" size={13} color={isUnconfigured ? T.white : T.navy} style={{ marginRight: 4 }} />
-                                            <Text style={[styles.actionBtnText, { color: isUnconfigured ? T.white : T.navy }]}>
+                                            <Ionicons name="key-outline" size={12} color={isUnconfigured ? T.white : T.navy} style={{ marginRight: 3 }} />
+                                            <Text style={[styles.actionBtnText, { color: isUnconfigured ? T.white : T.navy }]} numberOfLines={1}>
                                                 {isUnconfigured ? 'Set Token' : 'Vault Key'}
                                             </Text>
                                         </TouchableOpacity>
@@ -765,62 +766,63 @@ export default function LiquidityVaultScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalDecorStripe} />
-
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={styles.modalTitle}>Fund {selectedDepositProvider?.name}</Text>
-                            <TouchableOpacity onPress={() => setSelectedDepositProvider(null)}>
-                                <Ionicons name="close-circle" size={24} color={T.textSub} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.modalSubText}>
-                            Transfer funds to the dedicated bank account details below to instantly top up your API vendor balance.
-                        </Text>
-
-                        {selectedDepositProvider?.depositAccount ? (
-                            <View style={styles.bankDetailCard}>
-                                <View style={styles.bankDetailRow}>
-                                    <Text style={styles.bankLabel}>Bank Name:</Text>
-                                    <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.bankName}</Text>
-                                </View>
-
-                                <View style={styles.bankDetailRow}>
-                                    <Text style={styles.bankLabel}>Account Number:</Text>
-                                    <TouchableOpacity 
-                                        onPress={() => copyToClipboard(selectedDepositProvider.depositAccount!.accountNumber)}
-                                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                                    >
-                                        <Text style={[styles.bankValue, { color: T.navy, marginRight: 6 }]}>
-                                            {selectedDepositProvider.depositAccount.accountNumber}
-                                        </Text>
-                                        <Ionicons name="copy-outline" size={14} color={T.goldDk} />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={styles.bankDetailRow}>
-                                    <Text style={styles.bankLabel}>Account Name:</Text>
-                                    <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.accountName}</Text>
-                                </View>
-
-                                {copiedText && (
-                                    <Text style={styles.copySuccessToast}>
-                                        ✓ Account number copied to clipboard!
-                                    </Text>
-                                )}
-
-                                <Text style={styles.bankInstructions}>
-                                    💡 {selectedDepositProvider.depositAccount.instructions}
-                                </Text>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <Text style={styles.modalTitle}>Fund {selectedDepositProvider?.name}</Text>
+                                <TouchableOpacity onPress={() => setSelectedDepositProvider(null)}>
+                                    <Ionicons name="close-circle" size={22} color={T.textSub} />
+                                </TouchableOpacity>
                             </View>
-                        ) : (
-                            <Text style={{ color: T.textSub, marginVertical: 14, textAlign: 'center', fontSize: 12 }}>
-                                Direct bank funding accounts are managed via the provider merchant portal.
-                            </Text>
-                        )}
 
-                        <TouchableOpacity onPress={() => setSelectedDepositProvider(null)} style={styles.modalCloseBtn}>
-                            <Text style={styles.modalCloseBtnText}>Close</Text>
-                        </TouchableOpacity>
+                            <Text style={styles.modalSubText}>
+                                Transfer funds to the dedicated bank account details below to instantly top up your API vendor balance.
+                            </Text>
+
+                            {selectedDepositProvider?.depositAccount ? (
+                                <View style={styles.bankDetailCard}>
+                                    <View style={styles.bankDetailRow}>
+                                        <Text style={styles.bankLabel}>Bank Name:</Text>
+                                        <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.bankName}</Text>
+                                    </View>
+
+                                    <View style={styles.bankDetailRow}>
+                                        <Text style={styles.bankLabel}>Account Number:</Text>
+                                        <TouchableOpacity 
+                                            onPress={() => copyToClipboard(selectedDepositProvider.depositAccount!.accountNumber)}
+                                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                                        >
+                                            <Text style={[styles.bankValue, { color: T.navy, marginRight: 5 }]}>
+                                                {selectedDepositProvider.depositAccount.accountNumber}
+                                            </Text>
+                                            <Ionicons name="copy-outline" size={13} color={T.goldDk} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={styles.bankDetailRow}>
+                                        <Text style={styles.bankLabel}>Account Name:</Text>
+                                        <Text style={styles.bankValue}>{selectedDepositProvider.depositAccount.accountName}</Text>
+                                    </View>
+
+                                    {copiedText && (
+                                        <Text style={styles.copySuccessToast}>
+                                            ✓ Account number copied to clipboard!
+                                        </Text>
+                                    )}
+
+                                    <Text style={styles.bankInstructions}>
+                                        💡 {selectedDepositProvider.depositAccount.instructions}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text style={{ color: T.textSub, marginVertical: 12, textAlign: 'center', fontSize: 11.5 }}>
+                                    Direct bank funding accounts are managed via the provider merchant portal.
+                                </Text>
+                            )}
+
+                            <TouchableOpacity onPress={() => setSelectedDepositProvider(null)} style={styles.modalCloseBtn}>
+                                <Text style={styles.modalCloseBtnText}>Close</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -830,100 +832,101 @@ export default function LiquidityVaultScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalDecorStripe} />
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <Text style={styles.modalTitle}>Vault Key — {selectedTokenProvider?.name}</Text>
+                                <TouchableOpacity onPress={() => setSelectedTokenProvider(null)}>
+                                    <Ionicons name="close-circle" size={22} color={T.textSub} />
+                                </TouchableOpacity>
+                            </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={styles.modalTitle}>Vault Key — {selectedTokenProvider?.name}</Text>
-                            <TouchableOpacity onPress={() => setSelectedTokenProvider(null)}>
-                                <Ionicons name="close-circle" size={24} color={T.textSub} />
-                            </TouchableOpacity>
-                        </View>
+                            {selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi' ? (
+                                // BilalSadaSub & BigiSub: need Username + Password (Basic Auth / JWT)
+                                <>
+                                    <View style={{
+                                        backgroundColor: '#fffbeb', borderRadius: 8, padding: 8,
+                                        borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 12
+                                    }}>
+                                        <Text style={{ color: '#92400e', fontSize: 11, fontWeight: '700' }}>
+                                            🔐 {selectedTokenProvider?.name} uses Username + Password authentication.
+                                            Enter your login credentials below — they are saved securely in Vault.
+                                        </Text>
+                                    </View>
 
-                        {selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi' ? (
-                            // BilalSadaSub & BigiSub: need Username + Password (Basic Auth / JWT)
-                            <>
-                                <View style={{
-                                    backgroundColor: '#fffbeb', borderRadius: 10, padding: 10,
-                                    borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 14
-                                }}>
-                                    <Text style={{ color: '#92400e', fontSize: 11.5, fontWeight: '700' }}>
-                                        🔐 {selectedTokenProvider?.name} uses Username + Password authentication.
-                                        Enter your login credentials below — they are saved securely in Vault.
-                                    </Text>
-                                </View>
+                                    <Text style={styles.inputLabel}>Username (Login)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder={`Enter your ${selectedTokenProvider?.name} username`}
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        value={selectedTokenProvider?.id === 'bigi' ? bigiUsername : bilalUsername}
+                                        onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiUsername : setBilalUsername}
+                                    />
 
-                                <Text style={styles.inputLabel}>Username (Login)</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    placeholder={`Enter your ${selectedTokenProvider?.name} username`}
-                                    placeholderTextColor="#94a3b8"
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    value={selectedTokenProvider?.id === 'bigi' ? bigiUsername : bilalUsername}
-                                    onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiUsername : setBilalUsername}
-                                />
+                                    <Text style={styles.inputLabel}>Password</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder={`Enter your ${selectedTokenProvider?.name} password`}
+                                        placeholderTextColor="#94a3b8"
+                                        secureTextEntry={true}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        value={selectedTokenProvider?.id === 'bigi' ? bigiPassword : bilalPassword}
+                                        onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiPassword : setBilalPassword}
+                                    />
 
-                                <Text style={styles.inputLabel}>Password</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    placeholder={`Enter your ${selectedTokenProvider?.name} password`}
-                                    placeholderTextColor="#94a3b8"
-                                    secureTextEntry={true}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    value={selectedTokenProvider?.id === 'bigi' ? bigiPassword : bilalPassword}
-                                    onChangeText={selectedTokenProvider?.id === 'bigi' ? setBigiPassword : setBilalPassword}
-                                />
-
-                                <Text style={[styles.inputLabel, { marginTop: 8 }]}>Access Token (Optional)</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    placeholder="Paste token if you have one (optional)"
-                                    placeholderTextColor="#94a3b8"
-                                    autoCapitalize="none"
-                                    value={tokenValue}
-                                    onChangeText={setTokenValue}
-                                />
-                            </>
-                        ) : (
-                            // All other providers: just show Secret Key Name + Token Value
-                            <>
-                                <Text style={styles.modalSubText}>
-                                    View or update the secret API key for this vendor stored in Vault.
-                                </Text>
-
-                                <Text style={styles.inputLabel}>Secret Key Name</Text>
-                                <TextInput
-                                    style={[styles.modalInput, { backgroundColor: '#e2e8f0', color: T.textSub }]}
-                                    value={tokenKeyName}
-                                    editable={false}
-                                />
-
-                                <Text style={styles.inputLabel}>Secret Token Value</Text>
-                                <TextInput
-                                    style={styles.modalInput}
-                                    placeholder="Paste API Key or Token here..."
-                                    placeholderTextColor="#94a3b8"
-                                    secureTextEntry={false}
-                                    value={tokenValue}
-                                    onChangeText={setTokenValue}
-                                />
-                            </>
-                        )}
-
-                        <TouchableOpacity
-                            onPress={handleSaveVaultToken}
-                            disabled={tokenSaving}
-                            style={styles.executeWithdrawBtn}
-                            activeOpacity={0.85}
-                        >
-                            {tokenSaving ? (
-                                <ActivityIndicator color={T.navy} size="small" />
+                                    <Text style={[styles.inputLabel, { marginTop: 6 }]}>Access Token (Optional)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Paste token if you have one (optional)"
+                                        placeholderTextColor="#94a3b8"
+                                        autoCapitalize="none"
+                                        value={tokenValue}
+                                        onChangeText={setTokenValue}
+                                    />
+                                </>
                             ) : (
-                                <Text style={styles.executeWithdrawBtnText}>
-                                    {selectedTokenProvider?.id === 'bilalsadasub' ? 'Save Credentials to Vault' : 'Save Secret Key to Vault'}
-                                </Text>
+                                // All other providers: just show Secret Key Name + Token Value
+                                <>
+                                    <Text style={styles.modalSubText}>
+                                        View or update the secret API key for this vendor stored in Vault.
+                                    </Text>
+
+                                    <Text style={styles.inputLabel}>Secret Key Name</Text>
+                                    <TextInput
+                                        style={[styles.modalInput, { backgroundColor: '#e2e8f0', color: T.textSub }]}
+                                        value={tokenKeyName}
+                                        editable={false}
+                                    />
+
+                                    <Text style={styles.inputLabel}>Secret Token Value</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Paste API Key or Token here..."
+                                        placeholderTextColor="#94a3b8"
+                                        secureTextEntry={false}
+                                        value={tokenValue}
+                                        onChangeText={setTokenValue}
+                                    />
+                                </>
                             )}
-                        </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleSaveVaultToken}
+                                disabled={tokenSaving}
+                                style={styles.executeWithdrawBtn}
+                                activeOpacity={0.85}
+                            >
+                                {tokenSaving ? (
+                                    <ActivityIndicator color={T.navy} size="small" />
+                                ) : (
+                                    <Text style={styles.executeWithdrawBtnText}>
+                                        {(selectedTokenProvider?.id === 'bilalsadasub' || selectedTokenProvider?.id === 'bigi') ? 'Save Credentials to Vault' : 'Save Secret Key to Vault'}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -933,72 +936,71 @@ export default function LiquidityVaultScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalDecorStripe} />
-
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={styles.modalTitle}>Withdraw from {selectedWithdrawProvider?.name}</Text>
-                            <TouchableOpacity onPress={() => setSelectedWithdrawProvider(null)}>
-                                <Ionicons name="close-circle" size={24} color={T.textSub} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.modalSubText}>
-                            Transfer funds out of provider balance directly to your destination Nigerian bank account.
-                        </Text>
-
-                        <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <TextInput 
-                            style={styles.modalInput}
-                            placeholder="50000"
-                            placeholderTextColor="#94a3b8"
-                            keyboardType="numeric"
-                            value={withdrawAmount}
-                            onChangeText={setWithdrawAmount}
-                        />
-
-                        <Text style={styles.inputLabel}>Select Destination Bank</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                            {NIGERIAN_BANKS.map((b) => (
-                                <TouchableOpacity 
-                                    key={b.code}
-                                    onPress={() => setSelectedBank(b)}
-                                    style={[
-                                        styles.bankChip,
-                                        selectedBank.code === b.code && styles.bankChipSelected
-                                    ]}
-                                >
-                                    <Text style={[
-                                        styles.bankChipText,
-                                        selectedBank.code === b.code && { color: T.navy, fontWeight: '900' }
-                                    ]}>{b.name}</Text>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <Text style={styles.modalTitle}>Withdraw from {selectedWithdrawProvider?.name}</Text>
+                                <TouchableOpacity onPress={() => setSelectedWithdrawProvider(null)}>
+                                    <Ionicons name="close-circle" size={22} color={T.textSub} />
                                 </TouchableOpacity>
-                            ))}
+                            </View>
+
+                            <Text style={styles.modalSubText}>
+                                Transfer funds out of provider balance directly to your destination Nigerian bank account.
+                            </Text>
+
+                            <Text style={styles.inputLabel}>Amount (₦)</Text>
+                            <TextInput 
+                                style={styles.modalInput}
+                                placeholder="50000"
+                                placeholderTextColor="#94a3b8"
+                                keyboardType="numeric"
+                                value={withdrawAmount}
+                                onChangeText={setWithdrawAmount}
+                            />
+
+                            <Text style={styles.inputLabel}>Select Destination Bank</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                                {NIGERIAN_BANKS.map((b) => (
+                                    <TouchableOpacity 
+                                        key={b.code}
+                                        onPress={() => setSelectedBank(b)}
+                                        style={[
+                                            styles.bankChip,
+                                            selectedBank.code === b.code && styles.bankChipSelected
+                                        ]}
+                                    >
+                                        <Text style={[
+                                            styles.bankChipText,
+                                            selectedBank.code === b.code && { color: T.navy, fontWeight: '900' }
+                                        ]}>{b.name}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <Text style={styles.inputLabel}>10-Digit Account Number</Text>
+                            <TextInput 
+                                style={styles.modalInput}
+                                placeholder="0123456789"
+                                placeholderTextColor="#94a3b8"
+                                keyboardType="number-pad"
+                                maxLength={10}
+                                value={withdrawAccount}
+                                onChangeText={setWithdrawAccount}
+                            />
+
+                            <TouchableOpacity 
+                                onPress={handleExecuteWithdrawal}
+                                disabled={withdrawLoading}
+                                style={styles.executeWithdrawBtn}
+                                activeOpacity={0.85}
+                            >
+                                {withdrawLoading ? (
+                                    <ActivityIndicator color={T.navy} size="small" />
+                                ) : (
+                                    <Text style={styles.executeWithdrawBtnText}>Execute Live Withdrawal Transfer</Text>
+                                )}
+                            </TouchableOpacity>
                         </ScrollView>
-
-                        <Text style={styles.inputLabel}>10-Digit Account Number</Text>
-                        <TextInput 
-                            style={styles.modalInput}
-                            placeholder="0123456789"
-                            placeholderTextColor="#94a3b8"
-                            keyboardType="number-pad"
-                            maxLength={10}
-                            value={withdrawAccount}
-                            onChangeText={setWithdrawAccount}
-                        />
-
-                        <TouchableOpacity 
-                            onPress={handleExecuteWithdrawal}
-                            disabled={withdrawLoading}
-                            style={styles.executeWithdrawBtn}
-                            activeOpacity={0.85}
-                        >
-                            {withdrawLoading ? (
-                                <ActivityIndicator color={T.navy} size="small" />
-                            ) : (
-                                <Text style={styles.executeWithdrawBtnText}>Execute Live Withdrawal Transfer</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
             </Modal>
         </View>
     );
@@ -1010,8 +1012,8 @@ const styles = StyleSheet.create({
         backgroundColor: T.bg,
     },
     scrollContent: {
-        padding: 16,
-        paddingBottom: 40,
+        padding: 14,
+        paddingBottom: 36,
     },
     desktopScrollContent: {
         maxWidth: 780,
@@ -1019,109 +1021,109 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     heroCard: {
-        borderRadius: 20,
-        padding: 22,
-        marginBottom: 16,
+        borderRadius: 16,
+        padding: 18,
+        marginBottom: 14,
         overflow: 'hidden',
         position: 'relative',
         shadowColor: T.navyDark,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 5,
     },
     heroAccentStripe: {
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: 5,
+        height: 4,
         backgroundColor: T.gold,
     },
     heroTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 18,
+        marginBottom: 14,
     },
     heroBadgeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        marginBottom: 4,
+        gap: 4,
+        marginBottom: 3,
     },
     heroSubTitle: {
         color: T.gold,
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '900',
         letterSpacing: 0.8,
     },
     heroBalanceText: {
         color: T.white,
         fontWeight: '900',
-        fontSize: 28,
-        letterSpacing: 0.5,
+        fontSize: 24,
+        letterSpacing: 0.4,
     },
     refreshBtn: {
         backgroundColor: 'rgba(245, 166, 35, 0.15)',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 99,
         borderWidth: 1,
         borderColor: T.gold,
     },
     refreshBtnText: {
         color: T.gold,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '900',
     },
     badgeGridRow: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
         flexWrap: 'wrap',
     },
     statBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
     },
     statBadgeText: {
         color: '#e2e8f0',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
-        marginLeft: 5,
+        marginLeft: 4,
     },
     searchBarBox: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: T.cardBg,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 44,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        height: 40,
         borderWidth: 1,
         borderColor: T.border,
-        marginBottom: 12,
+        marginBottom: 10,
     },
     searchInput: {
         flex: 1,
-        fontSize: 13,
+        fontSize: 12,
         color: T.navy,
         fontWeight: '600',
     },
     filterBar: {
-        marginBottom: 16,
+        marginBottom: 14,
     },
     filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
         borderRadius: 99,
         backgroundColor: T.cardBg,
         borderWidth: 1,
         borderColor: T.border,
-        marginRight: 8,
+        marginRight: 6,
     },
     filterChipActive: {
         backgroundColor: T.navy,
@@ -1129,7 +1131,7 @@ const styles = StyleSheet.create({
     },
     filterChipText: {
         color: T.textSub,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
     },
     filterChipTextActive: {
@@ -1140,63 +1142,63 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     sectionTitle: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 15,
+        fontSize: 14,
     },
     manageVaultLink: {
         color: T.goldDk,
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     loadingBox: {
-        padding: 40,
+        padding: 30,
         alignItems: 'center',
     },
     loadingText: {
         color: T.textSub,
-        marginTop: 10,
+        marginTop: 8,
         fontWeight: '600',
-        fontSize: 12,
+        fontSize: 11.5,
     },
     emptyBox: {
-        padding: 40,
+        padding: 30,
         alignItems: 'center',
         backgroundColor: T.cardBg,
-        borderRadius: 16,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: T.border,
     },
     emptyTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '800',
         color: T.navy,
-        marginTop: 8,
+        marginTop: 6,
     },
     emptySub: {
-        fontSize: 12,
+        fontSize: 11,
         color: T.textSub,
-        marginTop: 4,
+        marginTop: 3,
     },
     providersGrid: {
-        gap: 12,
+        gap: 10,
     },
     providerCard: {
         backgroundColor: T.cardBg,
-        borderRadius: 16,
-        padding: 16,
-        paddingLeft: 20,
+        borderRadius: 14,
+        padding: 14,
+        paddingLeft: 18,
         borderWidth: 1,
         borderColor: T.border,
         position: 'relative',
         overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
         elevation: 2,
     },
     providerCardLeftBar: {
@@ -1204,79 +1206,82 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         bottom: 0,
-        width: 5,
+        width: 4,
     },
     providerCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     providerCategory: {
         color: T.textSub,
-        fontSize: 9.5,
+        fontSize: 9,
         fontWeight: '900',
         textTransform: 'uppercase',
-        letterSpacing: 0.6,
+        letterSpacing: 0.5,
     },
     latencyTag: {
         color: T.success,
-        fontSize: 9.5,
+        fontSize: 9,
         fontWeight: '800',
-        marginLeft: 6,
+        marginLeft: 5,
     },
     providerName: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 14.5,
-        marginTop: 2,
+        fontSize: 13.5,
+        marginTop: 1,
     },
     statusPill: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
         borderRadius: 99,
         borderWidth: 1,
     },
     statusPillText: {
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '900',
-        letterSpacing: 0.5,
+        letterSpacing: 0.4,
     },
     balanceContainer: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        marginVertical: 6,
+        marginVertical: 4,
     },
     currencySymbol: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '900',
         color: T.goldDk,
-        marginRight: 3,
+        marginRight: 2,
     },
     providerBalance: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 22,
+        fontSize: 20,
     },
     providerErrorText: {
         color: T.warning,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '700',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     actionButtonsRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginTop: 8,
+        gap: 6,
+        marginTop: 6,
+        flexWrap: 'wrap',
     },
     actionBtn: {
         flex: 1,
-        height: 38,
-        borderRadius: 10,
+        minWidth: 90,
+        height: 34,
+        borderRadius: 8,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: 6,
     },
     depositBtn: {
         backgroundColor: T.gold,
@@ -1289,38 +1294,39 @@ const styles = StyleSheet.create({
     tokenBtn: {
         backgroundColor: T.goldBg,
         borderColor: T.gold,
-        maxWidth: 90,
+        maxWidth: 105,
     },
     tokenBtnHighlight: {
         backgroundColor: T.warning,
         borderColor: T.warning,
-        maxWidth: 100,
+        maxWidth: 105,
     },
     actionBtnText: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         fontWeight: '900',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(13, 27, 62, 0.8)',
+        backgroundColor: 'rgba(13, 27, 62, 0.82)',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 18,
+        padding: 16,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 440,
+        maxWidth: 420,
+        maxHeight: '85%',
         backgroundColor: T.white,
-        borderRadius: 20,
-        padding: 22,
+        borderRadius: 16,
+        padding: 18,
         borderWidth: 2,
         borderColor: T.gold,
         position: 'relative',
         overflow: 'hidden',
         shadowColor: T.navyDark,
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
-        shadowRadius: 12,
+        shadowRadius: 10,
         elevation: 8,
     },
     modalDecorStripe: {
@@ -1328,98 +1334,99 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        height: 5,
+        height: 4,
         backgroundColor: T.gold,
     },
     modalTitle: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 16.5,
+        fontSize: 15,
     },
     modalSubText: {
         color: T.textSub,
-        fontSize: 12,
-        lineHeight: 17,
-        marginBottom: 16,
+        fontSize: 11.5,
+        lineHeight: 16,
+        marginBottom: 12,
     },
     bankDetailCard: {
         backgroundColor: T.goldBg,
-        borderRadius: 14,
-        padding: 14,
+        borderRadius: 12,
+        padding: 12,
         borderWidth: 1,
         borderColor: 'rgba(245,166,35,0.3)',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     bankDetailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 6,
+        paddingVertical: 5,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     bankLabel: {
         color: T.textSub,
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '700',
     },
     bankValue: {
         color: T.navy,
-        fontSize: 12.5,
+        fontSize: 12,
         fontWeight: '900',
     },
     copySuccessToast: {
         color: T.success,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '800',
-        marginTop: 8,
+        marginTop: 6,
         textAlign: 'center',
     },
     bankInstructions: {
         color: T.navy,
-        fontSize: 11,
-        marginTop: 10,
-        lineHeight: 16,
+        fontSize: 10.5,
+        marginTop: 8,
+        lineHeight: 15,
         fontWeight: '600',
     },
     modalCloseBtn: {
-        height: 42,
-        borderRadius: 10,
+        height: 38,
+        borderRadius: 8,
         backgroundColor: '#e2e8f0',
         alignItems: 'center',
         justifyContent: 'center',
+        marginTop: 6,
     },
     modalCloseBtnText: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 13,
+        fontSize: 12,
     },
     inputLabel: {
         color: T.navy,
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '800',
-        marginBottom: 5,
+        marginBottom: 4,
     },
     modalInput: {
-        height: 42,
-        borderRadius: 10,
+        height: 38,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: T.border,
         backgroundColor: '#f8fafc',
         color: T.navy,
-        paddingHorizontal: 12,
-        fontSize: 12.5,
+        paddingHorizontal: 10,
+        fontSize: 12,
         fontWeight: '700',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     bankChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
         backgroundColor: '#f1f5f9',
         borderWidth: 1,
         borderColor: T.border,
-        marginRight: 6,
+        marginRight: 5,
     },
     bankChipSelected: {
         backgroundColor: T.gold,
@@ -1427,21 +1434,21 @@ const styles = StyleSheet.create({
     },
     bankChipText: {
         color: T.navy,
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '700',
     },
     executeWithdrawBtn: {
-        height: 44,
-        borderRadius: 10,
+        height: 40,
+        borderRadius: 8,
         backgroundColor: T.gold,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 12,
+        marginTop: 10,
     },
     executeWithdrawBtnText: {
         color: T.navy,
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 13,
     },
 });
 
