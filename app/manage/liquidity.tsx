@@ -95,6 +95,7 @@ export default function LiquidityVaultScreen() {
     // Low Float Email & SMS Alert States
     const [alertEmail, setAlertEmail] = useState('');
     const [alertPhone, setAlertPhone] = useState('');
+    const [termiiApiKey, setTermiiApiKey] = useState('');
     const [alertThreshold, setAlertThreshold] = useState('5000');
     const [alertIntervalMins, setAlertIntervalMins] = useState('30');
     const [alertEnabled, setAlertEnabled] = useState(true);
@@ -132,6 +133,9 @@ export default function LiquidityVaultScreen() {
             if (vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP']) {
                 setAlertPhone(vaultSecrets['ALERT_PHONE'] || vaultSecrets['SUPPORT_WHATSAPP'] || '');
             }
+            if (vaultSecrets['TERMII_API_KEY'] || vaultSecrets['TERMII_KEY']) {
+                setTermiiApiKey(vaultSecrets['TERMII_API_KEY'] || vaultSecrets['TERMII_KEY'] || '');
+            }
             if (vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER']) {
                 setSmtpEmail(vaultSecrets['ZOHO_EMAIL'] || vaultSecrets['SMTP_USER'] || '');
             }
@@ -157,6 +161,10 @@ export default function LiquidityVaultScreen() {
 
             if (alertPhone.trim()) {
                 updates.push({ key: 'ALERT_PHONE', value: alertPhone.trim(), description: 'Admin Phone Number for Low Balance SMS Alerts' });
+            }
+            if (termiiApiKey.trim()) {
+                updates.push({ key: 'TERMII_API_KEY', value: termiiApiKey.trim(), description: 'Termii SMS Gateway API Key' });
+                updates.push({ key: 'TERMII_KEY', value: termiiApiKey.trim(), description: 'Termii SMS Gateway API Key' });
             }
             if (smtpEmail.trim()) {
                 updates.push({ key: 'ZOHO_EMAIL', value: smtpEmail.trim(), description: 'SMTP Sender Email' });
@@ -791,6 +799,16 @@ export default function LiquidityVaultScreen() {
                                     />
                                 </View>
                             </View>
+
+                            <Text style={styles.inputLabel}>Termii SMS API Key (For Phone SMS Alerts)</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Paste your Termii API Key here..."
+                                placeholderTextColor="#94a3b8"
+                                autoCapitalize="none"
+                                value={termiiApiKey}
+                                onChangeText={setTermiiApiKey}
+                            />
 
                             <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <View style={{ flex: 1 }}>
