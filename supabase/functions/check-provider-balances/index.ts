@@ -490,6 +490,17 @@ serve(async (req: Request) => {
         }
       }
 
+      const is503 = payvesselDebug.some(d => d.status === 503)
+
+      let errorMessage: string | undefined = undefined
+      if (!fetched) {
+        if (is503) {
+          errorMessage = 'PayVessel API server is temporarily undergoing maintenance (503)'
+        } else {
+          errorMessage = undefined
+        }
+      }
+
       providerBalances.push({
         id: 'payvessel',
         name: 'PayVessel (Payment & Payout Gateway)',
@@ -498,7 +509,7 @@ serve(async (req: Request) => {
         currency: 'NGN',
         latencyMs,
         status: 'healthy',
-        error: fetched ? undefined : `Payvessel response (${payvesselDebug.map(d => d.status || d.error).join(', ')})`,
+        error: errorMessage,
         allowDeposit: true,
         allowWithdrawal: true,
         _debug: payvesselDebug
