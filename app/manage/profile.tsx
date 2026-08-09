@@ -245,7 +245,7 @@ export default function MyProfile() {
                             onPress={() => setIsEditing(!isEditing)}
                             className="bg-slate-200 px-3 py-1 rounded border border-slate-300"
                         >
-                            <Text className="text-slate-700 font-medium text-[11px]">{isEditing ? 'Cancel' : 'Edit'}</Text>
+                            <Text className="text-slate-700 font-medium text-xs">{isEditing ? 'Cancel' : 'Edit'}</Text>
                         </TouchableOpacity>
                     )
                 }} 
@@ -272,12 +272,12 @@ export default function MyProfile() {
                     </View>
                     
                     <Text className="text-slate-800 font-bold text-base">{profile?.full_name || 'System Admin'}</Text>
-                    <Text className="text-slate-500 text-[11px] font-medium mt-0.5">{profile?.email || 'admin@mafhal.com'}</Text>
+                    <Text className="text-slate-500 text-xs font-medium mt-0.5">{profile?.email || 'admin@mafhal.com'}</Text>
                     
                     <View className="flex-row gap-2 mt-3">
                         <View className="bg-slate-100 px-2 py-1 rounded flex-row items-center gap-1 border border-slate-200">
                             <Ionicons name="shield-checkmark" size={10} color="#475569" />
-                            <Text className="text-slate-600 font-medium text-[9px] uppercase tracking-wider">{profile?.role?.replace('_', ' ')}</Text>
+                            <Text className="text-slate-600 font-medium text-xs uppercase tracking-wider">{profile?.role?.replace('_', ' ')}</Text>
                         </View>
                     </View>
                 </View>
@@ -289,7 +289,7 @@ export default function MyProfile() {
                             <Text className="text-slate-800 font-bold text-sm mb-4">Personal Information</Text>
                             
                             <View className="mb-3">
-                                <Text className="text-slate-500 text-[10px] font-medium uppercase mb-1 ml-0.5">Full Name</Text>
+                                <Text className="text-slate-500 text-xs font-medium uppercase mb-1 ml-0.5">Full Name</Text>
                                 <TextInput
                                     value={editForm.full_name}
                                     onChangeText={(t) => setEditForm(prev => ({...prev, full_name: t}))}
@@ -298,7 +298,7 @@ export default function MyProfile() {
                             </View>
 
                             <View className="mb-3">
-                                <Text className="text-slate-500 text-[10px] font-medium uppercase mb-1 ml-0.5">Email Address</Text>
+                                <Text className="text-slate-500 text-xs font-medium uppercase mb-1 ml-0.5">Email Address</Text>
                                 <TextInput
                                     value={editForm.email}
                                     onChangeText={(t) => setEditForm(prev => ({...prev, email: t}))}
@@ -309,7 +309,7 @@ export default function MyProfile() {
                             </View>
 
                             <View className="mb-4">
-                                <Text className="text-slate-500 text-[10px] font-medium uppercase mb-1 ml-0.5">Phone Number</Text>
+                                <Text className="text-slate-500 text-xs font-medium uppercase mb-1 ml-0.5">Phone Number</Text>
                                 <TextInput
                                     value={editForm.phone}
                                     onChangeText={(t) => setEditForm(prev => ({...prev, phone: t}))}
@@ -333,29 +333,29 @@ export default function MyProfile() {
                     ) : (
                         <>
                             {/* LIVE SYSTEM STATS */}
-                            <Text className="text-slate-500 font-medium text-[10px] uppercase tracking-wider mb-2 ml-1">Live System Metrics</Text>
+                            <Text className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-2 ml-1">Live System Metrics</Text>
                             <View className="flex-row gap-2 mb-5">
                                 <View className="flex-1 bg-white p-3 rounded-xl border border-slate-200 items-center">
                                     <Text className="text-lg font-bold text-slate-800">{stats.users.toLocaleString()}</Text>
-                                    <Text className="text-slate-500 text-[9px] uppercase">Total Users</Text>
+                                    <Text className="text-slate-500 text-xs uppercase">Total Users</Text>
                                 </View>
                                 <View className="flex-1 bg-white p-3 rounded-xl border border-slate-200 items-center">
                                     <Text className="text-lg font-bold text-slate-800">{stats.kyc.toLocaleString()}</Text>
-                                    <Text className="text-slate-500 text-[9px] uppercase">Approved KYC</Text>
+                                    <Text className="text-slate-500 text-xs uppercase">Approved KYC</Text>
                                 </View>
                                 <View className="flex-1 bg-white p-3 rounded-xl border border-slate-200 items-center">
                                     <Text className="text-lg font-bold text-slate-800">{stats.tickets.toLocaleString()}</Text>
-                                    <Text className="text-slate-500 text-[9px] uppercase">Resolved Tickets</Text>
+                                    <Text className="text-slate-500 text-xs uppercase">Resolved Tickets</Text>
                                 </View>
                             </View>
 
                             {/* PREFERENCES & SECURITY */}
-                            <Text className="text-slate-500 font-medium text-[10px] uppercase tracking-wider mb-2 ml-1">Security & Notifications</Text>
+                            <Text className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-2 ml-1">Security & Notifications</Text>
                             <View className="bg-white rounded-xl border border-slate-200 mb-5">
                                 <View className="flex-row justify-between items-center p-3 border-b border-slate-100">
                                     <View>
                                         <Text className="text-slate-700 font-medium text-xs">Two-Factor Auth</Text>
-                                        <Text className="text-slate-400 text-[9px]">Require OTP on login</Text>
+                                        <Text className="text-slate-400 text-xs">Require OTP on login</Text>
                                     </View>
                                     <Switch 
                                         value={twoFA} 
@@ -368,7 +368,7 @@ export default function MyProfile() {
                                 <View className="flex-row justify-between items-center p-3 border-b border-slate-100">
                                     <View>
                                         <Text className="text-slate-700 font-medium text-xs">Push Alerts</Text>
-                                        <Text className="text-slate-400 text-[9px]">Live notification on actions</Text>
+                                        <Text className="text-slate-400 text-xs">Live notification on actions</Text>
                                     </View>
                                     <Switch 
                                         value={pushNotifs} 
@@ -381,7 +381,7 @@ export default function MyProfile() {
                                 <View className="flex-row justify-between items-center p-3">
                                     <View>
                                         <Text className="text-slate-700 font-medium text-xs">Email Digest</Text>
-                                        <Text className="text-slate-400 text-[9px]">Daily summary reports</Text>
+                                        <Text className="text-slate-400 text-xs">Daily summary reports</Text>
                                     </View>
                                     <Switch 
                                         value={emailAlerts} 
@@ -393,12 +393,12 @@ export default function MyProfile() {
                             </View>
 
                             {/* DANGER ZONE - ADVANCED CONTROLS */}
-                            <Text className="text-red-500 font-medium text-[10px] uppercase tracking-wider mb-2 ml-1 mt-2">Critical Operations</Text>
+                            <Text className="text-red-500 font-medium text-xs uppercase tracking-wider mb-2 ml-1 mt-2">Critical Operations</Text>
                             <View className="bg-red-50 rounded-xl border border-red-100 mb-6 overflow-hidden">
                                 <View className="flex-row justify-between items-center p-3 border-b border-red-100/50">
                                     <View>
                                         <Text className="text-red-700 font-bold text-xs">Maintenance Mode</Text>
-                                        <Text className="text-red-500/80 text-[9px]">Blocks all users from logging in</Text>
+                                        <Text className="text-red-500/80 text-xs">Blocks all users from logging in</Text>
                                     </View>
                                     <Switch 
                                         value={maintenanceMode} 
@@ -422,7 +422,7 @@ export default function MyProfile() {
                             </View>
 
                             {/* ADVANCED ADMIN SHORTCUTS */}
-                            <Text className="text-slate-500 font-medium text-[10px] uppercase tracking-wider mb-2 ml-1">Quick Commands</Text>
+                            <Text className="text-slate-500 font-medium text-xs uppercase tracking-wider mb-2 ml-1">Quick Commands</Text>
                             <View className="bg-white rounded-xl border border-slate-200 mb-6">
                                 <TouchableOpacity 
                                     className="flex-row items-center justify-between p-3 border-b border-slate-100"
@@ -471,7 +471,7 @@ export default function MyProfile() {
                                 </TouchableOpacity>
                             </View>
 
-                            <Text className="text-slate-500 text-[10px] mb-2 uppercase font-medium">New Password</Text>
+                            <Text className="text-slate-500 text-xs mb-2 uppercase font-medium">New Password</Text>
                             <TextInput
                                 value={newPassword}
                                 onChangeText={setNewPassword}

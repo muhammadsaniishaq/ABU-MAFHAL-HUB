@@ -43,7 +43,7 @@ export default function WealthManager() {
                     <Text className="text-slate-400 text-xs mt-1">Users invested: 14,200</Text>
                 </View>
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4 mt-4">Savings APY Control</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4 mt-4">Savings APY Control</Text>
 
                 {[
                     { name: 'Standard Savings', rate: '8.5%', color: 'blue' },

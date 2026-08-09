@@ -190,7 +190,7 @@ export default function GeoMap() {
                         <Text className="text-cyan-400 font-black text-xl tracking-widest uppercase">Global Radar</Text>
                         <View className="flex-row items-center bg-emerald-950/50 px-3 py-1.5 rounded-full border border-emerald-800">
                             <View className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2" />
-                            <Text className="text-emerald-400 text-[10px] font-bold tracking-widest">SYS.ONLINE • {pingLatency}ms</Text>
+                            <Text className="text-emerald-400 text-xs font-bold tracking-widest">SYS.ONLINE • {pingLatency}ms</Text>
                         </View>
                     </View>
 
@@ -198,12 +198,12 @@ export default function GeoMap() {
                     <View className="flex-row justify-between gap-3">
                         <View className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 rounded-2xl p-4 flex-1 items-start shadow-xl">
                             <Ionicons name="pulse" size={18} color="#10B981" className="mb-2" />
-                            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Live Txns</Text>
+                            <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Live Txns</Text>
                             <Text className="text-white font-black text-2xl">{dailyCount}</Text>
                         </View>
                         <View className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 rounded-2xl p-4 flex-1 items-start shadow-xl">
                             <Ionicons name="stats-chart" size={18} color="#38BDF8" className="mb-2" />
-                            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Daily Vol</Text>
+                            <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Daily Vol</Text>
                             <Text className="text-white font-black text-xl tracking-tighter">₦{dailyVolume.toLocaleString()}</Text>
                         </View>
                     </View>
@@ -216,7 +216,7 @@ export default function GeoMap() {
                             <Ionicons name="list" size={16} color="#94A3B8" className="mr-2" />
                             <Text className="text-slate-300 text-sm font-bold tracking-widest uppercase">Live Intercepts</Text>
                         </View>
-                        <Text className="text-slate-500 text-[10px] tracking-widest uppercase">Decrypted</Text>
+                        <Text className="text-slate-500 text-xs tracking-widest uppercase">Decrypted</Text>
                     </View>
                     
                     <ScrollView className="gap-2" showsVerticalScrollIndicator={false}>
@@ -235,11 +235,11 @@ export default function GeoMap() {
                                     <View className="flex-1">
                                         <View className="flex-row justify-between items-center mb-0.5">
                                             <Text className="text-white font-bold text-sm tracking-tight">₦{tx.amount?.toLocaleString()}</Text>
-                                            <Text className="text-slate-400 text-[10px] font-bold">{new Date(tx.created_at).toLocaleTimeString()}</Text>
+                                            <Text className="text-slate-400 text-xs font-bold">{new Date(tx.created_at).toLocaleTimeString()}</Text>
                                         </View>
                                         <View className="flex-row justify-between items-center">
-                                            <Text style={{ color }} className="text-[10px] font-bold uppercase tracking-wider">{tx.type}</Text>
-                                            <Text className="text-slate-400 text-[10px] uppercase font-bold" numberOfLines={1}>
+                                            <Text style={{ color }} className="text-xs font-bold uppercase tracking-wider">{tx.type}</Text>
+                                            <Text className="text-slate-400 text-xs uppercase font-bold" numberOfLines={1}>
                                                 {tx.status === 'success' || tx.status === 'completed' ? 'SUCCESS' : (tx.status === 'pending' ? 'PENDING' : 'FAILED')}
                                             </Text>
                                         </View>

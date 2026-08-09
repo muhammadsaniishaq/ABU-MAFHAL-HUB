@@ -282,14 +282,14 @@ export default function ManageFeaturesScreen() {
                         onPress={() => setActiveTab('admin_locks')}
                         style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12, backgroundColor: activeTab === 'admin_locks' ? '#fffbeb' : 'transparent', borderWidth: activeTab === 'admin_locks' ? 1 : 0, borderColor: '#fde68a' }}
                     >
-                        <Text style={{ fontWeight: '900', fontSize: 11, color: activeTab === 'admin_locks' ? '#d97706' : '#64748b' }}>👑 ADMIN MODULE LOCKS</Text>
+                        <Text style={{ fontWeight: '900', fontSize: 12, color: activeTab === 'admin_locks' ? '#d97706' : '#64748b' }}>👑 ADMIN MODULE LOCKS</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
                         onPress={() => setActiveTab('app_features')}
                         style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12, backgroundColor: activeTab === 'app_features' ? '#eff6ff' : 'transparent', borderWidth: activeTab === 'app_features' ? 1 : 0, borderColor: '#bfdbfe' }}
                     >
-                        <Text style={{ fontWeight: '900', fontSize: 11, color: activeTab === 'app_features' ? '#2563eb' : '#64748b' }}>⚙️ USER APP FEATURES</Text>
+                        <Text style={{ fontWeight: '900', fontSize: 12, color: activeTab === 'app_features' ? '#2563eb' : '#64748b' }}>⚙️ USER APP FEATURES</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -301,7 +301,7 @@ export default function ManageFeaturesScreen() {
                                 <Ionicons name="eye-off-outline" size={18} color="#d97706" />
                                 <Text style={{ fontWeight: '900', fontSize: 12, color: '#d97706' }}>SUPER ADMIN MODULE HIDING CONTROL</Text>
                             </View>
-                            <Text style={{ color: '#475569', fontSize: 11, lineHeight: 16 }}>
+                            <Text style={{ color: '#475569', fontSize: 12, lineHeight: 16 }}>
                                 Toggle switches below to HIDE or SHOW specific modules from normal Staff Admins. When a module is HIDDEN, normal staff admins will NOT see or have access to it on their dashboard. Super Admin always retains master key access.
                             </Text>
                         </View>
@@ -318,7 +318,7 @@ export default function ManageFeaturesScreen() {
                                                 </View>
                                                 <View style={{ flex: 1, marginHorizontal: 10 }}>
                                                     <Text style={[s.cardTitle, isHidden && { color: '#ef4444' }]}>{mod.label}</Text>
-                                                    <Text style={{ fontSize: 10, fontWeight: '700', color: isHidden ? '#ef4444' : '#10b981', marginTop: 2 }}>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: isHidden ? '#ef4444' : '#10b981', marginTop: 2 }}>
                                                         {isHidden ? 'HIDDEN FROM STAFF ADMINS 🙈' : 'VISIBLE TO STAFF ADMINS 👁️'}
                                                     </Text>
                                                 </View>
@@ -504,7 +504,7 @@ const s = StyleSheet.create({
     },
     cardInfo: { flex: 1 },
     cardTitle: { fontSize: 12, fontWeight: '700', color: '#0f172a', marginBottom: 2 },
-    cardSubtitle: { fontSize: 9, color: '#64748b' },
+    cardSubtitle: { fontSize: 12, color: '#64748b' },
     cardAction: { marginRight: -6 },
     
     messageBox: {
@@ -514,9 +514,9 @@ const s = StyleSheet.create({
         borderTopColor: '#f1f5f9',
     },
     messageHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    messageLabel: { fontSize: 11, fontWeight: '600', color: '#ef4444', marginLeft: 6, flex: 1 },
+    messageLabel: { fontSize: 12, fontWeight: '600', color: '#ef4444', marginLeft: 6, flex: 1 },
     editBtn: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#f1f5f9', borderRadius: 4 },
-    editBtnTxt: { fontSize: 10, fontWeight: '600', color: '#0d1b3e' },
+    editBtnTxt: { fontSize: 12, fontWeight: '600', color: '#0d1b3e' },
     messageText: { fontSize: 12, color: '#475569', lineHeight: 18, backgroundColor: '#fef2f2', padding: 8, borderRadius: 6 },
     
     editContainer: { marginTop: 4 },

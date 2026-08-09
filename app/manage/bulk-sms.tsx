@@ -318,7 +318,7 @@ FORMATTING & STYLE RULES:
                         <Text style={{ color: NAVY }} className="font-bold text-[14px] uppercase tracking-wider mb-4">Recent SMS Broadcasts</Text>
                         {history.length === 0 ? <Text style={{ color: NAVY }} className="text-sm opacity-60">No history found.</Text> : history.map((log, i) => (
                             <View key={i} className="border-b border-slate-100 py-3">
-                                <Text style={{ color: NAVY }} className="font-bold text-[11px] opacity-60">{new Date(log.created_at).toLocaleString()}</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs opacity-60">{new Date(log.created_at).toLocaleString()}</Text>
                                 <Text style={{ color: NAVY }} className="text-sm font-medium mt-1">{log.details}</Text>
                             </View>
                         ))}
@@ -329,7 +329,7 @@ FORMATTING & STYLE RULES:
                     <>
                 {/* SENDER NAME CARD */}
                 <View className="bg-white rounded-3xl p-5 mb-4 border shadow-sm shadow-slate-200" style={{ borderColor: `${GOLD}40` }}>
-                    <Text style={{ color: NAVY }} className="font-bold text-[11px] uppercase tracking-wider mb-3">Sender Name / Subject</Text>
+                    <Text style={{ color: NAVY }} className="font-bold text-xs uppercase tracking-wider mb-3">Sender Name / Subject</Text>
                     <TextInput
                         value={senderId}
                         onChangeText={setSenderId}
@@ -339,16 +339,16 @@ FORMATTING & STYLE RULES:
                         placeholderTextColor={`${NAVY}60`}
                         maxLength={11}
                     />
-                    <Text style={{ color: NAVY }} className="text-[10px] font-medium text-right mt-2 opacity-60">{senderId.length}/11</Text>
+                    <Text style={{ color: NAVY }} className="text-xs font-medium text-right mt-2 opacity-60">{senderId.length}/11</Text>
                 </View>
 
                 {/* MESSAGE CARD */}
                 <View className="bg-white rounded-3xl p-5 mb-4 border border-slate-200 shadow-sm shadow-slate-200">
                     <View className="flex-row justify-between items-center mb-3">
-                        <Text style={{ color: NAVY }} className="font-bold text-[11px] uppercase tracking-wider">Message</Text>
+                        <Text style={{ color: NAVY }} className="font-bold text-xs uppercase tracking-wider">Message</Text>
                         <TouchableOpacity onPress={() => setShowAIModal(true)} style={{ backgroundColor: LIGHT_GOLD }} className="flex-row items-center px-3 py-1.5 rounded-full gap-1">
                             <Ionicons name="sparkles" size={12} color={NAVY} />
-                            <Text style={{ color: NAVY }} className="font-bold text-[10px]">AI Assist</Text>
+                            <Text style={{ color: NAVY }} className="font-bold text-xs">AI Assist</Text>
                         </TouchableOpacity>
                     </View>
                     
@@ -361,7 +361,7 @@ FORMATTING & STYLE RULES:
                                 style={{ backgroundColor: `${NAVY}0A`, borderColor: `${NAVY}20` }}
                                 className="border px-4 py-2 rounded-full"
                             >
-                                <Text style={{ color: NAVY }} className="font-bold text-[11px]">{key}</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">{key}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -376,14 +376,14 @@ FORMATTING & STYLE RULES:
                         multiline
                         textAlignVertical="top"
                     />
-                    <Text style={{ color: NAVY }} className="text-[10px] font-medium text-right mt-3 opacity-60">
+                    <Text style={{ color: NAVY }} className="text-xs font-medium text-right mt-3 opacity-60">
                         {charCount} chars • {pageCount} page • Plain Text
                     </Text>
                 </View>
 
                 {/* RECIPIENTS CARD */}
                 <View className="bg-white rounded-3xl p-5 mb-4 border border-slate-200 shadow-sm shadow-slate-200">
-                    <Text style={{ color: NAVY }} className="font-bold text-[11px] uppercase tracking-wider mb-3">Recipients</Text>
+                    <Text style={{ color: NAVY }} className="font-bold text-xs uppercase tracking-wider mb-3">Recipients</Text>
                     
                     <TextInput
                         value={recipients}
@@ -399,29 +399,29 @@ FORMATTING & STYLE RULES:
 
                     <View className="flex-row flex-wrap gap-3">
                         <TouchableOpacity onPress={handleValidateNumbers} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-4 py-2.5 rounded-lg border">
-                            <Text style={{ color: NAVY }} className="font-bold text-[11px]">Validate Numbers</Text>
+                            <Text style={{ color: NAVY }} className="font-bold text-xs">Validate Numbers</Text>
                         </TouchableOpacity>
                         <View className="flex-row flex-wrap gap-2 mt-2">
-                            <Text style={{ color: NAVY }} className="w-full font-bold text-[11px] mb-1">Load From Database:</Text>
+                            <Text style={{ color: NAVY }} className="w-full font-bold text-xs mb-1">Load From Database:</Text>
                             
                             <TouchableOpacity onPress={() => handleLoadUsers('all')} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-3 py-2 rounded-lg border">
-                                <Text style={{ color: NAVY }} className="font-bold text-[10px]">All Users</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">All Users</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => handleLoadUsers('active')} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-3 py-2 rounded-lg border">
-                                <Text style={{ color: NAVY }} className="font-bold text-[10px]">Active</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">Active</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => handleLoadUsers('inactive')} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-3 py-2 rounded-lg border">
-                                <Text style={{ color: NAVY }} className="font-bold text-[10px]">Inactive</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">Inactive</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => handleLoadUsers('admin')} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-3 py-2 rounded-lg border">
-                                <Text style={{ color: NAVY }} className="font-bold text-[10px]">Admins</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">Admins</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => handleLoadUsers('user')} style={{ backgroundColor: LIGHT_GOLD, borderColor: GOLD }} className="px-3 py-2 rounded-lg border">
-                                <Text style={{ color: NAVY }} className="font-bold text-[10px]">Users Only</Text>
+                                <Text style={{ color: NAVY }} className="font-bold text-xs">Users Only</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -429,7 +429,7 @@ FORMATTING & STYLE RULES:
 
                 {/* DELIVERY TIMING */}
                 <View className="bg-white rounded-3xl p-5 mb-4 border border-slate-200 shadow-sm shadow-slate-200">
-                    <Text style={{ color: NAVY }} className="font-bold text-[11px] uppercase tracking-wider mb-3">Delivery Timing</Text>
+                    <Text style={{ color: NAVY }} className="font-bold text-xs uppercase tracking-wider mb-3">Delivery Timing</Text>
                     <TouchableOpacity onPress={() => Alert.alert('Notice', 'Bigisub API currently only supports Immediate delivery. Scheduled messages will be added when supported.')} style={{ borderColor: `${NAVY}20` }} className="bg-slate-50 px-4 py-4 rounded-xl border flex-row justify-between items-center">
                         <Text style={{ color: NAVY }} className="font-medium text-sm">{deliveryTiming}</Text>
                         <Ionicons name="chevron-down" size={16} color={NAVY} />
@@ -443,8 +443,8 @@ FORMATTING & STYLE RULES:
                             <Ionicons name="warning" size={16} color={NAVY} />
                             <Text style={{ color: NAVY }} className="font-bold text-[12px]">Please complete the following:</Text>
                         </View>
-                        {missingMessage && <Text style={{ color: NAVY }} className="text-[11px] ml-6 mb-1 opacity-80">• Enter a message</Text>}
-                        {missingRecipients && <Text style={{ color: NAVY }} className="text-[11px] ml-6 opacity-80">• Enter at least one recipient</Text>}
+                        {missingMessage && <Text style={{ color: NAVY }} className="text-xs ml-6 mb-1 opacity-80">• Enter a message</Text>}
+                        {missingRecipients && <Text style={{ color: NAVY }} className="text-xs ml-6 opacity-80">• Enter at least one recipient</Text>}
                     </View>
                 )}
 

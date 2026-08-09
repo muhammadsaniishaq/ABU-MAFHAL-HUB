@@ -51,14 +51,14 @@ export default function ReportGenerator() {
             <Stack.Screen options={{ title: 'Report Generator' }} />
 
             <View className="p-6">
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Select Report Type</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Select Report Type</Text>
                 <View className="flex-row justify-between mb-8">
                     <ReportTypeCard id="transactions" icon="receipt" label="Financials" color="#10B981" />
                     <ReportTypeCard id="users" icon="people" label="User Growth" color="#3B82F6" />
                     <ReportTypeCard id="security" icon="shield" label="Security Logs" color="#EF4444" />
                 </View>
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Date Range</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Date Range</Text>
                 <View className="bg-white p-2 rounded-xl border border-gray-100 flex-row mb-8">
                     {['24h', '7d', '30d', 'Custom'].map(r => (
                         <TouchableOpacity

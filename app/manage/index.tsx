@@ -498,7 +498,7 @@ export default function AdminBento() {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                             <Text style={s.sectionHeader}>👑 Super Admin Master Controls</Text>
                             <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
-                                <Text style={{ color: T.gold, fontSize: 10, fontWeight: 'bold' }}>ROOT PERMISSIONS</Text>
+                                <Text style={{ color: T.gold, fontSize: 12, fontWeight: 'bold' }}>ROOT PERMISSIONS</Text>
                             </View>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
@@ -696,7 +696,7 @@ const s = StyleSheet.create({
     },
     brandTxtSub: {
         color: T.gold,
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '900',
         letterSpacing: 1.5,
         lineHeight: 10,
@@ -719,7 +719,7 @@ const s = StyleSheet.create({
     },
     logoutBtnText: {
         color: '#cbd5e1',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
     },
     welcomeStatusRow: {
@@ -730,7 +730,7 @@ const s = StyleSheet.create({
     },
     welcomeText: {
         color: '#94a3b8',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
     },
     liveRow: {
@@ -751,7 +751,7 @@ const s = StyleSheet.create({
     },
     liveText: {
         color: '#10b981',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -771,7 +771,7 @@ const s = StyleSheet.create({
     },
     dateText: {
         color: '#cbd5e1',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '700',
     },
     bellActionBtn: {
@@ -828,7 +828,7 @@ const s = StyleSheet.create({
     avatarLetters: {
         color: '#ffffff',
         fontWeight: '900',
-        fontSize: 10,
+        fontSize: 12,
         letterSpacing: 0.5,
     },
     avatarActiveDot: {
@@ -857,7 +857,7 @@ const s = StyleSheet.create({
     },
     adminBadgeText: {
         color: T.gold,
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -893,7 +893,7 @@ const s = StyleSheet.create({
     },
     cmdText: {
         color: 'rgba(255, 255, 255, 0.4)',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '700',
     },
     floatingCardContainer: {
@@ -929,7 +929,7 @@ const s = StyleSheet.create({
         marginBottom: 1,
     },
     statLabel: {
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '700',
         color: '#cbd5e1',
         textTransform: 'uppercase',
@@ -975,7 +975,7 @@ const s = StyleSheet.create({
     },
     superCardLabel: {
         color: T.navy,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
     },
     quickActionBtn: {
@@ -999,7 +999,7 @@ const s = StyleSheet.create({
     },
     quickActionLabel: {
         color: T.text,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '700',
         marginTop: 6,
     },
@@ -1050,7 +1050,7 @@ const s = StyleSheet.create({
         color: T.navy,
     },
     accordionSubtitle: {
-        fontSize: 10,
+        fontSize: 12,
         color: T.textSub,
         fontWeight: '500',
         marginTop: 1,
@@ -1070,7 +1070,7 @@ const s = StyleSheet.create({
     },
     sectionBadgeText: {
         color: '#ffffff',
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '900',
     },
     accordionBody: {
@@ -1123,7 +1123,7 @@ const s = StyleSheet.create({
     },
     badgeText: {
         color: '#ffffff',
-        fontSize: 7,
+        fontSize: 12,
         fontWeight: '800',
     },
     gridCardFooter: {
@@ -1131,17 +1131,17 @@ const s = StyleSheet.create({
     },
     statText: {
         color: '#10b981',
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '700',
         marginBottom: 1,
     },
     gridCardTitle: {
         fontWeight: '700',
-        fontSize: 10,
+        fontSize: 12,
         color: T.navy,
     },
     sectionHeader: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
         color: T.textSub,
         textTransform: 'uppercase',

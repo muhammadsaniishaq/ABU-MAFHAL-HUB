@@ -194,7 +194,7 @@ export default function SecuritySub() {
 
                 {/* Authentication Controls */}
                 <View className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4 mb-8">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4 tracking-wider">Authentication Policy</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4 tracking-wider">Authentication Policy</Text>
 
                     {/* Require 2FA (Google Authenticator) */}
                     <View className="flex-row items-center justify-between mb-6">
@@ -236,7 +236,7 @@ export default function SecuritySub() {
                 </View>
 
                 {/* Active Sessions */}
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-3 ml-1 tracking-wider">Active Sessions</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-3 ml-1 tracking-wider">Active Sessions</Text>
                 <View className="bg-slate-800 rounded-xl p-4 mb-3 border border-slate-700 flex-row justify-between items-center">
                     <View className="flex-row items-center gap-3">
                         <Ionicons
@@ -248,7 +248,7 @@ export default function SecuritySub() {
                             <View className="flex-row items-center gap-2">
                                 <Text className="text-slate-200 font-bold">Current Session</Text>
                                 <View className="bg-green-500/20 px-1.5 py-0.5 rounded">
-                                    <Text className="text-green-500 text-[8px] font-bold uppercase">Active</Text>
+                                    <Text className="text-green-500 text-xs font-bold uppercase">Active</Text>
                                 </View>
                             </View>
                             <Text className="text-slate-500 text-xs">Console • Connected</Text>
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     copyBtnText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
         color: '#0d1b3e',
     },

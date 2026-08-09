@@ -37,18 +37,18 @@ export default function InfrastructureGrid() {
                     {nodes.map(node => (
                         <View key={node.id} className="w-[31%] aspect-square bg-slate-900 rounded-xl p-3 border border-slate-800 justify-between">
                             <View className="flex-row justify-between">
-                                <Text className="text-slate-500 font-mono text-[10px]">{node.id}</Text>
+                                <Text className="text-slate-500 font-mono text-xs">{node.id}</Text>
                                 <View className={`w-1.5 h-1.5 rounded-full ${node.status === 'online' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
                             </View>
 
                             <View>
-                                <Text className="text-slate-400 text-[10px] font-bold mb-1">CPU Load</Text>
+                                <Text className="text-slate-400 text-xs font-bold mb-1">CPU Load</Text>
                                 <View className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
                                     <View style={{ width: `${node.load}%` }} className={`h-full ${node.load > 70 ? 'bg-orange-500' : 'bg-blue-500'}`} />
                                 </View>
                             </View>
 
-                            <Text className="text-slate-600 text-[8px] font-mono">{node.region}</Text>
+                            <Text className="text-slate-600 text-xs font-mono">{node.region}</Text>
                         </View>
                     ))}
                 </View>
@@ -56,10 +56,10 @@ export default function InfrastructureGrid() {
                 <View className="mt-8 bg-black p-4 rounded-xl border border-slate-800">
                     <Text className="text-green-500 font-mono text-xs mb-2">$ tail -f /var/log/syslog</Text>
                     <View className="gap-1 opacity-70">
-                        <Text className="text-slate-500 font-mono text-[10px]">[INFO] Auto-scaling group trigger: +2 nodes</Text>
-                        <Text className="text-slate-500 font-mono text-[10px]">[INFO] Database backup completed (2.4GB)</Text>
-                        <Text className="text-slate-500 font-mono text-[10px]">[WARN] High latency detected in eu-west-1</Text>
-                        <Text className="text-slate-500 font-mono text-[10px]">[INFO] Cache invalidated for key: users_list</Text>
+                        <Text className="text-slate-500 font-mono text-xs">[INFO] Auto-scaling group trigger: +2 nodes</Text>
+                        <Text className="text-slate-500 font-mono text-xs">[INFO] Database backup completed (2.4GB)</Text>
+                        <Text className="text-slate-500 font-mono text-xs">[WARN] High latency detected in eu-west-1</Text>
+                        <Text className="text-slate-500 font-mono text-xs">[INFO] Cache invalidated for key: users_list</Text>
                     </View>
                 </View>
             </View>

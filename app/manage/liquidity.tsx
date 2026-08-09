@@ -822,10 +822,10 @@ export default function LiquidityVaultScreen() {
                                 <Ionicons name="mail-unread-outline" size={16} color="#d97706" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: T.navy, fontWeight: '700', fontSize: 11.5 }}>
+                                <Text style={{ color: T.navy, fontWeight: '700', fontSize: 12.5 }}>
                                     ⚡ Low Float Auto Email Alerts
                                 </Text>
-                                <Text style={{ color: T.textSub, fontSize: 9.5 }} numberOfLines={1}>
+                                <Text style={{ color: T.textSub, fontSize: 12.5 }} numberOfLines={1}>
                                     {alertEnabled && alertEmail ? `Alerts active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()} | Every ${alertIntervalMins || 30} mins)` : 'Configure email, minimum threshold & time interval'}
                                 </Text>
                             </View>
@@ -835,7 +835,7 @@ export default function LiquidityVaultScreen() {
 
                     {showAlertCard && (
                         <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                            <Text style={{ color: T.textSub, fontSize: 10, marginBottom: 10, lineHeight: 14 }}>
+                            <Text style={{ color: T.textSub, fontSize: 12, marginBottom: 10, lineHeight: 14 }}>
                                 Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Set your preferred check frequency in minutes!
                             </Text>
 
@@ -924,7 +924,7 @@ export default function LiquidityVaultScreen() {
                                     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
                                 }}
                             >
-                                <Text style={{ color: '#92400e', fontSize: 10, fontWeight: '700' }}>
+                                <Text style={{ color: '#92400e', fontSize: 12, fontWeight: '700' }}>
                                     🔐 Configure Custom SMTP / Zoho Email (100% Direct Inbox)
                                 </Text>
                                 <Ionicons name={showSmtpConfig ? "chevron-up" : "chevron-down"} size={14} color="#92400e" />
@@ -932,7 +932,7 @@ export default function LiquidityVaultScreen() {
 
                             {showSmtpConfig && (
                                 <View style={{ backgroundColor: '#f8fafc', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: T.border, marginBottom: 8 }}>
-                                    <Text style={{ color: T.textSub, fontSize: 9.5, marginBottom: 8 }}>
+                                    <Text style={{ color: T.textSub, fontSize: 12.5, marginBottom: 8 }}>
                                         Enter your official Zoho or domain email credentials below to send alerts directly from your own domain and guarantee Inbox delivery without hitting Spam.
                                     </Text>
 
@@ -961,7 +961,7 @@ export default function LiquidityVaultScreen() {
                             )}
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
-                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email & SMS Alerts</Text>
+                                <Text style={{ color: T.navy, fontWeight: '600', fontSize: 12 }}>Enable Auto Email & SMS Alerts</Text>
                                 <Switch
                                     value={alertEnabled}
                                     onValueChange={handleToggleAlertSwitch}
@@ -1202,7 +1202,7 @@ export default function LiquidityVaultScreen() {
                             {/* Inline Bank Details Customiser / Editor */}
                             {editingDepositBank ? (
                                 <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: T.border, marginBottom: 12 }}>
-                                    <Text style={{ color: T.navy, fontWeight: '700', fontSize: 11, marginBottom: 8 }}>
+                                    <Text style={{ color: T.navy, fontWeight: '700', fontSize: 12, marginBottom: 8 }}>
                                         ✏️ Edit Top-Up Bank Account (Saved in Vault)
                                     </Text>
 
@@ -1256,7 +1256,7 @@ export default function LiquidityVaultScreen() {
                                         alignItems: 'center', marginBottom: 10
                                     }}
                                 >
-                                    <Text style={{ color: T.navy, fontSize: 10.5, fontWeight: '700' }}>
+                                    <Text style={{ color: T.navy, fontSize: 12.5, fontWeight: '700' }}>
                                         ✏️ Edit / Update Top-Up Bank Account Details
                                     </Text>
                                 </TouchableOpacity>
@@ -1290,7 +1290,7 @@ export default function LiquidityVaultScreen() {
                                         backgroundColor: '#fffbeb', borderRadius: 8, padding: 8,
                                         borderLeftWidth: 3, borderLeftColor: T.gold, marginBottom: 12
                                     }}>
-                                        <Text style={{ color: '#92400e', fontSize: 11, fontWeight: '700' }}>
+                                        <Text style={{ color: '#92400e', fontSize: 12, fontWeight: '700' }}>
                                             🔐 {selectedTokenProvider?.name} uses Username + Password authentication.
                                             Enter your login credentials below — they are saved securely in Vault.
                                         </Text>
@@ -1499,7 +1499,7 @@ const styles = StyleSheet.create({
     },
     heroSubTitle: {
         color: T.gold,
-        fontSize: 8.5,
+        fontSize: 12.5,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
@@ -1519,7 +1519,7 @@ const styles = StyleSheet.create({
     },
     refreshBtnText: {
         color: T.gold,
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '700',
     },
     badgeGridRow: {
@@ -1537,7 +1537,7 @@ const styles = StyleSheet.create({
     },
     statBadgeText: {
         color: '#e2e8f0',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '600',
         marginLeft: 3,
     },
@@ -1554,7 +1554,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 11,
+        fontSize: 12,
         color: T.navy,
         fontWeight: '500',
     },
@@ -1576,7 +1576,7 @@ const styles = StyleSheet.create({
     },
     filterChipText: {
         color: T.textSub,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '600',
     },
     filterChipTextActive: {
@@ -1596,7 +1596,7 @@ const styles = StyleSheet.create({
     },
     manageVaultLink: {
         color: T.goldDk,
-        fontSize: 10.5,
+        fontSize: 12.5,
         fontWeight: '700',
     },
     loadingBox: {
@@ -1607,7 +1607,7 @@ const styles = StyleSheet.create({
         color: T.textSub,
         marginTop: 5,
         fontWeight: '500',
-        fontSize: 10.5,
+        fontSize: 12.5,
     },
     emptyBox: {
         padding: 20,
@@ -1624,7 +1624,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     emptySub: {
-        fontSize: 10,
+        fontSize: 12,
         color: T.textSub,
         marginTop: 2,
     },
@@ -1661,21 +1661,21 @@ const styles = StyleSheet.create({
     },
     providerCategory: {
         color: T.textSub,
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '600',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     latencyTag: {
         color: T.success,
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '700',
         marginLeft: 4,
     },
     providerName: {
         color: T.navy,
         fontWeight: '700',
-        fontSize: 11.5,
+        fontSize: 12.5,
         marginTop: 1,
     },
     statusPill: {
@@ -1685,7 +1685,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     statusPillText: {
-        fontSize: 7.5,
+        fontSize: 12.5,
         fontWeight: '700',
         letterSpacing: 0.3,
     },
@@ -1707,7 +1707,7 @@ const styles = StyleSheet.create({
     },
     providerErrorText: {
         color: T.warning,
-        fontSize: 9.5,
+        fontSize: 12.5,
         fontWeight: '600',
         marginBottom: 3,
     },
@@ -1747,7 +1747,7 @@ const styles = StyleSheet.create({
         maxWidth: 90,
     },
     actionBtnText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
     },
     modalOverlay: {
@@ -1789,7 +1789,7 @@ const styles = StyleSheet.create({
     },
     modalSubText: {
         color: T.textSub,
-        fontSize: 11.5,
+        fontSize: 12.5,
         lineHeight: 16,
         marginBottom: 10,
     },
@@ -1811,7 +1811,7 @@ const styles = StyleSheet.create({
     },
     bankLabel: {
         color: T.textSub,
-        fontSize: 11.5,
+        fontSize: 12.5,
         fontWeight: '500',
     },
     bankValue: {
@@ -1821,14 +1821,14 @@ const styles = StyleSheet.create({
     },
     copySuccessToast: {
         color: T.success,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
         marginTop: 4,
         textAlign: 'center',
     },
     bankInstructions: {
         color: T.navy,
-        fontSize: 11,
+        fontSize: 12,
         marginTop: 6,
         lineHeight: 15,
         fontWeight: '500',
@@ -1848,7 +1848,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         color: T.navy,
-        fontSize: 11.5,
+        fontSize: 12.5,
         fontWeight: '600',
         marginBottom: 3,
     },
@@ -1879,7 +1879,7 @@ const styles = StyleSheet.create({
     },
     bankChipText: {
         color: T.navy,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
     },
     executeWithdrawBtn: {

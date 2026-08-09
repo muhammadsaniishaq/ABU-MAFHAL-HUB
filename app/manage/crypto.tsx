@@ -203,7 +203,7 @@ export default function CryptoManager() {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={s.sectionTitle}>Recent Trades & Swaps</Text>
                             <TouchableOpacity style={{ backgroundColor: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
-                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569' }}>View All</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#475569' }}>View All</Text>
                             </TouchableOpacity>
                         </View>
                         <View style={s.card}>
@@ -240,7 +240,7 @@ export default function CryptoManager() {
                                             <Ionicons name="person" size={20} color="#fff" />
                                         </View>
                                         <View style={{ marginLeft: 12 }}>
-                                            <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>User Account</Text>
+                                            <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>User Account</Text>
                                             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{wallet.user?.email || 'Unknown User'}</Text>
                                             <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '600', marginTop: 2 }}>
                                                 Total Est: ${(
@@ -598,17 +598,17 @@ const s = StyleSheet.create({
     },
     badge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1, borderColor: T.navyDark },
     headerScreenTitle: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
-    headerScreenSubtitle: { fontSize: 10, color: T.goldLight, marginTop: 2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+    headerScreenSubtitle: { fontSize: 12, color: T.goldLight, marginTop: 2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
     
     statsCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
     statBox: { alignItems: 'center', flex: 1 },
-    statLabel: { color: '#64748B', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+    statLabel: { color: '#64748B', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
     statValue: { color: '#fff', fontSize: 16, fontWeight: '900' },
     statValueDark: { color: T.navy, fontSize: 16, fontWeight: '900' },
     statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'center' },
     statDividerDark: { width: 1, height: 30, backgroundColor: '#E2E8F0', alignSelf: 'center' },
     trendTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 6 },
-    trendTagTxt: { color: '#10B981', fontSize: 9, fontWeight: '800', marginLeft: 2 },
+    trendTagTxt: { color: '#10B981', fontSize: 12, fontWeight: '800', marginLeft: 2 },
     
     headerBottomStrip: { height: 4, backgroundColor: T.gold, width: '100%', position: 'absolute', bottom: 0 },
 
@@ -632,16 +632,16 @@ const s = StyleSheet.create({
     quickCardBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     quickIconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#000', shadowOffset: {width:0,height:4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
     quickCardTitle: { fontSize: 15, fontWeight: '800', color: T.navy },
-    quickCardSub: { fontSize: 11, color: '#64748B', marginTop: 4, fontWeight: '600' },
+    quickCardSub: { fontSize: 12, color: '#64748B', marginTop: 4, fontWeight: '600' },
 
-    sectionTitle: { fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+    sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
     card: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: 'rgba(0,0,0,0.02)' },
     
     coinRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
     coinInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     coinIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
     coinName: { fontSize: 14, fontWeight: '800', color: T.navy, marginBottom: 2 },
-    coinRate: { fontSize: 11, fontWeight: '600', color: '#64748B' },
+    coinRate: { fontSize: 12, fontWeight: '600', color: '#64748B' },
     divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 14, width: '100%' },
 
     updateRatesBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: T.navy, paddingVertical: 16, borderRadius: 16, marginTop: 20, gap: 8, shadowColor: T.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
@@ -649,7 +649,7 @@ const s = StyleSheet.create({
 
     feeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     feeLabel: { fontSize: 14, fontWeight: '800', color: '#334155' },
-    feeSubLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
+    feeSubLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
     feeInputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12 },
     feeInput: { paddingVertical: 10, fontSize: 14, fontWeight: '800', color: T.navy, width: 60, textAlign: 'right' },
     feeSuffix: { fontSize: 12, fontWeight: '800', color: '#94A3B8', marginLeft: 8 },
@@ -659,12 +659,12 @@ const s = StyleSheet.create({
     nodeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     nodeTxt: { fontSize: 14, fontWeight: '700', color: '#334155', flex: 1, marginLeft: 12 },
     nodeStatus: { backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    nodeStatusTxt: { color: '#059669', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+    nodeStatusTxt: { color: '#059669', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
 
     p2pStatRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
     p2pStat: { flex: 1, alignItems: 'center' },
     p2pStatVal: { fontSize: 24, fontWeight: '900', color: T.green },
-    p2pStatLabel: { fontSize: 11, color: '#64748B', fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
+    p2pStatLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
 
     alertCard: { flexDirection: 'row', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FECACA', marginBottom: 20, overflow: 'hidden' },
     alertIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
@@ -676,20 +676,20 @@ const s = StyleSheet.create({
     historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
     historyIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
     historyTitle: { fontSize: 13, fontWeight: '800', color: '#1E293B' },
-    historySub: { fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' },
+    historySub: { fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '600' },
     historyAmt: { fontSize: 13, fontWeight: '900', color: T.navy },
     statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 4, alignSelf: 'flex-end' },
-    historyStatus: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
+    historyStatus: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
 
     userEmail: { fontSize: 13, fontWeight: '800', color: T.navy, marginBottom: 8 },
     balanceGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
     balanceItem: { alignItems: 'center', flex: 1 },
-    balLabel: { fontSize: 10, color: '#64748B', fontWeight: '800', textTransform: 'uppercase' },
+    balLabel: { fontSize: 12, color: '#64748B', fontWeight: '800', textTransform: 'uppercase' },
     balValue: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginTop: 4 },
     fundActions: { flexDirection: 'row', gap: 10 },
     fundBtn: { flex: 1, backgroundColor: '#D1FAE5', paddingVertical: 10, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
-    fundBtnTxt: { color: '#059669', fontSize: 11, fontWeight: '800' },
+    fundBtnTxt: { color: '#059669', fontSize: 12, fontWeight: '800' },
 
     approveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: T.navy, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    approveBtnTxt: { color: '#fff', fontSize: 11, fontWeight: '800' }
+    approveBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' }
 });

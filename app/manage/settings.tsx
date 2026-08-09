@@ -535,9 +535,9 @@ export default function AdminSettings() {
                             <View style={{ marginTop: 12, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', padding: 12, borderRadius: 14 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                     <Ionicons name="information-circle" size={16} color="#d97706" />
-                                    <Text style={{ color: '#b45309', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>Recommended Sleek Banner Dimensions</Text>
+                                    <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Recommended Sleek Banner Dimensions</Text>
                                 </View>
-                                <Text style={{ color: '#78350f', fontSize: 11, lineHeight: 16, fontWeight: '500' }}>
+                                <Text style={{ color: '#78350f', fontSize: 12, lineHeight: 16, fontWeight: '500' }}>
                                     • <Text style={{ fontWeight: '700' }}>Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
                                     • <Text style={{ fontWeight: '700' }}>Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
                                     • <Text style={{ fontWeight: '700' }}>File Format:</Text> High-quality JPG, PNG, or WEBP (under 2 MB)
@@ -555,7 +555,7 @@ export default function AdminSettings() {
                                         />
                                     </View>
                                     <View style={{ padding: 12, alignItems: 'center' }}>
-                                        <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sleek Cropped Banner Preview (180px Display) ✨</Text>
+                                        <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sleek Cropped Banner Preview (180px Display) ✨</Text>
                                         {announcementText ? (
                                             <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' }} numberOfLines={2}>
                                                 {announcementText}
@@ -704,7 +704,7 @@ export default function AdminSettings() {
                             <View style={s.accordionBody}>
                                 <View style={{ backgroundColor: '#f0f9ff', padding: 14, borderRadius: 14, marginBottom: 16, borderWidth: 1.5, borderColor: '#bae6fd' }}>
                                     <Text style={[s.label, { color: '#0369a1', fontWeight: '800', fontSize: 13 }]}>Choose Active APIs (Select 1, 2, or All 3)</Text>
-                                    <Text style={{ fontSize: 11, color: '#0284c7', marginBottom: 12, lineHeight: 16 }}>Select the APIs you want active. If multiple are checked, your app will automatically route and failover between them for 99.9% uptime!</Text>
+                                    <Text style={{ fontSize: 12, color: '#0284c7', marginBottom: 12, lineHeight: 16 }}>Select the APIs you want active. If multiple are checked, your app will automatically route and failover between them for 99.9% uptime!</Text>
                                     
                                     <View style={{ gap: 8 }}>
                                         {[
@@ -743,11 +743,11 @@ export default function AdminSettings() {
                                                     </View>
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={{ fontSize: 13, fontWeight: '800', color: checked ? '#1e40af' : '#334155' }}>{item.name}</Text>
-                                                        <Text style={{ fontSize: 10.5, color: '#64748b' }}>{item.desc}</Text>
+                                                        <Text style={{ fontSize: 12.5, color: '#64748b' }}>{item.desc}</Text>
                                                     </View>
                                                     {checked && (
                                                         <View style={{ backgroundColor: '#dbeafe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#1d4ed8' }}>ENABLED</Text>
+                                                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1d4ed8' }}>ENABLED</Text>
                                                         </View>
                                                     )}
                                                 </TouchableOpacity>
@@ -786,7 +786,7 @@ export default function AdminSettings() {
                         {(expandedApi === 'all' || expandedApi === 'identity') && (
                             <View style={s.accordionBody}>
                                 <Text style={[s.label, { color: '#0d1b3e', marginBottom: 6, fontWeight: '800' }]}>🔑 AgentHub API Key (agenthub.ng)</Text>
-                                <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Used for NIN Verification, BVN Lookup, and VNIN Slip Generation.</Text>
+                                <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Used for NIN Verification, BVN Lookup, and VNIN Slip Generation.</Text>
                                 <ApiInputRow placeholder="AgentHub API Key (Bearer Token)" value={agentHubApiKey} onChangeText={setAgentHubApiKey} isSecret={true} />
                                 
                                 <View style={s.divider} />
@@ -883,12 +883,12 @@ const s = StyleSheet.create({
     toggleLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     iconBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
     toggleTitle: { fontSize: 14, fontWeight: '800', color: '#0F172A', marginBottom: 2 },
-    toggleSubtitle: { fontSize: 11, color: '#64748b', lineHeight: 16 },
+    toggleSubtitle: { fontSize: 12, color: '#64748b', lineHeight: 16 },
     
     divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 4 },
     
     inputGroup: { marginBottom: 16 },
-    label: { fontSize: 11, fontWeight: '800', color: '#475569', marginBottom: 8, marginLeft: 4 },
+    label: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 8, marginLeft: 4 },
     inputWrapper: { backgroundColor: '#f8fafc', borderRadius: 14, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
     prefixBox: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, height: 48, justifyContent: 'center', alignItems: 'center', borderRightWidth: 1, borderRightColor: '#e2e8f0' },
     inputPrefix: { fontSize: 14, fontWeight: '800', color: '#475569' },

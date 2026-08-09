@@ -111,7 +111,7 @@ export default function SMMPricingManager() {
                         </TouchableOpacity>
                         <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/10 flex-row items-center gap-1.5">
                             <Ionicons name="sparkles" size={14} color="#f5a623" />
-                            <Text className="text-[#f5a623] font-bold text-[10px] uppercase tracking-widest">SMM Pricing</Text>
+                            <Text className="text-[#f5a623] font-bold text-xs uppercase tracking-widest">SMM Pricing</Text>
                         </View>
                     </View>
                     
@@ -120,7 +120,7 @@ export default function SMMPricingManager() {
                     
                     {/* Glassmorphism Markup Control */}
                     <View className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                        <Text className="text-slate-300 text-[10px] font-bold mb-3 uppercase tracking-widest">Markup Percentage</Text>
+                        <Text className="text-slate-300 text-xs font-bold mb-3 uppercase tracking-widest">Markup Percentage</Text>
                         <View className="flex-row gap-3">
                             <View className="flex-1 flex-row items-center bg-black/40 rounded-xl px-4 border border-white/5 h-12">
                                 <TextInput
@@ -197,10 +197,10 @@ export default function SMMPricingManager() {
                             <View key={srv.service} className="bg-white p-4 rounded-2xl mb-4 shadow-sm shadow-slate-200/50 border border-slate-100">
                                 <View className="flex-row justify-between items-center mb-3">
                                     <View className="bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100 max-w-[70%]">
-                                        <Text className="text-slate-500 text-[9px] font-bold uppercase tracking-widest truncate" numberOfLines={1}>{srv.category}</Text>
+                                        <Text className="text-slate-500 text-xs font-bold uppercase tracking-widest truncate" numberOfLines={1}>{srv.category}</Text>
                                     </View>
                                     <View className="bg-slate-100 px-2 py-1 rounded-md">
-                                        <Text className="text-slate-400 text-[9px] font-bold">ID: {srv.service}</Text>
+                                        <Text className="text-slate-400 text-xs font-bold">ID: {srv.service}</Text>
                                     </View>
                                 </View>
                                 
@@ -210,21 +210,21 @@ export default function SMMPricingManager() {
                                 
                                 <View className="flex-row justify-between items-center">
                                     <View>
-                                        <Text className="text-slate-400 text-[9px] uppercase font-bold mb-0.5 tracking-wider">Provider Cost</Text>
+                                        <Text className="text-slate-400 text-xs uppercase font-bold mb-0.5 tracking-wider">Provider Cost</Text>
                                         <Text className="text-slate-600 font-bold text-xs">₦{parseFloat(srv.original_rate || '0').toFixed(2)}</Text>
                                     </View>
                                     
                                     <View className="items-center px-2">
                                         <View className="bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/50 flex-row items-center gap-1">
                                             <Ionicons name="trending-up" size={10} color="#059669" />
-                                            <Text className="text-emerald-600 font-bold text-[10px]">
+                                            <Text className="text-emerald-600 font-bold text-xs">
                                                 +₦{(parseFloat(srv.rate || '0') - parseFloat(srv.original_rate || '0')).toFixed(2)} Profit
                                             </Text>
                                         </View>
                                     </View>
                                     
                                     <View className="items-end">
-                                        <Text className="text-[#f5a623] text-[9px] uppercase font-bold mb-0.5 tracking-widest">User Pays</Text>
+                                        <Text className="text-[#f5a623] text-xs uppercase font-bold mb-0.5 tracking-widest">User Pays</Text>
                                         <Text className="text-[#0F172A] font-black text-lg">₦{parseFloat(srv.rate || '0').toFixed(2)}</Text>
                                     </View>
                                 </View>

@@ -308,7 +308,7 @@ export default function NinPricingBoard() {
                             ) : (
                                 <>
                                     <Ionicons name="sync" size={12} color="#60a5fa" style={{ marginRight: 4 }} />
-                                    <Text style={{ color: '#60a5fa', fontSize: 10, fontWeight: '800' }}>Sync AgentHub API</Text>
+                                    <Text style={{ color: '#60a5fa', fontSize: 12, fontWeight: '800' }}>Sync AgentHub API</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -359,7 +359,7 @@ export default function NinPricingBoard() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="document-text" size={13} color={activeTab === 'nin' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'nin' && styles.tabTextActive, { fontSize: 10 }]}>NIN Slips</Text>
+                        <Text style={[styles.tabText, activeTab === 'nin' && styles.tabTextActive, { fontSize: 12 }]}>NIN Slips</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         onPress={() => setActiveTab('ipe')}
@@ -367,7 +367,7 @@ export default function NinPricingBoard() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="shield-checkmark" size={13} color={activeTab === 'ipe' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'ipe' && styles.tabTextActive, { fontSize: 10 }]}>IPE</Text>
+                        <Text style={[styles.tabText, activeTab === 'ipe' && styles.tabTextActive, { fontSize: 12 }]}>IPE</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         onPress={() => setActiveTab('validation')}
@@ -375,7 +375,7 @@ export default function NinPricingBoard() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="checkmark-circle" size={13} color={activeTab === 'validation' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'validation' && styles.tabTextActive, { fontSize: 10 }]}>Validation</Text>
+                        <Text style={[styles.tabText, activeTab === 'validation' && styles.tabTextActive, { fontSize: 12 }]}>Validation</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         onPress={() => setActiveTab('personalization')}
@@ -383,7 +383,7 @@ export default function NinPricingBoard() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="sparkles" size={13} color={activeTab === 'personalization' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'personalization' && styles.tabTextActive, { fontSize: 10 }]}>Personalize</Text>
+                        <Text style={[styles.tabText, activeTab === 'personalization' && styles.tabTextActive, { fontSize: 12 }]}>Personalize</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         onPress={() => setActiveTab('bvn')}
@@ -391,7 +391,7 @@ export default function NinPricingBoard() {
                         activeOpacity={0.8}
                     >
                         <Ionicons name="finger-print" size={13} color={activeTab === 'bvn' ? '#ffffff' : '#64748b'} />
-                        <Text style={[styles.tabText, activeTab === 'bvn' && styles.tabTextActive, { fontSize: 10 }]}>BVN</Text>
+                        <Text style={[styles.tabText, activeTab === 'bvn' && styles.tabTextActive, { fontSize: 12 }]}>BVN</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
         letterSpacing: -0.5,
     },
     headerSub: {
-        fontSize: 11,
+        fontSize: 12,
         color: '#94a3b8',
         fontWeight: '500',
     },
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#f5a623',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
         marginLeft: 4,
         textTransform: 'uppercase',
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         color: '#94a3b8',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '600',
         marginTop: 2,
         textTransform: 'uppercase',
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
         color: '#0f172a',
     },
     cardId: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#94a3b8',
         fontWeight: '600',
         marginTop: 2,
@@ -758,7 +758,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     totalBadgeLabel: {
-        fontSize: 8,
+        fontSize: 12,
         color: '#16a34a',
         fontWeight: '700',
         textTransform: 'uppercase',
@@ -777,14 +777,14 @@ const styles = StyleSheet.create({
         width: '48.5%',
     },
     inputLabel: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
         color: '#64748b',
         marginBottom: 6,
         textTransform: 'uppercase',
     },
     marginText: {
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '800',
         color: '#4f46e5',
     },

@@ -310,9 +310,9 @@ export default function StaffManager() {
                                     <View>
                                         <Text className="font-bold text-slate-800 text-base">{member.full_name || 'Admin'}</Text>
                                         <View className="flex-row items-center gap-2 mt-0.5">
-                                            <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">{member.role}</Text>
+                                            <Text className="text-slate-500 text-xs uppercase font-bold tracking-wider">{member.role}</Text>
                                             <View className={`px-1.5 py-0.5 rounded ${member.status === 'active' ? 'bg-emerald-100' : 'bg-gray-100'}`}>
-                                                <Text className={`text-[9px] font-bold uppercase tracking-widest ${member.status === 'active' ? 'text-emerald-600' : 'text-gray-500'}`}>
+                                                <Text className={`text-xs font-bold uppercase tracking-widest ${member.status === 'active' ? 'text-emerald-600' : 'text-gray-500'}`}>
                                                     {member.status === 'active' ? 'Online' : 'Offline'}
                                                 </Text>
                                             </View>
@@ -327,7 +327,7 @@ export default function StaffManager() {
                     </ScrollView>
                 )}
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Shift Schedule (Today)</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Shift Schedule (Today)</Text>
                 <View className="flex-row gap-4">
                     <View className="flex-1 bg-blue-50 p-4 rounded-xl border border-blue-100">
                         <Text className="text-blue-800 font-bold mb-1">Morning Shift</Text>
@@ -369,10 +369,10 @@ export default function StaffManager() {
                                 
                                 <View className="flex-row gap-2 mb-3">
                                     <View className="bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
-                                        <Text className="text-emerald-400 font-bold text-[10px] uppercase tracking-wider">{selectedAdmin.role}</Text>
+                                        <Text className="text-emerald-400 font-bold text-xs uppercase tracking-wider">{selectedAdmin.role}</Text>
                                     </View>
                                     <View className={`px-3 py-1 rounded-full border ${selectedAdmin.status === 'active' ? 'bg-blue-500/20 border-blue-500/30' : 'bg-red-500/20 border-red-500/30'}`}>
-                                        <Text className={`${selectedAdmin.status === 'active' ? 'text-blue-400' : 'text-red-400'} font-bold text-[10px] uppercase tracking-wider`}>{selectedAdmin.status}</Text>
+                                        <Text className={`${selectedAdmin.status === 'active' ? 'text-blue-400' : 'text-red-400'} font-bold text-xs uppercase tracking-wider`}>{selectedAdmin.status}</Text>
                                     </View>
                                 </View>
 
@@ -430,13 +430,13 @@ export default function StaffManager() {
                                                 <Text style={{ fontWeight: '900', fontSize: 13, color: '#0f172a' }}>PER-ADMIN MODULE PERMISSIONS</Text>
                                             </View>
                                             <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a' }}>
-                                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#d97706' }}>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#d97706' }}>
                                                     {ALL_ADMIN_MODULES.length - individualHiddenModules.length}/{ALL_ADMIN_MODULES.length} ENABLED
                                                 </Text>
                                             </View>
                                         </View>
 
-                                        <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 12, lineHeight: 15 }}>
+                                        <Text style={{ color: '#64748b', fontSize: 12, marginBottom: 12, lineHeight: 15 }}>
                                             Custom permissions for <Text style={{ fontWeight: 'bold', color: '#0f172a' }}>{selectedAdmin.full_name || 'this admin'}</Text>. Disabled modules will be hidden completely from their admin dashboard.
                                         </Text>
 
@@ -473,7 +473,7 @@ export default function StaffManager() {
                                                                 backgroundColor: isActive ? (cat === 'RedZone' ? '#ef4444' : '#0f172a') : '#f1f5f9',
                                                             }}
                                                         >
-                                                            <Text style={{ fontSize: 10, fontWeight: '800', color: isActive ? '#ffffff' : '#64748b' }}>
+                                                            <Text style={{ fontSize: 12, fontWeight: '800', color: isActive ? '#ffffff' : '#64748b' }}>
                                                                 {cat === 'RedZone' ? '🚨 RedZone' : cat}
                                                             </Text>
                                                         </TouchableOpacity>
@@ -488,21 +488,21 @@ export default function StaffManager() {
                                                 onPress={() => applyQuickPreset(selectedAdmin.id, 'hide_redzone')}
                                                 style={{ flex: 1, backgroundColor: '#fef2f2', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' }}
                                             >
-                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#ef4444' }}>🚨 Hide RedZone</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#ef4444' }}>🚨 Hide RedZone</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity
                                                 onPress={() => applyQuickPreset(selectedAdmin.id, 'enable_all')}
                                                 style={{ flex: 1, backgroundColor: '#ecfdf5', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#a7f3d0' }}
                                             >
-                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#10b981' }}>👁️ Enable All</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#10b981' }}>👁️ Enable All</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity
                                                 onPress={() => applyQuickPreset(selectedAdmin.id, 'hide_all')}
                                                 style={{ flex: 1, backgroundColor: '#f8fafc', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}
                                             >
-                                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748b' }}>🙈 Lock All</Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748b' }}>🙈 Lock All</Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -535,18 +535,18 @@ export default function StaffManager() {
                                                                 <Ionicons name={mod.icon as any} size={16} color={isHidden ? '#ef4444' : '#d97706'} />
                                                             </View>
                                                             <View style={{ flex: 1 }}>
-                                                                <Text style={{ fontWeight: 'bold', fontSize: 11, color: isHidden ? '#ef4444' : '#0f172a' }}>{mod.label}</Text>
+                                                                <Text style={{ fontWeight: 'bold', fontSize: 12, color: isHidden ? '#ef4444' : '#0f172a' }}>{mod.label}</Text>
                                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                                                     <View style={{
                                                                         paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6,
                                                                         backgroundColor: isHidden ? '#fef2f2' : '#ecfdf5',
                                                                         borderWidth: 1, borderColor: isHidden ? '#fecaca' : '#a7f3d0'
                                                                     }}>
-                                                                        <Text style={{ fontSize: 8, fontWeight: '800', color: isHidden ? '#ef4444' : '#10b981' }}>
+                                                                        <Text style={{ fontSize: 12, fontWeight: '800', color: isHidden ? '#ef4444' : '#10b981' }}>
                                                                             {isHidden ? 'HIDDEN 🙈' : 'ENABLED 👁️'}
                                                                         </Text>
                                                                     </View>
-                                                                    <Text style={{ fontSize: 8, fontWeight: '700', color: '#94a3b8' }}>• {mod.cat}</Text>
+                                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#94a3b8' }}>• {mod.cat}</Text>
                                                                 </View>
                                                             </View>
                                                         </View>
@@ -583,16 +583,16 @@ export default function StaffManager() {
                                             <View className="flex-1 bg-white p-4 rounded-xl border border-slate-100 shadow-sm shadow-slate-100">
                                                 <View className="flex-row justify-between items-center mb-1">
                                                     <Text className="font-bold text-slate-800 text-[13px]">{item.action}</Text>
-                                                    <Text className="text-[10px] font-bold text-slate-400">
+                                                    <Text className="text-xs font-bold text-slate-400">
                                                         {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                     </Text>
                                                 </View>
-                                                <Text className="text-slate-500 text-[11px] leading-4">
+                                                <Text className="text-slate-500 text-xs leading-4">
                                                     {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
                                                 </Text>
                                                 {item.target_resource && (
                                                     <View className="mt-2 self-start bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
-                                                        <Text className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{item.target_resource}</Text>
+                                                        <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest">{item.target_resource}</Text>
                                                     </View>
                                                 )}
                                             </View>

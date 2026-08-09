@@ -357,7 +357,7 @@ const s = StyleSheet.create({
         borderRightColor: '#f1f5f9',
     },
     label: {
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
         color: T.textSub,
         textTransform: 'uppercase',
@@ -407,7 +407,7 @@ const s = StyleSheet.create({
         elevation: 1,
     },
     modeText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
         color: '#94a3b8',
     },
@@ -474,11 +474,11 @@ const s = StyleSheet.create({
     },
     mockBtnText: {
         color: '#ffffff',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: '800',
     },
     previewLabel: {
-        fontSize: 11,
+        fontSize: 12,
         color: '#94a3b8',
         fontWeight: '700',
         marginTop: 12,
@@ -528,7 +528,7 @@ const s = StyleSheet.create({
         marginBottom: 4,
     },
     assetDesc: {
-        fontSize: 11,
+        fontSize: 12,
         color: T.textSub,
         marginBottom: 16,
         lineHeight: 16,

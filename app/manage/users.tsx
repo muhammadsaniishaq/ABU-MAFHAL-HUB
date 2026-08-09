@@ -752,12 +752,12 @@ Metadata:
                                 <Text className="text-[#D4AF37] text-xs font-mono font-bold" numberOfLines={1}>{selectedUser?.email}</Text>
                                 <View className="flex-row items-center gap-2 mt-1">
                                     <View className={`px-2 py-0.5 rounded-full border ${selectedUser?.status === 'active' ? 'bg-emerald-500/20 border-emerald-400' : 'bg-rose-500/20 border-rose-400'}`}>
-                                        <Text className={`text-[9px] uppercase tracking-widest font-bold ${selectedUser?.status === 'active' ? 'text-emerald-400' : 'text-rose-400'}`}>{selectedUser?.status}</Text>
+                                        <Text className={`text-xs uppercase tracking-widest font-bold ${selectedUser?.status === 'active' ? 'text-emerald-400' : 'text-rose-400'}`}>{selectedUser?.status}</Text>
                                     </View>
                                     {selectedUser?.kyc_verified && (
                                         <View className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400 flex-row items-center">
                                             <Ionicons name="shield-checkmark" size={10} color="#60A5FA" />
-                                            <Text className="text-blue-300 text-[9px] uppercase tracking-widest font-bold ml-1">Verified</Text>
+                                            <Text className="text-blue-300 text-xs uppercase tracking-widest font-bold ml-1">Verified</Text>
                                         </View>
                                     )}
                                 </View>
@@ -772,48 +772,48 @@ Metadata:
 
                         {isEditing ? (
                             <View className="p-4 gap-y-3">
-                                <Text className="text-[10px] text-[#0A1128] font-black uppercase tracking-widest mb-1">Edit Profile Details</Text>
+                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mb-1">Edit Profile Details</Text>
                                 <View className="flex-row gap-3">
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Full Name</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Full Name</Text>
                                         <TextInput value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Username</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Username</Text>
                                         <TextInput value={editForm.username} onChangeText={(t) => setEditForm({...editForm, username: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                 </View>
                                 <View className="flex-row gap-3">
                                     <View className="flex-[1.5]">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Phone</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Phone</Text>
                                         <TextInput value={editForm.phone} onChangeText={(t) => setEditForm({...editForm, phone: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="phone-pad" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Gender</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Gender</Text>
                                         <TextInput value={editForm.gender} onChangeText={(t) => setEditForm({...editForm, gender: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                 </View>
                                 <View className="flex-row gap-3">
                                     <View className="flex-[2]">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Address</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Address</Text>
                                         <TextInput value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">State</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">State</Text>
                                         <TextInput value={editForm.state} onChangeText={(t) => setEditForm({...editForm, state: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                 </View>
                                 <View className="flex-row gap-3 mt-2">
                                     <View className="flex-[1.5]">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Email</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Email</Text>
                                         <TextInput value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="email-address" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">DOB</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">DOB</Text>
                                         <TextInput placeholder="YYYY-MM-DD" value={editForm.dob} onChangeText={(t) => setEditForm({...editForm, dob: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                 </View>
-                                <Text className="text-[10px] text-[#0A1128] font-black uppercase tracking-widest mt-2 mb-1">Next of Kin</Text>
+                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mt-2 mb-1">Next of Kin</Text>
                                 <View className="flex-row gap-3">
                                     <View className="flex-1">
                                         <TextInput placeholder="Name" value={editForm.next_of_kin_name} onChangeText={(t) => setEditForm({...editForm, next_of_kin_name: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
@@ -822,24 +822,24 @@ Metadata:
                                         <TextInput placeholder="Phone" value={editForm.next_of_kin_phone} onChangeText={(t) => setEditForm({...editForm, next_of_kin_phone: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="phone-pad" />
                                     </View>
                                 </View>
-                                <Text className="text-[10px] text-[#0A1128] font-black uppercase tracking-widest mt-3 mb-1">Admin Controls (Identity & KYC)</Text>
+                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mt-3 mb-1">Admin Controls (Identity & KYC)</Text>
                                 <View className="flex-row gap-3">
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">BVN</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">BVN</Text>
                                         <TextInput value={editForm.bvn} onChangeText={(t) => setEditForm({...editForm, bvn: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">NIN</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">NIN</Text>
                                         <TextInput value={editForm.nin} onChangeText={(t) => setEditForm({...editForm, nin: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
                                     </View>
                                 </View>
                                 <View className="flex-row gap-3 mt-1">
                                     <View className="flex-[1.5]">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Custom ID</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Custom ID</Text>
                                         <TextInput value={editForm.custom_id} onChangeText={(t) => setEditForm({...editForm, custom_id: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
                                     </View>
                                     <View className="flex-1">
-                                        <Text className="text-[9px] text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">KYC Tier (1-3)</Text>
+                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">KYC Tier (1-3)</Text>
                                         <TextInput value={editForm.kyc_tier} onChangeText={(t) => setEditForm({...editForm, kyc_tier: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
                                     </View>
                                 </View>
@@ -854,11 +854,11 @@ Metadata:
                                     {/* Main Balance (Navy) */}
                                     <View className="flex-[1.5] bg-[#0A1128] p-4 rounded-[20px] shadow-sm relative overflow-hidden border border-[#D4AF37]/50">
                                         <View className="absolute top-0 right-0 w-24 h-24 bg-[#D4AF37]/20 rounded-full blur-2xl -mr-10 -mt-10" />
-                                        <Text className="text-[#D4AF37] font-bold text-[9px] uppercase tracking-widest mb-1">Wallet Balance</Text>
+                                        <Text className="text-[#D4AF37] font-bold text-xs uppercase tracking-widest mb-1">Wallet Balance</Text>
                                         <Text className="text-white text-2xl font-black tracking-tight">₦{(selectedUser?.balance || 0).toLocaleString()}</Text>
                                         <View className="mt-2 bg-white/10 px-2.5 py-1.5 rounded-lg self-start flex-row items-center gap-1 border border-white/5">
                                             <Ionicons name="card" size={10} color="#E2E8F0" />
-                                            <Text className="text-white font-mono text-[9px] tracking-widest">{selectedUser?.account_number || 'N/A'}</Text>
+                                            <Text className="text-white font-mono text-xs tracking-widest">{selectedUser?.account_number || 'N/A'}</Text>
                                         </View>
                                     </View>
 
@@ -866,11 +866,11 @@ Metadata:
                                     {aiInsight && (
                                         <View className="flex-1 bg-white p-4 rounded-[20px] border border-slate-200 shadow-sm justify-between">
                                             <View className="flex-row items-center justify-between mb-1">
-                                                <Text className="text-[#0A1128] font-bold text-[9px] uppercase tracking-widest">AI Scan</Text>
+                                                <Text className="text-[#0A1128] font-bold text-xs uppercase tracking-widest">AI Scan</Text>
                                                 <Ionicons name="sparkles" size={12} color="#D4AF37" />
                                             </View>
                                             <Text className={`text-xs font-black uppercase tracking-tight ${aiInsight.risk === 'High' ? 'text-rose-600' : 'text-emerald-600'}`}>{aiInsight.risk} Risk</Text>
-                                            <Text className="text-[#D4AF37] font-bold text-[10px] leading-tight mt-1" numberOfLines={2}>{aiInsight.nextAction}</Text>
+                                            <Text className="text-[#D4AF37] font-bold text-xs leading-tight mt-1" numberOfLines={2}>{aiInsight.nextAction}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -886,7 +886,7 @@ Metadata:
                                                 thumbColor={"#fff"}
                                                 style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                             />
-                                            <Text className={`text-[10px] font-black uppercase tracking-widest ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>{isDebit ? 'Debit Wallet' : 'Fund Wallet'}</Text>
+                                            <Text className={`text-xs font-black uppercase tracking-widest ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>{isDebit ? 'Debit Wallet' : 'Fund Wallet'}</Text>
                                         </View>
                                         <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden w-36 h-9">
                                             <Text className="text-[#0A1128] font-black pl-2 text-xs">₦</Text>
@@ -914,7 +914,7 @@ Metadata:
                                                 }}
                                                 className={`px-2 py-1.5 rounded-lg border items-center justify-center ${fundAmount === val ? 'bg-[#0A1128] border-[#0A1128]' : 'bg-slate-50 border-slate-200'}`}
                                             >
-                                                <Text className={`font-bold text-[9px] ${fundAmount === val ? 'text-[#D4AF37]' : 'text-slate-700'}`}>+₦{Number(val)/1000}k</Text>
+                                                <Text className={`font-bold text-xs ${fundAmount === val ? 'text-[#D4AF37]' : 'text-slate-700'}`}>+₦{Number(val)/1000}k</Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
@@ -923,7 +923,7 @@ Metadata:
                                 {/* Limits & Notes Grid */}
                                 <View className="flex-row gap-3 mb-4">
                                     <View className="flex-1 bg-white p-4 rounded-[20px] border border-slate-200 shadow-sm">
-                                        <Text className="text-[#0A1128] font-bold text-[9px] uppercase tracking-widest mb-2">Daily Limit (₦)</Text>
+                                        <Text className="text-[#0A1128] font-bold text-xs uppercase tracking-widest mb-2">Daily Limit (₦)</Text>
                                         <TextInput 
                                             placeholder="No Limit" 
                                             keyboardType="numeric"
@@ -940,7 +940,7 @@ Metadata:
                                     </View>
                                     <View className="flex-[1.5] bg-amber-50 p-4 rounded-[20px] border border-amber-200 shadow-sm">
                                         <View className="flex-row items-center justify-between mb-2">
-                                            <Text className="text-amber-800 font-bold text-[9px] uppercase tracking-widest">Private Notes</Text>
+                                            <Text className="text-amber-800 font-bold text-xs uppercase tracking-widest">Private Notes</Text>
                                             <Ionicons name="lock-closed" size={10} color="#D97706" />
                                         </View>
                                         <TextInput 
@@ -964,7 +964,7 @@ Metadata:
                                 <View className="flex-row flex-wrap gap-2 mb-6">
                                     <TouchableOpacity onPress={initiateBlock} className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${selectedUser?.status === 'active' ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
                                         <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={14} color={selectedUser?.status === 'active' ? "#E11D48" : "#10B981"} />
-                                        <Text className={`font-black text-[10px] uppercase tracking-widest ${selectedUser?.status === 'active' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}</Text>
+                                        <Text className={`font-black text-xs uppercase tracking-widest ${selectedUser?.status === 'active' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}</Text>
                                     </TouchableOpacity>
 
                                     {/* Super Admin / Admin Role Switcher */}
@@ -977,7 +977,7 @@ Metadata:
                                         className="w-[48%] bg-amber-50 border border-amber-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm"
                                     >
                                         <MaterialCommunityIcons name="crown-outline" size={14} color="#D97706" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-amber-700">
+                                        <Text className="font-black text-xs uppercase tracking-widest text-amber-700">
                                             {selectedUser?.role === 'super_admin' ? 'Super Admin 👑' : selectedUser?.role === 'admin' ? 'Admin 🛡️' : 'Make Admin 👑'}
                                         </Text>
                                     </TouchableOpacity>
@@ -991,7 +991,7 @@ Metadata:
                                         className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.crypto_enabled ?? true) ? 'bg-amber-50 border-amber-300' : 'bg-slate-100 border-slate-300'}`}
                                     >
                                         <Ionicons name="logo-bitcoin" size={14} color={(selectedUser?.crypto_enabled ?? true) ? "#D97706" : "#64748B"} />
-                                        <Text className={`font-black text-[10px] uppercase tracking-widest ${(selectedUser?.crypto_enabled ?? true) ? 'text-amber-800' : 'text-slate-600'}`}>
+                                        <Text className={`font-black text-xs uppercase tracking-widest ${(selectedUser?.crypto_enabled ?? true) ? 'text-amber-800' : 'text-slate-600'}`}>
                                             Crypto: {(selectedUser?.crypto_enabled ?? true) ? 'ON 🪙' : 'OFF 🚫'}
                                         </Text>
                                     </TouchableOpacity>
@@ -1005,58 +1005,58 @@ Metadata:
                                         className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.virtual_cards_enabled ?? true) ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-100 border-slate-300'}`}
                                     >
                                         <Ionicons name="card-outline" size={14} color={(selectedUser?.virtual_cards_enabled ?? true) ? "#4F46E5" : "#64748B"} />
-                                        <Text className={`font-black text-[10px] uppercase tracking-widest ${(selectedUser?.virtual_cards_enabled ?? true) ? 'text-indigo-800' : 'text-slate-600'}`}>
+                                        <Text className={`font-black text-xs uppercase tracking-widest ${(selectedUser?.virtual_cards_enabled ?? true) ? 'text-indigo-800' : 'text-slate-600'}`}>
                                             Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON 💳' : 'OFF 🚫'}
                                         </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateResetPin} className="w-[48%] bg-white border border-slate-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <MaterialCommunityIcons name="lock-reset" size={14} color="#64748B" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-slate-700">Reset PIN</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-slate-700">Reset PIN</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} className="w-[48%] bg-purple-50 border border-purple-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <MaterialCommunityIcons name="incognito" size={14} color="#9333EA" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-purple-700">View As</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-purple-700">View As</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={toggleKyc} className="w-[48%] bg-sky-50 border border-sky-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name={selectedUser?.kyc_verified ? "checkmark-done-circle" : "shield-checkmark-outline"} size={14} color="#0284C7" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-sky-700">{selectedUser?.kyc_verified ? 'Revoke KYC' : 'Verify KYC'}</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-sky-700">{selectedUser?.kyc_verified ? 'Revoke KYC' : 'Verify KYC'}</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.id || '', 'User ID')} className="w-[48%] bg-slate-50 border border-slate-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="copy-outline" size={14} color="#475569" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-slate-700">Copy ID</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-slate-700">Copy ID</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={() => setShowNotifyInput(!showNotifyInput)} className="w-[48%] bg-indigo-50 border border-indigo-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="chatbubble-ellipses-outline" size={14} color="#4F46E5" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-indigo-700">Message</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-indigo-700">Message</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateDelete} className="w-[48%] bg-red-50 border border-red-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-red-700">Delete</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-red-700">Delete</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={() => setShowGenerateAccount(!showGenerateAccount)} className="w-[48%] bg-teal-50 border border-teal-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="card-outline" size={14} color="#0D9488" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-teal-700">Gen Account</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-teal-700">Gen Account</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateResetTxPin} className="w-[48%] bg-orange-50 border border-orange-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="keypad" size={14} color="#EA580C" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-orange-700">Reset Tx PIN</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-orange-700">Reset Tx PIN</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={initiateClearDevice} className="w-[48%] bg-gray-50 border border-gray-300 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
                                         <Ionicons name="hardware-chip-outline" size={14} color="#4B5563" />
-                                        <Text className="font-black text-[10px] uppercase tracking-widest text-gray-700">Unlink Device</Text>
+                                        <Text className="font-black text-xs uppercase tracking-widest text-gray-700">Unlink Device</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 {showGenerateAccount && (
                                     <View className="bg-teal-50 p-4 rounded-xl mb-6 border border-teal-200 shadow-sm">
-                                        <Text className="text-teal-800 font-bold text-[10px] uppercase tracking-widest mb-2">Generate Virtual Account (KYC)</Text>
+                                        <Text className="text-teal-800 font-bold text-xs uppercase tracking-widest mb-2">Generate Virtual Account (KYC)</Text>
                                         <TextInput
                                             placeholder="Enter BVN/NIN (Optional if already in DB)"
                                             className="bg-white border border-teal-100 rounded-lg p-3 text-teal-900 text-sm mb-3"
@@ -1072,7 +1072,7 @@ Metadata:
 
                                 {showNotifyInput && (
                                     <View className="bg-indigo-50 p-4 rounded-xl mb-6 border border-indigo-200 shadow-sm">
-                                        <Text className="text-indigo-800 font-bold text-[10px] uppercase tracking-widest mb-2">Send Push Notification</Text>
+                                        <Text className="text-indigo-800 font-bold text-xs uppercase tracking-widest mb-2">Send Push Notification</Text>
                                         <TextInput
                                             placeholder="Type message here..."
                                             multiline
@@ -1093,7 +1093,7 @@ Metadata:
                                         <View className="py-6 items-center"><ActivityIndicator color="#D4AF37" size="small" /></View>
                                     ) : userTransactions.length === 0 ? (
                                         <View className="p-4 items-center">
-                                            <Text className="text-[#0A1128]/50 text-[10px] uppercase tracking-widest font-bold">No history</Text>
+                                            <Text className="text-[#0A1128]/50 text-xs uppercase tracking-widest font-bold">No history</Text>
                                         </View>
                                     ) : (
                                         userTransactions.slice(0,3).map((tx, i) => (
@@ -1104,7 +1104,7 @@ Metadata:
                                                     </View>
                                                     <View>
                                                         <Text className="font-bold text-[#0A1128] text-xs capitalize">{tx.type || 'Txn'}</Text>
-                                                        <Text className="text-[9px] text-[#0A1128]/60 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()}</Text>
+                                                        <Text className="text-xs text-[#0A1128]/60 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()}</Text>
                                                     </View>
                                                 </View>
                                                 <Text className={`font-black text-xs ${tx.type === 'topup' ? 'text-emerald-500' : 'text-[#0A1128]'}`}>
@@ -1136,7 +1136,7 @@ Metadata:
                     <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
                         <View className="space-y-5">
                             <View>
-                                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</Text>
+                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</Text>
                                 <TextInput 
                                     className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
                                     placeholder="e.g. John Doe"
@@ -1145,7 +1145,7 @@ Metadata:
                                 />
                             </View>
                              <View>
-                                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</Text>
+                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</Text>
                                 <TextInput 
                                     className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
                                     placeholder="e.g. johndoe123"
@@ -1155,7 +1155,7 @@ Metadata:
                                 />
                             </View>
                             <View>
-                                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</Text>
+                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</Text>
                                 <TextInput 
                                     className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
                                     placeholder="john@example.com"
@@ -1166,7 +1166,7 @@ Metadata:
                                 />
                             </View>
                              <View>
-                                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone (Optional)</Text>
+                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone (Optional)</Text>
                                 <TextInput 
                                     className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
                                     placeholder="+234..."
@@ -1178,7 +1178,7 @@ Metadata:
                             
                              <View className="flex-row gap-4">
                                 <View className="flex-1">
-                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Gender</Text>
+                                    <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Gender</Text>
                                     <TextInput 
                                         className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold"
                                         placeholder="M/F"
@@ -1187,7 +1187,7 @@ Metadata:
                                     />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">DOB</Text>
+                                    <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">DOB</Text>
                                     <TextInput 
                                         className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold"
                                         placeholder="YYYY-MM-DD"
@@ -1198,14 +1198,14 @@ Metadata:
                             </View>
 
                             <View>
-                                <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Initial Password</Text>
+                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Initial Password</Text>
                                  <TextInput 
                                     className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
                                     value={newUserForm.password}
                                     onChangeText={t => setNewUserForm({...newUserForm, password: t})}
                                     secureTextEntry
                                 />
-                                 <Text className="text-[10px] font-medium text-slate-400 mt-2 ml-2">User should change this on first login.</Text>
+                                 <Text className="text-xs font-medium text-slate-400 mt-2 ml-2">User should change this on first login.</Text>
                             </View>
                             
                              <View className="flex-row items-center justify-between mt-4 mb-2 bg-[#1A2950] p-5 rounded-[20px] border border-[#D4AF37]/50/5">
@@ -1282,8 +1282,8 @@ Metadata:
                                     <Ionicons name="wallet" size={10} color="#34D399" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-[6px] uppercase tracking-widest font-bold">Vault</Text>
-                                    <Text className="text-white text-[10px] font-black">₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance}</Text>
+                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">Vault</Text>
+                                    <Text className="text-white text-xs font-black">₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance}</Text>
                                 </View>
                             </View>
                             <View className="bg-white/5 rounded-lg p-1.5 flex-1 mr-1.5 flex-row items-center border border-white/5">
@@ -1291,8 +1291,8 @@ Metadata:
                                     <Ionicons name="people" size={10} color="#60A5FA" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-[6px] uppercase tracking-widest font-bold">Users</Text>
-                                    <Text className="text-white text-[10px] font-black">{stats.activeUsers}</Text>
+                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">Users</Text>
+                                    <Text className="text-white text-xs font-black">{stats.activeUsers}</Text>
                                 </View>
                             </View>
                             <View className="bg-white/5 rounded-lg p-1.5 flex-1 flex-row items-center border border-white/5">
@@ -1300,8 +1300,8 @@ Metadata:
                                     <Ionicons name="shield-checkmark" size={10} color="#C084FC" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-[6px] uppercase tracking-widest font-bold">KYC</Text>
-                                    <Text className="text-white text-[10px] font-black">{stats.verifiedUsers}</Text>
+                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">KYC</Text>
+                                    <Text className="text-white text-xs font-black">{stats.verifiedUsers}</Text>
                                 </View>
                             </View>
                         </View>
@@ -1332,7 +1332,7 @@ Metadata:
                                             : 'bg-[#111D3B]/20 border-[#D4AF37]/50/10'
                                         }`}
                                     >
-                                        <Text className={`text-[10px] font-black tracking-[0.1em] uppercase ${
+                                        <Text className={`text-xs font-black tracking-[0.1em] uppercase ${
                                             filterStatus === status ? 'text-white' : 'text-slate-400'
                                         }`}>
                                             {status}
@@ -1350,7 +1350,7 @@ Metadata:
                                 className="bg-[#111D3B]/20 px-3 py-1.5 rounded-full border border-[#D4AF37]/50/10 flex-row items-center backdrop-blur-xl"
                             >
                                 <Ionicons name="filter" size={10} color="#CBD5E1" style={{ marginRight: 4 }} />
-                                <Text className="text-white text-[10px] font-black tracking-widest uppercase">
+                                <Text className="text-white text-xs font-black tracking-widest uppercase">
                                     {sortBy === 'newest' ? 'New' : (sortBy === 'balance_high' ? 'High' : 'Low')}
                                 </Text>
                             </TouchableOpacity>
@@ -1364,15 +1364,15 @@ Metadata:
                 <BlurView intensity={90} tint="light" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50, padding: 20, paddingBottom: 40, borderTopWidth: 1, borderTopColor: 'rgba(212,175,55,0.05)', flexDirection: 'row', justifyContent: 'space-around' }}>
                     <TouchableOpacity onPress={() => executeBulkAction('block')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
                          <Ionicons name="ban" size={24} color="#E11D48" className="mb-1" />
-                        <Text className="text-[10px] font-black uppercase tracking-widest text-rose-600 mt-1">Suspend</Text>
+                        <Text className="text-xs font-black uppercase tracking-widest text-rose-600 mt-1">Suspend</Text>
                     </TouchableOpacity>
                      <TouchableOpacity onPress={() => executeBulkAction('unblock')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
                          <Ionicons name="checkmark-circle" size={24} color="#059669" className="mb-1" />
-                        <Text className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mt-1">Activate</Text>
+                        <Text className="text-xs font-black uppercase tracking-widest text-emerald-600 mt-1">Activate</Text>
                     </TouchableOpacity>
                      <TouchableOpacity onPress={() => executeBulkAction('verify')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
                          <Ionicons name="shield-checkmark" size={24} color="#2563EB" className="mb-1" />
-                        <Text className="text-[10px] font-black uppercase tracking-widest text-blue-600 mt-1">Verify</Text>
+                        <Text className="text-xs font-black uppercase tracking-widest text-blue-600 mt-1">Verify</Text>
                     </TouchableOpacity>
                 </BlurView>
             )}
@@ -1433,14 +1433,14 @@ Metadata:
                                     {item.full_name || 'Unknown User'}
                                 </Text>
                                 <View className="flex-row items-center gap-2 mb-1.5">
-                                    <Text className="text-[9px] text-slate-500 font-mono tracking-widest opacity-80">
+                                    <Text className="text-xs text-slate-500 font-mono tracking-widest opacity-80">
                                         {item.account_number || 'No Account'}
                                     </Text>
                                     {(item.phone || item.email) && (
                                         <View className="flex-row items-center gap-1 opacity-60">
                                             <View className="w-1 h-1 rounded-full bg-slate-300" />
                                             <Ionicons name={item.phone ? "call" : "mail"} size={8} color="#64748b" />
-                                            <Text className="text-[8px] text-slate-500 font-medium" numberOfLines={1}>
+                                            <Text className="text-xs text-slate-500 font-medium" numberOfLines={1}>
                                                 {item.phone || item.email}
                                             </Text>
                                         </View>
@@ -1448,19 +1448,19 @@ Metadata:
                                 </View>
                                 <View className="flex-row items-center gap-1.5 flex-wrap">
                                     <View className={`px-2 py-0.5 rounded-md ${item.status === 'active' ? 'bg-emerald-100/70' : 'bg-rose-100/70'}`}>
-                                         <Text className={`text-[8px] font-black tracking-widest uppercase ${item.status === 'active' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                         <Text className={`text-xs font-black tracking-widest uppercase ${item.status === 'active' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                             {item.status}
                                          </Text>
                                     </View>
                                     {item.role === 'admin' && (
                                         <View className="bg-amber-100/70 px-2 py-0.5 rounded-md">
-                                            <Text className="text-[8px] font-black tracking-widest text-amber-700 uppercase">ADMIN</Text>
+                                            <Text className="text-xs font-black tracking-widest text-amber-700 uppercase">ADMIN</Text>
                                         </View>
                                     )}
                                     {item.corporate_email && (
                                         <View className="bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md flex-row items-center gap-1">
                                             <Ionicons name="at-circle" size={9} color="#D97706" />
-                                            <Text className="text-[8.5px] font-black tracking-tight text-amber-700">{item.corporate_email}</Text>
+                                            <Text className="text-xs font-black tracking-tight text-amber-700">{item.corporate_email}</Text>
                                         </View>
                                     )}
                                     {item.kyc_verified && (
@@ -1473,7 +1473,7 @@ Metadata:
                         </View>
                         <View className="items-center flex-row pl-2 relative z-10">
                             <View className="items-end mr-2">
-                                <Text className="text-[8px] text-slate-400 font-bold uppercase tracking-[0.2em] mb-0.5">Vault Bal</Text>
+                                <Text className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mb-0.5">Vault Bal</Text>
                                 <Text className="font-black text-slate-800 text-base tracking-tighter">₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
                             </View>
                             <TouchableOpacity className="w-7 h-7 items-center justify-center rounded-full bg-slate-100/50">

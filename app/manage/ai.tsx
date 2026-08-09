@@ -77,7 +77,7 @@ export default function AIInsights() {
             <View className="bg-slate-900/90 border-b border-slate-800 px-4 py-2 flex-row items-center justify-between shadow-sm">
                 <View className="flex-row items-center gap-2">
                     <View className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <Text className="text-slate-300 text-[11.5px] font-bold">Neural Engine • Real-time DB Access</Text>
+                    <Text className="text-slate-300 text-xs font-bold">Neural Engine • Real-time DB Access</Text>
                 </View>
                 <TouchableOpacity onPress={() => setMessages([{ role: 'system', text: 'Cortex AI v4.0 System Reset.' }])} className="p-1">
                     <Ionicons name="trash-outline" size={14} color="#ef4444" />
@@ -124,7 +124,7 @@ export default function AIInsights() {
                     {loading && (
                         <View className="flex-row items-center gap-2 bg-slate-900/80 border border-slate-800 px-3 py-2 rounded-2xl self-start">
                             <ActivityIndicator color="#818cf8" size="small" />
-                            <Text className="text-slate-400 text-[11px] font-semibold italic">Analyzing Database & Running Neural Logic...</Text>
+                            <Text className="text-slate-400 text-xs font-semibold italic">Analyzing Database & Running Neural Logic...</Text>
                         </View>
                     )}
                 </ScrollView>
@@ -140,7 +140,7 @@ export default function AIInsights() {
                                     className="bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full active:bg-slate-800 flex-row items-center gap-1.5"
                                 >
                                     <Ionicons name="sparkles-outline" size={11} color="#818cf8" />
-                                    <Text className="text-slate-300 text-[11.5px] font-semibold">{prompt}</Text>
+                                    <Text className="text-slate-300 text-xs font-semibold">{prompt}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>

@@ -114,26 +114,26 @@ export default function ForensicsScreen() {
                     ))}
 
                     <View className="absolute bottom-4 left-4">
-                        <Text className="text-indigo-400 text-[10px] uppercase font-bold tracking-widest">Live Traffic Map</Text>
+                        <Text className="text-indigo-400 text-xs uppercase font-bold tracking-widest">Live Traffic Map</Text>
                     </View>
                 </View>
 
                 {/* KPI Grid */}
                 <View className="flex-row flex-wrap justify-between gap-y-4 mb-8">
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Health Score</Text>
+                        <Text className="text-slate-500 text-xs uppercase font-bold mb-1">Health Score</Text>
                         <Text className="text-emerald-400 text-3xl font-black">{systemHealth}%</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Total Users</Text>
+                        <Text className="text-slate-500 text-xs uppercase font-bold mb-1">Total Users</Text>
                         <Text className="text-blue-400 text-3xl font-black">{userCount}</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">New Signups</Text>
+                        <Text className="text-slate-500 text-xs uppercase font-bold mb-1">New Signups</Text>
                         <Text className="text-amber-500 text-3xl font-black">{liveUsers.length}</Text>
                     </View>
                     <View className="w-[48%] bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Threat Level</Text>
+                        <Text className="text-slate-500 text-xs uppercase font-bold mb-1">Threat Level</Text>
                         <Text className="text-slate-200 text-3xl font-black">LOW</Text>
                     </View>
                 </View>
@@ -153,7 +153,7 @@ export default function ForensicsScreen() {
                                     <Text className="text-slate-500 text-xs">{user.phone || 'No Phone'}</Text>
                                 </View>
                             </View>
-                            <Text className="text-slate-600 text-[10px] font-bold">{new Date(user.created_at).toLocaleDateString()}</Text>
+                            <Text className="text-slate-600 text-xs font-bold">{new Date(user.created_at).toLocaleDateString()}</Text>
                         </View>
                     ))}
                 </View>

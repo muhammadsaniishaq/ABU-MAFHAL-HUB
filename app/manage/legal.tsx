@@ -18,7 +18,7 @@ export default function LegalVault() {
                 {/* Doc Card */}
                 <View className="bg-white p-4 rounded-xl border border-gray-100 mb-4 flex-row items-center shadow-sm">
                     <View className="w-12 h-14 bg-red-50 border border-red-100 rounded items-center justify-center mr-4">
-                        <Text className="text-red-500 font-black text-[10px]">PDF</Text>
+                        <Text className="text-red-500 font-black text-xs">PDF</Text>
                     </View>
                     <View className="flex-1">
                         <Text className="font-bold text-slate-800 text-base">CBN License 2026.pdf</Text>
@@ -31,7 +31,7 @@ export default function LegalVault() {
 
                 <View className="bg-white p-4 rounded-xl border border-gray-100 mb-4 flex-row items-center shadow-sm">
                     <View className="w-12 h-14 bg-blue-50 border border-blue-100 rounded items-center justify-center mr-4">
-                        <Text className="text-blue-500 font-black text-[10px]">DOC</Text>
+                        <Text className="text-blue-500 font-black text-xs">DOC</Text>
                     </View>
                     <View className="flex-1">
                         <Text className="font-bold text-slate-800 text-base">Partner Agreement - Visa</Text>
@@ -42,7 +42,7 @@ export default function LegalVault() {
                     </TouchableOpacity>
                 </View>
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4 mt-4">Pending Signatures</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4 mt-4">Pending Signatures</Text>
 
                 <View className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-4">
                     <View className="flex-row justify-between items-start mb-2">

@@ -82,7 +82,7 @@ export default function DatabaseManager() {
                 <View className="flex-1 flex-row">
                     {/* Sidebar */}
                     <View className="w-1/3 bg-slate-900 border-r border-slate-800 pt-4">
-                        <Text className="text-slate-500 font-bold uppercase text-[10px] mb-4 px-4">Tables</Text>
+                        <Text className="text-slate-500 font-bold uppercase text-xs mb-4 px-4">Tables</Text>
                         <ScrollView>
                             {tables.map(table => (
                                 <TouchableOpacity
@@ -125,7 +125,7 @@ export default function DatabaseManager() {
                                     {rows.map((row, i) => (
                                         <View key={i} className="flex-row py-3 border-b border-slate-900">
                                             {columns.map(col => (
-                                                <Text key={col} className="w-40 text-slate-300 text-[10px] font-mono px-2" numberOfLines={1}>
+                                                <Text key={col} className="w-40 text-slate-300 text-xs font-mono px-2" numberOfLines={1}>
                                                     {String(row[col])}
                                                 </Text>
                                             ))}

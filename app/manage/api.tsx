@@ -204,11 +204,11 @@ export default function APIVaultScreen() {
                                 </View>
                                 <View className="flex-1">
                                     <Text className={`font-bold text-xs ${checked ? 'text-indigo-300' : 'text-slate-300'}`}>{item.name}</Text>
-                                    <Text className="text-slate-500 text-[10px]">{item.desc}</Text>
+                                    <Text className="text-slate-500 text-xs">{item.desc}</Text>
                                 </View>
                                 {checked && (
                                     <View className="bg-indigo-500/20 px-2 py-0.5 rounded">
-                                        <Text className="text-indigo-400 font-bold text-[9px]">ACTIVE</Text>
+                                        <Text className="text-indigo-400 font-bold text-xs">ACTIVE</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>

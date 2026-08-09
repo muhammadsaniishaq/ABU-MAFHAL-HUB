@@ -31,7 +31,7 @@ export default function AutomationBuilder() {
                 </View>
 
                 <View className="flex-row items-center justify-between mb-4">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px]">Your Workflows</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs">Your Workflows</Text>
                     <TouchableOpacity className="bg-indigo-600 px-3 py-1.5 rounded-lg flex-row items-center">
                         <Ionicons name="add" size={16} color="white" />
                         <Text className="text-white text-xs font-bold ml-1">New Flow</Text>
@@ -61,13 +61,13 @@ export default function AutomationBuilder() {
                         {/* Visual Node Mock */}
                         <View className="flex-row items-center gap-2 px-2">
                             <View className="bg-slate-900 px-3 py-1.5 rounded border border-slate-600">
-                                <Text className="text-slate-300 text-[10px] font-mono">IF: {bot.trigger}</Text>
+                                <Text className="text-slate-300 text-xs font-mono">IF: {bot.trigger}</Text>
                             </View>
                             <View className="h-[1px] w-4 bg-slate-600" />
                             <Ionicons name="arrow-forward" size={12} color="#475569" />
                             <View className="h-[1px] w-4 bg-slate-600" />
                             <View className="bg-slate-900 px-3 py-1.5 rounded border border-slate-600">
-                                <Text className="text-emerald-400 text-[10px] font-mono">THEN: {bot.action}</Text>
+                                <Text className="text-emerald-400 text-xs font-mono">THEN: {bot.action}</Text>
                             </View>
                         </View>
                     </View>

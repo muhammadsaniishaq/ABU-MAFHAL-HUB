@@ -62,22 +62,22 @@ export default function LendingHQ() {
             <ScrollView className="flex-1">
                 <View className="p-6">
                     <View className="bg-white p-6 rounded-3xl mb-8 shadow-sm border border-slate-100">
-                        <Text className="text-slate-400 font-bold uppercase text-[10px] mb-2">Total Loan Book</Text>
+                        <Text className="text-slate-400 font-bold uppercase text-xs mb-2">Total Loan Book</Text>
                         <Text className="text-4xl font-black text-slate-800">₦ {stats.total.toLocaleString()}</Text>
                         <View className="flex-row gap-4 mt-6">
                             <View>
                                 <Text className="text-green-600 font-bold text-lg">{stats.performing}%</Text>
-                                <Text className="text-slate-400 text-[10px]">Performing</Text>
+                                <Text className="text-slate-400 text-xs">Performing</Text>
                             </View>
                             <View className="w-[1px] bg-gray-200" />
                             <View>
                                 <Text className="text-red-500 font-bold text-lg">{stats.defaulted}%</Text>
-                                <Text className="text-slate-400 text-[10px]">Non-Performing</Text>
+                                <Text className="text-slate-400 text-xs">Non-Performing</Text>
                             </View>
                         </View>
                     </View>
 
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Loan Requests (AI Scored)</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Loan Requests (AI Scored)</Text>
 
                     {loading ? (
                         <ActivityIndicator size="large" color="#0F172A" />
@@ -88,7 +88,7 @@ export default function LendingHQ() {
                                     <View>
                                         <Text className="font-bold text-slate-800 text-base">{loan.profiles?.full_name || 'System User'}</Text>
                                         <Text className="text-slate-400 text-xs">Requesting ₦{Number(loan.amount).toLocaleString()}</Text>
-                                        <Text className="text-[10px] text-indigo-500 font-bold mt-1 uppercase">{loan.status}</Text>
+                                        <Text className="text-xs text-indigo-500 font-bold mt-1 uppercase">{loan.status}</Text>
                                     </View>
                                     <View className={`w-10 h-10 rounded-full items-center justify-center border-4 ${loan.ai_score >= 70 ? 'border-green-100 bg-green-50' : loan.ai_score < 40 ? 'border-red-100 bg-red-50' : 'border-yellow-100 bg-yellow-50'}`}>
                                         <Text className={`font-black text-xs ${loan.ai_score >= 70 ? 'text-green-600' : loan.ai_score < 40 ? 'text-red-600' : 'text-yellow-600'}`}>{loan.ai_score || '??'}</Text>

@@ -110,7 +110,7 @@ export default function TransactionHistory() {
                                 }`}>
                                 {item.type === 'deposit' ? '+' : '-'}₦{parseFloat(item.amount.toString()).toLocaleString()}
                             </Text>
-                            <Text className={`text-[10px] font-bold mt-1 uppercase ${item.status === 'success' ? 'text-green-500' :
+                            <Text className={`text-xs font-bold mt-1 uppercase ${item.status === 'success' ? 'text-green-500' :
                                 item.status === 'pending' ? 'text-orange-500' : 'text-red-500'
                                 }`}>{item.status}</Text>
                         </View>

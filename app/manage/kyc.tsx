@@ -326,13 +326,13 @@ export default function KYCQueue() {
                             <View className="w-10 h-10 bg-blue-50 rounded-full items-center justify-center">
                                 <Text className="text-blue-600 font-black text-lg">{kycQueue.filter(k => k.status === 'pending').length}</Text>
                             </View>
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase leading-3">Pending{'\n'}Action</Text>
+                            <Text className="text-slate-500 text-xs font-bold uppercase leading-3">Pending{'\n'}Action</Text>
                          </View>
                          <View className="flex-1 bg-white p-3 rounded-2xl flex-row items-center gap-3 shadow-sm border border-emerald-100/50">
                             <View className="w-10 h-10 bg-emerald-50 rounded-full items-center justify-center">
                                 <Text className="text-emerald-600 font-black text-lg">{approvedToday}</Text>
                             </View>
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase leading-3">Approved{'\n'}Today</Text>
+                            <Text className="text-slate-500 text-xs font-bold uppercase leading-3">Approved{'\n'}Today</Text>
                          </View>
                     </View>
 
@@ -358,7 +358,7 @@ export default function KYCQueue() {
                             onPress={toggleSort}
                             className="bg-slate-100 px-3 py-1.5 rounded-lg flex-row items-center gap-1"
                         >
-                            <Text className="text-[10px] font-bold text-slate-500 uppercase">{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</Text>
+                            <Text className="text-xs font-bold text-slate-500 uppercase">{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</Text>
                             <Ionicons name={sortOrder === 'desc' ? "arrow-down" : "arrow-up"} size={12} color="#64748B" />
                         </TouchableOpacity>
                     </View>
@@ -427,7 +427,7 @@ export default function KYCQueue() {
                                         </View>
                                         
                                         <View className={`px-2 py-1 rounded-lg ${item.status === 'pending' ? 'bg-orange-50' : item.status === 'approved' ? 'bg-green-50' : 'bg-red-50'}`}>
-                                            <Text className={`text-[10px] font-black uppercase ${item.status === 'pending' ? 'text-orange-600' : item.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                                            <Text className={`text-xs font-black uppercase ${item.status === 'pending' ? 'text-orange-600' : item.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {item.status}
                                             </Text>
                                         </View>
@@ -444,7 +444,7 @@ export default function KYCQueue() {
                                                 />
                                             </View>
                                             <View className="flex-1">
-                                                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Document</Text>
+                                                <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider">Document</Text>
                                                 <Text className="text-slate-800 font-bold capitalize text-sm">{item.document_type.replace('_', ' ')}</Text>
                                             </View>
                                             <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
@@ -491,7 +491,7 @@ export default function KYCQueue() {
                                         
                                         {/* Floating Badge */}
                                         <View className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm">
-                                            <Text className="text-[10px] font-bold uppercase text-slate-800 tracking-wide">
+                                            <Text className="text-xs font-bold uppercase text-slate-800 tracking-wide">
                                                 {inspectorItem.document_type?.replace('_', ' ')}
                                             </Text>
                                         </View>

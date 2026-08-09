@@ -304,7 +304,7 @@ export default function CommunicationManager() {
                         className={`flex-1 flex-row py-3 items-center justify-center rounded-xl ${isActive ? 'bg-[#0d1b3e] shadow-md shadow-[#0d1b3e]/30' : ''}`}
                     >
                         <Ionicons name={icons[tab]} size={16} color={isActive ? '#f5a623' : '#64748b'} />
-                        <Text className={`font-black uppercase ml-2 text-[11px] tracking-wider ${isActive ? 'text-[#f5a623]' : 'text-slate-500'}`}>{tab}</Text>
+                        <Text className={`font-black uppercase ml-2 text-xs tracking-wider ${isActive ? 'text-[#f5a623]' : 'text-slate-500'}`}>{tab}</Text>
                     </TouchableOpacity>
                 );
             })}
@@ -328,7 +328,7 @@ export default function CommunicationManager() {
                             className={`flex-1 flex-col items-center justify-center p-3 rounded-2xl border-2 ${isActive ? 'bg-[#0d1b3e]/5 border-[#0d1b3e]' : 'bg-slate-50 border-transparent'}`}
                         >
                             <Ionicons name={mode.icon} size={20} color={isActive ? '#0d1b3e' : '#64748B'} />
-                            <Text className={`mt-2 text-[10px] font-bold text-center ${isActive ? 'text-[#0d1b3e]' : 'text-slate-500'}`}>{mode.label}</Text>
+                            <Text className={`mt-2 text-xs font-bold text-center ${isActive ? 'text-[#0d1b3e]' : 'text-slate-500'}`}>{mode.label}</Text>
                         </TouchableOpacity>
                     );
                 })}
@@ -408,7 +408,7 @@ export default function CommunicationManager() {
                         </TouchableOpacity>
                         <View className="flex-1 items-center">
                             <Text className="text-white font-bold text-base">Comms Center</Text>
-                            <Text className="text-[#f5a623] text-[10px] mt-0.5">Engage Users</Text>
+                            <Text className="text-[#f5a623] text-xs mt-0.5">Engage Users</Text>
                         </View>
                         <View className="w-8" />
                     </View>
@@ -450,7 +450,7 @@ export default function CommunicationManager() {
                             <View className={`w-8 h-8 rounded-full items-center justify-center ${isScheduled ? 'bg-indigo-500' : 'bg-slate-100'}`}>
                                 <Ionicons name="time-outline" size={16} color={isScheduled ? '#fff' : '#64748b'} />
                             </View>
-                            <Text className={`font-bold text-[11px] uppercase tracking-wider ${isScheduled ? 'text-indigo-800' : 'text-slate-500'}`}>Schedule</Text>
+                            <Text className={`font-bold text-xs uppercase tracking-wider ${isScheduled ? 'text-indigo-800' : 'text-slate-500'}`}>Schedule</Text>
                         </View>
                         <Switch value={isScheduled} onValueChange={setIsScheduled} trackColor={{false: '#e2e8f0', true: '#818cf8'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
                     </TouchableOpacity>
@@ -464,7 +464,7 @@ export default function CommunicationManager() {
                             <View className={`w-8 h-8 rounded-full items-center justify-center ${isHighPriority ? 'bg-rose-500' : 'bg-slate-100'}`}>
                                 <Ionicons name="alert-outline" size={16} color={isHighPriority ? '#fff' : '#64748b'} />
                             </View>
-                            <Text className={`font-bold text-[11px] uppercase tracking-wider ${isHighPriority ? 'text-rose-800' : 'text-slate-500'}`}>Urgent</Text>
+                            <Text className={`font-bold text-xs uppercase tracking-wider ${isHighPriority ? 'text-rose-800' : 'text-slate-500'}`}>Urgent</Text>
                         </View>
                         <Switch value={isHighPriority} onValueChange={setIsHighPriority} trackColor={{false: '#e2e8f0', true: '#f43f5e'}} thumbColor="#fff" style={{ transform: [{ scale: 0.8 }] }} />
                     </TouchableOpacity>
@@ -479,7 +479,7 @@ export default function CommunicationManager() {
                             className="bg-[#0d1b3e] px-3 py-2 rounded-xl flex-row items-center gap-1.5 shadow-md shadow-[#0d1b3e]/20"
                         >
                             <Ionicons name="sparkles" size={12} color="#f5a623" />
-                            <Text className="text-[#f5a623] font-black text-[10px] uppercase tracking-wider">AI Writer</Text>
+                            <Text className="text-[#f5a623] font-black text-xs uppercase tracking-wider">AI Writer</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -512,7 +512,7 @@ export default function CommunicationManager() {
 
                     {activeTab === 'push' && (
                         <View className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                            <Text className="text-slate-500 text-[10px] font-bold uppercase mb-3">Action Route (Deep Link)</Text>
+                            <Text className="text-slate-500 text-xs font-bold uppercase mb-3">Action Route (Deep Link)</Text>
                             <View className="flex-row gap-2">
                                 <View className="flex-1 bg-white border border-slate-200 rounded-xl px-3 flex-row items-center h-12 shadow-sm">
                                     <Ionicons name="link-outline" size={16} color="#94a3b8" />
@@ -526,7 +526,7 @@ export default function CommunicationManager() {
                                 </View>
                                 {/* Quick Routes */}
                                 <TouchableOpacity onPress={() => setActionRoute('/wallet')} className="bg-[#0d1b3e] px-4 rounded-xl items-center justify-center shadow-md">
-                                    <Text className="text-[#f5a623] text-[10px] font-bold uppercase tracking-wider">Wallet</Text>
+                                    <Text className="text-[#f5a623] text-xs font-bold uppercase tracking-wider">Wallet</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -565,7 +565,7 @@ export default function CommunicationManager() {
                     {history.length === 0 ? (
                         <View className="items-center py-6 bg-white/50 rounded-xl border border-dashed border-slate-300">
                             <Ionicons name="documents-outline" size={32} color="#CBD5E1" />
-                            <Text className="text-slate-400 mt-2 text-[10px] font-medium">No recent logs</Text>
+                            <Text className="text-slate-400 mt-2 text-xs font-medium">No recent logs</Text>
                         </View>
                     ) : (
                         history.map((log) => (
@@ -585,18 +585,18 @@ export default function CommunicationManager() {
                                             <Text className="font-bold text-[#0d1b3e] text-xs" numberOfLines={1}>{log.subject}</Text>
                                             {log.priority && <Ionicons name="alert-circle" size={10} color="#EF4444" />}
                                         </View>
-                                        <Text className="text-[9px] text-slate-400">To: {log.recipient}</Text>
+                                        <Text className="text-xs text-slate-400">To: {log.recipient}</Text>
                                     </View>
                                 </View>
                                 <View className="items-end">
                                     <View className={`px-1.5 py-0.5 rounded mb-0.5 ${
                                         log.status === 'Scheduled' ? 'bg-[#f5a623]/20' : 'bg-green-100'
                                     }`}>
-                                        <Text className={`text-[8px] font-bold ${
+                                        <Text className={`text-xs font-bold ${
                                             log.status === 'Scheduled' ? 'text-[#d4890e]' : 'text-green-700'
                                         }`}>{log.status.toUpperCase()}</Text>
                                     </View>
-                                    <Text className="text-[8px] text-slate-400">{log.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                                    <Text className="text-xs text-slate-400">{log.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
                                 </View>
                             </View>
                         ))
@@ -621,18 +621,18 @@ export default function CommunicationManager() {
                             {isHighPriority && (
                                 <View className="bg-red-50 border border-red-100 p-2 rounded-lg flex-row items-center gap-2 mb-3">
                                     <Ionicons name="alert-circle" size={14} color="#EF4444" />
-                                    <Text className="text-red-700 font-bold text-[10px]">High Priority Dispatch</Text>
+                                    <Text className="text-red-700 font-bold text-xs">High Priority Dispatch</Text>
                                 </View>
                             )}
                             
                             <View className="mb-3">
-                                <Text className="text-slate-400 text-[10px] uppercase font-bold">Channel</Text>
+                                <Text className="text-slate-400 text-xs uppercase font-bold">Channel</Text>
                                 <Text className="text-[#0d1b3e] font-bold capitalize text-xs">{activeTab}</Text>
                             </View>
 
                             {activeTab === 'email' && (
                                 <View className="mb-3">
-                                    <Text className="text-slate-400 text-[10px] uppercase font-bold">Subject</Text>
+                                    <Text className="text-slate-400 text-xs uppercase font-bold">Subject</Text>
                                     <Text className="text-[#0d1b3e] text-sm font-bold leading-5">{subject || '(No Subject)'}</Text>
                                 </View>
                             )}
@@ -644,7 +644,7 @@ export default function CommunicationManager() {
                             {isScheduled && (
                                 <View className="mt-3 flex-row items-center gap-2 bg-[#f5a623]/10 p-2 rounded-xl border border-[#f5a623]/30">
                                     <Ionicons name="time" size={14} color="#0d1b3e" />
-                                    <Text className="text-[#0d1b3e] text-[10px] font-bold">Scheduled Delivery: Tomorrow, 9:00 AM</Text>
+                                    <Text className="text-[#0d1b3e] text-xs font-bold">Scheduled Delivery: Tomorrow, 9:00 AM</Text>
                                 </View>
                             )}
 

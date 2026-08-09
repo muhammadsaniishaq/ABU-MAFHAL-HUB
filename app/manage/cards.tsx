@@ -163,7 +163,7 @@ export default function CardManager() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                     <View>
                         <Text style={{ fontSize: 22, fontWeight: '900', color: '#ffffff' }}>Issued Virtual Cards</Text>
-                        <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Payvessel API Engine & Merchant Controls</Text>
+                        <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Payvessel API Engine & Merchant Controls</Text>
                     </View>
 
                     <TouchableOpacity 
@@ -171,24 +171,24 @@ export default function CardManager() {
                         style={{ backgroundColor: '#f5a623', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                     >
                         <Ionicons name="key-outline" size={16} color="#0f172a" />
-                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11 }}>API Config</Text>
+                        <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>API Config</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Metric Summary Cards */}
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
                     <View style={{ flex: 1, backgroundColor: '#1e293b', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#334155' }}>
-                        <Text style={{ color: '#94a3b8', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Total Issued</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Total Issued</Text>
                         <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '900', marginTop: 2 }}>{cards.length}</Text>
                     </View>
 
                     <View style={{ flex: 1, backgroundColor: '#1e293b', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#334155' }}>
-                        <Text style={{ color: '#4ade80', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Active Cards</Text>
+                        <Text style={{ color: '#4ade80', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Active Cards</Text>
                         <Text style={{ color: '#4ade80', fontSize: 20, fontWeight: '900', marginTop: 2 }}>{activeCount}</Text>
                     </View>
 
                     <View style={{ flex: 1, backgroundColor: '#1e293b', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#334155' }}>
-                        <Text style={{ color: '#f5a623', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Float Balance</Text>
+                        <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Float Balance</Text>
                         <Text style={{ color: '#f5a623', fontSize: 18, fontWeight: '900', marginTop: 2 }}>${totalBalance.toFixed(2)}</Text>
                     </View>
                 </View>
@@ -221,7 +221,7 @@ export default function CardManager() {
                                     borderColor: activeFilter === f ? '#f5a623' : '#334155'
                                 }}
                             >
-                                <Text style={{ color: activeFilter === f ? '#0f172a' : '#94a3b8', fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>
+                                <Text style={{ color: activeFilter === f ? '#0f172a' : '#94a3b8', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>
                                     {f}
                                 </Text>
                             </TouchableOpacity>
@@ -247,12 +247,12 @@ export default function CardManager() {
                                     </View>
                                     <View>
                                         <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>{card.card_holder_name}</Text>
-                                        <Text style={{ color: '#94a3b8', fontSize: 11 }}>{card.profiles?.email || 'User'}</Text>
+                                        <Text style={{ color: '#94a3b8', fontSize: 12 }}>{card.profiles?.email || 'User'}</Text>
                                     </View>
                                 </View>
 
                                 <View style={{ backgroundColor: card.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: card.status === 'active' ? '#22c55e' : '#ef4444' }}>
-                                    <Text style={{ color: card.status === 'active' ? '#4ade80' : '#f87171', fontSize: 9, fontWeight: '900' }}>
+                                    <Text style={{ color: card.status === 'active' ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: '900' }}>
                                         {card.status.toUpperCase()}
                                     </Text>
                                 </View>
@@ -260,14 +260,14 @@ export default function CardManager() {
 
                             <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <View>
-                                    <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800' }}>CARD NUMBER</Text>
+                                    <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800' }}>CARD NUMBER</Text>
                                     <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginTop: 2 }}>
                                         {card.card_number_masked}
                                     </Text>
                                 </View>
 
                                 <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={{ color: '#64748b', fontSize: 9, fontWeight: '800' }}>BALANCE</Text>
+                                    <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800' }}>BALANCE</Text>
                                     <Text style={{ color: '#f5a623', fontSize: 14, fontWeight: '900', marginTop: 2 }}>
                                         {card.currency === 'USD' ? '$' : '₦'}{card.balance}
                                     </Text>
@@ -280,7 +280,7 @@ export default function CardManager() {
                                     onPress={() => handleAdminToggleFreeze(card)}
                                     style={{ flex: 1, backgroundColor: card.status === 'active' ? '#ef4444' : '#22c55e', paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
                                 >
-                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 11 }}>
+                                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
                                         {card.status === 'active' ? 'Freeze Card ❄️' : 'Unfreeze Card 🔓'}
                                     </Text>
                                 </TouchableOpacity>
@@ -290,7 +290,7 @@ export default function CardManager() {
                                         onPress={() => handleAdminTerminateCard(card)}
                                         style={{ flex: 1, backgroundColor: '#334155', paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
                                     >
-                                        <Text style={{ color: '#f87171', fontWeight: '800', fontSize: 11 }}>Terminate 🗑️</Text>
+                                        <Text style={{ color: '#f87171', fontWeight: '800', fontSize: 12 }}>Terminate 🗑️</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -310,9 +310,9 @@ export default function CardManager() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: '#94a3b8', fontSize: 11, marginBottom: 12 }}>Configure Payvessel API Credentials for virtual account & virtual card issuance:</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 12 }}>Configure Payvessel API Credentials for virtual account & virtual card issuance:</Text>
 
-                        <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>Payvessel API Key</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', marginBottom: 4 }}>Payvessel API Key</Text>
                         <TextInput
                             style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}
                             placeholder="PV_API_KEY_..."
@@ -321,7 +321,7 @@ export default function CardManager() {
                             onChangeText={setPayvesselApiKey}
                         />
 
-                        <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>Payvessel Secret Key</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', marginBottom: 4 }}>Payvessel Secret Key</Text>
                         <TextInput
                             style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}
                             placeholder="PV_SECRET_KEY_..."
@@ -331,7 +331,7 @@ export default function CardManager() {
                             secureTextEntry
                         />
 
-                        <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>Payvessel Business ID</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', marginBottom: 4 }}>Payvessel Business ID</Text>
                         <TextInput
                             style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}
                             placeholder="PV_BIZ_ID_..."
@@ -340,7 +340,7 @@ export default function CardManager() {
                             onChangeText={setPayvesselBusinessId}
                         />
 
-                        <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 4 }}>Virtual Card Creation Fee (USD $)</Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', marginBottom: 4 }}>Virtual Card Creation Fee (USD $)</Text>
                         <TextInput
                             style={{ backgroundColor: '#0f172a', color: '#ffffff', padding: 12, borderRadius: 12, fontSize: 12, marginBottom: 14, borderWidth: 1, borderColor: '#334155' }}
                             placeholder="3.00"
@@ -352,22 +352,22 @@ export default function CardManager() {
 
                         {/* Commercial Rates Summary Banner */}
                         <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#334155' }}>
-                            <Text style={{ color: '#f5a623', fontSize: 11, fontWeight: '900', marginBottom: 6 }}>📜 Payvessel Rates (ABU MAFHAL LTD Proposal):</Text>
+                            <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '900', marginBottom: 6 }}>📜 Payvessel Rates (ABU MAFHAL LTD Proposal):</Text>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Card Issuance Wholesale Cost:</Text>
-                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>$1.50 / card</Text>
+                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>• Card Issuance Wholesale Cost:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 12, fontWeight: 'bold' }}>$1.50 / card</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Apple/Google Pay Contactless:</Text>
-                                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold' }}>$2.50 / card</Text>
+                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>• Apple/Google Pay Contactless:</Text>
+                                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>$2.50 / card</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Monthly & API Access Fees:</Text>
-                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>WAIVED ($0)</Text>
+                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>• Monthly & API Access Fees:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 12, fontWeight: 'bold' }}>WAIVED ($0)</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#94a3b8', fontSize: 10 }}>• Individual Card Funding Fee:</Text>
-                                <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: 'bold' }}>NO FEE ($0)</Text>
+                                <Text style={{ color: '#94a3b8', fontSize: 12 }}>• Individual Card Funding Fee:</Text>
+                                <Text style={{ color: '#4ade80', fontSize: 12, fontWeight: 'bold' }}>NO FEE ($0)</Text>
                             </View>
                         </View>
 

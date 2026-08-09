@@ -17,7 +17,7 @@ export default function RiskMonitor() {
 
                 {/* Net Position Card */}
                 <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-6">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Net Open Position</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Net Open Position</Text>
                     <View className="flex-row items-end gap-2">
                         <Text className="text-4xl font-black text-slate-800">₦ 12.4M</Text>
                         <Text className="text-slate-400 font-bold mb-2">Long</Text>
@@ -27,8 +27,8 @@ export default function RiskMonitor() {
                         <View className="absolute left-[50%] w-0.5 h-4 -top-1 bg-slate-900" />
                     </View>
                     <View className="flex-row justify-between mt-1">
-                        <Text className="text-[10px] text-slate-400 font-bold">Short Limit</Text>
-                        <Text className="text-[10px] text-slate-400 font-bold">Long Limit</Text>
+                        <Text className="text-xs text-slate-400 font-bold">Short Limit</Text>
+                        <Text className="text-xs text-slate-400 font-bold">Long Limit</Text>
                     </View>
                 </View>
 
@@ -51,7 +51,7 @@ export default function RiskMonitor() {
                 </View>
 
                 {/* Counterparty Risk */}
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Counterparty Risk</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Counterparty Risk</Text>
                 {[1, 2, 3].map((_, i) => (
                     <View key={i} className="flex-row items-center justify-between py-3 border-b border-gray-100">
                         <View className="flex-row items-center gap-3">

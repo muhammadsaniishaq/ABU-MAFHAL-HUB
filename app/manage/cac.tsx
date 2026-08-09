@@ -574,7 +574,7 @@ export default function ManageCAC() {
             <View style={[s.priceCard, { backgroundColor: '#fffbeb', borderColor: COLORS.gold }]}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={[s.priceName, { color: COLORS.navy }]}>TIN Processing Add-on Fee</Text>
-                <Text style={{ fontSize: 10, color: COLORS.textSub, marginTop: 2 }}>Fee charged when users check "Apply with TIN"</Text>
+                <Text style={{ fontSize: 12, color: COLORS.textSub, marginTop: 2 }}>Fee charged when users check "Apply with TIN"</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={{ color: COLORS.textSub, fontWeight: '600' }}>₦</Text>
@@ -620,7 +620,7 @@ export default function ManageCAC() {
               <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
                 <TouchableOpacity onPress={copyAllDetails} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                   <Ionicons name="copy-outline" size={16} color={COLORS.navy} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.navy }}>Copy</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.navy }}>Copy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setSelectedReq(null)}><Ionicons name="close" size={24} color={COLORS.navy} /></TouchableOpacity>
               </View>
@@ -852,10 +852,10 @@ const s = StyleSheet.create({
   reqDetailsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   reqSub: { fontSize: 12, color: COLORS.textSub, marginLeft: 6, fontWeight: '500' },
   reqFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  reqDate: { fontSize: 10, color: '#94a3b8', fontWeight: '500' },
+  reqDate: { fontSize: 12, color: '#94a3b8', fontWeight: '500' },
   
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  badgeTxt: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  badgeTxt: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   
   priceCard: { backgroundColor: COLORS.white, padding: 14, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },
   priceName: { fontSize: 13, fontWeight: '600', color: COLORS.navy, flex: 1 },
@@ -866,7 +866,7 @@ const s = StyleSheet.create({
   modalTitle: { fontSize: 15, fontWeight: '700', color: COLORS.navy },
   modalContent: { flex: 1 },
   
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: COLORS.gold, marginBottom: 8, marginTop: 18, letterSpacing: 1 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: COLORS.gold, marginBottom: 8, marginTop: 18, letterSpacing: 1 },
   
   infoBlock: { backgroundColor: COLORS.white, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -879,25 +879,25 @@ const s = StyleSheet.create({
   personHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   pName: { fontSize: 14, fontWeight: '700', color: COLORS.navy, flex: 1 },
   genderBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
-  genderText: { fontSize: 9, color: COLORS.textSub, fontWeight: '700', textTransform: 'uppercase' },
+  genderText: { fontSize: 12, color: COLORS.textSub, fontWeight: '700', textTransform: 'uppercase' },
   pDetailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
   pDetailItem: { flexDirection: 'row', alignItems: 'center', gap: 4, width: '45%' },
   pDetailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 12, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 },
-  pText: { fontSize: 11, color: COLORS.textMain, fontWeight: '500' },
-  pTextAddr: { fontSize: 11, color: COLORS.textMain, fontWeight: '500', flex: 1, lineHeight: 16 },
+  pText: { fontSize: 12, color: COLORS.textMain, fontWeight: '500' },
+  pTextAddr: { fontSize: 12, color: COLORS.textMain, fontWeight: '500', flex: 1, lineHeight: 16 },
   docButtonsRow: { flexDirection: 'row', gap: 8 },
   dlBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#e2e8f0' },
-  dlBtnTxt: { fontSize: 11, color: COLORS.navy, fontWeight: '700' },
+  dlBtnTxt: { fontSize: 12, color: COLORS.navy, fontWeight: '700' },
   
   actionBlock: { backgroundColor: COLORS.white, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },
   actionBtn: { flex: 1, height: 34, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, justifyContent: 'center' },
-  actionBtnTxt: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
-  uploadSuccessMsg: { color: COLORS.success, fontSize: 11, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
+  actionBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
+  uploadSuccessMsg: { color: COLORS.success, fontSize: 12, fontWeight: '600', marginBottom: 4, textAlign: 'center' },
   queryInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 10, height: 70, textAlignVertical: 'top', marginBottom: 12, backgroundColor: '#f8fafc', fontSize: 12, color: COLORS.navy },
   
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14, gap: 8 },
   statCard: { flex: 1, backgroundColor: COLORS.white, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, borderLeftWidth: 3 },
-  statLabel: { fontSize: 10, color: COLORS.textSub, fontWeight: '600', textTransform: 'uppercase', marginBottom: 2 },
+  statLabel: { fontSize: 12, color: COLORS.textSub, fontWeight: '600', textTransform: 'uppercase', marginBottom: 2 },
   statValue: { fontSize: 16, color: COLORS.navy, fontWeight: '800' },
   
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 10, marginBottom: 14, height: 38 },
@@ -909,9 +909,9 @@ const s = StyleSheet.create({
 
   infoBanner: { flexDirection: 'row', backgroundColor: '#e0e7ff', padding: 12, borderRadius: 10, marginBottom: 16, borderWidth: 1, borderColor: '#c7d2fe', alignItems: 'center' },
   infoBannerTitle: { fontSize: 12, fontWeight: '700', color: COLORS.navy, marginBottom: 2 },
-  infoBannerText: { fontSize: 10, color: COLORS.textSub, lineHeight: 14 },
+  infoBannerText: { fontSize: 12, color: COLORS.textSub, lineHeight: 14 },
   savePriceBtn: { backgroundColor: COLORS.navy, paddingHorizontal: 12, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  savePriceBtnTxt: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
+  savePriceBtnTxt: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' },
   viewerHeader: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 20, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, zIndex: 10 },

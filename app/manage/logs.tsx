@@ -107,19 +107,19 @@ export default function AuditLogs() {
                                                 <Text className="hidden" />
                                                 {/* In a real app we'd use Image, but using a View for now to avoid import issues if Image wasn't imported */}
                                                 <View className="w-full h-full bg-blue-100 items-center justify-center">
-                                                    <Text className="text-[8px] font-bold text-blue-700">{item.profiles.full_name?.charAt(0) || 'A'}</Text>
+                                                    <Text className="text-xs font-bold text-blue-700">{item.profiles.full_name?.charAt(0) || 'A'}</Text>
                                                 </View>
                                             </View>
                                         ) : (
                                             <View className="w-6 h-6 rounded-full bg-slate-100 items-center justify-center border border-slate-200">
-                                                <Text className="font-bold text-slate-500 text-[10px]">{item.profiles?.full_name?.charAt(0) || 'S'}</Text>
+                                                <Text className="font-bold text-slate-500 text-xs">{item.profiles?.full_name?.charAt(0) || 'S'}</Text>
                                             </View>
                                         )}
                                         <Text className="text-xs font-bold text-slate-600">{item.profiles?.full_name || 'System'}</Text>
                                     </View>
                                     
                                     <View className="bg-gray-100 px-2 py-1 rounded">
-                                        <Text className="text-[9px] text-gray-500 font-bold uppercase" numberOfLines={1}>
+                                        <Text className="text-xs text-gray-500 font-bold uppercase" numberOfLines={1}>
                                             RES: {item.target_resource || 'System'}
                                         </Text>
                                     </View>

@@ -295,7 +295,7 @@ export default function ManageDataPlans() {
         return (
             <View style={{ backgroundColor: info.bg }} className="px-2 py-0.5 rounded-full flex-row items-center border border-slate-200/50 mr-2">
                 <View style={{ backgroundColor: info.color }} className="w-1.5 h-1.5 rounded-full mr-1" />
-                <Text style={{ color: info.text }} className="text-[9px] font-black uppercase">
+                <Text style={{ color: info.text }} className="text-xs font-black uppercase">
                     {info.name} {isPrimary ? ' (Active)' : ''}
                 </Text>
             </View>
@@ -318,7 +318,7 @@ export default function ManageDataPlans() {
                         <Text className="text-sm font-extrabold text-[#0d1b3e]">Data Pricing & Multi-API Sync</Text>
                         <View className="flex-row items-center mt-0.5">
                             <View className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
-                            <Text className="text-[10px] font-bold text-slate-500">
+                            <Text className="text-xs font-bold text-slate-500">
                                 Active Primary API: <Text className="text-emerald-600 font-extrabold uppercase">{activeVendor}</Text>
                             </Text>
                         </View>
@@ -333,12 +333,12 @@ export default function ManageDataPlans() {
                         ) : (
                             <Ionicons name="cloud-download-outline" size={14} color={T.gold} className="mr-1.5" />
                         )}
-                        <Text className={`text-[11px] font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync All APIs</Text>
+                        <Text className={`text-xs font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync All APIs</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* API Vendor Filter Tabs & Active API Selector */}
-                <Text className="text-[9px] font-extrabold uppercase text-slate-400 mb-1">Filter View / Set Active System API:</Text>
+                <Text className="text-xs font-extrabold uppercase text-slate-400 mb-1">Filter View / Set Active System API:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
                     {VENDORS.map(vendor => {
                         const isSelectedFilter = selectedVendorFilter === vendor.id;
@@ -365,12 +365,12 @@ export default function ManageDataPlans() {
                                     color={isPrimaryActive ? '#10b981' : isSelectedFilter ? T.gold : '#64748b'} 
                                     style={{ marginRight: 4 }} 
                                 />
-                                <Text className={`text-[11px] font-bold ${isSelectedFilter ? 'text-white' : 'text-slate-600'}`}>
+                                <Text className={`text-xs font-bold ${isSelectedFilter ? 'text-white' : 'text-slate-600'}`}>
                                     {vendor.name}
                                 </Text>
                                 {isPrimaryActive && vendor.id !== 'all' && (
                                     <View className="bg-emerald-500 px-1 py-0.2 rounded ml-1.5">
-                                        <Text className="text-[7px] text-white font-black uppercase">Active</Text>
+                                        <Text className="text-xs text-white font-black uppercase">Active</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -397,7 +397,7 @@ export default function ManageDataPlans() {
                         ) : (
                             <Ionicons name="flash" size={11} color={T.gold} className="mr-1.5" />
                         )}
-                        <Text className="text-white text-[10px] font-extrabold">Apply Markup ({selectedNetwork.toUpperCase()})</Text>
+                        <Text className="text-white text-xs font-extrabold">Apply Markup ({selectedNetwork.toUpperCase()})</Text>
                     </TouchableOpacity>
                 </View>
                 <View className="flex-row justify-between gap-1.5">
@@ -413,11 +413,11 @@ export default function ManageDataPlans() {
                                 }}
                                 className="flex-1 bg-slate-50 border border-slate-100 p-2 rounded-lg items-center justify-between"
                             >
-                                <Text className="text-[9px] uppercase font-extrabold text-slate-400">{net}</Text>
+                                <Text className="text-xs uppercase font-extrabold text-slate-400">{net}</Text>
                                 <Text className="text-xs font-black text-[#0d1b3e] mt-0.5">
                                     {conf.markup_type === 'percentage' ? `${conf.markup_value}%` : `₦${conf.markup_value}`}
                                 </Text>
-                                <Text className="text-[8px] text-[#f5a623] mt-1 font-semibold underline">Configure</Text>
+                                <Text className="text-xs text-[#f5a623] mt-1 font-semibold underline">Configure</Text>
                             </TouchableOpacity>
                         );
                     })}
@@ -436,7 +436,7 @@ export default function ManageDataPlans() {
                         }}
                         className={`flex-1 py-1.5 rounded-lg border items-center`}
                     >
-                        <Text className={`font-bold text-[11px] capitalize ${selectedNetwork === net ? 'text-white' : 'text-slate-600'}`}>{net}</Text>
+                        <Text className={`font-bold text-xs capitalize ${selectedNetwork === net ? 'text-white' : 'text-slate-600'}`}>{net}</Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -455,17 +455,17 @@ export default function ManageDataPlans() {
                                     {getVendorBadge(plan.api_vendor, plan.name)}
                                     <Text className="font-extrabold text-slate-800 text-xs mr-1.5 flex-1" numberOfLines={1}>{plan.name}</Text>
                                     <View className={`px-1.5 py-0.5 rounded ${plan.is_active ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                                        <Text className={`${plan.is_active ? 'text-emerald-700' : 'text-red-700'} text-[8px] font-black uppercase`}>
+                                        <Text className={`${plan.is_active ? 'text-emerald-700' : 'text-red-700'} text-xs font-black uppercase`}>
                                             {plan.is_active ? 'Active' : 'Off'}
                                         </Text>
                                     </View>
                                 </View>
                                 <View className="mt-1 bg-blue-50/70 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
-                                    <Text className="text-slate-500 text-[10px] font-bold">API Cost: ₦{plan.cost_price}</Text>
+                                    <Text className="text-slate-500 text-xs font-bold">API Cost: ₦{plan.cost_price}</Text>
                                     <Text className="text-[#0d1b3e] font-extrabold text-xs">Selling: ₦{plan.selling_price}</Text>
                                 </View>
                                 <View className="flex-row items-center mt-1">
-                                    <Text className="text-emerald-600 text-[9px] font-bold">
+                                    <Text className="text-emerald-600 text-xs font-bold">
                                         Profit Margin: ₦{Math.max(0, Number(plan.selling_price) - Number(plan.cost_price))}
                                     </Text>
                                 </View>
@@ -505,17 +505,17 @@ export default function ManageDataPlans() {
                     <View style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} className="flex-1 justify-center items-center px-6">
                         <View className="bg-white w-full max-w-sm rounded-xl p-5 border border-slate-100 shadow-xl">
                             <Text className="font-extrabold text-sm text-[#0d1b3e] mb-1">Edit Price Manually</Text>
-                            <Text className="text-slate-400 text-[11px] mb-3" numberOfLines={1}>{editingPlan.name}</Text>
+                            <Text className="text-slate-400 text-xs mb-3" numberOfLines={1}>{editingPlan.name}</Text>
                             
                             <View className="mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex-row justify-between items-center">
                                  <View>
-                                     <Text className="text-[9px] text-slate-400 uppercase font-extrabold">API Original Price</Text>
+                                     <Text className="text-xs text-slate-400 uppercase font-extrabold">API Original Price</Text>
                                      <Text className="text-sm font-extrabold text-slate-600">₦{editingPlan.cost_price}</Text>
                                  </View>
                                  {getVendorBadge(editingPlan.api_vendor, editingPlan.name)}
                             </View>
 
-                            <Text className="text-[9px] text-[#0d1b3e] uppercase font-extrabold mb-1">New Selling Price (₦)</Text>
+                            <Text className="text-xs text-[#0d1b3e] uppercase font-extrabold mb-1">New Selling Price (₦)</Text>
                             <TextInput 
                                 className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm font-bold text-[#0d1b3e] mb-4"
                                 keyboardType="numeric"
@@ -553,10 +553,10 @@ export default function ManageDataPlans() {
                                 <Ionicons name="settings-outline" size={16} color={T.gold} className="mr-1.5" />
                                 <Text className="font-extrabold text-sm text-[#0d1b3e]">Markup Config</Text>
                             </View>
-                            <Text className="text-slate-400 text-[11px] mb-3">Adjust default markup for {editingConfig.network.toUpperCase()}</Text>
+                            <Text className="text-slate-400 text-xs mb-3">Adjust default markup for {editingConfig.network.toUpperCase()}</Text>
                             
                             {/* Markup Type Toggle */}
-                            <Text className="text-[9px] text-slate-400 uppercase font-extrabold mb-1.5">Markup Type</Text>
+                            <Text className="text-xs text-slate-400 uppercase font-extrabold mb-1.5">Markup Type</Text>
                             <View className="flex-row gap-2 mb-3">
                                 <TouchableOpacity 
                                     onPress={() => setNewMarkupType('fixed')}
@@ -580,7 +580,7 @@ export default function ManageDataPlans() {
                                 </TouchableOpacity>
                             </View>
 
-                            <Text className="text-[9px] text-[#0d1b3e] uppercase font-extrabold mb-1">
+                            <Text className="text-xs text-[#0d1b3e] uppercase font-extrabold mb-1">
                                 {newMarkupType === 'percentage' ? 'Markup Percentage (%)' : 'Markup Amount (₦)'}
                             </Text>
                             <TextInput 

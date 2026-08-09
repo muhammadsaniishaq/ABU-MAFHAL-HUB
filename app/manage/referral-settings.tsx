@@ -416,7 +416,7 @@ export default function ReferralSettings() {
                                                 </Text>
                                                 <Ionicons name="ellipsis-vertical" size={12} color="#CBD5E1" />
                                             </View>
-                                            <Text className="text-[10px] text-slate-400 font-mono">₦{item.reward_amount}</Text>
+                                            <Text className="text-xs text-slate-400 font-mono">₦{item.reward_amount}</Text>
                                         </View>
                                     </TouchableOpacity>
                                 ))

@@ -31,7 +31,7 @@ export default function KanbanBoard() {
                 <View className={`px-2 py-1 rounded-md ${item.tag === 'Backend' ? 'bg-red-100' :
                         item.tag === 'Design' ? 'bg-purple-100' : 'bg-blue-100'
                     }`}>
-                    <Text className={`text-[8px] font-bold uppercase ${item.tag === 'Backend' ? 'text-red-700' :
+                    <Text className={`text-xs font-bold uppercase ${item.tag === 'Backend' ? 'text-red-700' :
                             item.tag === 'Design' ? 'text-purple-700' : 'text-blue-700'
                         }`}>{item.tag}</Text>
                 </View>
@@ -54,7 +54,7 @@ export default function KanbanBoard() {
                             <Text className="font-black text-slate-700 uppercase text-xs">To Do</Text>
                         </View>
                         <View className="bg-slate-200 px-2 rounded-full">
-                            <Text className="text-slate-500 font-bold text-[10px]">{tasks.filter(t => t.col === 'todo').length}</Text>
+                            <Text className="text-slate-500 font-bold text-xs">{tasks.filter(t => t.col === 'todo').length}</Text>
                         </View>
                     </View>
                     <View className="bg-slate-100/50 p-2 rounded-2xl flex-1 min-h-[500px]">
@@ -73,7 +73,7 @@ export default function KanbanBoard() {
                             <Text className="font-black text-slate-700 uppercase text-xs">In Progress</Text>
                         </View>
                         <View className="bg-orange-100 px-2 rounded-full">
-                            <Text className="text-orange-600 font-bold text-[10px]">{tasks.filter(t => t.col === 'progress').length}</Text>
+                            <Text className="text-orange-600 font-bold text-xs">{tasks.filter(t => t.col === 'progress').length}</Text>
                         </View>
                     </View>
                     <View className="bg-orange-50/50 p-2 rounded-2xl flex-1 min-h-[500px]">
@@ -89,7 +89,7 @@ export default function KanbanBoard() {
                             <Text className="font-black text-slate-700 uppercase text-xs">Completed</Text>
                         </View>
                         <View className="bg-green-100 px-2 rounded-full">
-                            <Text className="text-green-600 font-bold text-[10px]">{tasks.filter(t => t.col === 'done').length}</Text>
+                            <Text className="text-green-600 font-bold text-xs">{tasks.filter(t => t.col === 'done').length}</Text>
                         </View>
                     </View>
                     <View className="bg-green-50/50 p-2 rounded-2xl flex-1 min-h-[500px]">

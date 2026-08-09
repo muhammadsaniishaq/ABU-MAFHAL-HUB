@@ -15,7 +15,7 @@ export default function MarketingStudio() {
             <View className="flex-1 flex-row">
                 {/* Campaign Builder */}
                 <View className="flex-1 p-6 border-r border-gray-100">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Select Channel</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Select Channel</Text>
                     <View className="flex-row gap-4 mb-8">
                         <TouchableOpacity
                             onPress={() => setCampaignType('push')}
@@ -33,7 +33,7 @@ export default function MarketingStudio() {
                         </TouchableOpacity>
                     </View>
 
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-2">Campaign Details</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-2">Campaign Details</Text>
                     <TextInput
                         placeholder="Campaign Title"
                         value={title}
@@ -89,7 +89,7 @@ export default function MarketingStudio() {
                                     <View className="flex-1">
                                         <View className="flex-row justify-between">
                                             <Text className="font-bold text-xs text-slate-900">Abu Mafhal Sub</Text>
-                                            <Text className="text-[10px] text-slate-500">now</Text>
+                                            <Text className="text-xs text-slate-500">now</Text>
                                         </View>
                                         <Text className="font-bold text-sm text-slate-800 leading-tight">{title || 'Campaign Title'}</Text>
                                         <Text className="text-xs text-slate-600 leading-tight">{message || 'Your message will appear here...'}</Text>

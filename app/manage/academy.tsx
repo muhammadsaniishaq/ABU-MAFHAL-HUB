@@ -28,7 +28,7 @@ export default function AdminAcademy() {
                     <Text className="text-indigo-100 text-xs font-medium">350 / 500 XP to next level</Text>
                 </View>
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Mandatory Training</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Mandatory Training</Text>
 
                 {courses.map((course, i) => (
                     <TouchableOpacity key={i} className="bg-white p-4 rounded-2xl mb-3 border border-gray-100 flex-row items-center">
@@ -45,12 +45,12 @@ export default function AdminAcademy() {
                     </TouchableOpacity>
                 ))}
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4 mt-4">Certifications</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4 mt-4">Certifications</Text>
                 <View className="flex-row gap-4">
                     <View className="w-24 h-32 bg-white rounded-xl border border-gray-200 items-center justify-center relative overflow-hidden">
                         <View className="absolute top-0 w-full h-2 bg-yellow-400" />
                         <Ionicons name="ribbon" size={40} color="#F59E0B" className="mb-2" />
-                        <Text className="font-bold text-slate-700 text-[10px] text-center px-1">Certified Handler</Text>
+                        <Text className="font-bold text-slate-700 text-xs text-center px-1">Certified Handler</Text>
                     </View>
                     <View className="w-24 h-32 bg-gray-100 rounded-xl border border-dashed border-gray-300 items-center justify-center">
                         <Ionicons name="lock-closed" size={24} color="#94A3B8" />

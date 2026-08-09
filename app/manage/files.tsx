@@ -16,7 +16,7 @@ export default function FileManager() {
 
             <View className="p-6 pb-2">
                 <View className="bg-slate-900 rounded-2xl p-6 mb-6">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-2">Storage Usage</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-2">Storage Usage</Text>
                     <Text className="text-white text-3xl font-black mb-1">45.2 GB <Text className="text-lg text-slate-500 font-medium">/ 100 GB</Text></Text>
 
                     <View className="h-2 w-full bg-slate-800 rounded-full mt-4 overflow-hidden flex-row">
@@ -27,15 +27,15 @@ export default function FileManager() {
                     <View className="flex-row gap-4 mt-3">
                         <View className="flex-row items-center gap-1">
                             <View className="w-2 h-2 rounded-full bg-blue-500" />
-                            <Text className="text-slate-400 text-[10px]">Docs</Text>
+                            <Text className="text-slate-400 text-xs">Docs</Text>
                         </View>
                         <View className="flex-row items-center gap-1">
                             <View className="w-2 h-2 rounded-full bg-green-500" />
-                            <Text className="text-slate-400 text-[10px]">Media</Text>
+                            <Text className="text-slate-400 text-xs">Media</Text>
                         </View>
                         <View className="flex-row items-center gap-1">
                             <View className="w-2 h-2 rounded-full bg-orange-500" />
-                            <Text className="text-slate-400 text-[10px]">Other</Text>
+                            <Text className="text-slate-400 text-xs">Other</Text>
                         </View>
                     </View>
                 </View>
@@ -59,7 +59,7 @@ export default function FileManager() {
             </View>
 
             <ScrollView className="flex-1 px-6 pt-4">
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-3">Recent Uploads</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-3">Recent Uploads</Text>
                 {[1, 2, 3, 4, 5].map((_, i) => (
                     <View key={i} className="flex-row items-center justify-between py-3 border-b border-gray-50">
                         <View className="flex-row items-center gap-3">
@@ -68,7 +68,7 @@ export default function FileManager() {
                             </View>
                             <View>
                                 <Text className="font-bold text-slate-700 text-sm">invoice_january_{i + 1}.pdf</Text>
-                                <Text className="text-gray-400 text-[10px]">2.4 MB • Just now</Text>
+                                <Text className="text-gray-400 text-xs">2.4 MB • Just now</Text>
                             </View>
                         </View>
                         <Ionicons name="ellipsis-vertical" size={16} color="#CBD5E1" />

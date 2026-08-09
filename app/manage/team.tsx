@@ -54,7 +54,7 @@ export default function TeamChat() {
             <View className="w-1/4 bg-slate-50 border-r border-gray-100 pt-4">
                 <View className="mb-6 px-4">
                     <Text className="font-black text-slate-800 text-lg">Nexus</Text>
-                    <Text className="text-slate-400 text-[10px] font-bold uppercase">Online: 4</Text>
+                    <Text className="text-slate-400 text-xs font-bold uppercase">Online: 4</Text>
                 </View>
 
                 <View className="gap-1">
@@ -96,7 +96,7 @@ export default function TeamChat() {
                                 <View>
                                     <View className="flex-row items-baseline gap-2">
                                         <Text className="font-bold text-slate-800 text-xs">{m.sender}</Text>
-                                        <Text className="text-gray-300 text-[10px]">{m.time}</Text>
+                                        <Text className="text-gray-300 text-xs">{m.time}</Text>
                                     </View>
                                     <Text className="text-slate-600 text-sm">{m.text}</Text>
                                 </View>

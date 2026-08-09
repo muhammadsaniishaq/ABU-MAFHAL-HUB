@@ -484,7 +484,7 @@ export default function ContentManager() {
                                     <View className="flex-1 mr-2">
                                         <Text className="font-bold text-sm text-[#0D1B3E]" numberOfLines={1}>{b.title || 'Untitled Banner'}</Text>
                                         <Text className="text-xs text-[#2563EB] font-bold mt-0.5">Destinations: {b.placement || 'dashboard'}</Text>
-                                        {b.target_url ? <Text className="text-[10px] text-slate-500 font-mono mt-0.5" numberOfLines={1}>Link: {b.target_url}</Text> : null}
+                                        {b.target_url ? <Text className="text-xs text-slate-500 font-mono mt-0.5" numberOfLines={1}>Link: {b.target_url}</Text> : null}
                                     </View>
                                     <View className="flex-row items-center gap-2">
                                         <TouchableOpacity onPress={() => openEditModal(b)} className="p-2 bg-slate-100 rounded-lg">
@@ -523,7 +523,7 @@ export default function ContentManager() {
                                     <View className="flex-row items-center gap-2">
                                         <TouchableOpacity onPress={() => openEditPartnerModal(p)} className="p-2 bg-slate-100 rounded-lg flex-row items-center gap-1">
                                             <Ionicons name="pencil" size={14} color="#2563EB" />
-                                            <Text className="text-[10px] text-[#2563EB] font-bold">Edit</Text>
+                                            <Text className="text-xs text-[#2563EB] font-bold">Edit</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity onPress={() => deletePartner(p.id)} className="p-2 bg-red-50 rounded-lg">
@@ -546,7 +546,7 @@ export default function ContentManager() {
                                 </View>
                                 <View>
                                     <Text className="font-bold text-base text-[#0D1B3E]">Global Announcement</Text>
-                                    <Text className="text-[10px] text-slate-500 font-medium">Show banner popup to all users on app launch</Text>
+                                    <Text className="text-xs text-slate-500 font-medium">Show banner popup to all users on app launch</Text>
                                 </View>
                             </View>
                             <Switch value={announcementActive} onValueChange={setAnnouncementActive} />
@@ -610,7 +610,7 @@ export default function ContentManager() {
                                 <Ionicons name="information-circle" size={16} color="#d97706" />
                                 <Text className="font-bold text-xs text-amber-800 uppercase tracking-wide">Recommended Sleek Banner Dimensions</Text>
                             </View>
-                            <Text className="text-[11px] text-amber-900 leading-4 font-medium">
+                            <Text className="text-xs text-amber-900 leading-4 font-medium">
                                 • <Text className="font-bold">Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
                                 • <Text className="font-bold">Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
                                 • <Text className="font-bold">Format:</Text> High quality JPG, PNG, or WEBP (Under 2 MB)
@@ -628,7 +628,7 @@ export default function ContentManager() {
                                     />
                                 </View>
                                 <View className="p-3 items-center">
-                                    <Text className="text-amber-400 font-extrabold text-[10px] uppercase tracking-wider">Sleek Cropped Banner Preview (180px Display) ✨</Text>
+                                    <Text className="text-amber-400 font-extrabold text-xs uppercase tracking-wider">Sleek Cropped Banner Preview (180px Display) ✨</Text>
                                     {announcementText ? (
                                         <Text className="text-white font-medium text-xs mt-1 text-center" numberOfLines={2}>
                                             {announcementText}
@@ -659,7 +659,7 @@ export default function ContentManager() {
                                 </View>
                                 <View>
                                     <Text className="font-bold text-base text-[#0D1B3E]">Maintenance Mode</Text>
-                                    <Text className="text-[10px] text-slate-500 font-medium">Lock down the entire app</Text>
+                                    <Text className="text-xs text-slate-500 font-medium">Lock down the entire app</Text>
                                 </View>
                             </View>
                             <Switch value={maintenanceMode} onValueChange={toggleMaintenanceMode} trackColor={{ true: '#EF4444' }} />

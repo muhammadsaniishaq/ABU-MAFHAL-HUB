@@ -70,7 +70,7 @@ export default function AuditLogs() {
                                         <View className={`w-2 h-2 rounded-full ${log.action.toLowerCase().includes('delete') ? 'bg-red-500' : 'bg-green-500'}`} />
                                         <Text className="text-white font-bold">{log.action}</Text>
                                     </View>
-                                    <Text className="text-slate-500 text-[10px] font-mono">
+                                    <Text className="text-slate-500 text-xs font-mono">
                                         {new Date(log.created_at).toLocaleString()}
                                     </Text>
                                 </View>
@@ -82,7 +82,7 @@ export default function AuditLogs() {
 
                                 {log.details && (
                                     <View className="mt-3">
-                                        <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-tighter mb-2">Payload Details</Text>
+                                        <Text className="text-slate-500 text-xs uppercase font-bold tracking-tighter mb-2">Payload Details</Text>
                                         <Text className="text-slate-400 text-xs italic">
                                             {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
                                         </Text>

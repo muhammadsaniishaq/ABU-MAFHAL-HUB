@@ -22,7 +22,7 @@ export default function LocalizationManager() {
             <Stack.Screen options={{ title: 'Global Logic' }} />
 
             <View className="p-6">
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Supported Languages</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Supported Languages</Text>
                 <View className="flex-row gap-4 mb-8">
                     {languages.map(lang => (
                         <View key={lang.code} className="items-center">
@@ -54,18 +54,18 @@ export default function LocalizationManager() {
                 <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
                     {strings.map((str, i) => (
                         <View key={i} className="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                            <Text className="text-slate-400 font-mono text-[10px] mb-2">{str.key}</Text>
+                            <Text className="text-slate-400 font-mono text-xs mb-2">{str.key}</Text>
 
                             <View className="flex-row gap-4 mb-2">
                                 <View className="w-8 items-center justify-center bg-gray-200 rounded">
-                                    <Text className="text-[10px] font-bold text-gray-500">EN</Text>
+                                    <Text className="text-xs font-bold text-gray-500">EN</Text>
                                 </View>
                                 <Text className="font-medium text-slate-800">{str.en}</Text>
                             </View>
 
                             <View className="flex-row gap-4 items-center">
                                 <View className="w-8 items-center justify-center bg-indigo-100 rounded">
-                                    <Text className="text-[10px] font-bold text-indigo-500">HA</Text>
+                                    <Text className="text-xs font-bold text-indigo-500">HA</Text>
                                 </View>
                                 <TextInput
                                     value={str.ha}

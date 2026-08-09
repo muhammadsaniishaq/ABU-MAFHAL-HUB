@@ -307,7 +307,7 @@ export default function SupportTickets() {
                             <Text className="text-lg font-black text-white tracking-tight">Admin Support Desk</Text>
                             <View className="flex-row items-center gap-1.5 mt-0.5">
                                 <View className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">{openCount} Needs Action</Text>
+                                <Text className="text-slate-400 font-bold text-xs uppercase tracking-wider">{openCount} Needs Action</Text>
                             </View>
                         </View>
                     </View>
@@ -321,15 +321,15 @@ export default function SupportTickets() {
                 {/* METRICS ROW */}
                 <View className="flex-row gap-2 mb-3">
                     <View className="flex-1 bg-slate-900/90 border border-slate-800 p-2 rounded-xl items-center">
-                        <Text className="text-slate-400 text-[9px] font-bold uppercase">Total</Text>
+                        <Text className="text-slate-400 text-xs font-bold uppercase">Total</Text>
                         <Text className="text-white font-extrabold text-[13px]">{totalCount}</Text>
                     </View>
                     <View className="flex-1 bg-rose-500/10 border border-rose-500/30 p-2 rounded-xl items-center">
-                        <Text className="text-rose-400 text-[9px] font-bold uppercase">🔴 Open</Text>
+                        <Text className="text-rose-400 text-xs font-bold uppercase">🔴 Open</Text>
                         <Text className="text-rose-400 font-extrabold text-[13px]">{openCount}</Text>
                     </View>
                     <View className="flex-1 bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl items-center">
-                        <Text className="text-emerald-400 text-[9px] font-bold uppercase">🟢 Closed</Text>
+                        <Text className="text-emerald-400 text-xs font-bold uppercase">🟢 Closed</Text>
                         <Text className="text-emerald-400 font-extrabold text-[13px]">{resolvedCount}</Text>
                     </View>
                 </View>
@@ -369,7 +369,7 @@ export default function SupportTickets() {
                                         : 'bg-slate-900 border-slate-800'
                                 }`}
                             >
-                                <Text className={`font-bold text-[10.5px] uppercase ${isActive ? 'text-[#f5a623]' : 'text-slate-400'}`}>
+                                <Text className={`font-bold text-xs uppercase ${isActive ? 'text-[#f5a623]' : 'text-slate-400'}`}>
                                     {filter}
                                 </Text>
                             </TouchableOpacity>
@@ -383,10 +383,10 @@ export default function SupportTickets() {
                     <Text className="text-white font-bold text-[12px]">{selectedIds.length} Selected</Text>
                     <View className="flex-row gap-2">
                         <TouchableOpacity onPress={() => { setSelectMode(false); setSelectedIds([]); }} className="px-2.5 py-1 bg-white/20 rounded-full">
-                            <Text className="text-white text-[11px] font-bold">Cancel</Text>
+                            <Text className="text-white text-xs font-bold">Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={resolveSelectedTickets} className="px-3 py-1 bg-emerald-500 rounded-full">
-                            <Text className="text-white text-[11px] font-bold uppercase">Resolve All</Text>
+                            <Text className="text-white text-xs font-bold uppercase">Resolve All</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -414,7 +414,7 @@ export default function SupportTickets() {
                                 <Ionicons name="file-tray-outline" size={28} color="#f5a623" />
                             </View>
                             <Text className="text-base font-bold text-white">No Support Tickets Found</Text>
-                            <Text className="text-slate-400 mt-1 text-[11px] text-center px-10">
+                            <Text className="text-slate-400 mt-1 text-xs text-center px-10">
                                 {searchQuery ? 'No tickets match your search query.' : 'There are no active tickets matching your filter.'}
                             </Text>
                         </View>
@@ -445,12 +445,12 @@ export default function SupportTickets() {
                                         <Image source={{ uri: item.profiles.avatar_url }} className="w-8 h-8 rounded-full border border-slate-700" />
                                     ) : (
                                         <View className="w-8 h-8 rounded-full bg-slate-800 items-center justify-center border border-slate-700">
-                                            <Text className="font-black text-slate-300 text-[10px]">{getInitials(item.profiles?.full_name || 'Anonym')}</Text>
+                                            <Text className="font-black text-slate-300 text-xs">{getInitials(item.profiles?.full_name || 'Anonym')}</Text>
                                         </View>
                                     )}
                                     <View>
                                         <Text className="font-extrabold text-white text-[13px]">{item.profiles?.full_name || 'Anonymous User'}</Text>
-                                        <Text className="text-[9.5px] font-semibold text-slate-400 mt-0.5">#{item.id.split('-')[0]} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
+                                        <Text className="text-xs font-semibold text-slate-400 mt-0.5">#{item.id.split('-')[0]} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
                                     </View>
                                 </View>
 
@@ -459,7 +459,7 @@ export default function SupportTickets() {
                                     item.priority === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
                                     item.priority === 'medium' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800 border-slate-700'
                                 }`}>
-                                    <Text className={`text-[8px] uppercase font-black tracking-wider ${
+                                    <Text className={`text-xs uppercase font-black tracking-wider ${
                                         item.priority === 'high' ? 'text-rose-400' :
                                         item.priority === 'medium' ? 'text-amber-400' : 'text-slate-400'
                                     }`}>{item.priority}</Text>
@@ -474,7 +474,7 @@ export default function SupportTickets() {
                                     item.status === 'open' ? 'bg-rose-500/10 border-rose-500/30' :
                                     item.status === 'in_progress' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-emerald-500/10 border-emerald-500/30'
                                 }`}>
-                                    <Text className={`text-[8.5px] font-extrabold ${
+                                    <Text className={`text-xs font-extrabold ${
                                         item.status === 'open' ? 'text-rose-400' :
                                         item.status === 'in_progress' ? 'text-blue-400' : 'text-emerald-400'
                                     }`}>
@@ -493,7 +493,7 @@ export default function SupportTickets() {
                                             className="bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 flex-row items-center gap-1"
                                         >
                                             <Ionicons name="checkmark" size={10} color="#34d399" />
-                                            <Text className="text-emerald-400 text-[8.5px] font-black uppercase">Resolve</Text>
+                                            <Text className="text-emerald-400 text-xs font-black uppercase">Resolve</Text>
                                         </TouchableOpacity>
                                     )}
                                     <TouchableOpacity 
@@ -501,7 +501,7 @@ export default function SupportTickets() {
                                         className="bg-[#f5a623] px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shadow-sm"
                                     >
                                         <Ionicons name="chatbubbles" size={10} color="#060d21" />
-                                        <Text className="text-[#060d21] text-[8.5px] font-black uppercase">Reply</Text>
+                                        <Text className="text-[#060d21] text-xs font-black uppercase">Reply</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -533,19 +533,19 @@ export default function SupportTickets() {
                         <View className="flex-1">
                             <Text className="font-extrabold text-[#0d1b3e] text-[15px]">{selectedTicket?.profiles?.full_name || 'Anonymous'}</Text>
                             <View className="flex-row items-center gap-1.5 mt-0.5 flex-wrap">
-                                <Text className="text-slate-500 text-[10px] font-bold">Ticket #{selectedTicket?.id?.split('-')[0]}</Text>
+                                <Text className="text-slate-500 text-xs font-bold">Ticket #{selectedTicket?.id?.split('-')[0]}</Text>
                                 <View className={`px-1.5 py-0.5 rounded-sm ${
                                     selectedTicket?.priority === 'high' ? 'bg-rose-100' :
                                     selectedTicket?.priority === 'medium' ? 'bg-orange-100' : 'bg-slate-100'
                                 }`}>
-                                    <Text className={`text-[8px] font-bold uppercase tracking-wider ${
+                                    <Text className={`text-xs font-bold uppercase tracking-wider ${
                                         selectedTicket?.priority === 'high' ? 'text-rose-600' :
                                         selectedTicket?.priority === 'medium' ? 'text-orange-600' : 'text-slate-500'
                                     }`}>
                                         {selectedTicket?.priority || 'normal'}
                                     </Text>
                                 </View>
-                                <View className="bg-slate-100 px-1.5 py-0.5 rounded-sm"><Text className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">View Profile</Text></View>
+                                <View className="bg-slate-100 px-1.5 py-0.5 rounded-sm"><Text className="text-xs text-slate-500 font-bold uppercase tracking-wider">View Profile</Text></View>
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -554,13 +554,13 @@ export default function SupportTickets() {
                 {/* Status Toggle Buttons */}
                 <View className="flex-row justify-around bg-slate-50 p-1 rounded-lg border border-slate-100">
                     <TouchableOpacity onPress={() => changeTicketStatus('open')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'open' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-[10px] font-black uppercase tracking-wider ${selectedTicket?.status === 'open' ? 'text-rose-600' : 'text-slate-400'}`}>Open</Text>
+                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'open' ? 'text-rose-600' : 'text-slate-400'}`}>Open</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => changeTicketStatus('in_progress')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'in_progress' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-[10px] font-black uppercase tracking-wider ${selectedTicket?.status === 'in_progress' ? 'text-blue-600' : 'text-slate-400'}`}>In Progress</Text>
+                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'in_progress' ? 'text-blue-600' : 'text-slate-400'}`}>In Progress</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => changeTicketStatus('resolved')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'resolved' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-[10px] font-black uppercase tracking-wider ${selectedTicket?.status === 'resolved' ? 'text-emerald-600' : 'text-slate-400'}`}>Resolved</Text>
+                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'resolved' ? 'text-emerald-600' : 'text-slate-400'}`}>Resolved</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -595,7 +595,7 @@ export default function SupportTickets() {
                                 {/* Date Separator */}
                                 <View className="items-center my-5">
                                     <View className="bg-slate-200/50 px-4 py-1.5 rounded-full border border-slate-200">
-                                        <Text className="text-slate-500 text-[10px] font-bold tracking-widest uppercase">{displayDate}</Text>
+                                        <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase">{displayDate}</Text>
                                     </View>
                                 </View>
 
@@ -609,7 +609,7 @@ export default function SupportTickets() {
                                             <View key={m.id} className="w-full my-2 items-center justify-center">
                                                 <View className="bg-slate-200/50 px-4 py-1.5 rounded-full flex-row items-center gap-1.5 border border-slate-200">
                                                     <Ionicons name="information-circle-outline" size={12} color="#64748b" />
-                                                    <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                    <Text className="text-xs text-slate-500 font-bold uppercase tracking-wider">
                                                         {m.profiles?.full_name || 'Admin'} {m.message.replace('[SYSTEM]', '').trim()}
                                                     </Text>
                                                 </View>
@@ -625,13 +625,13 @@ export default function SupportTickets() {
                                                         <Image source={{ uri: m.profiles.avatar_url }} className="w-7 h-7 rounded-full border border-slate-300" />
                                                     ) : (
                                                         <View className="w-7 h-7 rounded-full bg-slate-200 border border-slate-300 items-center justify-center">
-                                                            <Text className="font-bold text-slate-500 text-[9px]">{getInitials(m.profiles?.full_name || selectedTicket?.profiles?.full_name || 'U')}</Text>
+                                                            <Text className="font-bold text-slate-500 text-xs">{getInitials(m.profiles?.full_name || selectedTicket?.profiles?.full_name || 'U')}</Text>
                                                         </View>
                                                     )}
                                                 </TouchableOpacity>
                                             )}
                                             <View className={`max-w-[82%] ${isMe ? 'items-end' : 'items-start'}`}>
-                                                {isMe && <Text className="text-[10px] text-slate-400 mb-1 pr-2 font-medium">{m.profiles?.full_name || 'Admin'}</Text>}
+                                                {isMe && <Text className="text-xs text-slate-400 mb-1 pr-2 font-medium">{m.profiles?.full_name || 'Admin'}</Text>}
                                                 <TouchableOpacity 
                                                     activeOpacity={0.9}
                                                     onLongPress={async () => {
@@ -657,7 +657,7 @@ export default function SupportTickets() {
                                                             </Text>
                                                         )}
                                                         <View className={`flex-row items-center mt-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                            <Text className={`text-[9px] font-medium ${isMe ? (m.message.startsWith('[IMAGE]') ? 'text-gray-500' : 'text-[#d4af37]/60') : 'text-slate-400'}`}>
+                                                            <Text className={`text-xs font-medium ${isMe ? (m.message.startsWith('[IMAGE]') ? 'text-gray-500' : 'text-[#d4af37]/60') : 'text-slate-400'}`}>
                                                                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </Text>
                                                             {isMe && <Ionicons name="checkmark-done" size={12} color="#d4af37" className="ml-1 opacity-70" />}
@@ -671,7 +671,7 @@ export default function SupportTickets() {
                                                         <Image source={{ uri: m.profiles.avatar_url }} className="w-7 h-7 rounded-full border border-[#d4af37]" />
                                                     ) : (
                                                         <View className="w-7 h-7 rounded-full bg-[#0d1b3e] border border-[#d4af37] items-center justify-center">
-                                                            <Text className="font-bold text-[#d4af37] text-[9px]">{getInitials(m.profiles?.full_name || 'A')}</Text>
+                                                            <Text className="font-bold text-[#d4af37] text-xs">{getInitials(m.profiles?.full_name || 'A')}</Text>
                                                         </View>
                                                     )}
                                                 </TouchableOpacity>
@@ -711,7 +711,7 @@ export default function SupportTickets() {
                                     onPress={() => sendMessage(qr)} 
                                     className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full mr-2 shadow-sm"
                                 >
-                                    <Text className="text-[11px] text-slate-300 font-medium">{qr}</Text>
+                                    <Text className="text-xs text-slate-300 font-medium">{qr}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -736,11 +736,11 @@ export default function SupportTickets() {
                                     className="flex-row items-center gap-1 bg-[#f5a623]/20 border border-[#f5a623]/40 px-2 py-0.5 rounded-full active:opacity-80"
                                 >
                                     <Ionicons name="sparkles" size={11} color="#f5a623" />
-                                    <Text className="text-[#f5a623] text-[9.5px] font-black uppercase tracking-wider">AI Draft (English)</Text>
+                                    <Text className="text-[#f5a623] text-xs font-black uppercase tracking-wider">AI Draft (English)</Text>
                                 </TouchableOpacity>
                                 
                                 <View className="flex-row items-center gap-2">
-                                    <Text className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Internal Note</Text>
+                                    <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Internal Note</Text>
                                     <Switch trackColor={{false: '#334155', true: '#f5a623'}} thumbColor="#fff" style={{ transform: [{ scale: 0.6 }] }} />
                                 </View>
                             </View>
@@ -801,7 +801,7 @@ export default function SupportTickets() {
                             
                             {userDetails && (
                                 <View className={`mt-2 px-3 py-1 rounded-full ${userDetails.status === 'active' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                                    <Text className={`text-[10px] uppercase font-black tracking-widest ${userDetails.status === 'active' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <Text className={`text-xs uppercase font-black tracking-widest ${userDetails.status === 'active' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         {userDetails.status}
                                     </Text>
                                 </View>
@@ -814,15 +814,15 @@ export default function SupportTickets() {
                             <ScrollView showsVerticalScrollIndicator={false} className="w-full">
                                 <View className="flex-row justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
                                     <View className="items-center flex-1 border-r border-slate-200">
-                                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Wallet</Text>
+                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Wallet</Text>
                                         <Text className="text-emerald-600 font-black text-sm">₦{userDetails.balance?.toLocaleString() || '0'}</Text>
                                     </View>
                                     <View className="items-center flex-1 border-r border-slate-200">
-                                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">KYC Tier</Text>
+                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">KYC Tier</Text>
                                         <Text className="text-[#0d1b3e] font-black text-sm">Tier {userDetails.kyc_tier || 1}</Text>
                                     </View>
                                     <View className="items-center flex-1">
-                                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Joined</Text>
+                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Joined</Text>
                                         <Text className="text-[#0d1b3e] font-black text-xs mt-0.5">{new Date(userDetails.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</Text>
                                     </View>
                                 </View>
@@ -859,7 +859,7 @@ export default function SupportTickets() {
                                         className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
                                     >
                                         <View className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center mb-2"><Ionicons name="copy-outline" size={16} color="#3b82f6" /></View>
-                                        <Text className="text-slate-600 font-bold text-[10px] uppercase">Copy Email</Text>
+                                        <Text className="text-slate-600 font-bold text-xs uppercase">Copy Email</Text>
                                     </TouchableOpacity>
                                     
                                     <TouchableOpacity 
@@ -870,7 +870,7 @@ export default function SupportTickets() {
                                         className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
                                     >
                                         <View className="w-8 h-8 rounded-full bg-emerald-100 items-center justify-center mb-2"><Ionicons name="call-outline" size={16} color="#10b981" /></View>
-                                        <Text className="text-slate-600 font-bold text-[10px] uppercase">Call User</Text>
+                                        <Text className="text-slate-600 font-bold text-xs uppercase">Call User</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity 
@@ -883,7 +883,7 @@ export default function SupportTickets() {
                                         className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
                                     >
                                         <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center mb-2"><Ionicons name="mail-outline" size={16} color="#6366f1" /></View>
-                                        <Text className="text-slate-600 font-bold text-[10px] uppercase">Send Email</Text>
+                                        <Text className="text-slate-600 font-bold text-xs uppercase">Send Email</Text>
                                     </TouchableOpacity>
                                 </View>
 

@@ -231,16 +231,16 @@ export default function SecretsManager() {
                                         </View>
                                         <View className="flex-col gap-1.5 items-end">
                                             <View className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                                                <Text className="text-slate-600 text-[9px] font-bold uppercase tracking-wider">{item.provider}</Text>
+                                                <Text className="text-slate-600 text-xs font-bold uppercase tracking-wider">{item.provider}</Text>
                                             </View>
                                             {isSaved && !modified && (
                                                 <View className="bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
-                                                    <Text className="text-emerald-600 text-[9px] font-bold uppercase tracking-wider">Configured</Text>
+                                                    <Text className="text-emerald-600 text-xs font-bold uppercase tracking-wider">Configured</Text>
                                                 </View>
                                             )}
                                             {modified && (
                                                 <View className="bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
-                                                    <Text className="text-amber-600 text-[9px] font-bold uppercase tracking-wider">Unsaved</Text>
+                                                    <Text className="text-amber-600 text-xs font-bold uppercase tracking-wider">Unsaved</Text>
                                                 </View>
                                             )}
                                         </View>

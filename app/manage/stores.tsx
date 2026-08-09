@@ -9,7 +9,7 @@ export default function AppStores() {
 
             <View className="p-6">
                 <View className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-8">
-                    <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Current Production Build</Text>
+                    <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Current Production Build</Text>
                     <View className="flex-row justify-between items-end">
                         <View>
                             <Text className="text-4xl font-black text-slate-800">v2.4.1</Text>
@@ -26,14 +26,14 @@ export default function AppStores() {
                     </View>
                 </View>
 
-                <Text className="text-slate-400 font-bold uppercase text-[10px] mb-4">Release Pipeline</Text>
+                <Text className="text-slate-400 font-bold uppercase text-xs mb-4">Release Pipeline</Text>
 
                 {/* Release Card */}
                 <View className="bg-white p-5 rounded-2xl border border-gray-100 mb-4">
                     <View className="flex-row justify-between mb-2">
                         <Text className="font-bold text-lg text-slate-800">v2.5.0 <Text className="text-slate-400 font-normal">(Beta)</Text></Text>
-                        <View className="px-2 py-1 bg-blue-100 rounded text-blue-600 text-[10px] font-bold">
-                            <Text className="text-blue-600 font-bold text-[10px]">IN REVIEW</Text>
+                        <View className="px-2 py-1 bg-blue-100 rounded text-blue-600 text-xs font-bold">
+                            <Text className="text-blue-600 font-bold text-xs">IN REVIEW</Text>
                         </View>
                     </View>
                     <Text className="text-slate-500 text-sm mb-4">Adds Admin Console Phase 10 features and performance improvements.</Text>
@@ -52,8 +52,8 @@ export default function AppStores() {
                 <View className="bg-white p-5 rounded-2xl border border-gray-100 opacity-60">
                     <View className="flex-row justify-between mb-2">
                         <Text className="font-bold text-lg text-slate-800">v2.6.0 <Text className="text-slate-400 font-normal">(Alpha)</Text></Text>
-                        <View className="px-2 py-1 bg-orange-100 rounded text-blue-600 text-[10px] font-bold">
-                            <Text className="text-orange-600 font-bold text-[10px]">DEVELOPMENT</Text>
+                        <View className="px-2 py-1 bg-orange-100 rounded text-blue-600 text-xs font-bold">
+                            <Text className="text-orange-600 font-bold text-xs">DEVELOPMENT</Text>
                         </View>
                     </View>
                     <Text className="text-slate-500 text-sm mb-4">Planned: Biometric authentication upgrade.</Text>

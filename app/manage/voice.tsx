@@ -38,7 +38,7 @@ export default function VoiceOS() {
                 )}
 
                 <View className="mt-16 bg-slate-900/50 p-6 rounded-2xl border border-white/10 w-[90%]">
-                    <Text className="text-slate-500 font-bold uppercase text-[10px] mb-4">Try saying...</Text>
+                    <Text className="text-slate-500 font-bold uppercase text-xs mb-4">Try saying...</Text>
                     <View className="gap-3">
                         <View className="flex-row items-center gap-3">
                             <Ionicons name="chatbubble-ellipses-outline" size={16} color="#94A3B8" />

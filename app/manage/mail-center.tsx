@@ -715,7 +715,7 @@ export default function MailCenterScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start' }}>
                   <Ionicons name="mail" size={12} color="#f5a623" />
-                  <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>DOMAIN: @{DOMAIN}</Text>
+                  <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>DOMAIN: @{DOMAIN}</Text>
                 </View>
 
                 <TouchableOpacity 
@@ -723,11 +723,11 @@ export default function MailCenterScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}
                 >
                   <Ionicons name="globe-outline" size={12} color="#ffffff" />
-                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>Webmail Login 🌐</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>Webmail Login 🌐</Text>
                 </TouchableOpacity>
               </View>
               <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', marginTop: 8 }}>Official App Mailbox</Text>
-              <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>Direct Email Dispatch & In-App Customer Inbox</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>Direct Email Dispatch & In-App Customer Inbox</Text>
             </View>
 
             <TouchableOpacity 
@@ -741,11 +741,11 @@ export default function MailCenterScreen() {
           {/* Quick Stats Bar */}
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
             <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 12 }}>
-              <Text style={{ color: '#94a3b8', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Unread Mails</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Unread Mails</Text>
               <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '900', marginTop: 2 }}>{emails.filter(e => !e.is_read).length}</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 12 }}>
-              <Text style={{ color: '#94a3b8', fontSize: 9, fontWeight: '800', textTransform: 'uppercase' }}>Admin Emails</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Admin Emails</Text>
               <Text style={{ color: '#f5a623', fontSize: 16, fontWeight: '900', marginTop: 2 }}>{corporateAccounts.length || 1}</Text>
             </View>
           </View>
@@ -788,7 +788,7 @@ export default function MailCenterScreen() {
                   style={{ backgroundColor: '#0f172a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                 >
                   <Ionicons name="add-circle-outline" size={14} color="#f5a623" />
-                  <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 11 }}>+ Create Admin Email</Text>
+                  <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 12 }}>+ Create Admin Email</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -798,7 +798,7 @@ export default function MailCenterScreen() {
                 <Ionicons name="at-circle-outline" size={32} color="#cbd5e1" />
                 <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '700', marginTop: 8 }}>No custom domain admin emails created yet.</Text>
                 <TouchableOpacity onPress={() => setCreateAdminMailVisible(true)} style={{ marginTop: 12, backgroundColor: '#f5a623', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}>
-                  <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11 }}>Create First Corporate Email</Text>
+                  <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>Create First Corporate Email</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -810,11 +810,11 @@ export default function MailCenterScreen() {
                     </View>
                     <View>
                       <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 13 }}>{account.display_name}</Text>
-                      <Text style={{ color: '#2563eb', fontWeight: 'bold', fontSize: 11 }}>{account.email}</Text>
+                      <Text style={{ color: '#2563eb', fontWeight: 'bold', fontSize: 12 }}>{account.email}</Text>
                     </View>
                   </View>
                   <View style={{ backgroundColor: account.role === 'super_admin' ? '#fffbeb' : '#eff6ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: account.role === 'super_admin' ? '#fde68a' : '#bfdbfe' }}>
-                    <Text style={{ color: account.role === 'super_admin' ? '#d97706' : '#2563eb', fontWeight: '900', fontSize: 9 }}>{account.role.toUpperCase()}</Text>
+                    <Text style={{ color: account.role === 'super_admin' ? '#d97706' : '#2563eb', fontWeight: '900', fontSize: 12 }}>{account.role.toUpperCase()}</Text>
                   </View>
                 </View>
               ))
@@ -855,12 +855,12 @@ export default function MailCenterScreen() {
                       <Text style={{ color: '#0f172a', fontWeight: mail.is_read ? '700' : '900', fontSize: 13 }} numberOfLines={1}>
                         {activeTab === 'inbox' ? mail.sender_email : `To: ${mail.recipient_email}`}
                       </Text>
-                      <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600' }}>
+                      <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '600' }}>
                         {formatMailTime(mail?.created_at)}
                       </Text>
                     </View>
                     <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 12, marginTop: 2 }} numberOfLines={1}>{mail.subject}</Text>
-                    <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2 }} numberOfLines={2}>{mail.body_text}</Text>
+                    <Text style={{ color: '#64748b', fontSize: 12, marginTop: 2 }} numberOfLines={2}>{mail.body_text}</Text>
                   </View>
                 </TouchableOpacity>
               ))
@@ -887,10 +887,10 @@ export default function MailCenterScreen() {
               <View style={{ flex: 1, marginRight: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 6 }}>
                   <Ionicons name="at-circle" size={14} color="#d97706" />
-                  <Text style={{ color: '#b45309', fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }}>Official Domain Mail @{DOMAIN}</Text>
+                  <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>Official Domain Mail @{DOMAIN}</Text>
                 </View>
                 <Text style={{ color: '#0f172a', fontWeight: '700', fontSize: 17 }}>Create Corporate Admin Email</Text>
-                <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '400', marginTop: 2 }}>Provision official staff email address & credentials.</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '400', marginTop: 2 }}>Provision official staff email address & credentials.</Text>
               </View>
 
               <TouchableOpacity 
@@ -901,7 +901,7 @@ export default function MailCenterScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Email Handle (@{DOMAIN}) *</Text>
+            <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Email Handle (@{DOMAIN}) *</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, marginBottom: 8 }}>
               <TextInput 
                 placeholder="e.g. musa"
@@ -917,7 +917,7 @@ export default function MailCenterScreen() {
             <View style={{ backgroundColor: '#0f172a', padding: 10, borderRadius: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
                 <Ionicons name="mail-open-outline" size={14} color="#f5a623" />
-                <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '400' }}>
+                <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '400' }}>
                   Live Corporate Email: <Text style={{ color: '#f5a623', fontWeight: '700' }}>{(adminUsername.trim() || 'musa').toLowerCase()}@{DOMAIN}</Text>
                 </Text>
               </View>
@@ -934,11 +934,11 @@ export default function MailCenterScreen() {
                 style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <Ionicons name={copiedCorpEmail ? "checkmark" : "copy-outline"} size={12} color="#ffffff" />
-                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '600' }}>{copiedCorpEmail ? "Copied" : "Copy"}</Text>
+                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>{copiedCorpEmail ? "Copied" : "Copy"}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Staff Full Name *</Text>
+            <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Staff Full Name *</Text>
             <TextInput 
               placeholder="e.g. Musa Ibrahim"
               value={adminFullName}
@@ -948,9 +948,9 @@ export default function MailCenterScreen() {
 
             {/* Password Generator & Eye Toggle */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600' }}>Initial Password *</Text>
+              <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600' }}>Initial Password *</Text>
               <TouchableOpacity onPress={generateCorpPassword}>
-                <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 11 }}>🎲 Auto-Generate</Text>
+                <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 12 }}>🎲 Auto-Generate</Text>
               </TouchableOpacity>
             </View>
 
@@ -968,7 +968,7 @@ export default function MailCenterScreen() {
             </View>
 
             {/* Role Cards */}
-            <Text style={{ color: '#475569', fontSize: 11, fontWeight: '600', marginBottom: 6 }}>Corporate Permission Role</Text>
+            <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Corporate Permission Role</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
               <TouchableOpacity
                 onPress={() => setAdminRole('admin')}
@@ -981,7 +981,7 @@ export default function MailCenterScreen() {
                   backgroundColor: adminRole === 'admin' ? '#0f172a' : '#ffffff' 
                 }}
               >
-                <Text style={{ color: adminRole === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 11 }}>Staff Admin 🛡️</Text>
+                <Text style={{ color: adminRole === 'admin' ? '#ffffff' : '#0f172a', fontWeight: '700', fontSize: 12 }}>Staff Admin 🛡️</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -995,7 +995,7 @@ export default function MailCenterScreen() {
                   backgroundColor: adminRole === 'super_admin' ? '#fffbeb' : '#ffffff' 
                 }}
               >
-                <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 11 }}>Super Admin 👑</Text>
+                <Text style={{ color: '#d97706', fontWeight: '700', fontSize: 12 }}>Super Admin 👑</Text>
               </TouchableOpacity>
             </View>
 
@@ -1025,7 +1025,7 @@ export default function MailCenterScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16 }}>Compose Official Email</Text>
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '600' }}>Direct domain email dispatch with AI Assistant</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '600' }}>Direct domain email dispatch with AI Assistant</Text>
               </View>
 
               <TouchableOpacity 
@@ -1033,7 +1033,7 @@ export default function MailCenterScreen() {
                 style={{ backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <Ionicons name="sparkles" size={14} color="#d97706" />
-                <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 11 }}>AI Assist ✨</Text>
+                <Text style={{ color: '#d97706', fontWeight: '900', fontSize: 12 }}>AI Assist ✨</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => setComposeVisible(false)} style={{ marginLeft: 8 }}>
@@ -1047,47 +1047,47 @@ export default function MailCenterScreen() {
                 onPress={() => setComposeMode('edit')}
                 style={{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 10, backgroundColor: composeMode === 'edit' ? '#0f172a' : 'transparent' }}
               >
-                <Text style={{ color: composeMode === 'edit' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 11 }}>✍️ Edit Email</Text>
+                <Text style={{ color: composeMode === 'edit' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 12 }}>✍️ Edit Email</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setComposeMode('preview')}
                 style={{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 10, backgroundColor: composeMode === 'preview' ? '#0f172a' : 'transparent' }}
               >
-                <Text style={{ color: composeMode === 'preview' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 11 }}>👁️ Live Preview</Text>
+                <Text style={{ color: composeMode === 'preview' ? '#ffffff' : '#64748b', fontWeight: '900', fontSize: 12 }}>👁️ Live Preview</Text>
               </TouchableOpacity>
             </View>
 
             {composeMode === 'preview' ? (
               <ScrollView style={{ minHeight: 250, maxHeight: 350, backgroundColor: '#0f172a', borderRadius: 16, padding: 16, marginBottom: 16 }}>
-                <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>LIVE EMAIL HTML PREVIEW</Text>
+                <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>LIVE EMAIL HTML PREVIEW</Text>
                 <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '900', marginBottom: 10 }}>{subjectInput || 'Email Subject Line'}</Text>
                 <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 12, marginBottom: 12 }}>
-                  <Text style={{ color: '#94a3b8', fontSize: 11 }}>From: <Text style={{ color: '#f5a623', fontWeight: 'bold' }}>{senderAccount}</Text></Text>
-                  <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>To: <Text style={{ color: '#ffffff', fontWeight: 'bold' }}>{recipientInput || 'recipient@example.com'}</Text></Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 12 }}>From: <Text style={{ color: '#f5a623', fontWeight: 'bold' }}>{senderAccount}</Text></Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>To: <Text style={{ color: '#ffffff', fontWeight: 'bold' }}>{recipientInput || 'recipient@example.com'}</Text></Text>
                 </View>
                 <Text style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 22 }}>{bodyInput || 'No message content written yet.'}</Text>
 
                 {attachments.length > 0 && (
                   <View style={{ marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
-                    <Text style={{ color: '#f5a623', fontSize: 10, fontWeight: '800', marginBottom: 6 }}>ATTACHMENTS ({attachments.length}):</Text>
+                    <Text style={{ color: '#f5a623', fontSize: 12, fontWeight: '800', marginBottom: 6 }}>ATTACHMENTS ({attachments.length}):</Text>
                     {attachments.map((att, i) => (
-                      <Text key={i} style={{ color: '#cbd5e1', fontSize: 11 }}>📎 {att.name}</Text>
+                      <Text key={i} style={{ color: '#cbd5e1', fontSize: 12 }}>📎 {att.name}</Text>
                     ))}
                   </View>
                 )}
               </ScrollView>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>From (Auto-Assigned Corporate Sender)</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>From (Auto-Assigned Corporate Sender)</Text>
                 <View style={{ backgroundColor: '#0f172a', padding: 12, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#334155', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#f5a623', fontWeight: '900', fontSize: 13 }}>{senderAccount}</Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 9.5, fontWeight: '600', marginTop: 2 }}>🔒 Linked directly from your logged-in Staff Account profile</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 12.5, fontWeight: '600', marginTop: 2 }}>🔒 Linked directly from your logged-in Staff Account profile</Text>
                   </View>
                   <Ionicons name="checkmark-circle" size={18} color="#10b981" />
                 </View>
 
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Recipient Email *</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Recipient Email *</Text>
                 <TextInput 
                   placeholder="user@example.com"
                   value={recipientInput}
@@ -1097,7 +1097,7 @@ export default function MailCenterScreen() {
                   style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 10 }}
                 />
 
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Subject *</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Subject *</Text>
                 <TextInput 
                   placeholder="Important Account Notification"
                   value={subjectInput}
@@ -1105,7 +1105,7 @@ export default function MailCenterScreen() {
                   style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0f172a', fontWeight: '700', fontSize: 13, marginBottom: 10 }}
                 />
 
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Message Body *</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Message Body *</Text>
                 <TextInput 
                   placeholder="Type your official message here or tap AI Assist..."
                   value={bodyInput}
@@ -1116,14 +1116,14 @@ export default function MailCenterScreen() {
                 />
 
                 {/* Attachments Section */}
-                <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Attach Files (PDF / Image / Documents)</Text>
+                <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Attach Files (PDF / Image / Documents)</Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                   <TouchableOpacity 
                     onPress={handlePickDocument}
                     style={{ flex: 1, backgroundColor: '#f0f9ff', borderWidth: 1, borderColor: '#bae6fd', paddingVertical: 8, borderRadius: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 }}
                   >
                     <Ionicons name="document-attach-outline" size={14} color="#0284c7" />
-                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 10 }}>Attach PDF / Doc</Text>
+                    <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 12 }}>Attach PDF / Doc</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
@@ -1131,7 +1131,7 @@ export default function MailCenterScreen() {
                     style={{ flex: 1, backgroundColor: '#fdf4ff', borderWidth: 1, borderColor: '#f5d0fe', paddingVertical: 8, borderRadius: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 }}
                   >
                     <Ionicons name="image-outline" size={14} color="#c026d3" />
-                    <Text style={{ color: '#c026d3', fontWeight: '900', fontSize: 10 }}>Attach Image</Text>
+                    <Text style={{ color: '#c026d3', fontWeight: '900', fontSize: 12 }}>Attach Image</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1141,7 +1141,7 @@ export default function MailCenterScreen() {
                     {attachments.map((file, idx) => (
                       <View key={idx} style={{ backgroundColor: '#0f172a', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Ionicons name="attach" size={12} color="#f5a623" />
-                        <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }} numberOfLines={1}>{file.name}</Text>
+                        <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{file.name}</Text>
                         <TouchableOpacity onPress={() => handleRemoveAttachment(idx)}>
                           <Ionicons name="close-circle" size={14} color="#ef4444" />
                         </TouchableOpacity>
@@ -1182,7 +1182,7 @@ export default function MailCenterScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Quick AI Topic Presets</Text>
+              <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Quick AI Topic Presets</Text>
               <View style={{ gap: 8, marginBottom: 16 }}>
                 {AI_EMAIL_PRESETS.map(preset => (
                   <TouchableOpacity
@@ -1192,14 +1192,14 @@ export default function MailCenterScreen() {
                   >
                     <View style={{ flex: 1, marginRight: 8 }}>
                       <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 12 }}>{preset.title}</Text>
-                      <Text style={{ color: '#d97706', fontSize: 10, marginTop: 2 }} numberOfLines={1}>{preset.subject}</Text>
+                      <Text style={{ color: '#d97706', fontSize: 12, marginTop: 2 }} numberOfLines={1}>{preset.subject}</Text>
                     </View>
                     <Ionicons name="flash-outline" size={14} color="#d97706" />
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Or Custom AI Prompt / Instruction</Text>
+              <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Or Custom AI Prompt / Instruction</Text>
               <TextInput
                 placeholder="e.g. Write an apology for server delay during updates..."
                 value={aiCustomPrompt}
@@ -1230,7 +1230,7 @@ export default function MailCenterScreen() {
           {selectedMail && (
             <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, maxHeight: '80%' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Official App Message</Text>
+                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>Official App Message</Text>
                 <TouchableOpacity onPress={() => setSelectedMail(null)}>
                   <Ionicons name="close" size={22} color="#0f172a" />
                 </TouchableOpacity>
@@ -1239,8 +1239,8 @@ export default function MailCenterScreen() {
               <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 16, marginBottom: 8 }}>{selectedMail.subject}</Text>
 
               <View style={{ backgroundColor: '#f8fafc', padding: 10, borderRadius: 12, marginBottom: 14, borderLeftWidth: 3, borderLeftColor: '#f5a623' }}>
-                <Text style={{ color: '#64748b', fontSize: 11 }}>From: <Text style={{ color: '#0f172a', fontWeight: 'bold' }}>{selectedMail.sender_email}</Text></Text>
-                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>To: <Text style={{ color: '#0f172a', fontWeight: 'bold' }}>{selectedMail.recipient_email}</Text></Text>
+                <Text style={{ color: '#64748b', fontSize: 12 }}>From: <Text style={{ color: '#0f172a', fontWeight: 'bold' }}>{selectedMail.sender_email}</Text></Text>
+                <Text style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>To: <Text style={{ color: '#0f172a', fontWeight: 'bold' }}>{selectedMail.recipient_email}</Text></Text>
               </View>
 
               <ScrollView style={{ minHeight: 120, maxHeight: 300, marginBottom: 16 }}>
