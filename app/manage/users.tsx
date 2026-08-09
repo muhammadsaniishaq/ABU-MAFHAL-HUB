@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, FlatList, Modal, Platform, Linking, Switch, Share, Image, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
@@ -8,7 +8,34 @@ import SecurityModal from '../../components/SecurityModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-// Define User Interface matching our Schema
+// Design Theme Tokens (Embedded CSS)
+const T = {
+    navyDark: '#0A1128',
+    navyMid: '#111D3B',
+    navyCard: '#1A2950',
+    gold: '#D4AF37',
+    goldDark: '#B8952B',
+    goldLight: '#F5E8D0',
+    goldBg: 'rgba(212,175,55,0.12)',
+    bg: '#F8FAFC',
+    card: '#FFFFFF',
+    textMain: '#0F172A',
+    textSub: '#64748B',
+    border: '#E2E8F0',
+    success: '#10B981',
+    successBg: '#ECFDF5',
+    danger: '#EF4444',
+    dangerBg: '#FEF2F2',
+    warning: '#F59E0B',
+    warningBg: '#FFFBEB',
+    info: '#0284C7',
+    infoBg: '#F0F9FF',
+    indigo: '#6366F1',
+    purple: '#9333EA',
+    teal: '#0D9488',
+};
+
+// Define User Interface matching Schema
 interface UserProfile {
     id: string;
     full_name: string;
@@ -74,7 +101,12 @@ export default function UserManagement() {
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const [showSecurity, setShowSecurity] = useState(false);
-    const [pendingAction, setPendingAction] = useState<{ type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards', amount?: number, role?: string, payload?: any } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ 
+        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards', 
+        amount?: number, 
+        role?: string, 
+        payload?: any 
+    } | null>(null);
     
     // Fund/Debit Input
     const [fundAmount, setFundAmount] = useState('');
@@ -242,7 +274,6 @@ export default function UserManagement() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            // Auto-maintenance: Mark users as inactive if they haven't logged in for 7 days
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
             await supabase
                 .from('profiles')
@@ -346,7 +377,6 @@ export default function UserManagement() {
                 const currentBalance = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
                 const newBalance = currentBalance + amount;
                 
-                // Update BOTH balance and credit_balance so main user wallet is credited immediately!
                 const { error } = await supabase.from('profiles').update({ 
                     balance: newBalance,
                     credit_balance: newBalance 
@@ -373,7 +403,7 @@ export default function UserManagement() {
                 const newStatus = selectedUser.status === 'active' ? 'suspended' : 'active';
                 const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', selectedUser.id);
                 if (error) throw error;
-                Alert.alert("Updated", `User is now ${newStatus.toUpperCase()}`);
+                Alert.alert("Updated", `User status is now ${newStatus.toUpperCase()}`);
                 setSelectedUser({ ...selectedUser, status: newStatus });
                 fetchUsers();
             }
@@ -444,64 +474,28 @@ export default function UserManagement() {
                 setShowGenerateAccount(false);
                 setBvnInput('');
                 
-                // Refresh profile to show new account number
                 const { data: updatedProfile } = await supabase.from('profiles').select('account_number').eq('id', selectedUser.id).single();
                 if (updatedProfile) {
                     setSelectedUser({ ...selectedUser, account_number: updatedProfile.account_number });
                 }
             }
-            else if (pendingAction.type === 'notify') {
-                const { error } = await supabase.from('notifications').insert({
-                    user_id: selectedUser.id,
-                    title: 'Admin Message',
-                    body: notifyMessage,
-                    is_read: false
-                });
-                if (error) throw error;
-                Alert.alert("Sent", "Notification sent successfully!");
-                setNotifyMessage('');
-                setShowNotifyInput(false);
-            }
             else if (pendingAction.type === 'delete_user') {
-                const { error } = await supabase.from('profiles').delete().eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Deleted", "User has been permanently deleted!");
+                await handleDeleteUser();
             }
             else if (pendingAction.type === 'reset_tx_pin') {
                 const { error } = await supabase.from('profiles').update({ transaction_pin: null }).eq('id', selectedUser.id);
                 if (error) throw error;
-                Alert.alert("PIN Reset", "User's transaction PIN has been cleared. They will be asked to set a new one.");
+                Alert.alert("Transaction PIN Reset", `Transaction PIN for ${selectedUser.full_name} has been cleared.`);
             }
             else if (pendingAction.type === 'clear_device') {
                 const { error } = await supabase.from('profiles').update({ push_token: null }).eq('id', selectedUser.id);
                 if (error) throw error;
-                Alert.alert("Device Cleared", "The user's registered device has been unlinked.");
-            }
-            else if (pendingAction.type === 'kyc') {
-                const newKycStatus = !selectedUser.kyc_verified;
-                const { error } = await supabase.from('profiles').update({ kyc_verified: newKycStatus }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("KYC Updated", `User is now ${newKycStatus ? 'VERIFIED' : 'UNVERIFIED'}`);
-                setSelectedUser({ ...selectedUser, kyc_verified: newKycStatus });
-            }
-            else if (pendingAction.type === 'set_limit') {
-                const limit = limitInput ? Number(limitInput) : null;
-                const { error } = await supabase.from('profiles').update({ transfer_limit: limit }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Limit Set", limit ? `Transfer limit set to ₦${limit.toLocaleString()}` : "Transfer limit removed");
-                setSelectedUser({ ...selectedUser, transfer_limit: limit || undefined });
-            }
-            else if (pendingAction.type === 'save_notes') {
-                const { error } = await supabase.from('profiles').update({ admin_notes: adminNotes }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Saved", "Admin notes updated.");
-                setSelectedUser({ ...selectedUser, admin_notes: adminNotes });
+                Alert.alert("Device Cleared", `Push token/device unlinked from ${selectedUser.full_name}.`);
             }
             else if (pendingAction.type === 'impersonate') {
                  Alert.alert("Impersonating", `Switching view to ${selectedUser.full_name}... (Simulation)`);
             }
 
-            // Refresh & Close
             fetchUsers();
             if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes'].includes(pendingAction.type)) {
                  if (pendingAction.type === 'edit_profile' && selectedUser) setSelectedUser({ ...selectedUser, ...editForm, kyc_tier: parseInt(editForm.kyc_tier) || 1 });
@@ -526,7 +520,6 @@ export default function UserManagement() {
 
         setCreatingUser(true);
         try {
-            // Call actual Edge Function to create user in Auth & profiles
             const { data, error } = await supabase.functions.invoke('admin-create-user', {
                 body: newUserForm
             });
@@ -534,11 +527,10 @@ export default function UserManagement() {
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
 
-            // Refetch or add real user from response to state
             if (data?.user) {
                 setUsers([data.user, ...users]);
             } else {
-                fetchUsers(); // Fallback if no user object returned
+                fetchUsers();
             }
 
             Alert.alert("User Created", `Successfully created account for ${newUserForm.fullName}. Credentials sent to email.`);
@@ -573,31 +565,23 @@ export default function UserManagement() {
             { text: "Yes", onPress: () => setShowSecurity(true) }
         ]);
     };
-    
-    const initiatePromote = () => {
-         setPendingAction({ type: 'promote' });
-         setShowSecurity(true);
-    };
 
     const initiateResetPin = () => {
         setPendingAction({ type: 'reset_pin' });
-        Alert.alert("Reset Password", `Send password reset instructions to ${selectedUser?.email}?`, [
-            { text: "Cancel", style: "cancel" },
-            { text: "Reset", style: 'destructive', onPress: () => setShowSecurity(true) }
-        ]);
+        setShowSecurity(true);
     };
 
-     const initiateResetTxPin = () => {
+    const initiateResetTxPin = () => {
         setPendingAction({ type: 'reset_tx_pin' });
-        Alert.alert("Reset Transaction PIN", `Are you sure you want to reset the 4-digit Transaction PIN for ${selectedUser?.full_name}?`, [
+        Alert.alert("Reset Tx PIN", `Are you sure you want to reset Transaction PIN for ${selectedUser?.full_name}?`, [
             { text: "Cancel", style: "cancel" },
-            { text: "Reset PIN", onPress: () => setShowSecurity(true) }
+            { text: "Reset", onPress: () => setShowSecurity(true) }
         ]);
     };
 
     const initiateClearDevice = () => {
         setPendingAction({ type: 'clear_device' });
-        Alert.alert("Clear Device", `This will unlink the current device (Push Token) from ${selectedUser?.full_name}'s account. Continue?`, [
+        Alert.alert("Clear Device", `This will unlink current device (Push Token) from ${selectedUser?.full_name}'s account. Continue?`, [
             { text: "Cancel", style: "cancel" },
             { text: "Clear", onPress: () => setShowSecurity(true) }
         ]);
@@ -605,7 +589,7 @@ export default function UserManagement() {
 
     const initiateDelete = () => {
         setPendingAction({ type: 'delete_user' });
-        Alert.alert("Delete User", `Are you sure you want to PERMANENTLY delete ${selectedUser?.full_name}? This action cannot be undone and may fail if the user has transaction history.`, [
+        Alert.alert("Delete User", `Are you sure you want to PERMANENTLY delete ${selectedUser?.full_name}? This action cannot be undone.`, [
             { text: "Cancel", style: "cancel" },
             { text: "Delete", style: 'destructive', onPress: () => setShowSecurity(true) }
         ]);
@@ -716,195 +700,194 @@ Metadata:
         });
     };
 
+    // User Profile Modal Render
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
-            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View className="bg-slate-50 rounded-[30px] h-[92%] w-[95%] overflow-hidden shadow-2xl border border-[#D4AF37]/50">
+            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                <View style={s.modalCard}>
                     
                     {/* Header Controls (Navy) */}
-                    <View className="flex-row justify-between items-center px-4 py-3 bg-[#0A1128] z-20 border-b border-[#D4AF37]/30">
-                        <TouchableOpacity onPress={() => setSelectedUser(null)} className="w-8 h-8 items-center justify-center rounded-full bg-white/10">
+                    <View style={s.modalHeader}>
+                        <TouchableOpacity onPress={() => setSelectedUser(null)} style={s.iconCircleBtn}>
                             <Ionicons name="close" size={18} color="#94A3B8" />
                         </TouchableOpacity>
-                        <Text className="text-white font-bold text-sm tracking-widest uppercase">Profile</Text>
-                        <View className="flex-row gap-2">
-                            <TouchableOpacity onPress={exportProfile} className="w-8 h-8 items-center justify-center rounded-full bg-white/10">
-                                <Ionicons name="share-outline" size={16} color="#D4AF37" />
+                        <Text style={s.modalHeaderTitle}>User Profile</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity onPress={exportProfile} style={s.iconCircleBtn}>
+                                <Ionicons name="share-outline" size={16} color={T.gold} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} className="w-8 h-8 items-center justify-center rounded-full bg-[#D4AF37]/20">
-                                <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={16} color="#D4AF37" />
+                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={[s.iconCircleBtn, { backgroundColor: 'rgba(212,175,55,0.2)' }]}>
+                                <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={16} color={T.gold} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        {/* Profile Identity Bar (Navy Gradient) */}
-                        <LinearGradient colors={['#111D3B', '#0A1128']} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(212,175,55,0.3)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3.84, elevation: 5 }}>
-                            <View className="w-14 h-14 bg-white rounded-full overflow-hidden border-[2px] border-[#D4AF37] items-center justify-center shadow-sm">
+                        {/* Profile Banner */}
+                        <LinearGradient colors={[T.navyMid, T.navyDark]} style={s.modalHeroBanner}>
+                            <View style={s.modalAvatarWrapper}>
                                 {selectedUser?.avatar_url ? (
-                                    <Image source={{ uri: selectedUser.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                                    <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
                                 ) : (
-                                    <Text className="text-2xl font-black text-[#D4AF37]">{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
+                                    <Text style={s.modalAvatarText}>{selectedUser?.full_name?.charAt(0).toUpperCase()}</Text>
                                 )}
                             </View>
-                            <View className="ml-4 flex-1">
-                                <Text className="text-white font-black text-lg tracking-tight" numberOfLines={1}>{selectedUser?.full_name}</Text>
-                                <Text className="text-[#D4AF37] text-xs font-mono font-bold" numberOfLines={1}>{selectedUser?.email}</Text>
-                                <View className="flex-row items-center gap-2 mt-1">
-                                    <View className={`px-2 py-0.5 rounded-full border ${selectedUser?.status === 'active' ? 'bg-emerald-500/20 border-emerald-400' : 'bg-rose-500/20 border-rose-400'}`}>
-                                        <Text className={`text-xs uppercase tracking-widest font-bold ${selectedUser?.status === 'active' ? 'text-emerald-400' : 'text-rose-400'}`}>{selectedUser?.status}</Text>
+                            <View style={{ marginLeft: 14, flex: 1 }}>
+                                <Text style={s.modalUserName} numberOfLines={1}>{selectedUser?.full_name}</Text>
+                                <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                    <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                        <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: '#34D399' } : { color: '#F87171' }]}>{selectedUser?.status}</Text>
                                     </View>
                                     {selectedUser?.kyc_verified && (
-                                        <View className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400 flex-row items-center">
+                                        <View style={s.kycBadge}>
                                             <Ionicons name="shield-checkmark" size={10} color="#60A5FA" />
-                                            <Text className="text-blue-300 text-xs uppercase tracking-widest font-bold ml-1">Verified</Text>
+                                            <Text style={s.kycBadgeText}>Verified</Text>
                                         </View>
                                     )}
                                 </View>
                             </View>
-                            <TouchableOpacity onPress={() => contactUser('call')} className="w-10 h-10 bg-white/10 rounded-full items-center justify-center border border-white/20 mr-2 shadow-sm">
+                            <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
                                 <Ionicons name="call" size={16} color="#E2E8F0" />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => contactUser('whatsapp')} className="w-10 h-10 bg-emerald-500/20 rounded-full items-center justify-center border border-emerald-400 shadow-sm">
-                                <Ionicons name="logo-whatsapp" size={18} color="#10B981" />
+                            <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: 'rgba(16,185,129,0.2)', borderColor: T.success }]}>
+                                <Ionicons name="logo-whatsapp" size={18} color={T.success} />
                             </TouchableOpacity>
                         </LinearGradient>
 
                         {isEditing ? (
-                            <View className="p-4 gap-y-3">
-                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mb-1">Edit Profile Details</Text>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Full Name</Text>
-                                        <TextInput value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                            <View style={{ padding: 16, gap: 12 }}>
+                                <Text style={s.sectionHeading}>Edit Profile Details</Text>
+                                <View style={s.formRow}>
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>Full Name</Text>
+                                        <TextInput value={editForm.full_name} onChangeText={(t) => setEditForm({...editForm, full_name: t})} style={s.formInput} />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Username</Text>
-                                        <TextInput value={editForm.username} onChangeText={(t) => setEditForm({...editForm, username: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
-                                    </View>
-                                </View>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-[1.5]">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Phone</Text>
-                                        <TextInput value={editForm.phone} onChangeText={(t) => setEditForm({...editForm, phone: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="phone-pad" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Gender</Text>
-                                        <TextInput value={editForm.gender} onChangeText={(t) => setEditForm({...editForm, gender: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>Username</Text>
+                                        <TextInput value={editForm.username} onChangeText={(t) => setEditForm({...editForm, username: t})} style={s.formInput} />
                                     </View>
                                 </View>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-[2]">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Address</Text>
-                                        <TextInput value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                                <View style={s.formRow}>
+                                    <View style={[s.formCol, { flex: 1.5 }]}>
+                                        <Text style={s.fieldLabel}>Phone</Text>
+                                        <TextInput value={editForm.phone} onChangeText={(t) => setEditForm({...editForm, phone: t})} style={s.formInput} keyboardType="phone-pad" />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">State</Text>
-                                        <TextInput value={editForm.state} onChangeText={(t) => setEditForm({...editForm, state: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
-                                    </View>
-                                </View>
-                                <View className="flex-row gap-3 mt-2">
-                                    <View className="flex-[1.5]">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Email</Text>
-                                        <TextInput value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="email-address" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">DOB</Text>
-                                        <TextInput placeholder="YYYY-MM-DD" value={editForm.dob} onChangeText={(t) => setEditForm({...editForm, dob: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>Gender</Text>
+                                        <TextInput value={editForm.gender} onChangeText={(t) => setEditForm({...editForm, gender: t})} style={s.formInput} />
                                     </View>
                                 </View>
-                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mt-2 mb-1">Next of Kin</Text>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <TextInput placeholder="Name" value={editForm.next_of_kin_name} onChangeText={(t) => setEditForm({...editForm, next_of_kin_name: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                                <View style={s.formRow}>
+                                    <View style={[s.formCol, { flex: 2 }]}>
+                                        <Text style={s.fieldLabel}>Address</Text>
+                                        <TextInput value={editForm.address} onChangeText={(t) => setEditForm({...editForm, address: t})} style={s.formInput} />
                                     </View>
-                                    <View className="flex-1">
-                                        <TextInput placeholder="Phone" value={editForm.next_of_kin_phone} onChangeText={(t) => setEditForm({...editForm, next_of_kin_phone: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="phone-pad" />
-                                    </View>
-                                </View>
-                                <Text className="text-xs text-[#0A1128] font-black uppercase tracking-widest mt-3 mb-1">Admin Controls (Identity & KYC)</Text>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">BVN</Text>
-                                        <TextInput value={editForm.bvn} onChangeText={(t) => setEditForm({...editForm, bvn: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">NIN</Text>
-                                        <TextInput value={editForm.nin} onChangeText={(t) => setEditForm({...editForm, nin: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>State</Text>
+                                        <TextInput value={editForm.state} onChangeText={(t) => setEditForm({...editForm, state: t})} style={s.formInput} />
                                     </View>
                                 </View>
-                                <View className="flex-row gap-3 mt-1">
-                                    <View className="flex-[1.5]">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">Custom ID</Text>
-                                        <TextInput value={editForm.custom_id} onChangeText={(t) => setEditForm({...editForm, custom_id: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" />
+                                <View style={s.formRow}>
+                                    <View style={[s.formCol, { flex: 1.5 }]}>
+                                        <Text style={s.fieldLabel}>Email</Text>
+                                        <TextInput value={editForm.email} onChangeText={(t) => setEditForm({...editForm, email: t})} style={s.formInput} keyboardType="email-address" />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-xs text-[#0A1128] font-bold uppercase tracking-widest ml-1 mb-1">KYC Tier (1-3)</Text>
-                                        <TextInput value={editForm.kyc_tier} onChangeText={(t) => setEditForm({...editForm, kyc_tier: t})} className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-[#0A1128] text-xs font-medium shadow-sm" keyboardType="numeric" />
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>DOB</Text>
+                                        <TextInput placeholder="YYYY-MM-DD" value={editForm.dob} onChangeText={(t) => setEditForm({...editForm, dob: t})} style={s.formInput} />
                                     </View>
                                 </View>
-                                <TouchableOpacity onPress={saveProfileChanges} className="bg-[#D4AF37] py-3 rounded-xl items-center mt-4 shadow-lg shadow-[#D4AF37]/40 border border-[#b8952b]">
-                                    <Text className="text-[#0A1128] font-black text-xs tracking-widest uppercase">Save Changes</Text>
+                                <Text style={s.sectionHeading}>Next of Kin</Text>
+                                <View style={s.formRow}>
+                                    <View style={s.formCol}>
+                                        <TextInput placeholder="Name" value={editForm.next_of_kin_name} onChangeText={(t) => setEditForm({...editForm, next_of_kin_name: t})} style={s.formInput} />
+                                    </View>
+                                    <View style={s.formCol}>
+                                        <TextInput placeholder="Phone" value={editForm.next_of_kin_phone} onChangeText={(t) => setEditForm({...editForm, next_of_kin_phone: t})} style={s.formInput} keyboardType="phone-pad" />
+                                    </View>
+                                </View>
+                                <Text style={s.sectionHeading}>Admin Controls (Identity & KYC)</Text>
+                                <View style={s.formRow}>
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>BVN</Text>
+                                        <TextInput value={editForm.bvn} onChangeText={(t) => setEditForm({...editForm, bvn: t})} style={s.formInput} keyboardType="numeric" />
+                                    </View>
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>NIN</Text>
+                                        <TextInput value={editForm.nin} onChangeText={(t) => setEditForm({...editForm, nin: t})} style={s.formInput} keyboardType="numeric" />
+                                    </View>
+                                </View>
+                                <View style={s.formRow}>
+                                    <View style={[s.formCol, { flex: 1.5 }]}>
+                                        <Text style={s.fieldLabel}>Custom ID</Text>
+                                        <TextInput value={editForm.custom_id} onChangeText={(t) => setEditForm({...editForm, custom_id: t})} style={s.formInput} />
+                                    </View>
+                                    <View style={s.formCol}>
+                                        <Text style={s.fieldLabel}>KYC Tier (1-3)</Text>
+                                        <TextInput value={editForm.kyc_tier} onChangeText={(t) => setEditForm({...editForm, kyc_tier: t})} style={s.formInput} keyboardType="numeric" />
+                                    </View>
+                                </View>
+                                <TouchableOpacity onPress={saveProfileChanges} style={s.saveBtn}>
+                                    <Text style={s.saveBtnText}>Save Changes</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
-                            <View className="p-4">
-                                {/* Wallet & Metrics Grid */}
-                                <View className="flex-row gap-3 mb-4">
-                                    {/* Main Balance (Navy) */}
-                                    <View className="flex-[1.5] bg-[#0A1128] p-4 rounded-[20px] shadow-sm relative overflow-hidden border border-[#D4AF37]/50">
-                                        <View className="absolute top-0 right-0 w-24 h-24 bg-[#D4AF37]/20 rounded-full blur-2xl -mr-10 -mt-10" />
-                                        <Text className="text-[#D4AF37] font-bold text-xs uppercase tracking-widest mb-1">Wallet Balance</Text>
-                                        <Text className="text-white text-2xl font-black tracking-tight">₦{(selectedUser?.balance || 0).toLocaleString()}</Text>
-                                        <View className="mt-2 bg-white/10 px-2.5 py-1.5 rounded-lg self-start flex-row items-center gap-1 border border-white/5">
-                                            <Ionicons name="card" size={10} color="#E2E8F0" />
-                                            <Text className="text-white font-mono text-xs tracking-widest">{selectedUser?.account_number || 'N/A'}</Text>
+                            <View style={{ padding: 16 }}>
+                                {/* Metrics Cards */}
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                    <View style={s.walletCard}>
+                                        <Text style={s.walletLabel}>Wallet Balance</Text>
+                                        <Text style={s.walletValue}>₦{(selectedUser?.balance || 0).toLocaleString()}</Text>
+                                        <View style={s.accountChip}>
+                                            <Ionicons name="card" size={12} color="#E2E8F0" />
+                                            <Text style={s.accountChipText}>{selectedUser?.account_number || 'N/A'}</Text>
                                         </View>
                                     </View>
 
-                                    {/* AI Insight (Light but with Navy Text) */}
                                     {aiInsight && (
-                                        <View className="flex-1 bg-white p-4 rounded-[20px] border border-slate-200 shadow-sm justify-between">
-                                            <View className="flex-row items-center justify-between mb-1">
-                                                <Text className="text-[#0A1128] font-bold text-xs uppercase tracking-widest">AI Scan</Text>
-                                                <Ionicons name="sparkles" size={12} color="#D4AF37" />
+                                        <View style={s.aiInsightCard}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Text style={s.aiTitle}>AI Scan</Text>
+                                                <Ionicons name="sparkles" size={14} color={T.gold} />
                                             </View>
-                                            <Text className={`text-xs font-black uppercase tracking-tight ${aiInsight.risk === 'High' ? 'text-rose-600' : 'text-emerald-600'}`}>{aiInsight.risk} Risk</Text>
-                                            <Text className="text-[#D4AF37] font-bold text-xs leading-tight mt-1" numberOfLines={2}>{aiInsight.nextAction}</Text>
+                                            <Text style={[s.aiRisk, aiInsight.risk === 'High' ? { color: T.danger } : { color: T.success }]}>{aiInsight.risk} Risk</Text>
+                                            <Text style={s.aiNextAction} numberOfLines={2}>{aiInsight.nextAction}</Text>
                                         </View>
                                     )}
                                 </View>
 
-                                {/* Admin Financial Control (Navy & Gold styling with Presets) */}
-                                <View className="bg-white p-4 rounded-[20px] border border-slate-200 mb-4 shadow-sm">
-                                    <View className="flex-row items-center justify-between mb-3">
-                                        <View className="flex-row items-center gap-2">
+                                {/* Admin Financial Control */}
+                                <View style={s.controlCard}>
+                                    <View style={s.switchRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <Switch 
                                                 value={isDebit} 
                                                 onValueChange={setIsDebit}
-                                                trackColor={{ false: "#34D399", true: "#FB7185" }}
-                                                thumbColor={"#fff"}
-                                                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                                trackColor={{ false: T.success, true: T.danger }}
+                                                thumbColor="#fff"
                                             />
-                                            <Text className={`text-xs font-black uppercase tracking-widest ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}>{isDebit ? 'Debit Wallet' : 'Fund Wallet'}</Text>
+                                            <Text style={[s.switchLabel, isDebit ? { color: T.danger } : { color: T.success }]}>
+                                                {isDebit ? 'Debit Wallet' : 'Fund Wallet'}
+                                            </Text>
                                         </View>
-                                        <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden w-36 h-9">
-                                            <Text className="text-[#0A1128] font-black pl-2 text-xs">₦</Text>
+                                        <View style={s.customAmountInputWrapper}>
+                                            <Text style={s.nairaSymbol}>₦</Text>
                                             <TextInput 
                                                 placeholder="Custom Amt" 
                                                 keyboardType="numeric"
-                                                className="flex-1 text-[#0A1128] font-bold text-xs px-1 text-center"
+                                                style={s.customAmountInput}
                                                 value={fundAmount}
                                                 onChangeText={setFundAmount}
                                             />
                                         </View>
-                                        <TouchableOpacity onPress={initiateFundOrDebit} className={`w-9 h-9 rounded-xl items-center justify-center ${isDebit ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                                        <TouchableOpacity onPress={initiateFundOrDebit} style={[s.actionCheckBtn, isDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success }]}>
                                             <Ionicons name="checkmark-done" size={16} color="white" />
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* Quick Funding Presets */}
-                                    <View className="flex-row gap-1.5 justify-between">
+                                    {/* Presets */}
+                                    <View style={s.presetRow}>
                                         {['5000', '10000', '25000', '50000', '100000'].map(val => (
                                             <TouchableOpacity
                                                 key={val}
@@ -912,22 +895,22 @@ Metadata:
                                                     setFundAmount(val);
                                                     setIsDebit(false);
                                                 }}
-                                                className={`px-2 py-1.5 rounded-lg border items-center justify-center ${fundAmount === val ? 'bg-[#0A1128] border-[#0A1128]' : 'bg-slate-50 border-slate-200'}`}
+                                                style={[s.presetChip, fundAmount === val ? s.presetChipActive : null]}
                                             >
-                                                <Text className={`font-bold text-xs ${fundAmount === val ? 'text-[#D4AF37]' : 'text-slate-700'}`}>+₦{Number(val)/1000}k</Text>
+                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.gold } : null]}>+₦{Number(val)/1000}k</Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
                                 </View>
 
-                                {/* Limits & Notes Grid */}
-                                <View className="flex-row gap-3 mb-4">
-                                    <View className="flex-1 bg-white p-4 rounded-[20px] border border-slate-200 shadow-sm">
-                                        <Text className="text-[#0A1128] font-bold text-xs uppercase tracking-widest mb-2">Daily Limit (₦)</Text>
+                                {/* Limits & Private Notes */}
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                    <View style={s.limitCard}>
+                                        <Text style={s.limitTitle}>Daily Limit (₦)</Text>
                                         <TextInput 
                                             placeholder="No Limit" 
                                             keyboardType="numeric"
-                                            className="font-black text-[#0A1128] text-base bg-slate-50 rounded-xl px-3 py-2 border border-slate-200"
+                                            style={s.limitInput}
                                             value={limitInput}
                                             onChangeText={setLimitInput}
                                             onBlur={() => {
@@ -938,15 +921,15 @@ Metadata:
                                             }}
                                         />
                                     </View>
-                                    <View className="flex-[1.5] bg-amber-50 p-4 rounded-[20px] border border-amber-200 shadow-sm">
-                                        <View className="flex-row items-center justify-between mb-2">
-                                            <Text className="text-amber-800 font-bold text-xs uppercase tracking-widest">Private Notes</Text>
-                                            <Ionicons name="lock-closed" size={10} color="#D97706" />
+                                    <View style={s.notesCard}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={s.notesTitle}>Private Notes</Text>
+                                            <Ionicons name="lock-closed" size={12} color="#D97706" />
                                         </View>
                                         <TextInput 
-                                            placeholder="Add notes..." 
+                                            placeholder="Add private notes..." 
                                             multiline
-                                            className="text-amber-900 text-xs bg-white border border-amber-200 rounded-xl px-3 py-2 min-h-[42px]"
+                                            style={s.notesInput}
                                             value={adminNotes}
                                             onChangeText={setAdminNotes}
                                             onBlur={() => {
@@ -960,154 +943,155 @@ Metadata:
                                 </View>
 
                                 {/* Quick Actions Grid */}
-                                <Text className="text-[#0A1128] font-black text-xs tracking-widest uppercase mb-2 ml-1">Admin & Feature Controls</Text>
-                                <View className="flex-row flex-wrap gap-2 mb-6">
-                                    <TouchableOpacity onPress={initiateBlock} className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${selectedUser?.status === 'active' ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                                        <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={14} color={selectedUser?.status === 'active' ? "#E11D48" : "#10B981"} />
-                                        <Text className={`font-black text-xs uppercase tracking-widest ${selectedUser?.status === 'active' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}</Text>
+                                <Text style={s.sectionHeading}>Admin Controls & Feature Toggles</Text>
+                                <View style={s.actionsGrid}>
+                                    <TouchableOpacity onPress={initiateBlock} style={[s.gridBtn, selectedUser?.status === 'active' ? s.gridBtnDanger : s.gridBtnSuccess]}>
+                                        <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={16} color={selectedUser?.status === 'active' ? T.danger : T.success} />
+                                        <Text style={[s.gridBtnText, selectedUser?.status === 'active' ? { color: T.danger } : { color: T.success }]}>
+                                            {selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}
+                                        </Text>
                                     </TouchableOpacity>
 
-                                    {/* Super Admin / Admin Role Switcher */}
                                     <TouchableOpacity 
                                         onPress={() => {
                                             const newRole = selectedUser?.role === 'super_admin' ? 'admin' : selectedUser?.role === 'admin' ? 'user' : 'super_admin';
                                             setPendingAction({ type: 'promote', role: newRole });
                                             setShowSecurity(true);
                                         }} 
-                                        className="w-[48%] bg-amber-50 border border-amber-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm"
+                                        style={[s.gridBtn, { backgroundColor: T.goldBg, borderColor: T.gold }]}
                                     >
-                                        <MaterialCommunityIcons name="crown-outline" size={14} color="#D97706" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-amber-700">
+                                        <MaterialCommunityIcons name="crown-outline" size={16} color={T.goldDark} />
+                                        <Text style={[s.gridBtnText, { color: T.goldDark }]}>
                                             {selectedUser?.role === 'super_admin' ? 'Super Admin 👑' : selectedUser?.role === 'admin' ? 'Admin 🛡️' : 'Make Admin 👑'}
                                         </Text>
                                     </TouchableOpacity>
 
-                                    {/* Crypto Feature Control */}
                                     <TouchableOpacity 
                                         onPress={() => {
                                             setPendingAction({ type: 'toggle_crypto' });
                                             executeAction();
                                         }} 
-                                        className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.crypto_enabled ?? true) ? 'bg-amber-50 border-amber-300' : 'bg-slate-100 border-slate-300'}`}
+                                        style={[s.gridBtn, (selectedUser?.crypto_enabled ?? true) ? { backgroundColor: T.warningBg, borderColor: T.warning } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
                                     >
-                                        <Ionicons name="logo-bitcoin" size={14} color={(selectedUser?.crypto_enabled ?? true) ? "#D97706" : "#64748B"} />
-                                        <Text className={`font-black text-xs uppercase tracking-widest ${(selectedUser?.crypto_enabled ?? true) ? 'text-amber-800' : 'text-slate-600'}`}>
+                                        <Ionicons name="logo-bitcoin" size={16} color={(selectedUser?.crypto_enabled ?? true) ? T.warning : T.textSub} />
+                                        <Text style={[s.gridBtnText, (selectedUser?.crypto_enabled ?? true) ? { color: '#B45309' } : { color: T.textSub }]}>
                                             Crypto: {(selectedUser?.crypto_enabled ?? true) ? 'ON 🪙' : 'OFF 🚫'}
                                         </Text>
                                     </TouchableOpacity>
 
-                                    {/* Virtual Cards Feature Control */}
                                     <TouchableOpacity 
                                         onPress={() => {
                                             setPendingAction({ type: 'toggle_cards' });
                                             executeAction();
                                         }} 
-                                        className={`w-[48%] py-3 rounded-xl border flex-row justify-center items-center gap-2 shadow-sm ${(selectedUser?.virtual_cards_enabled ?? true) ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-100 border-slate-300'}`}
+                                        style={[s.gridBtn, (selectedUser?.virtual_cards_enabled ?? true) ? { backgroundColor: '#EEF2FF', borderColor: '#818CF8' } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
                                     >
-                                        <Ionicons name="card-outline" size={14} color={(selectedUser?.virtual_cards_enabled ?? true) ? "#4F46E5" : "#64748B"} />
-                                        <Text className={`font-black text-xs uppercase tracking-widest ${(selectedUser?.virtual_cards_enabled ?? true) ? 'text-indigo-800' : 'text-slate-600'}`}>
+                                        <Ionicons name="card-outline" size={16} color={(selectedUser?.virtual_cards_enabled ?? true) ? T.indigo : T.textSub} />
+                                        <Text style={[s.gridBtnText, (selectedUser?.virtual_cards_enabled ?? true) ? { color: '#3730A3' } : { color: T.textSub }]}>
                                             Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON 💳' : 'OFF 🚫'}
                                         </Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiateResetPin} className="w-[48%] bg-white border border-slate-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <MaterialCommunityIcons name="lock-reset" size={14} color="#64748B" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-slate-700">Reset PIN</Text>
+                                    <TouchableOpacity onPress={initiateResetPin} style={s.gridBtn}>
+                                        <MaterialCommunityIcons name="lock-reset" size={16} color={T.textSub} />
+                                        <Text style={s.gridBtnText}>Reset PIN</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} className="w-[48%] bg-purple-50 border border-purple-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <MaterialCommunityIcons name="incognito" size={14} color="#9333EA" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-purple-700">View As</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={toggleKyc} className="w-[48%] bg-sky-50 border border-sky-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name={selectedUser?.kyc_verified ? "checkmark-done-circle" : "shield-checkmark-outline"} size={14} color="#0284C7" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-sky-700">{selectedUser?.kyc_verified ? 'Revoke KYC' : 'Verify KYC'}</Text>
+                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} style={[s.gridBtn, { backgroundColor: '#F3E8FF', borderColor: '#C084FC' }]}>
+                                        <MaterialCommunityIcons name="incognito" size={16} color={T.purple} />
+                                        <Text style={[s.gridBtnText, { color: T.purple }]}>View As</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.id || '', 'User ID')} className="w-[48%] bg-slate-50 border border-slate-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="copy-outline" size={14} color="#475569" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-slate-700">Copy ID</Text>
+                                    <TouchableOpacity onPress={toggleKyc} style={[s.gridBtn, { backgroundColor: T.infoBg, borderColor: T.info }]}>
+                                        <Ionicons name={selectedUser?.kyc_verified ? "checkmark-done-circle" : "shield-checkmark-outline"} size={16} color={T.info} />
+                                        <Text style={[s.gridBtnText, { color: T.info }]}>{selectedUser?.kyc_verified ? 'Revoke KYC' : 'Verify KYC'}</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => setShowNotifyInput(!showNotifyInput)} className="w-[48%] bg-indigo-50 border border-indigo-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#4F46E5" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-indigo-700">Message</Text>
+                                    <TouchableOpacity onPress={() => copyToClipboard(selectedUser?.id || '', 'User ID')} style={s.gridBtn}>
+                                        <Ionicons name="copy-outline" size={16} color={T.textSub} />
+                                        <Text style={s.gridBtnText}>Copy ID</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiateDelete} className="w-[48%] bg-red-50 border border-red-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="trash-outline" size={14} color="#DC2626" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-red-700">Delete</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => setShowGenerateAccount(!showGenerateAccount)} className="w-[48%] bg-teal-50 border border-teal-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="card-outline" size={14} color="#0D9488" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-teal-700">Gen Account</Text>
+                                    <TouchableOpacity onPress={() => setShowNotifyInput(!showNotifyInput)} style={[s.gridBtn, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
+                                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={T.indigo} />
+                                        <Text style={[s.gridBtnText, { color: T.indigo }]}>Message</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiateResetTxPin} className="w-[48%] bg-orange-50 border border-orange-200 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="keypad" size={14} color="#EA580C" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-orange-700">Reset Tx PIN</Text>
+                                    <TouchableOpacity onPress={initiateDelete} style={[s.gridBtn, { backgroundColor: T.dangerBg, borderColor: T.danger }]}>
+                                        <Ionicons name="trash-outline" size={16} color={T.danger} />
+                                        <Text style={[s.gridBtnText, { color: T.danger }]}>Delete</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiateClearDevice} className="w-[48%] bg-gray-50 border border-gray-300 py-3 rounded-xl flex-row justify-center items-center gap-2 shadow-sm">
-                                        <Ionicons name="hardware-chip-outline" size={14} color="#4B5563" />
-                                        <Text className="font-black text-xs uppercase tracking-widest text-gray-700">Unlink Device</Text>
+                                    <TouchableOpacity onPress={() => setShowGenerateAccount(!showGenerateAccount)} style={[s.gridBtn, { backgroundColor: '#F0FDFA', borderColor: T.teal }]}>
+                                        <Ionicons name="card-outline" size={16} color={T.teal} />
+                                        <Text style={[s.gridBtnText, { color: T.teal }]}>Gen Account</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity onPress={initiateResetTxPin} style={[s.gridBtn, { backgroundColor: '#FFF7ED', borderColor: '#F97316' }]}>
+                                        <Ionicons name="keypad" size={16} color="#EA580C" />
+                                        <Text style={[s.gridBtnText, { color: '#C2410C' }]}>Reset Tx PIN</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity onPress={initiateClearDevice} style={s.gridBtn}>
+                                        <Ionicons name="hardware-chip-outline" size={16} color={T.textSub} />
+                                        <Text style={s.gridBtnText}>Unlink Device</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 {showGenerateAccount && (
-                                    <View className="bg-teal-50 p-4 rounded-xl mb-6 border border-teal-200 shadow-sm">
-                                        <Text className="text-teal-800 font-bold text-xs uppercase tracking-widest mb-2">Generate Virtual Account (KYC)</Text>
+                                    <View style={s.subFormCard}>
+                                        <Text style={[s.sectionHeading, { color: T.teal }]}>Generate Virtual Account (KYC)</Text>
                                         <TextInput
-                                            placeholder="Enter BVN/NIN (Optional if already in DB)"
-                                            className="bg-white border border-teal-100 rounded-lg p-3 text-teal-900 text-sm mb-3"
+                                            placeholder="Enter BVN/NIN (Optional if in DB)"
+                                            style={s.subFormInput}
                                             value={bvnInput}
                                             onChangeText={setBvnInput}
                                             keyboardType="numeric"
                                         />
-                                        <TouchableOpacity onPress={() => { setPendingAction({ type: 'generate_account' }); setShowSecurity(true); }} className="bg-[#0D9488] py-2.5 rounded-lg items-center shadow-sm">
-                                            <Text className="text-white font-bold text-xs uppercase tracking-widest">Generate Now</Text>
+                                        <TouchableOpacity onPress={() => { setPendingAction({ type: 'generate_account' }); setShowSecurity(true); }} style={[s.subFormSubmitBtn, { backgroundColor: T.teal }]}>
+                                            <Text style={s.subFormSubmitBtnText}>Generate Now</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
 
                                 {showNotifyInput && (
-                                    <View className="bg-indigo-50 p-4 rounded-xl mb-6 border border-indigo-200 shadow-sm">
-                                        <Text className="text-indigo-800 font-bold text-xs uppercase tracking-widest mb-2">Send Push Notification</Text>
+                                    <View style={[s.subFormCard, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
+                                        <Text style={[s.sectionHeading, { color: T.indigo }]}>Send Push Notification</Text>
                                         <TextInput
                                             placeholder="Type message here..."
                                             multiline
-                                            className="bg-white border border-indigo-100 rounded-lg p-3 text-indigo-900 text-sm mb-3 min-h-[60px]"
+                                            style={[s.subFormInput, { minHeight: 60 }]}
                                             value={notifyMessage}
                                             onChangeText={setNotifyMessage}
                                         />
-                                        <TouchableOpacity onPress={sendNotification} className="bg-[#4F46E5] py-2.5 rounded-lg items-center shadow-sm">
-                                            <Text className="text-white font-bold text-xs uppercase tracking-widest">Send Now</Text>
+                                        <TouchableOpacity onPress={sendNotification} style={[s.subFormSubmitBtn, { backgroundColor: T.indigo }]}>
+                                            <Text style={s.subFormSubmitBtnText}>Send Now</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
 
                                 {/* Compact Transactions */}
-                                <Text className="text-[#0A1128] font-black text-xs tracking-widest uppercase mb-2 ml-1">Recent Transactions</Text>
-                                <View className="bg-white rounded-2xl border border-[#D4AF37]/20 overflow-hidden mb-6 shadow-sm">
+                                <Text style={s.sectionHeading}>Recent Transactions</Text>
+                                <View style={s.txCard}>
                                     {loadingHistory ? (
-                                        <View className="py-6 items-center"><ActivityIndicator color="#D4AF37" size="small" /></View>
+                                        <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
                                     ) : userTransactions.length === 0 ? (
-                                        <View className="p-4 items-center">
-                                            <Text className="text-[#0A1128]/50 text-xs uppercase tracking-widest font-bold">No history</Text>
+                                        <View style={{ padding: 16, alignItems: 'center' }}>
+                                            <Text style={s.noHistoryText}>No transaction history</Text>
                                         </View>
                                     ) : (
                                         userTransactions.slice(0,3).map((tx, i) => (
-                                            <View key={tx.id} className={`flex-row justify-between items-center px-4 py-3 ${i !== Math.min(userTransactions.length, 3) - 1 ? 'border-b border-slate-100' : ''}`}>
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className={`w-6 h-6 rounded-full items-center justify-center ${tx.type === 'topup' ? 'bg-emerald-100' : 'bg-slate-100'}`}>
-                                                        <Ionicons name={tx.type === 'topup' ? 'arrow-down' : 'arrow-up'} size={10} color={tx.type === 'topup' ? '#10B981' : '#64748B'} />
+                                            <View key={tx.id} style={[s.txRow, i !== Math.min(userTransactions.length, 3) - 1 ? { borderBottomWidth: 1, borderBottomColor: T.border } : null]}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                    <View style={[s.txIconWrapper, tx.type === 'topup' ? { backgroundColor: T.successBg } : { backgroundColor: '#F1F5F9' }]}>
+                                                        <Ionicons name={tx.type === 'topup' ? 'arrow-down' : 'arrow-up'} size={12} color={tx.type === 'topup' ? T.success : T.textSub} />
                                                     </View>
                                                     <View>
-                                                        <Text className="font-bold text-[#0A1128] text-xs capitalize">{tx.type || 'Txn'}</Text>
-                                                        <Text className="text-xs text-[#0A1128]/60 font-bold uppercase">{new Date(tx.created_at).toLocaleDateString()}</Text>
+                                                        <Text style={s.txTitle}>{tx.type || 'Txn'}</Text>
+                                                        <Text style={s.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
                                                     </View>
                                                 </View>
-                                                <Text className={`font-black text-xs ${tx.type === 'topup' ? 'text-emerald-500' : 'text-[#0A1128]'}`}>
+                                                <Text style={[s.txAmount, tx.type === 'topup' ? { color: T.success } : { color: T.textMain }]}>
                                                     {tx.type === 'topup' ? '+' : '-'}₦{tx.amount?.toLocaleString()}
                                                 </Text>
                                             </View>
@@ -1122,43 +1106,47 @@ Metadata:
         </Modal>
     );
 
+    // Create User Modal Render
     const renderCreateUserModal = () => (
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
-            <BlurView intensity={90} tint="dark" style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 16 }}>
-                 <View className="bg-[#111D3B] rounded-[36px] overflow-hidden shadow-2xl h-[88%] relative">
-                    <View className="p-6 border-b border-[#D4AF37]/50/5 flex-row justify-between items-center bg-[#1A2950]/50 z-10 relative">
-                        <Text className="text-2xl font-black text-slate-100 tracking-tight">Create User</Text>
-                        <TouchableOpacity onPress={() => setShowCreateUser(false)} className="bg-[#111D3B] w-10 h-10 items-center justify-center rounded-full shadow-sm border border-[#D4AF37]/50/5">
-                            <Ionicons name="close" size={20} color="#64748B" />
+            <BlurView intensity={90} tint="dark" style={s.modalOverlay}>
+                 <View style={s.createUserCard}>
+                    <View style={s.createUserHeader}>
+                        <Text style={s.createUserTitle}>Create User Account</Text>
+                        <TouchableOpacity onPress={() => setShowCreateUser(false)} style={s.iconCircleBtn}>
+                            <Ionicons name="close" size={20} color="#94A3B8" />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        <View className="space-y-5">
+                    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+                        <View style={{ gap: 14 }}>
                             <View>
-                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Full Name</Text>
+                                <Text style={s.fieldLabel}>Full Name</Text>
                                 <TextInput 
-                                    className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
+                                    style={s.createInput}
                                     placeholder="e.g. John Doe"
+                                    placeholderTextColor="#94A3B8"
                                     value={newUserForm.fullName}
                                     onChangeText={t => setNewUserForm({...newUserForm, fullName: t})}
                                 />
                             </View>
                              <View>
-                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</Text>
+                                <Text style={s.fieldLabel}>Username</Text>
                                 <TextInput 
-                                    className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
+                                    style={s.createInput}
                                     placeholder="e.g. johndoe123"
+                                    placeholderTextColor="#94A3B8"
                                     value={newUserForm.username}
                                     onChangeText={t => setNewUserForm({...newUserForm, username: t})}
                                     autoCapitalize="none"
                                 />
                             </View>
                             <View>
-                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</Text>
+                                <Text style={s.fieldLabel}>Email Address</Text>
                                 <TextInput 
-                                    className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
+                                    style={s.createInput}
                                     placeholder="john@example.com"
+                                    placeholderTextColor="#94A3B8"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     value={newUserForm.email}
@@ -1166,31 +1154,34 @@ Metadata:
                                 />
                             </View>
                              <View>
-                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone (Optional)</Text>
+                                <Text style={s.fieldLabel}>Phone (Optional)</Text>
                                 <TextInput 
-                                    className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
+                                    style={s.createInput}
                                     placeholder="+234..."
+                                    placeholderTextColor="#94A3B8"
                                     keyboardType="phone-pad"
                                     value={newUserForm.phone}
                                     onChangeText={t => setNewUserForm({...newUserForm, phone: t})}
                                 />
                             </View>
                             
-                             <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Gender</Text>
+                             <View style={s.formRow}>
+                                <View style={s.formCol}>
+                                    <Text style={s.fieldLabel}>Gender</Text>
                                     <TextInput 
-                                        className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold"
+                                        style={s.createInput}
                                         placeholder="M/F"
+                                        placeholderTextColor="#94A3B8"
                                         value={newUserForm.gender}
                                         onChangeText={t => setNewUserForm({...newUserForm, gender: t})}
                                     />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">DOB</Text>
+                                <View style={s.formCol}>
+                                    <Text style={s.fieldLabel}>DOB</Text>
                                     <TextInput 
-                                        className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold"
+                                        style={s.createInput}
                                         placeholder="YYYY-MM-DD"
+                                        placeholderTextColor="#94A3B8"
                                         value={newUserForm.dob}
                                         onChangeText={t => setNewUserForm({...newUserForm, dob: t})}
                                     />
@@ -1198,38 +1189,38 @@ Metadata:
                             </View>
 
                             <View>
-                                <Text className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Initial Password</Text>
+                                <Text style={s.fieldLabel}>Initial Password</Text>
                                  <TextInput 
-                                    className="bg-[#1A2950] border border-[#D4AF37]/50/10 rounded-[20px] px-5 py-4 text-slate-100 font-bold text-base"
+                                    style={s.createInput}
                                     value={newUserForm.password}
                                     onChangeText={t => setNewUserForm({...newUserForm, password: t})}
                                     secureTextEntry
                                 />
-                                 <Text className="text-xs font-medium text-slate-400 mt-2 ml-2">User should change this on first login.</Text>
+                                 <Text style={s.fieldSubNote}>User can update password after first login.</Text>
                             </View>
                             
-                             <View className="flex-row items-center justify-between mt-4 mb-2 bg-[#1A2950] p-5 rounded-[20px] border border-[#D4AF37]/50/5">
+                             <View style={s.adminRoleSwitchRow}>
                                  <View>
-                                    <Text className="font-bold text-slate-100 text-base">Admin Privileges</Text>
-                                    <Text className="text-xs text-slate-500 mt-1">Grant full dashboard access</Text>
+                                    <Text style={{ fontWeight: '700', color: '#F8FAFC', fontSize: 14 }}>Admin Privileges</Text>
+                                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>Grant full manager dashboard access</Text>
                                  </View>
                                  <Switch 
                                     value={newUserForm.role === 'admin'}
                                     onValueChange={(val) => setNewUserForm({...newUserForm, role: val ? 'admin' : 'user'})}
-                                    trackColor={{ false: "#E2E8F0", true: "#6366F1" }}
-                                    ios_backgroundColor="#E2E8F0"
+                                    trackColor={{ false: "#475569", true: T.indigo }}
+                                    thumbColor="#fff"
                                  />
                             </View>
 
                             <TouchableOpacity 
                                 onPress={handleCreateUser}
                                 disabled={creatingUser}
-                                className={`py-4 rounded-[20px] items-center mt-6 shadow-xl ${creatingUser ? 'bg-indigo-400' : 'bg-[#D4AF37] shadow-[#D4AF37]/20'}`}
+                                style={[s.createUserBtn, creatingUser ? { backgroundColor: '#818CF8' } : null]}
                             >
                                 {creatingUser ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
-                                    <Text className="text-white font-black uppercase tracking-widest text-sm">Create Account</Text>
+                                    <Text style={s.createUserBtnText}>Create Account</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -1240,101 +1231,93 @@ Metadata:
     );
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
 
-            {/* Hyper-Modern Command Center Header */}
-            <View className="z-10 relative pt-16 px-3 pb-2">
-                <LinearGradient colors={['#0A1128', '#111D3B', '#1A2950']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16, borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(212,175,55,0.2)' }}>
-                    {/* Premium Decorative Elements */}
-                    <View className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
-                    <View className="absolute bottom-0 left-0 w-24 h-24 bg-blue-400/10 rounded-full blur-3xl -ml-8 -mb-8 pointer-events-none" />
-                    
-                    {/* Top Bar: Title & Actions */}
-                    <View className="flex-row justify-between items-center mb-3 relative z-10">
+            {/* Header Command Center */}
+            <View style={s.headerContainer}>
+                <LinearGradient colors={[T.navyDark, T.navyMid, T.navyCard]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.headerGradient}>
+                    {/* Top Bar */}
+                    <View style={s.headerTopRow}>
                         {isSelectionMode ? (
-                            <View className="flex-row items-center">
-                                <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="bg-[#111D3B]/10 w-8 h-8 items-center justify-center rounded-full mr-2 border border-[#D4AF37]/50/20">
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} style={s.closeSelectionBtn}>
                                     <Ionicons name="close" size={16} color="white" />
                                 </TouchableOpacity>
-                                <Text className="text-white text-base font-black tracking-tight">{selectedIds.size} Selected</Text>
+                                <Text style={s.selectionText}>{selectedIds.size} Selected</Text>
                             </View>
                         ) : (
                             <View>
-                                <Text className="text-white text-lg font-black tracking-tighter leading-tight">User Manager</Text>
+                                <Text style={s.headerTitle}>User Manager</Text>
                             </View>
                         )}
-                        <View className="flex-row gap-2">
-                            <TouchableOpacity 
-                                onPress={() => setShowCreateUser(true)}
-                                className="w-8 h-8 bg-[#111D3B]/10 backdrop-blur-xl rounded-full items-center justify-center border border-[#D4AF37]/50/20 shadow-sm shadow-black/20"
-                            >
-                                <Ionicons name="person-add" size={14} color="white" />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity onPress={() => setShowCreateUser(true)} style={s.addUserHeaderBtn}>
+                                <Ionicons name="person-add" size={16} color="white" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Compact Mini-Stats Row */}
+                    {/* Stats Row */}
                     {!isSelectionMode && (
-                        <View className="flex-row justify-between mb-2">
-                            <View className="bg-white/5 rounded-lg p-1.5 flex-1 mr-1.5 flex-row items-center border border-white/5">
-                                <View className="w-5 h-5 rounded-full bg-emerald-500/20 items-center justify-center mr-1.5">
-                                    <Ionicons name="wallet" size={10} color="#34D399" />
+                        <View style={s.statsRow}>
+                            <View style={s.statBox}>
+                                <View style={[s.statIcon, { backgroundColor: 'rgba(16,185,129,0.2)' }]}>
+                                    <Ionicons name="wallet" size={12} color={T.success} />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">Vault</Text>
-                                    <Text className="text-white text-xs font-black">₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance}</Text>
+                                    <Text style={s.statLabel}>Vault</Text>
+                                    <Text style={s.statValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
                                 </View>
                             </View>
-                            <View className="bg-white/5 rounded-lg p-1.5 flex-1 mr-1.5 flex-row items-center border border-white/5">
-                                <View className="w-5 h-5 rounded-full bg-blue-500/20 items-center justify-center mr-1.5">
-                                    <Ionicons name="people" size={10} color="#60A5FA" />
+                            <View style={s.statBox}>
+                                <View style={[s.statIcon, { backgroundColor: 'rgba(96,165,250,0.2)' }]}>
+                                    <Ionicons name="people" size={12} color="#60A5FA" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">Users</Text>
-                                    <Text className="text-white text-xs font-black">{stats.activeUsers}</Text>
+                                    <Text style={s.statLabel}>Active</Text>
+                                    <Text style={s.statValue}>{stats.activeUsers}</Text>
                                 </View>
                             </View>
-                            <View className="bg-white/5 rounded-lg p-1.5 flex-1 flex-row items-center border border-white/5">
-                                <View className="w-5 h-5 rounded-full bg-purple-500/20 items-center justify-center mr-1.5">
-                                    <Ionicons name="shield-checkmark" size={10} color="#C084FC" />
+                            <View style={s.statBox}>
+                                <View style={[s.statIcon, { backgroundColor: 'rgba(192,132,252,0.2)' }]}>
+                                    <Ionicons name="shield-checkmark" size={12} color="#C084FC" />
                                 </View>
                                 <View>
-                                    <Text className="text-slate-400 text-xs uppercase tracking-widest font-bold">KYC</Text>
-                                    <Text className="text-white text-xs font-black">{stats.verifiedUsers}</Text>
+                                    <Text style={s.statLabel}>KYC</Text>
+                                    <Text style={s.statValue}>{stats.verifiedUsers}</Text>
                                 </View>
                             </View>
                         </View>
                     )}
 
-                    {/* Search & Filter Row */}
-                    <View className="relative z-10">
-                        <View className="bg-black/20 border border-[#D4AF37]/50/20 py-2 px-4 rounded-full flex-row items-center backdrop-blur-2xl mb-2 shadow-inner">
+                    {/* Search & Filter Bar */}
+                    <View>
+                        <View style={s.searchBar}>
                             <Ionicons name="search" size={16} color="#94A3B8" />
                             <TextInput
                                 placeholder="Search users..."
                                 placeholderTextColor="#64748B"
-                                className="flex-1 ml-2 font-semibold text-slate-200 text-xs py-0"
+                                style={s.searchInput}
                                 value={search}
                                 onChangeText={handleSearch}
                             />
+                            {search.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearch('')}>
+                                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                                </TouchableOpacity>
+                            )}
                         </View>
                         
-                        <View className="flex-row justify-between items-center">
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 mr-2">
+                        <View style={s.filterRow}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, marginRight: 8 }}>
                                 {['all', 'active', 'suspended'].map((status) => (
                                     <TouchableOpacity 
                                         key={status} 
                                         onPress={() => setFilterStatus(status)}
-                                        className={`mr-2 px-3 py-1.5 rounded-full border ${
-                                            filterStatus === status 
-                                            ? 'bg-[#D4AF37] border-[#D4AF37] shadow-sm shadow-[#D4AF37]/30' 
-                                            : 'bg-[#111D3B]/20 border-[#D4AF37]/50/10'
-                                        }`}
+                                        style={[s.filterChip, filterStatus === status ? s.filterChipActive : null]}
                                     >
-                                        <Text className={`text-xs font-black tracking-[0.1em] uppercase ${
-                                            filterStatus === status ? 'text-white' : 'text-slate-400'
-                                        }`}>
+                                        <Text style={[s.filterChipText, filterStatus === status ? { color: T.navyDark } : { color: '#94A3B8' }]}>
                                             {status}
                                         </Text>
                                     </TouchableOpacity>
@@ -1347,10 +1330,10 @@ Metadata:
                                     else if (sortBy === 'balance_high') setSortBy('balance_low');
                                     else setSortBy('newest');
                                 }}
-                                className="bg-[#111D3B]/20 px-3 py-1.5 rounded-full border border-[#D4AF37]/50/10 flex-row items-center backdrop-blur-xl"
+                                style={s.sortBtn}
                             >
-                                <Ionicons name="filter" size={10} color="#CBD5E1" style={{ marginRight: 4 }} />
-                                <Text className="text-white text-xs font-black tracking-widest uppercase">
+                                <Ionicons name="filter" size={12} color="#CBD5E1" style={{ marginRight: 4 }} />
+                                <Text style={s.sortBtnText}>
                                     {sortBy === 'newest' ? 'New' : (sortBy === 'balance_high' ? 'High' : 'Low')}
                                 </Text>
                             </TouchableOpacity>
@@ -1359,22 +1342,22 @@ Metadata:
                 </LinearGradient>
             </View>
 
-            {/* Bulk Action Bar - Sticky Bottom */}
+            {/* Bulk Action Sticky Bar */}
             {isSelectionMode && (
-                <BlurView intensity={90} tint="light" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50, padding: 20, paddingBottom: 40, borderTopWidth: 1, borderTopColor: 'rgba(212,175,55,0.05)', flexDirection: 'row', justifyContent: 'space-around' }}>
-                    <TouchableOpacity onPress={() => executeBulkAction('block')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
-                         <Ionicons name="ban" size={24} color="#E11D48" className="mb-1" />
-                        <Text className="text-xs font-black uppercase tracking-widest text-rose-600 mt-1">Suspend</Text>
+                <View style={s.bulkBar}>
+                    <TouchableOpacity onPress={() => executeBulkAction('block')} style={s.bulkBtn}>
+                         <Ionicons name="ban" size={20} color={T.danger} />
+                        <Text style={[s.bulkBtnText, { color: T.danger }]}>Suspend</Text>
                     </TouchableOpacity>
-                     <TouchableOpacity onPress={() => executeBulkAction('unblock')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
-                         <Ionicons name="checkmark-circle" size={24} color="#059669" className="mb-1" />
-                        <Text className="text-xs font-black uppercase tracking-widest text-emerald-600 mt-1">Activate</Text>
+                     <TouchableOpacity onPress={() => executeBulkAction('unblock')} style={s.bulkBtn}>
+                         <Ionicons name="checkmark-circle" size={20} color={T.success} />
+                        <Text style={[s.bulkBtnText, { color: T.success }]}>Activate</Text>
                     </TouchableOpacity>
-                     <TouchableOpacity onPress={() => executeBulkAction('verify')} className="items-center bg-white py-3 px-6 rounded-2xl shadow-sm border border-slate-100 min-w-[100px]">
-                         <Ionicons name="shield-checkmark" size={24} color="#2563EB" className="mb-1" />
-                        <Text className="text-xs font-black uppercase tracking-widest text-blue-600 mt-1">Verify</Text>
+                     <TouchableOpacity onPress={() => executeBulkAction('verify')} style={s.bulkBtn}>
+                         <Ionicons name="shield-checkmark" size={20} color={T.info} />
+                        <Text style={[s.bulkBtnText, { color: T.info }]}>Verify</Text>
                     </TouchableOpacity>
-                </BlurView>
+                </View>
             )}
 
             {/* User List */}
@@ -1382,128 +1365,113 @@ Metadata:
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ padding: 20, paddingBottom: 150, paddingTop: 10 }}
+                contentContainerStyle={s.listContent}
                 refreshControl={
                     <RefreshControl 
                         refreshing={refreshing} 
                         onRefresh={onRefresh} 
-                        tintColor="#4F46E5" 
-                        colors={['#4F46E5']} 
+                        tintColor={T.gold} 
+                        colors={[T.gold]} 
                     />
                 }
                 renderItem={({ item }) => (
                     <TouchableOpacity 
                         onPress={() => isSelectionMode ? toggleSelection(item.id) : setSelectedUser(item)}
                         onLongPress={() => handleLongPress(item.id)}
-                        className={`p-3 rounded-[20px] mb-2.5 border flex-row items-center overflow-hidden ${
-                            selectedIds.has(item.id) 
-                                ? 'bg-[#D4AF37]/10 border-[#D4AF37]/50' 
-                                : 'bg-white border-slate-200/80'
-                        }`}
-                        style={{ elevation: 2, shadowColor: '#64748b', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10 }}
+                        style={[s.userCard, selectedIds.has(item.id) ? s.userCardSelected : null]}
                     >
-                        {/* Premium Decorative background accents */}
-                        <View className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-[0.04] ${item.role === 'admin' ? 'bg-amber-500' : 'bg-[#D4AF37]'}`} />
-                        <View className={`absolute -bottom-8 -left-8 w-24 h-24 rounded-full opacity-[0.06] blur-xl ${item.role === 'admin' ? 'bg-amber-400' : 'bg-blue-400'}`} />
-                        <View className="absolute top-2 left-1/2 w-20 h-20 rounded-full opacity-[0.02] bg-indigo-500 blur-2xl" />
-
-
                         {isSelectionMode && (
-                            <View className={`w-5 h-5 rounded-full border mr-3 items-center justify-center shadow-sm ${selectedIds.has(item.id) ? 'bg-[#D4AF37] border-indigo-600' : 'border-slate-300 bg-slate-50'}`}>
+                            <View style={[s.checkBox, selectedIds.has(item.id) ? s.checkBoxActive : null]}>
                                 {selectedIds.has(item.id) && <Ionicons name="checkmark" size={12} color="white" />}
                             </View>
                         )}
 
-                        <View className="flex-row items-center gap-3 flex-1 relative z-10">
-                            <View className={`w-10 h-10 rounded-full items-center justify-center border-2 overflow-hidden shadow-sm ${
-                                item.role === 'admin' ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'
-                            }`}>
+                        <View style={s.userCardContent}>
+                            <View style={[s.avatar, item.role === 'admin' ? s.avatarAdmin : null]}>
                                 {item.avatar_url ? (
-                                    <Image source={{ uri: item.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                                    <Image source={{ uri: item.avatar_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                                 ) : (
-                                    <Text className={`font-black text-base ${
-                                        item.role === 'admin' ? 'text-amber-600' : 'text-slate-600'
-                                    }`}>
+                                    <Text style={[s.avatarText, item.role === 'admin' ? { color: T.goldDark } : null]}>
                                         {item.full_name?.charAt(0).toUpperCase() || 'U'}
                                     </Text>
                                 )}
                             </View>
-                            <View className="flex-1">
-                                <Text className="font-bold text-slate-800 text-sm mb-0.5 tracking-tight" numberOfLines={1}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.userName} numberOfLines={1}>
                                     {item.full_name || 'Unknown User'}
                                 </Text>
-                                <View className="flex-row items-center gap-2 mb-1.5">
-                                    <Text className="text-xs text-slate-500 font-mono tracking-widest opacity-80">
+                                <View style={s.userSubRow}>
+                                    <Text style={s.accountNumber}>
                                         {item.account_number || 'No Account'}
                                     </Text>
                                     {(item.phone || item.email) && (
-                                        <View className="flex-row items-center gap-1 opacity-60">
-                                            <View className="w-1 h-1 rounded-full bg-slate-300" />
-                                            <Ionicons name={item.phone ? "call" : "mail"} size={8} color="#64748b" />
-                                            <Text className="text-xs text-slate-500 font-medium" numberOfLines={1}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <View style={s.dotDivider} />
+                                            <Ionicons name={item.phone ? "call" : "mail"} size={10} color={T.textSub} />
+                                            <Text style={s.contactInfo} numberOfLines={1}>
                                                 {item.phone || item.email}
                                             </Text>
                                         </View>
                                     )}
                                 </View>
-                                <View className="flex-row items-center gap-1.5 flex-wrap">
-                                    <View className={`px-2 py-0.5 rounded-md ${item.status === 'active' ? 'bg-emerald-100/70' : 'bg-rose-100/70'}`}>
-                                         <Text className={`text-xs font-black tracking-widest uppercase ${item.status === 'active' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                <View style={s.badgesRow}>
+                                    <View style={[s.badge, item.status === 'active' ? s.badgeSuccess : s.badgeDanger]}>
+                                         <Text style={[s.badgeText, item.status === 'active' ? { color: '#047857' } : { color: '#B91C1C' }]}>
                                             {item.status}
                                          </Text>
                                     </View>
                                     {item.role === 'admin' && (
-                                        <View className="bg-amber-100/70 px-2 py-0.5 rounded-md">
-                                            <Text className="text-xs font-black tracking-widest text-amber-700 uppercase">ADMIN</Text>
+                                        <View style={[s.badge, s.badgeGold]}>
+                                            <Text style={[s.badgeText, { color: '#B45309' }]}>ADMIN</Text>
                                         </View>
                                     )}
                                     {item.corporate_email && (
-                                        <View className="bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md flex-row items-center gap-1">
-                                            <Ionicons name="at-circle" size={9} color="#D97706" />
-                                            <Text className="text-xs font-black tracking-tight text-amber-700">{item.corporate_email}</Text>
+                                        <View style={[s.badge, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
+                                            <Ionicons name="at-circle" size={10} color="#D97706" />
+                                            <Text style={[s.badgeText, { color: '#B45309', marginLeft: 2 }]}>{item.corporate_email}</Text>
                                         </View>
                                     )}
                                     {item.kyc_verified && (
-                                        <View className="bg-blue-100/70 px-1 py-0.5 rounded-md flex-row items-center">
-                                            <Ionicons name="shield-checkmark" size={8} color="#2563EB" />
+                                        <View style={[s.badge, s.badgeInfo]}>
+                                            <Ionicons name="shield-checkmark" size={10} color={T.info} />
                                         </View>
                                     )}
                                 </View>
                             </View>
                         </View>
-                        <View className="items-center flex-row pl-2 relative z-10">
-                            <View className="items-end mr-2">
-                                <Text className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mb-0.5">Vault Bal</Text>
-                                <Text className="font-black text-slate-800 text-base tracking-tighter">₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
+                        
+                        <View style={s.userCardRight}>
+                            <View style={{ alignItems: 'flex-end', marginRight: 6 }}>
+                                <Text style={s.balLabel}>Vault Bal</Text>
+                                <Text style={s.balAmount}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
                             </View>
-                            <TouchableOpacity className="w-7 h-7 items-center justify-center rounded-full bg-slate-100/50">
+                            <View style={s.chevronCircle}>
                                 <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                            </TouchableOpacity>
+                            </View>
                         </View>
                     </TouchableOpacity>
                 )}
                 ListEmptyComponent={
-                    <View className="items-center justify-center mt-8">
+                    <View style={s.emptyWrapper}>
                         {loading ? (
-                            <View className="w-full px-2">
+                            <View style={{ paddingHorizontal: 8 }}>
                                 {[1, 2, 3, 4, 5].map(i => (
-                                    <View key={i} className="mb-4 bg-white p-5 rounded-[28px] border border-slate-100 flex-row items-center animate-pulse opacity-60">
-                                        <View className="w-14 h-14 bg-slate-200 rounded-[20px] mr-4" />
-                                        <View className="flex-1 space-y-3">
-                                            <View className="h-4 bg-slate-200 rounded-full w-3/4" />
-                                            <View className="h-3 bg-slate-200 rounded-full w-1/3" />
+                                    <View key={i} style={s.skeletonRow}>
+                                        <View style={s.skeletonAvatar} />
+                                        <View style={{ flex: 1, gap: 6 }}>
+                                            <View style={s.skeletonTextLine1} />
+                                            <View style={s.skeletonTextLine2} />
                                         </View>
-                                        <View className="w-20 h-6 bg-slate-200 rounded-full" />
                                     </View>
                                 ))}
                             </View>
                         ) : (
-                            <View className="items-center mt-12 bg-[#111D3B] p-10 rounded-[40px] border border-[#D4AF37]/50/5 shadow-sm w-full">
-                                <View className="w-20 h-20 bg-[#1A2950] rounded-full items-center justify-center mb-4">
+                            <View style={s.emptyCard}>
+                                <View style={s.emptyIconCircle}>
                                     <Ionicons name="people-outline" size={40} color="#94A3B8" />
                                 </View>
-                                <Text className="text-slate-100 font-bold text-lg mb-1">No Users Found</Text>
-                                <Text className="text-slate-400 text-center text-sm px-4">Try adjusting your filters or searching with different terms.</Text>
+                                <Text style={s.emptyTitle}>No Users Found</Text>
+                                <Text style={s.emptySubText}>Try adjusting your filters or searching with different terms.</Text>
                             </View>
                         )}
                     </View>
@@ -1514,7 +1482,7 @@ Metadata:
             {renderUserModal()}
             {renderCreateUserModal()}
 
-            {/* Security Check for Sensitive Actions */}
+            {/* Security Check Modal */}
             <SecurityModal 
                 visible={showSecurity}
                 onClose={() => setShowSecurity(false)}
@@ -1528,11 +1496,945 @@ Metadata:
     );
 }
 
-const DetailRow = ({ label, value, capitalize }: { label: string, value?: string, capitalize?: boolean }) => (
-    <View className="flex-row justify-between py-3 border-b border-slate-50">
-        <Text className="text-slate-500 font-medium text-[13px]">{label}</Text>
-        <Text className={`text-slate-100 font-bold text-right text-[13px] ${capitalize ? 'capitalize' : ''} flex-1 ml-4`}>
-            {value || 'N/A'}
-        </Text>
-    </View>
-);
+// Embedded StyleSheet (CSS for Manager Users Screen)
+const s = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: T.bg,
+    },
+    headerContainer: {
+        paddingTop: Platform.OS === 'ios' ? 50 : 20,
+        paddingHorizontal: 12,
+        paddingBottom: 8,
+    },
+    headerGradient: {
+        paddingVertical: 18,
+        paddingHorizontal: 16,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.3)',
+    },
+    headerTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    headerTitle: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+        letterSpacing: -0.5,
+    },
+    closeSelectionBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+    selectionText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    addUserHeaderBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(212,175,55,0.25)',
+        borderWidth: 1,
+        borderColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        gap: 6,
+    },
+    statBox: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        padding: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    statIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 6,
+    },
+    statLabel: {
+        color: '#94A3B8',
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    statValue: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    searchBar: {
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 40,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.2)',
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: 8,
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    filterChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        marginRight: 6,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    filterChipActive: {
+        backgroundColor: T.gold,
+        borderColor: T.goldDark,
+    },
+    filterChipText: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    sortBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    sortBtnText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    bulkBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 10,
+    },
+    bulkBtn: {
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        minWidth: 90,
+    },
+    bulkBtnText: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        marginTop: 4,
+    },
+    listContent: {
+        paddingHorizontal: 14,
+        paddingTop: 8,
+        paddingBottom: 140,
+    },
+    userCard: {
+        backgroundColor: T.card,
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#64748b',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    userCardSelected: {
+        backgroundColor: T.goldBg,
+        borderColor: T.gold,
+    },
+    checkBox: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: T.textSub,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    checkBoxActive: {
+        backgroundColor: T.gold,
+        borderColor: T.goldDark,
+    },
+    userCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 12,
+    },
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1.5,
+        borderColor: T.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    avatarAdmin: {
+        backgroundColor: T.goldBg,
+        borderColor: T.gold,
+    },
+    avatarText: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: T.textMain,
+    },
+    userName: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: T.textMain,
+        marginBottom: 2,
+    },
+    userSubRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 4,
+    },
+    accountNumber: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: T.textSub,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    dotDivider: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: T.textSub,
+    },
+    contactInfo: {
+        fontSize: 11,
+        color: T.textSub,
+        fontWeight: '500',
+    },
+    badgesRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        flexWrap: 'wrap',
+    },
+    badge: {
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    badgeSuccess: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+    },
+    badgeDanger: {
+        backgroundColor: '#FEF2F2',
+        borderColor: '#FECACA',
+    },
+    badgeGold: {
+        backgroundColor: T.goldBg,
+        borderColor: T.gold,
+    },
+    badgeInfo: {
+        backgroundColor: '#F0F9FF',
+        borderColor: '#BAE6FD',
+    },
+    badgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    userCardRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 8,
+    },
+    balLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: T.textSub,
+        textTransform: 'uppercase',
+    },
+    balAmount: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: T.navyMid,
+    },
+    chevronCircle: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyWrapper: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 20,
+    },
+    skeletonRow: {
+        marginBottom: 12,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    skeletonAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#E2E8F0',
+        marginRight: 12,
+    },
+    skeletonTextLine1: {
+        height: 14,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 7,
+        width: '60%',
+    },
+    skeletonTextLine2: {
+        height: 10,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 5,
+        width: '40%',
+    },
+    emptyCard: {
+        alignItems: 'center',
+        backgroundColor: T.navyMid,
+        padding: 30,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: T.gold,
+        width: '100%',
+    },
+    emptyIconCircle: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: T.navyDark,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    emptyTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+    emptySubText: {
+        color: '#94A3B8',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+    // Modals
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 12,
+    },
+    modalCard: {
+        backgroundColor: T.bg,
+        borderRadius: 24,
+        height: '92%',
+        width: '98%',
+        maxWidth: 500,
+        overflow: 'hidden',
+        borderWidth: 1.5,
+        borderColor: T.gold,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: T.navyDark,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(212,175,55,0.3)',
+    },
+    modalHeaderTitle: {
+        color: '#FFFFFF',
+        fontWeight: '800',
+        fontSize: 14,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    iconCircleBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalHeroBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(212,175,55,0.3)',
+    },
+    modalAvatarWrapper: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 2,
+        borderColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    modalAvatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    modalAvatarText: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: T.goldDark,
+    },
+    modalUserName: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    modalUserEmail: {
+        color: T.gold,
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    statusBadgeActive: {
+        backgroundColor: 'rgba(16,185,129,0.2)',
+        borderColor: T.success,
+    },
+    statusBadgeSuspended: {
+        backgroundColor: 'rgba(239,68,68,0.2)',
+        borderColor: T.danger,
+    },
+    statusBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    kycBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+        backgroundColor: 'rgba(96,165,250,0.2)',
+        borderColor: '#60A5FA',
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    kycBadgeText: {
+        color: '#93C5FD',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        marginLeft: 4,
+    },
+    contactBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 4,
+    },
+    sectionHeading: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: T.navyMid,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 8,
+        marginTop: 6,
+    },
+    formRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    formCol: {
+        flex: 1,
+    },
+    fieldLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: T.navyMid,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    formInput: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 38,
+        fontSize: 13,
+        fontWeight: '600',
+        color: T.textMain,
+    },
+    saveBtn: {
+        backgroundColor: T.gold,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: T.goldDark,
+    },
+    saveBtnText: {
+        color: T.navyDark,
+        fontWeight: '900',
+        fontSize: 13,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    walletCard: {
+        flex: 1.5,
+        backgroundColor: T.navyDark,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.gold,
+        position: 'relative',
+    },
+    walletLabel: {
+        color: T.gold,
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    walletValue: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '900',
+    },
+    accountChip: {
+        marginTop: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    accountChipText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    aiInsightCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        justifyContent: 'space-between',
+    },
+    aiTitle: {
+        color: T.navyMid,
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    aiRisk: {
+        fontSize: 12,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        marginVertical: 2,
+    },
+    aiNextAction: {
+        color: T.goldDark,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    controlCard: {
+        backgroundColor: '#FFFFFF',
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        marginBottom: 12,
+    },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    switchLabel: {
+        fontSize: 12,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    customAmountInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        width: 140,
+        height: 36,
+        paddingHorizontal: 8,
+    },
+    nairaSymbol: {
+        fontWeight: '900',
+        color: T.navyMid,
+        fontSize: 13,
+    },
+    customAmountInput: {
+        flex: 1,
+        color: T.navyMid,
+        fontWeight: '700',
+        fontSize: 13,
+        textAlign: 'center',
+    },
+    actionCheckBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    presetRow: {
+        flexDirection: 'row',
+        gap: 6,
+        justifyContent: 'space-between',
+    },
+    presetChip: {
+        flex: 1,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+    },
+    presetChipActive: {
+        backgroundColor: T.navyMid,
+        borderColor: T.navyDark,
+    },
+    presetChipText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.textMain,
+    },
+    limitCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    limitTitle: {
+        color: T.navyMid,
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    limitInput: {
+        fontWeight: '900',
+        fontSize: 16,
+        color: T.navyDark,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        height: 38,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    notesCard: {
+        flex: 1.5,
+        backgroundColor: '#FFFBEB',
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    notesTitle: {
+        color: '#92400E',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    notesInput: {
+        fontSize: 12,
+        color: '#78350F',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#FCD34D',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        minHeight: 42,
+    },
+    actionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 16,
+    },
+    gridBtn: {
+        width: '48%',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: '#FFFFFF',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    gridBtnDanger: {
+        backgroundColor: T.dangerBg,
+        borderColor: '#FECACA',
+    },
+    gridBtnSuccess: {
+        backgroundColor: T.successBg,
+        borderColor: '#A7F3D0',
+    },
+    gridBtnText: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        color: T.textMain,
+    },
+    subFormCard: {
+        backgroundColor: '#F0FDFA',
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#99F6E4',
+        marginBottom: 16,
+    },
+    subFormInput: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: T.textMain,
+        marginBottom: 10,
+    },
+    subFormSubmitBtn: {
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    subFormSubmitBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    txCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: T.border,
+        overflow: 'hidden',
+        marginBottom: 16,
+    },
+    noHistoryText: {
+        color: T.textSub,
+        fontSize: 12,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    txRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    txIconWrapper: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    txTitle: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.textMain,
+        textTransform: 'capitalize',
+    },
+    txDate: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: T.textSub,
+    },
+    txAmount: {
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    // Create User Modal
+    createUserCard: {
+        backgroundColor: T.navyMid,
+        borderRadius: 24,
+        height: '88%',
+        width: '96%',
+        maxWidth: 480,
+        overflow: 'hidden',
+        borderWidth: 1.5,
+        borderColor: T.gold,
+    },
+    createUserHeader: {
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        backgroundColor: T.navyDark,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(212,175,55,0.3)',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    createUserTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    createInput: {
+        backgroundColor: T.navyCard,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.2)',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    fieldSubNote: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 4,
+        marginLeft: 4,
+    },
+    adminRoleSwitchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: T.navyCard,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.2)',
+        marginTop: 6,
+    },
+    createUserBtn: {
+        backgroundColor: T.gold,
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: T.goldDark,
+    },
+    createUserBtnText: {
+        color: T.navyDark,
+        fontSize: 14,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+});
