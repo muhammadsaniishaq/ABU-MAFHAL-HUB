@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, ActivityIndicator, 
     Alert, Modal, TextInput, StyleSheet, useWindowDimensions, Platform, Switch 
@@ -123,8 +123,11 @@ export default function LiquidityVaultScreen() {
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [copiedText, setCopiedText] = useState(false);
 
+    const hasLoadedAlertConfig = useRef(false);
+
     useEffect(() => {
-        if (vaultSecrets) {
+        if (vaultSecrets && !hasLoadedAlertConfig.current) {
+            hasLoadedAlertConfig.current = true;
             if (vaultSecrets['LOW_BALANCE_ALERT_EMAIL']) setAlertEmail(vaultSecrets['LOW_BALANCE_ALERT_EMAIL']);
             if (vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']) setAlertThreshold(vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']);
             if (vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']) setAlertIntervalMins(vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']);
@@ -148,6 +151,43 @@ export default function LiquidityVaultScreen() {
             }
         }
     }, [vaultSecrets]);
+
+    const handleToggleAlertSwitch = async (newValue: boolean) => {
+        setAlertEnabled(newValue);
+        const strVal = newValue ? 'true' : 'false';
+        try {
+            await supabase.from('system_secrets').upsert({
+                key: 'LOW_BALANCE_ALERT_ENABLED',
+                value: strVal,
+                description: 'Enable Auto Low Balance Email Alerts',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            await supabase.from('app_settings').upsert({
+                key: 'LOW_BALANCE_ALERT_ENABLED',
+                value: strVal,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            setVaultSecrets(prev => ({ ...prev, 'LOW_BALANCE_ALERT_ENABLED': strVal }));
+
+            if (newValue) {
+                if (alertEmail.trim()) {
+                    supabase.functions.invoke('check-provider-balances', {
+                        body: { triggerAlertCheck: true, force: true }
+                    });
+                    Alert.alert("Alerts Enabled ⚡", `Automated low float alerts are active for ${alertEmail.trim()}.`);
+                } else {
+                    Alert.alert("Alerts Enabled ⚡", "Please enter your notification email address below and click Save.");
+                    setShowAlertCard(true);
+                }
+            } else {
+                Alert.alert("Alerts Disabled 🔕", "Automated low balance email & SMS notifications have been turned OFF.");
+            }
+        } catch (e: any) {
+            Alert.alert("Error", "Failed to update alert toggle state.");
+        }
+    };
 
     const handleSaveAlertSettings = async () => {
         if (alertEnabled && !alertEmail.trim()) {
@@ -213,7 +253,7 @@ export default function LiquidityVaultScreen() {
                 );
             }
             setShowAlertCard(false);
-            fetchProviderBalances();
+            fetchProviderBalances(true);
         } catch (e: any) {
             Alert.alert("Save Error", e.message || "Failed to save alert settings.");
         } finally {
@@ -222,10 +262,10 @@ export default function LiquidityVaultScreen() {
     };
 
     useEffect(() => {
-        fetchProviderBalances();
+        fetchProviderBalances(false);
         const autoPoll = setInterval(() => {
-            fetchProviderBalances();
-        }, 30000); // Auto-check balances & email alerts every 30 seconds
+            fetchProviderBalances(true); // background silent sync (no UI freeze/spinners)
+        }, 120000); // 2 minutes interval
         return () => clearInterval(autoPoll);
     }, []);
 
@@ -259,7 +299,7 @@ export default function LiquidityVaultScreen() {
 
             Alert.alert("Account Saved! 🎉", `Top-up bank account details for ${selectedDepositProvider.name} saved to Vault successfully.`);
             setEditingDepositBank(false);
-            fetchProviderBalances();
+            fetchProviderBalances(true);
         } catch (e: any) {
             Alert.alert("Save Error", e.message || "Failed to save bank account details.");
         } finally {
@@ -267,12 +307,8 @@ export default function LiquidityVaultScreen() {
         }
     };
 
-    useEffect(() => {
-        fetchProviderBalances();
-    }, []);
-
-    const fetchProviderBalances = async () => {
-        setRefreshing(true);
+    const fetchProviderBalances = async (isSilent = false) => {
+        if (!isSilent) setRefreshing(true);
         try {
             // 1. Invoke Edge Function first (uses SERVICE_ROLE_KEY to bypass RLS)
             const { data: edgeData, error: edgeError } = await supabase.functions.invoke('check-provider-balances', {
@@ -920,7 +956,7 @@ export default function LiquidityVaultScreen() {
                                 <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email & SMS Alerts</Text>
                                 <Switch
                                     value={alertEnabled}
-                                    onValueChange={setAlertEnabled}
+                                    onValueChange={handleToggleAlertSwitch}
                                     trackColor={{ false: '#cbd5e1', true: T.gold }}
                                     thumbColor={alertEnabled ? T.navy : '#f1f5f9'}
                                 />
