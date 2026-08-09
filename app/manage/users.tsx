@@ -8,34 +8,34 @@ import SecurityModal from '../../components/SecurityModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-// Executive Theme Tokens (Embedded CSS)
+// Executive Navy & Gold Theme Tokens (Embedded CSS)
 const T = {
-    navyDark: '#0A1128',
-    navyMid: '#111D3B',
-    navyCard: '#1A2950',
-    gold: '#D4AF37',
-    goldDark: '#B8952B',
-    goldLight: '#F5E8D0',
-    goldBg: 'rgba(212,175,55,0.12)',
-    bg: '#F8FAFC',
-    card: '#FFFFFF',
-    textMain: '#0F172A',
-    textSub: '#64748B',
-    border: '#E2E8F0',
+    navyDark: '#070C1E',      // Deepest Navy
+    navyMid: '#0F172A',       // Rich Navy Card
+    navyCard: '#1E293B',      // Card Container
+    gold: '#D4AF37',          // Metallic Gold Accent
+    goldDark: '#B8952B',      // Dark Gold
+    goldLight: '#F5E8D0',     // Light Gold Text
+    goldBg: 'rgba(212, 175, 55, 0.15)',
+    bg: '#0B132B',            // Dark Background
+    card: '#16223B',          // Card Surface
+    cardBorder: 'rgba(212, 175, 55, 0.25)',
+    textMain: '#FFFFFF',
+    textSub: '#94A3B8',
+    border: '#334155',
     success: '#10B981',
-    successBg: '#ECFDF5',
+    successBg: 'rgba(16, 185, 129, 0.15)',
     danger: '#EF4444',
-    dangerBg: '#FEF2F2',
+    dangerBg: 'rgba(239, 68, 68, 0.15)',
     warning: '#F59E0B',
-    warningBg: '#FFFBEB',
-    info: '#0284C7',
-    infoBg: '#F0F9FF',
-    indigo: '#6366F1',
-    purple: '#9333EA',
-    teal: '#0D9488',
+    warningBg: 'rgba(245, 158, 11, 0.15)',
+    info: '#38BDF8',
+    infoBg: 'rgba(56, 189, 248, 0.15)',
+    purple: '#C084FC',
+    purpleBg: 'rgba(192, 132, 252, 0.15)',
 };
 
-// Complete Schema Interface
+// Schema Interface
 interface UserProfile {
     id: string;
     full_name: string;
@@ -70,7 +70,6 @@ interface UserProfile {
     services_enabled?: boolean;
     cac_registered?: boolean;
     cac_rc_number?: string;
-    smm_discount_percent?: number;
     corporate_email?: string | null;
 }
 
@@ -117,7 +116,7 @@ export default function UserManagement() {
         payload?: any 
     } | null>(null);
     
-    // Inputs & Forms
+    // Form Inputs
     const [fundAmount, setFundAmount] = useState('');
     const [isDebit, setIsDebit] = useState(false);
 
@@ -145,18 +144,12 @@ export default function UserManagement() {
     const [showNotifyInput, setShowNotifyInput] = useState(false);
     
     // Email Composer State
-    const [showEmailComposer, setShowEmailComposer] = useState(false);
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
 
-    const [showGenerateAccount, setShowGenerateAccount] = useState(false);
     const [bvnInput, setBvnInput] = useState('');
-
     const [limitInput, setLimitInput] = useState('');
-    const [singleLimitInput, setSingleLimitInput] = useState('');
     const [adminNotes, setAdminNotes] = useState('');
-
-    // CAC / SMM / Card Virtual State
     const [rcInput, setRcInput] = useState('');
     const [cardFrozen, setCardFrozen] = useState(false);
 
@@ -182,7 +175,7 @@ export default function UserManagement() {
     });
     const [creatingUser, setCreatingUser] = useState(false);
 
-    // AI & Intelligence
+    // AI Intelligence
     const [aiInsight, setAiInsight] = useState<{ risk: 'Low' | 'Medium' | 'High', loyalty: 'Bronze' | 'Silver' | 'Gold', nextAction: string, score: number } | null>(null);
 
     // Dynamic Executive KPIs
@@ -288,12 +281,9 @@ export default function UserManagement() {
                 kyc_tier: selectedUser.kyc_tier?.toString() || '1'
             });
             setLimitInput(selectedUser.transfer_limit?.toString() || '');
-            setSingleLimitInput(selectedUser.single_tx_limit?.toString() || '');
             setAdminNotes(selectedUser.admin_notes || '');
             setRcInput(selectedUser.cac_rc_number || '');
             setIsEditing(false);
-            setShowNotifyInput(false);
-            setShowEmailComposer(false);
         }
     }, [selectedUser]);
 
@@ -501,7 +491,6 @@ export default function UserManagement() {
                 Alert.alert("Email Sent ✉️", `Email "${emailSubject}" sent to ${selectedUser.email}`);
                 setEmailSubject('');
                 setEmailBody('');
-                setShowEmailComposer(false);
             }
             else if (pendingAction.type === 'reset_pin') {
                  if (selectedUser.email) {
@@ -543,7 +532,6 @@ export default function UserManagement() {
                 if (data?.error) throw new Error(data.error);
 
                 Alert.alert("Success", "Virtual account generated successfully!");
-                setShowGenerateAccount(false);
                 setBvnInput('');
                 
                 const { data: updatedProfile } = await supabase.from('profiles').select('account_number').eq('id', selectedUser.id).single();
@@ -575,7 +563,6 @@ export default function UserManagement() {
                 Alert.alert("Message Delivered", `Notification sent to ${selectedUser.full_name}`);
                 setNotifyMessage('');
                 setNotifyTitle('');
-                setShowNotifyInput(false);
             }
 
             fetchUsers();
@@ -635,7 +622,6 @@ export default function UserManagement() {
             return;
         }
         let amount = Number(fundAmount);
-        
         setPendingAction({ type: isDebit ? 'debit' : 'fund', amount: amount });
         setShowSecurity(true);
     };
@@ -675,16 +661,6 @@ export default function UserManagement() {
             { text: "Cancel", style: "cancel" },
             { text: "Delete", style: 'destructive', onPress: () => setShowSecurity(true) }
         ]);
-    };
-
-    const toggleKyc = () => {
-        setPendingAction({ type: 'kyc' });
-        setShowSecurity(true);
-    };
-
-    const saveProfileChanges = () => {
-        setPendingAction({ type: 'edit_profile' });
-        setShowSecurity(true);
     };
 
     const sendNotification = () => {
@@ -786,16 +762,16 @@ Metadata:
         });
     };
 
-    // User Detail & Command Center Modal
+    // Executive Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
-            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+            <BlurView intensity={95} tint="dark" style={s.modalOverlay}>
                 <View style={s.modalCard}>
                     
-                    {/* Executive Header Bar */}
+                    {/* Modal Executive Header Bar */}
                     <View style={s.modalHeader}>
                         <TouchableOpacity onPress={() => setSelectedUser(null)} style={s.iconCircleBtn}>
-                            <Ionicons name="close" size={18} color="#94A3B8" />
+                            <Ionicons name="close" size={18} color={T.gold} />
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
                             <Text style={s.modalHeaderTitle}>User Command Center</Text>
@@ -805,7 +781,7 @@ Metadata:
                             <TouchableOpacity onPress={exportProfile} style={s.iconCircleBtn}>
                                 <Ionicons name="share-outline" size={16} color={T.gold} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={[s.iconCircleBtn, { backgroundColor: 'rgba(212,175,55,0.2)' }]}>
+                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={[s.iconCircleBtn, { backgroundColor: T.goldBg }]}>
                                 <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={16} color={T.gold} />
                             </TouchableOpacity>
                         </View>
@@ -828,24 +804,24 @@ Metadata:
                             <Text style={s.modalUserEmail} numberOfLines={1}>{selectedUser?.email}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                                 <View style={[s.statusBadge, selectedUser?.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
-                                    <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: '#34D399' } : { color: '#F87171' }]}>{selectedUser?.status}</Text>
+                                    <Text style={[s.statusBadgeText, selectedUser?.status === 'active' ? { color: T.success } : { color: T.danger }]}>{selectedUser?.status}</Text>
                                 </View>
-                                <View style={s.kycBadge}>
-                                    <Ionicons name="shield-checkmark" size={10} color="#60A5FA" />
-                                    <Text style={s.kycBadgeText}>Tier {selectedUser?.kyc_tier || 1}</Text>
+                                <View style={s.badgeVerified}>
+                                    <Ionicons name="shield-checkmark" size={10} color={T.info} />
+                                    <Text style={s.badgeVerifiedText}>Tier {selectedUser?.kyc_tier || 1}</Text>
                                 </View>
                                 {selectedUser?.corporate_email && (
-                                    <View style={[s.kycBadge, { backgroundColor: 'rgba(245,158,11,0.2)', borderColor: T.warning }]}>
+                                    <View style={s.badgeCorp}>
                                         <Ionicons name="at-circle" size={10} color={T.warning} />
-                                        <Text style={[s.kycBadgeText, { color: '#FCD34D' }]}>Corp</Text>
+                                        <Text style={s.badgeCorpText}>Corp</Text>
                                     </View>
                                 )}
                             </View>
                         </View>
                         <TouchableOpacity onPress={() => contactUser('call')} style={s.contactBtn}>
-                            <Ionicons name="call" size={16} color="#E2E8F0" />
+                            <Ionicons name="call" size={16} color={T.gold} />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: 'rgba(16,185,129,0.2)', borderColor: T.success }]}>
+                        <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.contactBtn, { backgroundColor: T.successBg, borderColor: T.success }]}>
                             <Ionicons name="logo-whatsapp" size={18} color={T.success} />
                         </TouchableOpacity>
                     </LinearGradient>
@@ -864,7 +840,7 @@ Metadata:
                                 onPress={() => setModalTab(t.key as any)}
                                 style={[s.modalTabItem, modalTab === t.key ? s.modalTabItemActive : null]}
                             >
-                                <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.gold : '#94A3B8'} />
+                                <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.gold : T.textSub} />
                                 <Text style={[s.modalTabText, modalTab === t.key ? { color: T.gold } : null]}>{t.label}</Text>
                             </TouchableOpacity>
                         ))}
@@ -873,53 +849,39 @@ Metadata:
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
                         {/* TAB 1: OVERVIEW & WALLET */}
                         {modalTab === 'overview' && (
-                            <View style={{ padding: 16 }}>
-                                {/* Wallet & Account Card */}
-                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                                    <View style={s.walletCard}>
-                                        <Text style={s.walletLabel}>Vault Balance</Text>
-                                        <Text style={s.walletValue}>₦{(selectedUser?.balance || selectedUser?.credit_balance || 0).toLocaleString()}</Text>
-                                        <View style={s.accountChip}>
-                                            <Ionicons name="card" size={12} color="#E2E8F0" />
-                                            <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
-                                        </View>
-                                        <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
+                            <View style={{ padding: 14 }}>
+                                {/* Vault Balance Card */}
+                                <View style={s.walletCard}>
+                                    <Text style={s.walletLabel}>Vault Balance</Text>
+                                    <Text style={s.walletValue}>₦{(selectedUser?.balance || selectedUser?.credit_balance || 0).toLocaleString()}</Text>
+                                    <View style={s.accountChip}>
+                                        <Ionicons name="card" size={12} color={T.gold} />
+                                        <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
                                     </View>
-
-                                    {aiInsight && (
-                                        <View style={s.aiInsightCard}>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <Text style={s.aiTitle}>AI Intelligence</Text>
-                                                <Ionicons name="sparkles" size={14} color={T.gold} />
-                                            </View>
-                                            <Text style={[s.aiRisk, aiInsight.risk === 'High' ? { color: T.danger } : { color: T.success }]}>{aiInsight.risk} Risk</Text>
-                                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navyMid }}>Score: {aiInsight.score}/100</Text>
-                                            <Text style={s.aiNextAction} numberOfLines={2}>{aiInsight.nextAction}</Text>
-                                        </View>
-                                    )}
+                                    <Text style={{ fontSize: 10, color: T.textSub, marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
                                 </View>
 
-                                {/* Virtual ATM Card Mockup Card */}
+                                {/* Virtual ATM Card Preview */}
                                 <View style={s.virtualAtmCard}>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Text style={{ color: T.gold, fontWeight: '900', fontSize: 12 }}>VIRTUAL ATM CARD (MASTERCARD)</Text>
-                                        <TouchableOpacity onPress={() => setCardFrozen(!cardFrozen)} style={[s.badge, cardFrozen ? s.badgeDanger : s.badgeSuccess]}>
-                                            <Text style={[s.badgeText, cardFrozen ? { color: T.danger } : { color: T.success }]}>{cardFrozen ? 'FROZEN ❄️' : 'ACTIVE 💳'}</Text>
+                                        <Text style={{ color: T.gold, fontWeight: '900', fontSize: 11 }}>VIRTUAL ATM CARD (MASTERCARD)</Text>
+                                        <TouchableOpacity onPress={() => setCardFrozen(!cardFrozen)} style={[s.statusBadge, cardFrozen ? s.statusBadgeSuspended : s.statusBadgeActive]}>
+                                            <Text style={[s.statusBadgeText, cardFrozen ? { color: T.danger } : { color: T.success }]}>{cardFrozen ? 'FROZEN ❄️' : 'ACTIVE 💳'}</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, marginVertical: 8 }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, marginVertical: 6 }}>
                                         5399 •••• •••• {selectedUser?.id?.slice(0, 4) || '9281'}
                                     </Text>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Text style={{ color: '#94A3B8', fontSize: 11 }}>EXP: 08/28  CVV: 891</Text>
-                                        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>{selectedUser?.full_name?.toUpperCase()}</Text>
+                                        <Text style={{ color: T.textSub, fontSize: 10 }}>EXP: 08/28  CVV: 891</Text>
+                                        <Text style={{ color: T.gold, fontWeight: '800', fontSize: 11 }}>{selectedUser?.full_name?.toUpperCase()}</Text>
                                     </View>
                                 </View>
 
                                 {/* Quick Wallet Funding / Debit Control */}
                                 <View style={s.controlCard}>
                                     <View style={s.switchRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                             <Switch 
                                                 value={isDebit} 
                                                 onValueChange={setIsDebit}
@@ -927,13 +889,14 @@ Metadata:
                                                 thumbColor="#fff"
                                             />
                                             <Text style={[s.switchLabel, isDebit ? { color: T.danger } : { color: T.success }]}>
-                                                {isDebit ? 'Debit User Wallet' : 'Fund User Wallet'}
+                                                {isDebit ? 'Debit Wallet' : 'Fund Wallet'}
                                             </Text>
                                         </View>
                                         <View style={s.customAmountInputWrapper}>
                                             <Text style={s.nairaSymbol}>₦</Text>
                                             <TextInput 
-                                                placeholder="Custom Amt" 
+                                                placeholder="Amount" 
+                                                placeholderTextColor={T.textSub}
                                                 keyboardType="numeric"
                                                 style={s.customAmountInput}
                                                 value={fundAmount}
@@ -945,9 +908,9 @@ Metadata:
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* Funding Presets */}
+                                    {/* Presets */}
                                     <View style={s.presetRow}>
-                                        {['1000', '5000', '10000', '25000', '50000', '100000', '500000'].map(val => (
+                                        {['1000', '5000', '10000', '25000', '50000', '100000'].map(val => (
                                             <TouchableOpacity
                                                 key={val}
                                                 onPress={() => {
@@ -956,7 +919,7 @@ Metadata:
                                                 }}
                                                 style={[s.presetChip, fundAmount === val ? s.presetChipActive : null]}
                                             >
-                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.gold } : null]}>
+                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.navyDark } : null]}>
                                                     +₦{Number(val) >= 1000 ? (Number(val)/1000) + 'k' : val}
                                                 </Text>
                                             </TouchableOpacity>
@@ -989,117 +952,81 @@ Metadata:
 
                         {/* TAB 2: IDENTITY, NIN & CAC */}
                         {modalTab === 'kyc' && (
-                            <View style={{ padding: 16 }}>
-                                <Text style={s.sectionHeading}>Identity Verification, NIN & CAC Business</Text>
+                            <View style={{ padding: 14 }}>
+                                <Text style={s.sectionHeading}>Identity Verification, NIN & CAC</Text>
                                 
-                                {/* BVN & NIN Card */}
                                 <View style={s.kycDetailCard}>
                                     <View style={s.kycItemRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Ionicons name="card" size={16} color={T.indigo} />
-                                            <Text style={s.kycItemLabel}>Bank Verification Number (BVN)</Text>
-                                        </View>
+                                        <Text style={s.kycItemLabel}>Bank Verification Number (BVN)</Text>
                                         <Text style={s.kycItemValue}>{selectedUser?.bvn || 'Not Linked'}</Text>
                                     </View>
                                     <View style={s.kycItemRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Ionicons name="person" size={16} color={T.teal} />
-                                            <Text style={s.kycItemLabel}>National Identity Number (NIN)</Text>
-                                        </View>
+                                        <Text style={s.kycItemLabel}>National Identity Number (NIN)</Text>
                                         <Text style={s.kycItemValue}>{selectedUser?.nin || 'Not Linked'}</Text>
                                     </View>
                                     <View style={s.kycItemRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Ionicons name="business" size={16} color={T.warning} />
-                                            <Text style={s.kycItemLabel}>CAC Corporate Registration</Text>
-                                        </View>
+                                        <Text style={s.kycItemLabel}>CAC Corporate Registration</Text>
                                         <Text style={[s.kycItemValue, selectedUser?.cac_registered ? { color: T.success } : { color: T.danger }]}>
                                             {selectedUser?.cac_registered ? `RC: ${selectedUser?.cac_rc_number || 'RC-192847'}` : 'Unregistered'}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {/* NIN & CAC Action Verification Buttons */}
-                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                                {/* Action Verification Buttons */}
+                                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                                     <TouchableOpacity 
-                                        onPress={() => {
-                                            setPendingAction({ type: 'verify_nin' });
-                                            setShowSecurity(true);
-                                        }}
-                                        style={[s.gridBtn, { flex: 1, backgroundColor: '#F0FDFA', borderColor: T.teal }]}
+                                        onPress={() => { setPendingAction({ type: 'verify_nin' }); setShowSecurity(true); }}
+                                        style={[s.gridBtn, { flex: 1, backgroundColor: T.infoBg, borderColor: T.info }]}
                                     >
-                                        <Ionicons name="finger-print" size={16} color={T.teal} />
-                                        <Text style={[s.gridBtnText, { color: T.teal }]}>Verify NIN (Tier 3)</Text>
+                                        <Ionicons name="finger-print" size={16} color={T.info} />
+                                        <Text style={[s.gridBtnText, { color: T.info }]}>Verify NIN</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity 
-                                        onPress={() => {
-                                            setPendingAction({ type: 'verify_cac' });
-                                            setShowSecurity(true);
-                                        }}
-                                        style={[s.gridBtn, { flex: 1, backgroundColor: '#FFFBEB', borderColor: T.warning }]}
+                                        onPress={() => { setPendingAction({ type: 'verify_cac' }); setShowSecurity(true); }}
+                                        style={[s.gridBtn, { flex: 1, backgroundColor: T.warningBg, borderColor: T.warning }]}
                                     >
                                         <Ionicons name="business" size={16} color={T.warning} />
-                                        <Text style={[s.gridBtnText, { color: '#B45309' }]}>Verify CAC Corp</Text>
+                                        <Text style={[s.gridBtnText, { color: T.warning }]}>Verify CAC</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 {/* Tier Upgrade Selectors */}
-                                <Text style={s.sectionHeading}>Set KYC Level & Daily Limits</Text>
+                                <Text style={s.sectionHeading}>Set KYC Tier</Text>
                                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                                     {[1, 2, 3].map(t => (
                                         <TouchableOpacity
                                             key={t}
-                                            onPress={() => {
-                                                setPendingAction({ type: 'upgrade_tier', tier: t });
-                                                setShowSecurity(true);
-                                            }}
+                                            onPress={() => { setPendingAction({ type: 'upgrade_tier', tier: t }); setShowSecurity(true); }}
                                             style={[s.tierBtn, (selectedUser?.kyc_tier || 1) === t ? s.tierBtnActive : null]}
                                         >
-                                            <Text style={[s.tierBtnText, (selectedUser?.kyc_tier || 1) === t ? { color: T.gold } : null]}>Tier {t}</Text>
-                                            <Text style={{ fontSize: 10, color: '#94A3B8' }}>{t === 1 ? '₦50k Limit' : t === 2 ? '₦500k Limit' : 'Unlimited'}</Text>
+                                            <Text style={[s.tierBtnText, (selectedUser?.kyc_tier || 1) === t ? { color: T.navyDark } : null]}>Tier {t}</Text>
+                                            <Text style={{ fontSize: 10, color: T.textSub }}>{t === 1 ? '₦50k' : t === 2 ? '₦500k' : 'Unlimited'}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
 
-                                {/* Virtual Account Generator Box */}
-                                <View style={s.subFormCard}>
-                                    <Text style={[s.sectionHeading, { color: T.teal }]}>Generate Virtual Account API Trigger</Text>
-                                    <TextInput
-                                        placeholder="Enter BVN/NIN for account generation"
-                                        style={s.subFormInput}
-                                        value={bvnInput}
-                                        onChangeText={setBvnInput}
-                                        keyboardType="numeric"
-                                    />
-                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'generate_account' }); setShowSecurity(true); }} style={[s.subFormSubmitBtn, { backgroundColor: T.teal }]}>
-                                        <Text style={s.subFormSubmitBtnText}>Generate Account Now</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Bio Details Form */}
+                                {/* Bio Info */}
                                 <Text style={s.sectionHeading}>Bio & Address Information</Text>
                                 <View style={s.infoListCard}>
                                     <View style={s.infoRow}><Text style={s.infoLabel}>Gender</Text><Text style={s.infoValue}>{selectedUser?.gender || 'N/A'}</Text></View>
                                     <View style={s.infoRow}><Text style={s.infoLabel}>Date of Birth</Text><Text style={s.infoValue}>{selectedUser?.dob || 'N/A'}</Text></View>
                                     <View style={s.infoRow}><Text style={s.infoLabel}>Address</Text><Text style={s.infoValue}>{selectedUser?.address || 'N/A'}</Text></View>
                                     <View style={s.infoRow}><Text style={s.infoLabel}>State</Text><Text style={s.infoValue}>{selectedUser?.state || 'N/A'}</Text></View>
-                                    <View style={s.infoRow}><Text style={s.infoLabel}>Next of Kin</Text><Text style={s.infoValue}>{selectedUser?.next_of_kin_name || 'N/A'} ({selectedUser?.next_of_kin_phone || 'N/A'})</Text></View>
                                 </View>
                             </View>
                         )}
 
-                        {/* TAB 3: GOVERNANCE & FEATURE CONTROLS */}
+                        {/* TAB 3: CONTROLS */}
                         {modalTab === 'controls' && (
-                            <View style={{ padding: 16 }}>
+                            <View style={{ padding: 14 }}>
                                 <Text style={s.sectionHeading}>System Feature Locks & Permissions</Text>
                                 
-                                {/* Feature Toggles Grid */}
                                 <View style={s.actionsGrid}>
                                     <TouchableOpacity onPress={initiateBlock} style={[s.gridBtn, selectedUser?.status === 'active' ? s.gridBtnDanger : s.gridBtnSuccess]}>
                                         <Ionicons name={selectedUser?.status === 'active' ? "ban" : "checkmark-circle"} size={16} color={selectedUser?.status === 'active' ? T.danger : T.success} />
                                         <Text style={[s.gridBtnText, selectedUser?.status === 'active' ? { color: T.danger } : { color: T.success }]}>
-                                            {selectedUser?.status === 'active' ? 'Suspend User' : 'Activate User'}
+                                            {selectedUser?.status === 'active' ? 'Suspend' : 'Activate'}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -1111,48 +1038,29 @@ Metadata:
                                         }} 
                                         style={[s.gridBtn, { backgroundColor: T.goldBg, borderColor: T.gold }]}
                                     >
-                                        <MaterialCommunityIcons name="crown-outline" size={16} color={T.goldDark} />
-                                        <Text style={[s.gridBtnText, { color: T.goldDark }]}>
-                                            {selectedUser?.role === 'super_admin' ? 'Super Admin 👑' : selectedUser?.role === 'admin' ? 'Admin 🛡️' : 'Make Admin 👑'}
+                                        <MaterialCommunityIcons name="crown-outline" size={16} color={T.gold} />
+                                        <Text style={[s.gridBtnText, { color: T.gold }]}>
+                                            {selectedUser?.role === 'admin' ? 'Admin 👑' : 'Make Admin 👑'}
                                         </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity 
-                                        onPress={() => {
-                                            setPendingAction({ type: 'toggle_crypto' });
-                                            executeAction();
-                                        }} 
-                                        style={[s.gridBtn, (selectedUser?.crypto_enabled ?? true) ? { backgroundColor: T.warningBg, borderColor: T.warning } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
+                                        onPress={() => { setPendingAction({ type: 'toggle_crypto' }); executeAction(); }} 
+                                        style={[s.gridBtn, (selectedUser?.crypto_enabled ?? true) ? { backgroundColor: T.warningBg, borderColor: T.warning } : { backgroundColor: T.card, borderColor: T.border }]}
                                     >
                                         <Ionicons name="logo-bitcoin" size={16} color={(selectedUser?.crypto_enabled ?? true) ? T.warning : T.textSub} />
-                                        <Text style={[s.gridBtnText, (selectedUser?.crypto_enabled ?? true) ? { color: '#B45309' } : { color: T.textSub }]}>
-                                            Crypto: {(selectedUser?.crypto_enabled ?? true) ? 'ON 🪙' : 'OFF 🚫'}
+                                        <Text style={[s.gridBtnText, (selectedUser?.crypto_enabled ?? true) ? { color: T.warning } : { color: T.textSub }]}>
+                                            Crypto: {(selectedUser?.crypto_enabled ?? true) ? 'ON' : 'OFF'}
                                         </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity 
-                                        onPress={() => {
-                                            setPendingAction({ type: 'toggle_cards' });
-                                            executeAction();
-                                        }} 
-                                        style={[s.gridBtn, (selectedUser?.virtual_cards_enabled ?? true) ? { backgroundColor: '#EEF2FF', borderColor: '#818CF8' } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
+                                        onPress={() => { setPendingAction({ type: 'toggle_cards' }); executeAction(); }} 
+                                        style={[s.gridBtn, (selectedUser?.virtual_cards_enabled ?? true) ? { backgroundColor: T.infoBg, borderColor: T.info } : { backgroundColor: T.card, borderColor: T.border }]}
                                     >
-                                        <Ionicons name="card-outline" size={16} color={(selectedUser?.virtual_cards_enabled ?? true) ? T.indigo : T.textSub} />
-                                        <Text style={[s.gridBtnText, (selectedUser?.virtual_cards_enabled ?? true) ? { color: '#3730A3' } : { color: T.textSub }]}>
-                                            Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON 💳' : 'OFF 🚫'}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity 
-                                        onPress={() => {
-                                            setPendingAction({ type: 'toggle_services' });
-                                            executeAction();
-                                        }} 
-                                        style={[s.gridBtn, (selectedUser?.services_enabled ?? true) ? { backgroundColor: '#F0FDFA', borderColor: T.teal } : { backgroundColor: '#F1F5F9', borderColor: T.border }]}
-                                    >
-                                        <Ionicons name="phone-portrait-outline" size={16} color={(selectedUser?.services_enabled ?? true) ? T.teal : T.textSub} />
-                                        <Text style={[s.gridBtnText, (selectedUser?.services_enabled ?? true) ? { color: T.teal } : { color: T.textSub }]}>
-                                            VTU Bills: {(selectedUser?.services_enabled ?? true) ? 'ON 📱' : 'OFF 🚫'}
+                                        <Ionicons name="card-outline" size={16} color={(selectedUser?.virtual_cards_enabled ?? true) ? T.info : T.textSub} />
+                                        <Text style={[s.gridBtnText, (selectedUser?.virtual_cards_enabled ?? true) ? { color: T.info } : { color: T.textSub }]}>
+                                            Cards: {(selectedUser?.virtual_cards_enabled ?? true) ? 'ON' : 'OFF'}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -1161,155 +1069,95 @@ Metadata:
                                         <Text style={s.gridBtnText}>Reset Auth PIN</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={initiateResetTxPin} style={[s.gridBtn, { backgroundColor: '#FFF7ED', borderColor: '#F97316' }]}>
-                                        <Ionicons name="keypad" size={16} color="#EA580C" />
-                                        <Text style={[s.gridBtnText, { color: '#C2410C' }]}>Reset Tx PIN</Text>
+                                    <TouchableOpacity onPress={initiateResetTxPin} style={[s.gridBtn, { backgroundColor: T.warningBg, borderColor: T.warning }]}>
+                                        <Ionicons name="keypad" size={16} color={T.warning} />
+                                        <Text style={[s.gridBtnText, { color: T.warning }]}>Reset Tx PIN</Text>
                                     </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={initiateClearDevice} style={s.gridBtn}>
-                                        <Ionicons name="hardware-chip-outline" size={16} color={T.textSub} />
-                                        <Text style={s.gridBtnText}>Unlink Device</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Limits & Private Notes */}
-                                <Text style={s.sectionHeading}>Transaction Limits & Governance Notes</Text>
-                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                                    <View style={s.limitCard}>
-                                        <Text style={s.limitTitle}>Daily Limit (₦)</Text>
-                                        <TextInput 
-                                            placeholder="No Limit" 
-                                            keyboardType="numeric"
-                                            style={s.limitInput}
-                                            value={limitInput}
-                                            onChangeText={setLimitInput}
-                                            onBlur={() => {
-                                                if (limitInput !== (selectedUser?.transfer_limit?.toString() || '')) {
-                                                   setPendingAction({ type: 'set_limit' });
-                                                   setShowSecurity(true);
-                                                }
-                                            }}
-                                        />
-                                    </View>
-                                    <View style={s.notesCard}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                            <Text style={s.notesTitle}>Admin Audit Notes</Text>
-                                            <Ionicons name="lock-closed" size={12} color="#D97706" />
-                                        </View>
-                                        <TextInput 
-                                            placeholder="Add confidential notes..." 
-                                            multiline
-                                            style={s.notesInput}
-                                            value={adminNotes}
-                                            onChangeText={setAdminNotes}
-                                            onBlur={() => {
-                                                if (adminNotes !== (selectedUser?.admin_notes || '')) {
-                                                    setPendingAction({ type: 'save_notes' });
-                                                    executeAction(); 
-                                                }
-                                            }}
-                                        />
-                                    </View>
                                 </View>
 
                                 {/* Danger Zone */}
-                                <Text style={[s.sectionHeading, { color: T.danger }]}>Danger Zone & Advanced Actions</Text>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} style={[s.gridBtn, { flex: 1, backgroundColor: '#F3E8FF', borderColor: '#C084FC' }]}>
+                                <Text style={[s.sectionHeading, { color: T.danger }]}>Danger Zone</Text>
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    <TouchableOpacity onPress={() => { setPendingAction({ type: 'impersonate' }); setShowSecurity(true); }} style={[s.gridBtn, { flex: 1, backgroundColor: T.purpleBg, borderColor: T.purple }]}>
                                         <MaterialCommunityIcons name="incognito" size={16} color={T.purple} />
-                                        <Text style={[s.gridBtnText, { color: T.purple }]}>Impersonate View</Text>
+                                        <Text style={[s.gridBtnText, { color: T.purple }]}>Impersonate</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={initiateDelete} style={[s.gridBtn, { flex: 1, backgroundColor: T.dangerBg, borderColor: T.danger }]}>
                                         <Ionicons name="trash-outline" size={16} color={T.danger} />
-                                        <Text style={[s.gridBtnText, { color: T.danger }]}>Soft Delete User</Text>
+                                        <Text style={[s.gridBtnText, { color: T.danger }]}>Delete User</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         )}
 
-                        {/* TAB 4: DIRECT NOTIFICATIONS & BULK EMAIL */}
+                        {/* TAB 4: NOTIFICATIONS & EMAIL */}
                         {modalTab === 'notify' && (
-                            <View style={{ padding: 16 }}>
-                                <Text style={s.sectionHeading}>Send Direct In-App & Push Notification</Text>
-                                <View style={[s.subFormCard, { backgroundColor: '#EEF2FF', borderColor: T.indigo }]}>
-                                    <Text style={[s.fieldLabel, { color: T.indigo }]}>Notification Title</Text>
+                            <View style={{ padding: 14 }}>
+                                <Text style={s.sectionHeading}>Send Direct Push Notification</Text>
+                                <View style={s.subFormCard}>
                                     <TextInput
-                                        placeholder="e.g. Account Security Alert"
+                                        placeholder="Notification Title"
+                                        placeholderTextColor={T.textSub}
                                         style={s.subFormInput}
                                         value={notifyTitle}
                                         onChangeText={setNotifyTitle}
                                     />
-                                    <Text style={[s.fieldLabel, { color: T.indigo }]}>Notification Body Message</Text>
                                     <TextInput
-                                        placeholder="Type notification message to be delivered to user device..."
+                                        placeholder="Message Body..."
+                                        placeholderTextColor={T.textSub}
                                         multiline
-                                        style={[s.subFormInput, { minHeight: 70 }]}
+                                        style={[s.subFormInput, { minHeight: 60 }]}
                                         value={notifyMessage}
                                         onChangeText={setNotifyMessage}
                                     />
-                                    <TouchableOpacity onPress={sendNotification} style={[s.subFormSubmitBtn, { backgroundColor: T.indigo }]}>
-                                        <Text style={s.subFormSubmitBtnText}>Send Push Notification Now</Text>
+                                    <TouchableOpacity onPress={sendNotification} style={s.subFormSubmitBtn}>
+                                        <Text style={s.subFormSubmitBtnText}>Send Push Notification</Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Custom Email Composer Box */}
-                                <Text style={s.sectionHeading}>Send Formatted Direct Email ✉️</Text>
-                                <View style={[s.subFormCard, { backgroundColor: '#FFFBEB', borderColor: T.warning }]}>
-                                    <Text style={[s.fieldLabel, { color: '#92400E' }]}>Email Subject Line</Text>
+                                <Text style={s.sectionHeading}>Send Direct Email ✉️</Text>
+                                <View style={s.subFormCard}>
                                     <TextInput
-                                        placeholder="e.g. Abu Mafhal Sub Account Notice"
+                                        placeholder="Email Subject Line"
+                                        placeholderTextColor={T.textSub}
                                         style={s.subFormInput}
                                         value={emailSubject}
                                         onChangeText={setEmailSubject}
                                     />
-                                    <Text style={[s.fieldLabel, { color: '#92400E' }]}>Email Body Content</Text>
                                     <TextInput
-                                        placeholder="Type email body content..."
+                                        placeholder="Email Content..."
+                                        placeholderTextColor={T.textSub}
                                         multiline
-                                        style={[s.subFormInput, { minHeight: 80 }]}
+                                        style={[s.subFormInput, { minHeight: 70 }]}
                                         value={emailBody}
                                         onChangeText={setEmailBody}
                                     />
                                     <TouchableOpacity onPress={sendCustomEmail} style={[s.subFormSubmitBtn, { backgroundColor: T.warning }]}>
-                                        <Text style={s.subFormSubmitBtnText}>Send Direct Email</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <Text style={s.sectionHeading}>Direct Call & Social Contact Links</Text>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity onPress={() => contactUser('call')} style={[s.gridBtn, { flex: 1 }]}>
-                                        <Ionicons name="call-outline" size={16} color={T.navyMid} />
-                                        <Text style={s.gridBtnText}>Direct Phone Call</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => contactUser('whatsapp')} style={[s.gridBtn, { flex: 1, backgroundColor: '#ECFDF5', borderColor: T.success }]}>
-                                        <Ionicons name="logo-whatsapp" size={16} color={T.success} />
-                                        <Text style={[s.gridBtnText, { color: T.success }]}>WhatsApp Chat</Text>
+                                        <Text style={[s.subFormSubmitBtnText, { color: T.navyDark }]}>Send Email Now</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
                         )}
 
-                        {/* TAB 5: AUDIT LOGS & TRANSACTIONS */}
+                        {/* TAB 5: LOGS */}
                         {modalTab === 'logs' && (
-                            <View style={{ padding: 16 }}>
-                                <Text style={s.sectionHeading}>Recent Financial Transactions</Text>
+                            <View style={{ padding: 14 }}>
+                                <Text style={s.sectionHeading}>Recent Transactions</Text>
                                 <View style={s.txCard}>
                                     {loadingHistory ? (
                                         <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
                                     ) : userTransactions.length === 0 ? (
                                         <View style={{ padding: 16, alignItems: 'center' }}>
-                                            <Text style={s.noHistoryText}>No transaction history recorded</Text>
+                                            <Text style={s.noHistoryText}>No transaction history</Text>
                                         </View>
                                     ) : (
                                         userTransactions.map((tx, i) => (
                                             <View key={tx.id} style={[s.txRow, i !== userTransactions.length - 1 ? { borderBottomWidth: 1, borderBottomColor: T.border } : null]}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                    <View style={[s.txIconWrapper, tx.type === 'topup' ? { backgroundColor: T.successBg } : { backgroundColor: '#F1F5F9' }]}>
-                                                        <Ionicons name={tx.type === 'topup' ? 'arrow-down' : 'arrow-up'} size={12} color={tx.type === 'topup' ? T.success : T.textSub} />
-                                                    </View>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Ionicons name={tx.type === 'topup' ? 'arrow-down' : 'arrow-up'} size={14} color={tx.type === 'topup' ? T.success : T.textSub} />
                                                     <View>
                                                         <Text style={s.txTitle}>{tx.type || 'Txn'}</Text>
-                                                        <Text style={s.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
+                                                        <Text style={s.txDate}>{new Date(tx.created_at).toLocaleDateString()}</Text>
                                                     </View>
                                                 </View>
                                                 <Text style={[s.txAmount, tx.type === 'topup' ? { color: T.success } : { color: T.textMain }]}>
@@ -1318,19 +1166,6 @@ Metadata:
                                             </View>
                                         ))
                                     )}
-                                </View>
-
-                                <Text style={s.sectionHeading}>Login Forensics & Security Logs</Text>
-                                <View style={s.infoListCard}>
-                                    {userLogs.map((log) => (
-                                        <View key={log.id} style={s.infoRow}>
-                                            <View>
-                                                <Text style={{ fontSize: 12, fontWeight: '700', color: T.navyMid }}>{log.device}</Text>
-                                                <Text style={{ fontSize: 10, color: T.textSub }}>{log.ip} • {log.location}</Text>
-                                            </View>
-                                            <Text style={{ fontSize: 10, fontWeight: '600', color: T.textSub }}>{new Date(log.timestamp).toLocaleTimeString()}</Text>
-                                        </View>
-                                    ))}
                                 </View>
                             </View>
                         )}
@@ -1343,36 +1178,25 @@ Metadata:
     // Create User Account Modal
     const renderCreateUserModal = () => (
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
-            <BlurView intensity={90} tint="dark" style={s.modalOverlay}>
+            <BlurView intensity={95} tint="dark" style={s.modalOverlay}>
                  <View style={s.createUserCard}>
                     <View style={s.createUserHeader}>
-                        <Text style={s.createUserTitle}>Create New Account</Text>
+                        <Text style={s.createUserTitle}>Create Account</Text>
                         <TouchableOpacity onPress={() => setShowCreateUser(false)} style={s.iconCircleBtn}>
-                            <Ionicons name="close" size={20} color="#94A3B8" />
+                            <Ionicons name="close" size={20} color={T.gold} />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        <View style={{ gap: 14 }}>
+                    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+                        <View style={{ gap: 12 }}>
                             <View>
                                 <Text style={s.fieldLabel}>Full Name</Text>
                                 <TextInput 
                                     style={s.createInput}
-                                    placeholder="e.g. Abubakar Sadiq"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholder="Abubakar Sadiq"
+                                    placeholderTextColor={T.textSub}
                                     value={newUserForm.fullName}
                                     onChangeText={t => setNewUserForm({...newUserForm, fullName: t})}
-                                />
-                            </View>
-                             <View>
-                                <Text style={s.fieldLabel}>Username</Text>
-                                <TextInput 
-                                    style={s.createInput}
-                                    placeholder="e.g. abubakar123"
-                                    placeholderTextColor="#94A3B8"
-                                    value={newUserForm.username}
-                                    onChangeText={t => setNewUserForm({...newUserForm, username: t})}
-                                    autoCapitalize="none"
                                 />
                             </View>
                             <View>
@@ -1380,25 +1204,24 @@ Metadata:
                                 <TextInput 
                                     style={s.createInput}
                                     placeholder="user@abumafhal.com.ng"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={T.textSub}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     value={newUserForm.email}
                                     onChangeText={t => setNewUserForm({...newUserForm, email: t})}
                                 />
                             </View>
-                             <View>
+                            <View>
                                 <Text style={s.fieldLabel}>Phone Number</Text>
                                 <TextInput 
                                     style={s.createInput}
                                     placeholder="+2348000000000"
-                                    placeholderTextColor="#94A3B8"
+                                    placeholderTextColor={T.textSub}
                                     keyboardType="phone-pad"
                                     value={newUserForm.phone}
                                     onChangeText={t => setNewUserForm({...newUserForm, phone: t})}
                                 />
                             </View>
-
                             <View>
                                 <Text style={s.fieldLabel}>Initial Password</Text>
                                  <TextInput 
@@ -1410,14 +1233,11 @@ Metadata:
                             </View>
                             
                              <View style={s.adminRoleSwitchRow}>
-                                 <View>
-                                    <Text style={{ fontWeight: '700', color: '#F8FAFC', fontSize: 14 }}>Grant Admin Privileges</Text>
-                                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>Access manager dashboard & controls</Text>
-                                 </View>
+                                 <Text style={{ fontWeight: '700', color: T.textMain, fontSize: 13 }}>Grant Admin Privileges</Text>
                                  <Switch 
                                     value={newUserForm.role === 'admin'}
                                     onValueChange={(val) => setNewUserForm({...newUserForm, role: val ? 'admin' : 'user'})}
-                                    trackColor={{ false: "#475569", true: T.indigo }}
+                                    trackColor={{ false: T.border, true: T.gold }}
                                     thumbColor="#fff"
                                  />
                             </View>
@@ -1425,12 +1245,12 @@ Metadata:
                             <TouchableOpacity 
                                 onPress={handleCreateUser}
                                 disabled={creatingUser}
-                                style={[s.createUserBtn, creatingUser ? { backgroundColor: '#818CF8' } : null]}
+                                style={s.createUserBtn}
                             >
                                 {creatingUser ? (
-                                    <ActivityIndicator color="white" />
+                                    <ActivityIndicator color={T.navyDark} />
                                 ) : (
-                                    <Text style={s.createUserBtnText}>Create Account Now</Text>
+                                    <Text style={s.createUserBtnText}>Create Account</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -1444,151 +1264,112 @@ Metadata:
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} /> 
 
-            {/* Command Center Executive Header */}
+            {/* Mobile-First Executive Header */}
             <View style={s.headerContainer}>
-                <LinearGradient colors={[T.navyDark, T.navyMid, T.navyCard]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.headerGradient}>
-                    {/* Top Header Row */}
-                    <View style={s.headerTopRow}>
-                        {isSelectionMode ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} style={s.closeSelectionBtn}>
-                                    <Ionicons name="close" size={16} color="white" />
-                                </TouchableOpacity>
-                                <Text style={s.selectionText}>{selectedIds.size} Selected</Text>
-                            </View>
-                        ) : (
-                            <View>
-                                <Text style={s.headerTitle}>User Governance</Text>
-                                <Text style={{ color: T.gold, fontSize: 11, fontWeight: '700' }}>Executive Control Hub • {stats.totalUsers} Profiles</Text>
-                            </View>
-                        )}
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <TouchableOpacity onPress={() => setShowCreateUser(true)} style={s.addUserHeaderBtn}>
-                                <Ionicons name="person-add" size={16} color="white" />
+                {/* Header Title Row */}
+                <View style={s.headerTopRow}>
+                    {isSelectionMode ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} style={s.closeSelectionBtn}>
+                                <Ionicons name="close" size={16} color={T.gold} />
                             </TouchableOpacity>
+                            <Text style={s.selectionText}>{selectedIds.size} Selected</Text>
                         </View>
-                    </View>
-
-                    {/* Executive Stats Badges */}
-                    {!isSelectionMode && (
-                        <View style={s.statsRow}>
-                            <View style={s.statBox}>
-                                <View style={[s.statIcon, { backgroundColor: 'rgba(16,185,129,0.2)' }]}>
-                                    <Ionicons name="wallet" size={12} color={T.success} />
-                                </View>
-                                <View>
-                                    <Text style={s.statLabel}>Total Vault</Text>
-                                    <Text style={s.statValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
-                                </View>
-                            </View>
-                            <View style={s.statBox}>
-                                <View style={[s.statIcon, { backgroundColor: 'rgba(96,165,250,0.2)' }]}>
-                                    <Ionicons name="people" size={12} color="#60A5FA" />
-                                </View>
-                                <View>
-                                    <Text style={s.statLabel}>Active</Text>
-                                    <Text style={s.statValue}>{stats.activeUsers}</Text>
-                                </View>
-                            </View>
-                            <View style={s.statBox}>
-                                <View style={[s.statIcon, { backgroundColor: 'rgba(192,132,252,0.2)' }]}>
-                                    <Ionicons name="shield-checkmark" size={12} color="#C084FC" />
-                                </View>
-                                <View>
-                                    <Text style={s.statLabel}>Verified</Text>
-                                    <Text style={s.statValue}>{stats.verifiedUsers}</Text>
-                                </View>
-                            </View>
-                            <View style={s.statBox}>
-                                <View style={[s.statIcon, { backgroundColor: 'rgba(245,158,11,0.2)' }]}>
-                                    <Ionicons name="briefcase" size={12} color={T.warning} />
-                                </View>
-                                <View>
-                                    <Text style={s.statLabel}>Corp</Text>
-                                    <Text style={s.statValue}>{stats.corporateAdmins}</Text>
-                                </View>
-                            </View>
+                    ) : (
+                        <View>
+                            <Text style={s.headerTitle}>User Governance</Text>
+                            <Text style={s.headerSubTitle}>Mobile Hub • {stats.totalUsers} Profiles</Text>
                         </View>
                     )}
+                    <TouchableOpacity onPress={() => setShowCreateUser(true)} style={s.addUserHeaderBtn}>
+                        <Ionicons name="person-add" size={16} color={T.navyDark} />
+                    </TouchableOpacity>
+                </View>
 
-                    {/* Search & Filter Bar */}
-                    <View>
-                        <View style={s.searchBar}>
-                            <Ionicons name="search" size={16} color="#94A3B8" />
-                            <TextInput
-                                placeholder="Search by name, email, phone, account, ID..."
-                                placeholderTextColor="#64748B"
-                                style={s.searchInput}
-                                value={search}
-                                onChangeText={handleSearch}
-                            />
-                            {search.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearch('')}>
-                                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                                </TouchableOpacity>
-                            )}
+                {/* 2x2 Stats Grid for Clean Mobile Viewing */}
+                {!isSelectionMode && (
+                    <View style={s.statsGrid}>
+                        <View style={s.statCard}>
+                            <Text style={s.statCardLabel}>TOTAL VAULT</Text>
+                            <Text style={s.statCardValue}>₦{stats.totalBalance > 1000000 ? (stats.totalBalance/1000000).toFixed(1)+'M' : stats.totalBalance.toLocaleString()}</Text>
                         </View>
-                        
-                        <View style={s.filterRow}>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, marginRight: 8 }}>
-                                {[
-                                    { key: 'all', label: 'All Users' },
-                                    { key: 'active', label: 'Active' },
-                                    { key: 'suspended', label: 'Suspended' },
-                                    { key: 'admin', label: 'Admins 👑' },
-                                    { key: 'verified', label: 'Verified 🛡️' },
-                                    { key: 'corporate', label: 'Corporate' },
-                                    { key: 'high_bal', label: 'High Vault' }
-                                ].map((f) => (
-                                    <TouchableOpacity 
-                                        key={f.key} 
-                                        onPress={() => setFilterStatus(f.key as any)}
-                                        style={[s.filterChip, filterStatus === f.key ? s.filterChipActive : null]}
-                                    >
-                                        <Text style={[s.filterChipText, filterStatus === f.key ? { color: T.navyDark } : { color: '#94A3B8' }]}>
-                                            {f.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    if (sortBy === 'newest') setSortBy('balance_high');
-                                    else if (sortBy === 'balance_high') setSortBy('balance_low');
-                                    else setSortBy('newest');
-                                }}
-                                style={s.sortBtn}
-                            >
-                                <Ionicons name="filter" size={12} color="#CBD5E1" style={{ marginRight: 4 }} />
-                                <Text style={s.sortBtnText}>
-                                    {sortBy === 'newest' ? 'Newest' : (sortBy === 'balance_high' ? 'High Bal' : 'Low Bal')}
-                                </Text>
-                            </TouchableOpacity>
+                        <View style={s.statCard}>
+                            <Text style={s.statCardLabel}>ACTIVE</Text>
+                            <Text style={s.statCardValue}>{stats.activeUsers}</Text>
+                        </View>
+                        <View style={s.statCard}>
+                            <Text style={s.statCardLabel}>VERIFIED</Text>
+                            <Text style={s.statCardValue}>{stats.verifiedUsers}</Text>
+                        </View>
+                        <View style={s.statCard}>
+                            <Text style={s.statCardLabel}>CORPORATE</Text>
+                            <Text style={s.statCardValue}>{stats.corporateAdmins}</Text>
                         </View>
                     </View>
-                </LinearGradient>
+                )}
+
+                {/* Search Bar */}
+                <View style={s.searchBar}>
+                    <Ionicons name="search" size={16} color={T.gold} />
+                    <TextInput
+                        placeholder="Search name, phone, account..."
+                        placeholderTextColor={T.textSub}
+                        style={s.searchInput}
+                        value={search}
+                        onChangeText={handleSearch}
+                    />
+                    {search.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearch('')}>
+                            <Ionicons name="close-circle" size={16} color={T.textSub} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Filter Chips Scroll Bar */}
+                <View style={s.filterRow}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                        {[
+                            { key: 'all', label: 'All Users' },
+                            { key: 'active', label: 'Active' },
+                            { key: 'suspended', label: 'Suspended' },
+                            { key: 'admin', label: 'Admins 👑' },
+                            { key: 'verified', label: 'Verified 🛡️' },
+                            { key: 'corporate', label: 'Corporate' },
+                            { key: 'high_bal', label: 'High Vault' }
+                        ].map((f) => (
+                            <TouchableOpacity 
+                                key={f.key} 
+                                onPress={() => setFilterStatus(f.key as any)}
+                                style={[s.filterChip, filterStatus === f.key ? s.filterChipActive : null]}
+                            >
+                                <Text style={[s.filterChipText, filterStatus === f.key ? { color: T.navyDark } : { color: T.textSub }]}>
+                                    {f.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
             </View>
 
-            {/* Sticky Bulk Selection Control Bar */}
+            {/* Bulk Selection Bar */}
             {isSelectionMode && (
                 <View style={s.bulkBar}>
                     <TouchableOpacity onPress={() => executeBulkAction('block')} style={s.bulkBtn}>
-                         <Ionicons name="ban" size={20} color={T.danger} />
+                        <Ionicons name="ban" size={18} color={T.danger} />
                         <Text style={[s.bulkBtnText, { color: T.danger }]}>Suspend</Text>
                     </TouchableOpacity>
-                     <TouchableOpacity onPress={() => executeBulkAction('unblock')} style={s.bulkBtn}>
-                         <Ionicons name="checkmark-circle" size={20} color={T.success} />
+                    <TouchableOpacity onPress={() => executeBulkAction('unblock')} style={s.bulkBtn}>
+                        <Ionicons name="checkmark-circle" size={18} color={T.success} />
                         <Text style={[s.bulkBtnText, { color: T.success }]}>Activate</Text>
                     </TouchableOpacity>
-                     <TouchableOpacity onPress={() => executeBulkAction('verify')} style={s.bulkBtn}>
-                         <Ionicons name="shield-checkmark" size={20} color={T.info} />
+                    <TouchableOpacity onPress={() => executeBulkAction('verify')} style={s.bulkBtn}>
+                        <Ionicons name="shield-checkmark" size={18} color={T.info} />
                         <Text style={[s.bulkBtnText, { color: T.info }]}>Verify</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
-            {/* Perfected User List Rendering (No Text Overlap!) */}
+            {/* Mobile-First Stacked User Cards (100% No Overlap!) */}
             <FlatList
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
@@ -1608,74 +1389,73 @@ Metadata:
                         onLongPress={() => handleLongPress(item.id)}
                         style={[s.userCard, selectedIds.has(item.id) ? s.userCardSelected : null]}
                     >
-                        {isSelectionMode && (
-                            <View style={[s.checkBox, selectedIds.has(item.id) ? s.checkBoxActive : null]}>
-                                {selectedIds.has(item.id) && <Ionicons name="checkmark" size={12} color="white" />}
-                            </View>
-                        )}
+                        {/* Section 1: Top Row (Avatar + Name/Acct + Status Badge) */}
+                        <View style={s.userCardTopRow}>
+                            {isSelectionMode && (
+                                <View style={[s.checkBox, selectedIds.has(item.id) ? s.checkBoxActive : null]}>
+                                    {selectedIds.has(item.id) && <Ionicons name="checkmark" size={12} color={T.navyDark} />}
+                                </View>
+                            )}
 
-                        <View style={s.userCardContent}>
                             <View style={[s.avatar, item.role === 'admin' ? s.avatarAdmin : null]}>
                                 {item.avatar_url ? (
-                                    <Image source={{ uri: item.avatar_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                    <Image source={{ uri: item.avatar_url }} style={s.avatarImage} resizeMode="cover" />
                                 ) : (
-                                    <Text style={[s.avatarText, item.role === 'admin' ? { color: T.goldDark } : null]}>
+                                    <Text style={[s.avatarText, item.role === 'admin' ? { color: T.gold } : null]}>
                                         {item.full_name?.charAt(0).toUpperCase() || 'U'}
                                     </Text>
                                 )}
                             </View>
-                            <View style={{ flex: 1, minWidth: 0 }}>
+
+                            <View style={s.userCardNameCol}>
                                 <Text style={s.userName} numberOfLines={1}>
                                     {item.full_name || 'Unknown User'}
                                 </Text>
-                                <View style={s.userSubRow}>
-                                    <Text style={s.accountNumber} numberOfLines={1}>
-                                        {item.account_number || 'No Account'}
-                                    </Text>
-                                    {(item.phone || item.email) && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                                            <View style={s.dotDivider} />
-                                            <Text style={s.contactInfo} numberOfLines={1}>
-                                                {item.phone || item.email}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                                <View style={s.badgesRow}>
-                                    <View style={[s.badge, item.status === 'active' ? s.badgeSuccess : s.badgeDanger]}>
-                                         <Text style={[s.badgeText, item.status === 'active' ? { color: '#047857' } : { color: '#B91C1C' }]}>
-                                            {item.status}
-                                         </Text>
-                                    </View>
-                                    {item.role === 'admin' && (
-                                        <View style={[s.badge, s.badgeGold]}>
-                                            <Text style={[s.badgeText, { color: '#B45309' }]}>ADMIN</Text>
-                                        </View>
-                                    )}
-                                    {item.corporate_email && (
-                                        <View style={[s.badge, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
-                                            <Ionicons name="at-circle" size={10} color="#D97706" />
-                                            <Text style={[s.badgeText, { color: '#B45309', marginLeft: 2 }]} numberOfLines={1}>
-                                                {item.corporate_email}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {item.kyc_verified && (
-                                        <View style={[s.badge, s.badgeInfo]}>
-                                            <Ionicons name="shield-checkmark" size={10} color={T.info} />
-                                        </View>
-                                    )}
-                                </View>
+                                <Text style={s.accountNumber} numberOfLines={1}>
+                                    {item.account_number ? `Acct: ${item.account_number}` : 'No Acct'} • {item.phone || item.email}
+                                </Text>
+                            </View>
+
+                            <View style={[s.statusBadge, item.status === 'active' ? s.statusBadgeActive : s.statusBadgeSuspended]}>
+                                <Text style={[s.statusBadgeText, item.status === 'active' ? { color: T.success } : { color: T.danger }]}>
+                                    {item.status}
+                                </Text>
                             </View>
                         </View>
-                        
-                        <View style={s.userCardRight}>
-                            <View style={{ alignItems: 'flex-end', marginRight: 6 }}>
-                                <Text style={s.balLabel}>Vault Bal</Text>
-                                <Text style={s.balAmount} numberOfLines={1}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
+
+                        {/* Section 2: Badges Row (Role, Corporate Email, KYC Status) */}
+                        <View style={s.badgesRow}>
+                            {item.role === 'admin' && (
+                                <View style={s.badgeGold}>
+                                    <MaterialCommunityIcons name="crown" size={10} color={T.gold} />
+                                    <Text style={s.badgeGoldText}>ADMIN</Text>
+                                </View>
+                            )}
+                            {item.corporate_email && (
+                                <View style={s.badgeCorp}>
+                                    <Ionicons name="at-circle" size={10} color={T.warning} />
+                                    <Text style={s.badgeCorpText} numberOfLines={1}>{item.corporate_email}</Text>
+                                </View>
+                            )}
+                            {item.kyc_verified && (
+                                <View style={s.badgeVerified}>
+                                    <Ionicons name="shield-checkmark" size={10} color={T.info} />
+                                    <Text style={s.badgeVerifiedText}>Tier {item.kyc_tier || 1} Verified</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Section 3: Bottom Dedicated Vault Balance Pill (Navy & Gold Accent) */}
+                        <View style={s.vaultBalanceBar}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="wallet-outline" size={14} color={T.gold} />
+                                <Text style={s.vaultLabel}>VAULT BAL:</Text>
+                                <Text style={s.vaultAmount}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
                             </View>
-                            <View style={s.chevronCircle}>
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+
+                            <View style={s.manageBtn}>
+                                <Text style={s.manageBtnText}>Manage</Text>
+                                <Ionicons name="chevron-forward" size={12} color={T.navyDark} />
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -1683,31 +1463,18 @@ Metadata:
                 ListEmptyComponent={
                     <View style={s.emptyWrapper}>
                         {loading ? (
-                            <View style={{ paddingHorizontal: 8 }}>
-                                {[1, 2, 3, 4, 5].map(i => (
-                                    <View key={i} style={s.skeletonRow}>
-                                        <View style={s.skeletonAvatar} />
-                                        <View style={{ flex: 1, gap: 6 }}>
-                                            <View style={s.skeletonTextLine1} />
-                                            <View style={s.skeletonTextLine2} />
-                                        </View>
-                                    </View>
-                                ))}
-                            </View>
+                            <ActivityIndicator size="large" color={T.gold} />
                         ) : (
                             <View style={s.emptyCard}>
-                                <View style={s.emptyIconCircle}>
-                                    <Ionicons name="people-outline" size={40} color="#94A3B8" />
-                                </View>
-                                <Text style={s.emptyTitle}>No Matching Users</Text>
-                                <Text style={s.emptySubText}>Try adjusting your search criteria or filter options.</Text>
+                                <Ionicons name="people-outline" size={36} color={T.gold} />
+                                <Text style={s.emptyTitle}>No Users Found</Text>
                             </View>
                         )}
                     </View>
                 }
             />
             
-            {/* Render Modals */}
+            {/* Modals */}
             {renderUserModal()}
             {renderCreateUserModal()}
 
@@ -1725,237 +1492,189 @@ Metadata:
     );
 }
 
-// Embedded StyleSheet (CSS for Manager Users Screen)
+// Embedded StyleSheet (CSS for Mobile-First Navy & Gold Manager Users Screen)
 const s = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: T.bg,
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'ios' ? 50 : 20,
+        paddingTop: Platform.OS === 'ios' ? 48 : 16,
         paddingHorizontal: 12,
-        paddingBottom: 8,
-    },
-    headerGradient: {
-        paddingVertical: 18,
-        paddingHorizontal: 16,
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: 'rgba(212,175,55,0.3)',
+        paddingBottom: 10,
+        backgroundColor: T.navyDark,
+        borderBottomWidth: 1.5,
+        borderBottomColor: T.gold,
     },
     headerTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     headerTitle: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '900',
         letterSpacing: -0.5,
     },
+    headerSubTitle: {
+        color: T.gold,
+        fontSize: 11,
+        fontWeight: '700',
+    },
     closeSelectionBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: T.goldBg,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 8,
     },
     selectionText: {
         color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '800',
     },
     addUserHeaderBtn: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: 'rgba(212,175,55,0.25)',
-        borderWidth: 1,
-        borderColor: T.gold,
+        backgroundColor: T.gold,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    statsRow: {
+    statsGrid: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 12,
+        flexWrap: 'wrap',
         gap: 6,
+        marginBottom: 10,
     },
-    statBox: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 12,
+    statCard: {
+        width: '49%',
+        backgroundColor: T.card,
+        borderRadius: 10,
         padding: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: T.cardBorder,
     },
-    statIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 6,
-    },
-    statLabel: {
-        color: '#94A3B8',
-        fontSize: 10,
-        fontWeight: '700',
+    statCardLabel: {
+        color: T.textSub,
+        fontSize: 9,
+        fontWeight: '800',
         textTransform: 'uppercase',
     },
-    statValue: {
-        color: '#FFFFFF',
-        fontSize: 12,
+    statCardValue: {
+        color: T.gold,
+        fontSize: 14,
         fontWeight: '900',
+        marginTop: 2,
     },
     searchBar: {
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 40,
+        backgroundColor: T.card,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        height: 38,
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
         borderWidth: 1,
-        borderColor: 'rgba(212,175,55,0.2)',
+        borderColor: T.gold,
     },
     searchInput: {
         flex: 1,
         marginLeft: 8,
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '600',
     },
     filterRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
     },
     filterChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        marginRight: 6,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderColor: T.border,
+        backgroundColor: T.card,
     },
     filterChipActive: {
         backgroundColor: T.gold,
         borderColor: T.goldDark,
     },
     filterChipText: {
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    sortBtn: {
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    sortBtnText: {
-        color: '#FFFFFF',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
     bulkBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderTopWidth: 1,
-        borderTopColor: T.border,
+        backgroundColor: T.navyMid,
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: T.gold,
         flexDirection: 'row',
         justifyContent: 'space-around',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-        elevation: 10,
     },
     bulkBtn: {
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        backgroundColor: T.card,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: T.border,
-        minWidth: 90,
+        minWidth: 80,
     },
     bulkBtnText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
-        marginTop: 4,
+        marginTop: 2,
     },
     listContent: {
-        paddingHorizontal: 14,
+        paddingHorizontal: 10,
         paddingTop: 8,
-        paddingBottom: 140,
+        paddingBottom: 100,
     },
+    // Stacked User Card (100% Mobile-First!)
     userCard: {
         backgroundColor: T.card,
-        borderRadius: 16,
+        borderRadius: 14,
         padding: 12,
         marginBottom: 10,
-        borderWidth: 1,
-        borderColor: T.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#64748b',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
+        borderWidth: 1.2,
+        borderColor: T.cardBorder,
+        gap: 8,
     },
     userCardSelected: {
-        backgroundColor: T.goldBg,
+        backgroundColor: T.navyMid,
         borderColor: T.gold,
     },
+    userCardTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
     checkBox: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
         borderWidth: 1.5,
-        borderColor: T.textSub,
+        borderColor: T.gold,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 10,
     },
     checkBoxActive: {
         backgroundColor: T.gold,
-        borderColor: T.goldDark,
-    },
-    userCardContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        gap: 12,
-        minWidth: 0,
     },
     avatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#F1F5F9',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: T.navyMid,
         borderWidth: 1.5,
         borderColor: T.border,
         alignItems: 'center',
@@ -1963,25 +1682,26 @@ const s = StyleSheet.create({
         overflow: 'hidden',
     },
     avatarAdmin: {
-        backgroundColor: T.goldBg,
         borderColor: T.gold,
+        backgroundColor: T.goldBg,
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
     avatarText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
-        color: T.textMain,
+        color: '#FFFFFF',
+    },
+    userCardNameCol: {
+        flex: 1,
+        minWidth: 0,
     },
     userName: {
         fontSize: 14,
         fontWeight: '800',
-        color: T.textMain,
-        marginBottom: 2,
-    },
-    userSubRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        marginBottom: 4,
+        color: '#FFFFFF',
     },
     accountNumber: {
         fontSize: 11,
@@ -1989,200 +1709,191 @@ const s = StyleSheet.create({
         color: T.textSub,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
-    dotDivider: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: T.textSub,
-        marginHorizontal: 3,
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 1,
     },
-    contactInfo: {
-        fontSize: 11,
-        color: T.textSub,
-        fontWeight: '500',
+    statusBadgeActive: {
+        backgroundColor: T.successBg,
+        borderColor: T.success,
+    },
+    statusBadgeSuspended: {
+        backgroundColor: T.dangerBg,
+        borderColor: T.danger,
+    },
+    statusBadgeText: {
+        fontSize: 9,
+        fontWeight: '900',
+        textTransform: 'uppercase',
     },
     badgesRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
         flexWrap: 'wrap',
-    },
-    badge: {
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-        borderRadius: 6,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    badgeSuccess: {
-        backgroundColor: '#ECFDF5',
-        borderColor: '#A7F3D0',
-    },
-    badgeDanger: {
-        backgroundColor: '#FEF2F2',
-        borderColor: '#FECACA',
     },
     badgeGold: {
         backgroundColor: T.goldBg,
         borderColor: T.gold,
-    },
-    badgeInfo: {
-        backgroundColor: '#F0F9FF',
-        borderColor: '#BAE6FD',
-    },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    userCardRight: {
+        borderWidth: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingLeft: 6,
+        gap: 3,
     },
-    balLabel: {
+    badgeGoldText: {
+        color: T.gold,
+        fontSize: 9,
+        fontWeight: '900',
+    },
+    badgeCorp: {
+        backgroundColor: T.warningBg,
+        borderColor: T.warning,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        maxWidth: 160,
+    },
+    badgeCorpText: {
+        color: T.warning,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    badgeVerified: {
+        backgroundColor: T.infoBg,
+        borderColor: T.info,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    badgeVerifiedText: {
+        color: T.info,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    vaultBalanceBar: {
+        backgroundColor: T.navyDark,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: T.gold,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    vaultLabel: {
         fontSize: 10,
-        fontWeight: '700',
-        color: T.textSub,
-        textTransform: 'uppercase',
+        fontWeight: '800',
+        color: T.gold,
     },
-    balAmount: {
+    vaultAmount: {
         fontSize: 14,
         fontWeight: '900',
-        color: T.navyMid,
+        color: '#FFFFFF',
     },
-    chevronCircle: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: '#F1F5F9',
+    manageBtn: {
+        backgroundColor: T.gold,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 2,
+    },
+    manageBtnText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: T.navyDark,
+        textTransform: 'uppercase',
     },
     emptyWrapper: {
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 20,
-    },
-    skeletonRow: {
-        marginBottom: 12,
-        backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: T.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    skeletonAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#E2E8F0',
-        marginRight: 12,
-    },
-    skeletonTextLine1: {
-        height: 14,
-        backgroundColor: '#E2E8F0',
-        borderRadius: 7,
-        width: '60%',
-    },
-    skeletonTextLine2: {
-        height: 10,
-        backgroundColor: '#E2E8F0',
-        borderRadius: 5,
-        width: '40%',
+        paddingVertical: 30,
     },
     emptyCard: {
         alignItems: 'center',
-        backgroundColor: T.navyMid,
-        padding: 30,
-        borderRadius: 24,
+        backgroundColor: T.card,
+        padding: 24,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: T.gold,
-        width: '100%',
-    },
-    emptyIconCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: T.navyDark,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 12,
     },
     emptyTitle: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '800',
-        marginBottom: 4,
+        marginTop: 6,
     },
-    emptySubText: {
-        color: '#94A3B8',
-        fontSize: 13,
-        textAlign: 'center',
-    },
-    // Modals & Tabs
+    // Modals
     modalOverlay: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 10,
+        padding: 8,
     },
     modalCard: {
         backgroundColor: T.bg,
-        borderRadius: 24,
-        height: '94%',
-        width: '98%',
-        maxWidth: 520,
+        borderRadius: 20,
+        height: '95%',
+        width: '100%',
+        maxWidth: 500,
         overflow: 'hidden',
         borderWidth: 1.5,
         borderColor: T.gold,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
         backgroundColor: T.navyDark,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(212,175,55,0.3)',
+        borderBottomColor: T.gold,
     },
     modalHeaderTitle: {
         color: '#FFFFFF',
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 13,
         textTransform: 'uppercase',
-        letterSpacing: 1,
     },
     iconCircleBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: T.navyMid,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: T.border,
     },
     modalHeroBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(212,175,55,0.3)',
+        borderBottomColor: T.border,
     },
     modalAvatarWrapper: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        backgroundColor: '#FFFFFF',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: T.navyMid,
         borderWidth: 2,
         borderColor: T.gold,
         alignItems: 'center',
@@ -2194,63 +1905,27 @@ const s = StyleSheet.create({
         height: '100%',
     },
     modalAvatarText: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: '900',
-        color: T.goldDark,
+        color: T.gold,
     },
     modalUserName: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
     },
     modalUserEmail: {
         color: T.gold,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
     },
-    statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        borderWidth: 1,
-    },
-    statusBadgeActive: {
-        backgroundColor: 'rgba(16,185,129,0.2)',
-        borderColor: T.success,
-    },
-    statusBadgeSuspended: {
-        backgroundColor: 'rgba(239,68,68,0.2)',
-        borderColor: T.danger,
-    },
-    statusBadgeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    kycBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        backgroundColor: 'rgba(96,165,250,0.2)',
-        borderColor: '#60A5FA',
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    kycBadgeText: {
-        color: '#93C5FD',
-        fontSize: 10,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-        marginLeft: 4,
-    },
     contactBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: T.navyCard,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: T.gold,
         alignItems: 'center',
         justifyContent: 'center',
         marginLeft: 4,
@@ -2260,11 +1935,10 @@ const s = StyleSheet.create({
         backgroundColor: T.navyDark,
         borderBottomWidth: 1,
         borderBottomColor: T.border,
-        paddingHorizontal: 4,
     },
     modalTabItem: {
         flex: 1,
-        paddingVertical: 10,
+        paddingVertical: 8,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 2,
@@ -2275,45 +1949,43 @@ const s = StyleSheet.create({
         borderBottomColor: T.gold,
     },
     modalTabText: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '800',
-        color: '#94A3B8',
         textTransform: 'uppercase',
     },
     sectionHeading: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
-        color: T.navyMid,
+        color: T.gold,
         textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 8,
+        letterSpacing: 0.5,
+        marginBottom: 6,
         marginTop: 6,
     },
     walletCard: {
-        flex: 1.4,
         backgroundColor: T.navyDark,
-        padding: 14,
-        borderRadius: 16,
+        padding: 12,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: T.gold,
+        marginBottom: 10,
     },
     walletLabel: {
         color: T.gold,
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
-        marginBottom: 4,
     },
     walletValue: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '900',
     },
     accountChip: {
-        marginTop: 8,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginTop: 6,
+        backgroundColor: T.card,
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 3,
         borderRadius: 6,
         alignSelf: 'flex-start',
         flexDirection: 'row',
@@ -2326,86 +1998,60 @@ const s = StyleSheet.create({
         fontWeight: '700',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
-    aiInsightCard: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: T.border,
-        justifyContent: 'space-between',
-    },
-    aiTitle: {
-        color: T.navyMid,
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    aiRisk: {
-        fontSize: 12,
-        fontWeight: '900',
-        textTransform: 'uppercase',
-        marginVertical: 2,
-    },
-    aiNextAction: {
-        color: T.goldDark,
-        fontSize: 11,
-        fontWeight: '700',
-    },
     virtualAtmCard: {
-        backgroundColor: T.navyCard,
-        borderRadius: 16,
-        padding: 14,
+        backgroundColor: T.navyMid,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
         borderColor: T.gold,
-        marginBottom: 14,
+        marginBottom: 10,
     },
     controlCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: T.card,
         padding: 12,
-        borderRadius: 16,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: T.border,
-        marginBottom: 12,
+        borderColor: T.cardBorder,
+        marginBottom: 10,
     },
     switchRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     switchLabel: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
         textTransform: 'uppercase',
     },
     customAmountInputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
+        backgroundColor: T.navyMid,
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: T.border,
-        width: 130,
-        height: 36,
-        paddingHorizontal: 8,
+        borderColor: T.gold,
+        width: 110,
+        height: 32,
+        paddingHorizontal: 6,
     },
     nairaSymbol: {
         fontWeight: '900',
-        color: T.navyMid,
-        fontSize: 13,
+        color: T.gold,
+        fontSize: 12,
     },
     customAmountInput: {
         flex: 1,
-        color: T.navyMid,
+        color: '#FFFFFF',
         fontWeight: '700',
-        fontSize: 13,
+        fontSize: 12,
         textAlign: 'center',
     },
     actionCheckBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2416,222 +2062,165 @@ const s = StyleSheet.create({
     },
     presetChip: {
         flex: 1,
-        paddingVertical: 6,
-        borderRadius: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
         borderWidth: 1,
         borderColor: T.border,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: T.navyMid,
         alignItems: 'center',
     },
     presetChipActive: {
-        backgroundColor: T.navyMid,
-        borderColor: T.navyDark,
+        backgroundColor: T.gold,
+        borderColor: T.goldDark,
     },
     presetChipText: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '800',
         color: T.textMain,
     },
     infoListCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: T.card,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: T.border,
-        padding: 12,
-        gap: 10,
-        marginBottom: 12,
+        borderColor: T.cardBorder,
+        padding: 10,
+        gap: 8,
+        marginBottom: 10,
     },
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        paddingVertical: 2,
     },
     infoLabel: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: T.textSub,
     },
     infoValue: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
-        color: T.navyMid,
+        color: '#FFFFFF',
     },
-    // KYC Styles
     kycDetailCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: T.card,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: T.border,
-        padding: 14,
-        gap: 12,
-        marginBottom: 14,
+        borderColor: T.cardBorder,
+        padding: 12,
+        gap: 8,
+        marginBottom: 10,
     },
     kycItemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
     },
     kycItemLabel: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
-        color: T.navyMid,
+        color: T.textSub,
     },
     kycItemValue: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
-        color: T.textSub,
+        color: '#FFFFFF',
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     tierBtn: {
         flex: 1,
-        padding: 12,
-        borderRadius: 12,
+        padding: 10,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: T.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: T.card,
         alignItems: 'center',
     },
     tierBtnActive: {
-        backgroundColor: T.navyDark,
-        borderColor: T.gold,
+        backgroundColor: T.gold,
+        borderColor: T.goldDark,
     },
     tierBtnText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '900',
-        color: T.navyMid,
+        color: '#FFFFFF',
     },
-    // Controls Grid
     actionsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 14,
+        gap: 6,
+        marginBottom: 10,
     },
     gridBtn: {
         width: '48%',
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 8,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: T.border,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: T.card,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 4,
     },
     gridBtnDanger: {
         backgroundColor: T.dangerBg,
-        borderColor: '#FECACA',
+        borderColor: T.danger,
     },
     gridBtnSuccess: {
         backgroundColor: T.successBg,
-        borderColor: '#A7F3D0',
+        borderColor: T.success,
     },
     gridBtnText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
         textTransform: 'uppercase',
         color: T.textMain,
-    },
-    limitCard: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: T.border,
-    },
-    limitTitle: {
-        color: T.navyMid,
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-        marginBottom: 6,
-    },
-    limitInput: {
-        fontWeight: '900',
-        fontSize: 16,
-        color: T.navyDark,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        height: 38,
-        borderWidth: 1,
-        borderColor: T.border,
-    },
-    notesCard: {
-        flex: 1.5,
-        backgroundColor: '#FFFBEB',
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    notesTitle: {
-        color: '#92400E',
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    notesInput: {
-        fontSize: 12,
-        color: '#78350F',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#FCD34D',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        minHeight: 42,
     },
     subFormCard: {
-        backgroundColor: '#F0FDFA',
-        padding: 14,
-        borderRadius: 16,
+        backgroundColor: T.card,
+        padding: 12,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#99F6E4',
-        marginBottom: 16,
-    },
-    subFormInput: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 13,
-        color: T.textMain,
+        borderColor: T.gold,
         marginBottom: 10,
     },
+    subFormInput: {
+        backgroundColor: T.navyMid,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        fontSize: 12,
+        color: '#FFFFFF',
+        marginBottom: 8,
+    },
     subFormSubmitBtn: {
-        paddingVertical: 10,
-        borderRadius: 10,
+        backgroundColor: T.gold,
+        paddingVertical: 8,
+        borderRadius: 8,
         alignItems: 'center',
     },
     subFormSubmitBtnText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '800',
+        color: T.navyDark,
+        fontSize: 11,
+        fontWeight: '900',
         textTransform: 'uppercase',
     },
     txCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: T.card,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: T.border,
+        borderColor: T.cardBorder,
         overflow: 'hidden',
-        marginBottom: 16,
+        marginBottom: 10,
     },
     noHistoryText: {
         color: T.textSub,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
@@ -2639,100 +2228,88 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-    },
-    txIconWrapper: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
     },
     txTitle: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
-        color: T.textMain,
+        color: '#FFFFFF',
         textTransform: 'capitalize',
     },
     txDate: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '600',
         color: T.textSub,
     },
     txAmount: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '900',
     },
     fieldLabel: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
-        color: T.navyMid,
+        color: T.gold,
         textTransform: 'uppercase',
-        marginBottom: 4,
+        marginBottom: 3,
     },
-    // Create User Modal
     createUserCard: {
         backgroundColor: T.navyMid,
-        borderRadius: 24,
-        height: '88%',
+        borderRadius: 20,
+        height: '85%',
         width: '96%',
-        maxWidth: 480,
+        maxWidth: 440,
         overflow: 'hidden',
         borderWidth: 1.5,
         borderColor: T.gold,
     },
     createUserHeader: {
-        paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: T.navyDark,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(212,175,55,0.3)',
+        borderBottomColor: T.gold,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
     createUserTitle: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
     },
     createInput: {
-        backgroundColor: T.navyCard,
+        backgroundColor: T.navyDark,
         borderWidth: 1,
-        borderColor: 'rgba(212,175,55,0.2)',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        borderColor: T.gold,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
     },
     adminRoleSwitchRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: T.navyCard,
-        padding: 14,
-        borderRadius: 14,
+        backgroundColor: T.navyDark,
+        padding: 12,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: 'rgba(212,175,55,0.2)',
-        marginTop: 6,
+        borderColor: T.border,
     },
     createUserBtn: {
         backgroundColor: T.gold,
-        paddingVertical: 14,
-        borderRadius: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
         alignItems: 'center',
-        marginTop: 10,
-        borderWidth: 1,
-        borderColor: T.goldDark,
+        marginTop: 6,
     },
     createUserBtnText: {
         color: T.navyDark,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '900',
         textTransform: 'uppercase',
-        letterSpacing: 1,
     },
 });
