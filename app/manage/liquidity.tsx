@@ -95,6 +95,7 @@ export default function LiquidityVaultScreen() {
     // Low Float Email Alert States
     const [alertEmail, setAlertEmail] = useState('');
     const [alertThreshold, setAlertThreshold] = useState('5000');
+    const [alertIntervalMins, setAlertIntervalMins] = useState('30');
     const [alertEnabled, setAlertEnabled] = useState(true);
     const [savingAlerts, setSavingAlerts] = useState(false);
     const [showAlertCard, setShowAlertCard] = useState(false);
@@ -118,6 +119,7 @@ export default function LiquidityVaultScreen() {
         if (vaultSecrets) {
             if (vaultSecrets['LOW_BALANCE_ALERT_EMAIL']) setAlertEmail(vaultSecrets['LOW_BALANCE_ALERT_EMAIL']);
             if (vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']) setAlertThreshold(vaultSecrets['LOW_BALANCE_ALERT_THRESHOLD']);
+            if (vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']) setAlertIntervalMins(vaultSecrets['LOW_BALANCE_ALERT_INTERVAL_MINS']);
             if (vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] !== undefined) {
                 setAlertEnabled(vaultSecrets['LOW_BALANCE_ALERT_ENABLED'] === 'true');
             }
@@ -134,6 +136,7 @@ export default function LiquidityVaultScreen() {
             const updates = [
                 { key: 'LOW_BALANCE_ALERT_EMAIL', value: alertEmail.trim(), description: 'Admin Email for Low Balance Alerts' },
                 { key: 'LOW_BALANCE_ALERT_THRESHOLD', value: alertThreshold.trim() || '5000', description: 'Minimum API Balance Threshold in NGN' },
+                { key: 'LOW_BALANCE_ALERT_INTERVAL_MINS', value: alertIntervalMins.trim() || '30', description: 'Low Float Alert Cooldown Interval in Minutes' },
                 { key: 'LOW_BALANCE_ALERT_ENABLED', value: alertEnabled ? 'true' : 'false', description: 'Enable Auto Low Balance Email Alerts' }
             ];
 
@@ -149,7 +152,7 @@ export default function LiquidityVaultScreen() {
 
             Alert.alert(
                 "Alert Settings Saved! ⚡",
-                `Low Float Email Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, an automated email notification will be dispatched.`
+                `Low Float Email Alerts are configured for ${alertEmail.trim()}.\n\nWhenever any API wallet drops below ₦${Number(alertThreshold).toLocaleString()}, an automated email alert will be sent every ${alertIntervalMins.trim() || 30} minutes.`
             );
             setShowAlertCard(false);
             fetchProviderBalances();
@@ -713,7 +716,7 @@ export default function LiquidityVaultScreen() {
                                     ⚡ Low Float Auto Email Alerts
                                 </Text>
                                 <Text style={{ color: T.textSub, fontSize: 9.5 }} numberOfLines={1}>
-                                    {alertEnabled && alertEmail ? `Alerts active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()})` : 'Configure email & minimum balance threshold'}
+                                    {alertEnabled && alertEmail ? `Alerts active → ${alertEmail} (Min: ₦${Number(alertThreshold || 5000).toLocaleString()} | Every ${alertIntervalMins || 30} mins)` : 'Configure email, minimum threshold & time interval'}
                                 </Text>
                             </View>
                         </View>
@@ -723,7 +726,7 @@ export default function LiquidityVaultScreen() {
                     {showAlertCard && (
                         <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
                             <Text style={{ color: T.textSub, fontSize: 10, marginBottom: 10, lineHeight: 14 }}>
-                                Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Single or grouped reports dispatched automatically!
+                                Receive automated email notifications whenever any API vendor wallet balance drops below your specified minimum threshold. Set your preferred check frequency in minutes!
                             </Text>
 
                             <Text style={styles.inputLabel}>Notification Email Address</Text>
@@ -737,15 +740,30 @@ export default function LiquidityVaultScreen() {
                                 onChangeText={setAlertEmail}
                             />
 
-                            <Text style={styles.inputLabel}>Minimum Float Threshold (₦)</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="e.g. 5000"
-                                placeholderTextColor="#94a3b8"
-                                keyboardType="numeric"
-                                value={alertThreshold}
-                                onChangeText={setAlertThreshold}
-                            />
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Minimum Threshold (₦)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. 5000"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="numeric"
+                                        value={alertThreshold}
+                                        onChangeText={setAlertThreshold}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Interval (Minutes)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="e.g. 30"
+                                        placeholderTextColor="#94a3b8"
+                                        keyboardType="numeric"
+                                        value={alertIntervalMins}
+                                        onChangeText={setAlertIntervalMins}
+                                    />
+                                </View>
+                            </View>
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
                                 <Text style={{ color: T.navy, fontWeight: '600', fontSize: 11 }}>Enable Auto Email Alerts</Text>

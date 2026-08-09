@@ -906,6 +906,8 @@ serve(async (req: Request) => {
     // -------------------------------------------------------------------------
     const alertEmail = secrets['LOW_BALANCE_ALERT_EMAIL'] || secrets['ALERT_EMAIL'] || Deno.env.get('ADMIN_ALERT_EMAIL') || ''
     const alertThreshold = Number(secrets['LOW_BALANCE_ALERT_THRESHOLD'] || '5000')
+    const alertIntervalMins = Number(secrets['LOW_BALANCE_ALERT_INTERVAL_MINS'] || '30')
+    const cooldownMs = Math.max(1, alertIntervalMins) * 60 * 1000
     const alertEnabled = (secrets['LOW_BALANCE_ALERT_ENABLED'] || 'true') === 'true'
     let alertReport: any = null
 
@@ -916,10 +918,10 @@ serve(async (req: Request) => {
         const lastSentStr = secrets['LAST_LOW_BALANCE_ALERT_SENT'] || ''
         const lastSentTime = lastSentStr ? new Date(lastSentStr).getTime() : 0
         const nowMs = Date.now()
-        const isForceTrigger = reqData?.triggerAlertCheck === true
+        const isForceTrigger = reqData?.triggerAlertCheck === true || reqData?.force === true
 
-        // Cooldown: 30 minutes between automatic emails (unless force trigger from UI button)
-        if (isForceTrigger || (nowMs - lastSentTime > 30 * 60 * 1000)) {
+        // Cooldown: Dynamic interval configured by user in minutes (default 30 mins)
+        if (isForceTrigger || (nowMs - lastSentTime >= cooldownMs)) {
           try {
             let subject = ''
             let text = ''
