@@ -29,6 +29,8 @@ const T = {
   dangerBg: '#FEE2E2',
   info: '#3B82F6',
   infoBg: '#DBEAFE',
+  purple: '#8B5CF6',
+  purpleBg: '#F3E8FF',
 };
 
 interface SMMService {
@@ -46,6 +48,7 @@ export default function SocialBoostScreen() {
   
   // Form State
   const [platformFilter, setPlatformFilter] = useState<string>('All');
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<SMMService | null>(null);
   const [link, setLink] = useState('');
@@ -115,7 +118,7 @@ export default function SocialBoostScreen() {
       }
       if (!userId) return 0;
 
-      // 3. Query profiles table with select('*') so PostgreSQL never fails on column names
+      // 3. Query profiles table with select('*') to prevent missing column errors
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -167,7 +170,7 @@ export default function SocialBoostScreen() {
 
   const fetchData = async () => {
     try {
-      // First load from cache for instant display
+      // Load from cache for instant display
       const cachedServices = await AsyncStorage.getItem('smm_services_cache');
       if (cachedServices) {
         setServices(JSON.parse(cachedServices));
@@ -193,12 +196,18 @@ export default function SocialBoostScreen() {
     }
   };
 
-  // Filter categories by selected platform filter tab
+  // Filter categories by platform filter & category search query
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(services.map(s => s.category.trim())));
-    if (platformFilter === 'All') return cats.sort();
-    return cats.filter(c => c.toLowerCase().includes(platformFilter.toLowerCase())).sort();
-  }, [services, platformFilter]);
+    let cats = Array.from(new Set(services.map(s => s.category.trim())));
+    if (platformFilter !== 'All') {
+      cats = cats.filter(c => c.toLowerCase().includes(platformFilter.toLowerCase()));
+    }
+    if (categorySearchQuery.trim()) {
+      const q = categorySearchQuery.toLowerCase().trim();
+      cats = cats.filter(c => c.toLowerCase().includes(q));
+    }
+    return cats.sort();
+  }, [services, platformFilter, categorySearchQuery]);
 
   const filteredServices = useMemo(() => {
     let list = services;
@@ -226,13 +235,14 @@ export default function SocialBoostScreen() {
   const linkDetector = useMemo(() => {
     if (!link.trim()) return null;
     const l = link.toLowerCase();
-    if (l.includes('instagram.com') || l.includes('instagr.am')) return { platform: 'Instagram', icon: 'logo-instagram', color: '#E1306C' };
-    if (l.includes('tiktok.com')) return { platform: 'TikTok', icon: 'logo-tiktok', color: '#000000' };
-    if (l.includes('youtube.com') || l.includes('youtu.be')) return { platform: 'YouTube', icon: 'logo-youtube', color: '#FF0000' };
-    if (l.includes('facebook.com') || l.includes('fb.watch')) return { platform: 'Facebook', icon: 'logo-facebook', color: '#1877F2' };
-    if (l.includes('twitter.com') || l.includes('x.com')) return { platform: 'Twitter/X', icon: 'logo-twitter', color: '#1DA1F2' };
-    if (l.includes('t.me') || l.includes('telegram.org')) return { platform: 'Telegram', icon: 'paper-plane', color: '#0088CC' };
-    return { platform: 'Web', icon: 'link-outline', color: '#64748b' };
+    if (l.includes('instagram.com') || l.includes('instagr.am')) return { platform: 'Instagram', icon: 'logo-instagram', color: '#E1306C', example: 'https://instagram.com/p/username' };
+    if (l.includes('tiktok.com')) return { platform: 'TikTok', icon: 'logo-tiktok', color: '#000000', example: 'https://tiktok.com/@username/video/123' };
+    if (l.includes('youtube.com') || l.includes('youtu.be')) return { platform: 'YouTube', icon: 'logo-youtube', color: '#FF0000', example: 'https://youtube.com/watch?v=abc' };
+    if (l.includes('facebook.com') || l.includes('fb.watch')) return { platform: 'Facebook', icon: 'logo-facebook', color: '#1877F2', example: 'https://facebook.com/posts/123' };
+    if (l.includes('twitter.com') || l.includes('x.com')) return { platform: 'Twitter/X', icon: 'logo-twitter', color: '#1DA1F2', example: 'https://x.com/username/status/123' };
+    if (l.includes('t.me') || l.includes('telegram.org')) return { platform: 'Telegram', icon: 'paper-plane', color: '#0088CC', example: 'https://t.me/channel/123' };
+    if (l.includes('spotify.com')) return { platform: 'Spotify', icon: 'musical-notes', color: '#1DB954', example: 'https://open.spotify.com/track/123' };
+    return { platform: 'Web Link', icon: 'link-outline', color: '#64748b', example: 'https://example.com' };
   }, [link]);
 
   const handleSubmit = async () => {
@@ -299,15 +309,15 @@ export default function SocialBoostScreen() {
 
   const getPlatformIcon = (cat: string) => {
     const l = cat.toLowerCase();
-    if (l.includes('instagram') || l.includes('ig')) return { name: 'logo-instagram', color: '#E1306C' };
-    if (l.includes('facebook') || l.includes('fb')) return { name: 'logo-facebook', color: '#1877F2' };
-    if (l.includes('youtube') || l.includes('yt')) return { name: 'logo-youtube', color: '#FF0000' };
-    if (l.includes('tiktok') || l.includes('tik')) return { name: 'logo-tiktok', color: '#000000' };
-    if (l.includes('twitter') || l.includes('x')) return { name: 'logo-twitter', color: '#1DA1F2' };
-    if (l.includes('telegram') || l.includes('tg')) return { name: 'paper-plane', color: '#0088CC' };
-    if (l.includes('spotify')) return { name: 'musical-notes', color: '#1DB954' };
-    if (l.includes('linkedin')) return { name: 'logo-linkedin', color: '#0A66C2' };
-    return { name: 'globe-outline', color: T.textSub };
+    if (l.includes('instagram') || l.includes('ig')) return { name: 'logo-instagram', color: '#E1306C', bg: '#FCE7F3' };
+    if (l.includes('facebook') || l.includes('fb')) return { name: 'logo-facebook', color: '#1877F2', bg: '#DBEAFE' };
+    if (l.includes('youtube') || l.includes('yt')) return { name: 'logo-youtube', color: '#FF0000', bg: '#FEE2E2' };
+    if (l.includes('tiktok') || l.includes('tik')) return { name: 'logo-tiktok', color: '#000000', bg: '#F1F5F9' };
+    if (l.includes('twitter') || l.includes('x')) return { name: 'logo-twitter', color: '#1DA1F2', bg: '#E0F2FE' };
+    if (l.includes('telegram') || l.includes('tg')) return { name: 'paper-plane', color: '#0088CC', bg: '#E0F2FE' };
+    if (l.includes('spotify')) return { name: 'musical-notes', color: '#1DB954', bg: '#DCFCE7' };
+    if (l.includes('linkedin')) return { name: 'logo-linkedin', color: '#0A66C2', bg: '#DBEAFE' };
+    return { name: 'globe-outline', color: T.textSub, bg: T.bgLight };
   };
 
   if (loading) {
@@ -334,15 +344,22 @@ export default function SocialBoostScreen() {
           <TouchableOpacity onPress={() => router.back()} style={s.iconBtn} activeOpacity={0.8}>
             <Ionicons name="chevron-back" size={20} color={T.gold} />
           </TouchableOpacity>
+
           <View style={s.headerTitleCol}>
-            <Text style={s.headerTitle}>Social Boost</Text>
-            <View style={s.balanceChip}>
-              <Ionicons name="wallet-outline" size={12} color={T.gold} />
+            <Text style={s.headerTitle}>Social Boost Hub</Text>
+            <TouchableOpacity 
+              onPress={fetchUserBalance} 
+              activeOpacity={0.8}
+              style={s.balanceChip}
+            >
+              <Ionicons name="wallet" size={13} color={T.gold} />
               <Text style={s.balanceChipText}>₦{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-            </View>
+              <Ionicons name="refresh" size={10} color={T.gold} style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
           </View>
+
           <TouchableOpacity onPress={() => router.push('/social-orders')} style={s.iconBtn} activeOpacity={0.8}>
-            <Ionicons name="receipt-outline" size={18} color={T.gold} />
+            <Ionicons name="receipt" size={18} color={T.gold} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -352,17 +369,18 @@ export default function SocialBoostScreen() {
           {/* Dynamic Banners */}
           <DynamicBanners placement="social_boost" />
           
-          {/* Horizontal Platform Filter Tabs */}
-          <Text style={s.sectionLabel}>Filter Platform</Text>
+          {/* VIP Platform Filter Carousel */}
+          <Text style={s.sectionLabel}>Select Platform</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
             {[
-              { id: 'All', name: 'All', icon: 'sparkles' },
+              { id: 'All', name: 'All Platforms', icon: 'sparkles' },
               { id: 'instagram', name: 'Instagram', icon: 'logo-instagram' },
               { id: 'tiktok', name: 'TikTok', icon: 'logo-tiktok' },
               { id: 'youtube', name: 'YouTube', icon: 'logo-youtube' },
               { id: 'facebook', name: 'Facebook', icon: 'logo-facebook' },
               { id: 'twitter', name: 'Twitter / X', icon: 'logo-twitter' },
               { id: 'telegram', name: 'Telegram', icon: 'paper-plane' },
+              { id: 'spotify', name: 'Spotify', icon: 'musical-notes' },
             ].map((tab) => {
               const isActive = platformFilter === tab.id;
               return (
@@ -376,14 +394,39 @@ export default function SocialBoostScreen() {
                   activeOpacity={0.8}
                   style={[s.filterPill, isActive ? s.filterPillActive : null]}
                 >
-                  <Ionicons name={tab.icon as any} size={13} color={isActive ? T.gold : T.textSub} />
+                  <Ionicons name={tab.icon as any} size={14} color={isActive ? T.gold : T.textSub} />
                   <Text style={[s.filterPillText, isActive ? s.filterPillTextActive : null]}>{tab.name}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          <Text style={s.sectionLabel}>Select Service Category</Text>
+          {/* Search Category Search Bar */}
+          <View style={s.searchBarRow}>
+            <Ionicons name="search" size={16} color={T.textSub} style={{ marginRight: 8 }} />
+            <TextInput
+              style={s.searchBarInput}
+              placeholder="Search category (e.g. Followers, Likes, Views)..."
+              placeholderTextColor={T.textSub}
+              value={categorySearchQuery}
+              onChangeText={setCategorySearchQuery}
+              autoCapitalize="none"
+            />
+            {categorySearchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setCategorySearchQuery('')}>
+                <Ionicons name="close-circle" size={16} color={T.textSub} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={s.sectionHeaderRow}>
+            <Text style={s.sectionLabel}>Service Categories ({categories.length})</Text>
+            {selectedCategory && (
+              <TouchableOpacity onPress={() => { setSelectedCategory(null); setSelectedService(null); }}>
+                <Text style={s.clearCategoryText}>Clear Selection</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           
           {/* Category Cards Grid */}
           <View style={s.catGrid}>
@@ -400,10 +443,10 @@ export default function SocialBoostScreen() {
                   activeOpacity={0.7}
                   style={[s.catCard, isSelected ? s.catCardActive : null]}
                 >
-                  <View style={[s.catIconBox, isSelected ? s.catIconBoxActive : null]}>
+                  <View style={[s.catIconBox, isSelected ? s.catIconBoxActive : { backgroundColor: icon.bg }]}>
                     <Ionicons name={icon.name as any} size={18} color={isSelected ? '#FFFFFF' : icon.color} />
                   </View>
-                  <Text style={[s.catCardText, isSelected ? s.catCardTextActive : null]} numberOfLines={1}>
+                  <Text style={[s.catCardText, isSelected ? s.catCardTextActive : null]} numberOfLines={2}>
                     {cat}
                   </Text>
                 </TouchableOpacity>
@@ -414,19 +457,26 @@ export default function SocialBoostScreen() {
           {/* Service & Order Form Section */}
           {selectedCategory && (
             <View style={s.formCard}>
-              <Text style={s.formHeading}>Order Details</Text>
+              <View style={s.formHeaderRow}>
+                <Text style={s.formHeading}>Boost Order Builder</Text>
+                <View style={s.categoryTagPill}>
+                  <Text style={s.categoryTagPillText}>{selectedCategory}</Text>
+                </View>
+              </View>
               
               <View style={s.fieldGroup}>
-                <Text style={s.fieldLabel}>Service Type</Text>
+                <Text style={s.fieldLabel}>1. Select Package Type</Text>
                 <TouchableOpacity 
                   onPress={() => setServiceModal(true)}
                   style={s.selectBtn}
                   activeOpacity={0.8}
                 >
-                  <Text style={[s.selectBtnText, selectedService ? s.selectBtnTextFilled : null]} numberOfLines={2}>
-                    {selectedService ? selectedService.name : "Select a service..."}
-                  </Text>
-                  <Ionicons name="chevron-down" size={18} color={T.textSub} />
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={[s.selectBtnText, selectedService ? s.selectBtnTextFilled : null]} numberOfLines={2}>
+                      {selectedService ? selectedService.name : "Choose a boost package..."}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-down-circle" size={20} color={T.gold} />
                 </TouchableOpacity>
               </View>
 
@@ -438,14 +488,14 @@ export default function SocialBoostScreen() {
                       <Text style={s.rateInfoValue}>₦{parseFloat(selectedService.rate).toLocaleString()}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={s.rateInfoSubLabel}>Limits & Speed</Text>
+                      <Text style={s.rateInfoSubLabel}>Min / Max Limits</Text>
                       <Text style={s.rateInfoSubValue}>{selectedService.min} - {selectedService.max} • ⚡ Instant</Text>
                     </View>
                   </View>
 
                   <View style={s.fieldGroup}>
                     <View style={s.fieldHeaderRow}>
-                      <Text style={s.fieldLabel}>Target Link</Text>
+                      <Text style={s.fieldLabel}>2. Target Link / Username</Text>
                       {linkDetector && (
                         <View style={s.detectedChip}>
                           <Ionicons name={linkDetector.icon as any} size={11} color={linkDetector.color} />
@@ -453,10 +503,11 @@ export default function SocialBoostScreen() {
                         </View>
                       )}
                     </View>
+
                     <View style={s.inputWithBtnContainer}>
                       <TextInput
                         style={s.inputWithBtn}
-                        placeholder="Paste profile or post link here (e.g. https://...)"
+                        placeholder={linkDetector ? `e.g. ${linkDetector.example}` : "Paste link e.g. https://instagram.com/p/..."}
                         placeholderTextColor={T.textSub}
                         value={link}
                         onChangeText={setLink}
@@ -475,10 +526,10 @@ export default function SocialBoostScreen() {
                   </View>
 
                   <View style={s.fieldGroup}>
-                    <Text style={s.fieldLabel}>Quantity</Text>
+                    <Text style={s.fieldLabel}>3. Select Quantity</Text>
                     <TextInput
                       style={s.standardInput}
-                      placeholder={`Minimum: ${selectedService.min}`}
+                      placeholder={`Min: ${selectedService.min} • Max: ${selectedService.max}`}
                       placeholderTextColor={T.textSub}
                       value={quantity}
                       onChangeText={setQuantity}
@@ -487,14 +538,14 @@ export default function SocialBoostScreen() {
                     
                     {/* Quick Quantity Selector Chips */}
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.qtyChipsRow}>
-                      {['100', '500', '1000', '5000', '10000'].map((val) => (
+                      {['100', '500', '1000', '2500', '5000', '10000', '25000', '50000'].map((val) => (
                         <TouchableOpacity
                           key={val}
                           onPress={() => setQuantity(val)}
                           activeOpacity={0.7}
-                          style={s.qtyChip}
+                          style={[s.qtyChip, quantity === val ? s.qtyChipActive : null]}
                         >
-                          <Text style={s.qtyChipText}>+{parseInt(val).toLocaleString()}</Text>
+                          <Text style={[s.qtyChipText, quantity === val ? { color: '#FFFFFF' } : null]}>+{parseInt(val).toLocaleString()}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -504,11 +555,11 @@ export default function SocialBoostScreen() {
                   <View style={s.summaryCard}>
                     <View style={s.summaryHeaderRow}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="receipt-outline" size={15} color={T.gold} />
+                        <Ionicons name="receipt" size={16} color={T.gold} />
                         <Text style={s.summaryHeadingText}>Order Summary</Text>
                       </View>
                       <View style={s.deliveryBadge}>
-                        <Text style={s.deliveryBadgeText}>Instant Delivery</Text>
+                        <Text style={s.deliveryBadgeText}>⚡ 2-15 Mins Start</Text>
                       </View>
                     </View>
 
@@ -519,13 +570,39 @@ export default function SocialBoostScreen() {
 
                     <View style={s.summaryItemRow}>
                       <Text style={s.summaryItemLabel}>Target Quantity</Text>
-                      <Text style={s.summaryItemValue}>{quantity || '0'}</Text>
+                      <Text style={s.summaryItemValue}>{quantity ? parseInt(quantity).toLocaleString() : '0'}</Text>
                     </View>
 
                     <View style={s.summaryTotalRow}>
                       <Text style={s.summaryTotalLabel}>Total Charge</Text>
                       <Text style={s.summaryTotalValue}>₦{totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                     </View>
+                  </View>
+
+                  {/* Wallet Balance Verification Banner */}
+                  <View style={[
+                    s.balanceCheckCard,
+                    walletBalance >= totalPrice ? s.balanceCheckCardOk : s.balanceCheckCardLow
+                  ]}>
+                    <Ionicons 
+                      name={walletBalance >= totalPrice ? "checkmark-circle" : "warning"} 
+                      size={16} 
+                      color={walletBalance >= totalPrice ? T.success : T.danger} 
+                    />
+                    <Text style={[
+                      s.balanceCheckText,
+                      walletBalance >= totalPrice ? { color: T.success } : { color: T.danger }
+                    ]}>
+                      {walletBalance >= totalPrice 
+                        ? `Available Balance: ₦${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                        : `Insufficient Balance (₦${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                      }
+                    </Text>
+                    {walletBalance < totalPrice && (
+                      <TouchableOpacity onPress={() => router.push('/(app)/wallet')} style={s.fundShortcutBtn}>
+                        <Text style={s.fundShortcutBtnText}>Fund Wallet</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Glowing Submit Button */}
@@ -538,17 +615,17 @@ export default function SocialBoostScreen() {
                     {isSubmitting ? (
                       <View style={s.submittingRow}>
                         <ActivityIndicator size="small" color={T.gold} />
-                        <Text style={s.submittingText}>Processing Order...</Text>
+                        <Text style={s.submittingText}>Launching Order...</Text>
                       </View>
                     ) : (
                       <>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <View style={s.submitIconBox}>
-                            <Ionicons name="flash" size={16} color={T.gold} />
+                            <Ionicons name="rocket" size={18} color={T.gold} />
                           </View>
                           <View>
                             <Text style={s.submitBtnTitle}>Submit Order Now</Text>
-                            <Text style={s.submitBtnSub}>Instant Execution • Safe & Secure</Text>
+                            <Text style={s.submitBtnSub}>Instant Delivery • Safe & Refill Guaranteed</Text>
                           </View>
                         </View>
                         <View style={s.submitPricePill}>
@@ -575,19 +652,19 @@ export default function SocialBoostScreen() {
                 <View style={s.modalHeaderIconBox}>
                   <Ionicons name="sparkles" size={16} color={T.gold} />
                 </View>
-                <Text style={s.modalHeaderTitle}>Select Boost Service</Text>
+                <Text style={s.modalHeaderTitle}>Select Boost Package</Text>
               </View>
               <TouchableOpacity onPress={() => setServiceModal(false)} style={s.modalCloseBtn}>
                 <Ionicons name="close" size={18} color={T.textSub} />
               </TouchableOpacity>
             </View>
 
-            {/* Search Bar */}
+            {/* Modal Search Bar */}
             <View style={s.modalSearchBox}>
               <Ionicons name="search" size={16} color={T.textSub} />
               <TextInput 
                 style={s.modalSearchInput}
-                placeholder="Search services (e.g. Followers, Likes, Views)..."
+                placeholder="Search packages (e.g. Real Followers, Likes, Views)..."
                 placeholderTextColor={T.textSub}
                 value={modalSearchQuery}
                 onChangeText={setModalSearchQuery}
@@ -637,7 +714,7 @@ export default function SocialBoostScreen() {
                         <View style={s.instantBadge}>
                           <Text style={s.instantBadgeText}>⚡ Instant</Text>
                         </View>
-                        <Text style={[s.serviceOptionLimits, isSelected ? { color: T.textSub } : null]}>
+                        <Text style={[s.serviceOptionLimits, isSelected ? { color: '#94A3B8' } : null]}>
                           Min: {item.min} • Max: {item.max}
                         </Text>
                       </View>
@@ -673,7 +750,7 @@ export default function SocialBoostScreen() {
 
             <View style={s.confirmReceiptCard}>
               <View style={{ marginBottom: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
-                <Text style={s.receiptItemLabel}>Selected Service</Text>
+                <Text style={s.receiptItemLabel}>Selected Package</Text>
                 <Text style={s.receiptItemValueTitle}>{selectedService?.name}</Text>
               </View>
 
@@ -684,12 +761,12 @@ export default function SocialBoostScreen() {
 
               <View style={s.receiptRow}>
                 <Text style={s.receiptLabel}>Quantity</Text>
-                <Text style={s.receiptValText}>{quantity}</Text>
+                <Text style={s.receiptValText}>{quantity ? parseInt(quantity).toLocaleString() : '0'}</Text>
               </View>
 
               <View style={s.receiptRow}>
                 <Text style={s.receiptLabel}>Delivery Speed</Text>
-                <Text style={s.speedText}>⚡ 0 - 15 Mins</Text>
+                <Text style={s.speedText}>⚡ 2 - 15 Mins Start</Text>
               </View>
 
               <View style={s.receiptTotalRow}>
@@ -843,9 +920,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -882,6 +959,12 @@ const s = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 120,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   sectionLabel: {
     color: T.textMain,
     fontSize: 11,
@@ -891,8 +974,13 @@ const s = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 2,
   },
+  clearCategoryText: {
+    color: T.gold,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   filterRow: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   filterPill: {
     flexDirection: 'row',
@@ -917,6 +1005,23 @@ const s = StyleSheet.create({
   },
   filterPillTextActive: {
     color: '#FFFFFF',
+  },
+  searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+    marginBottom: 14,
+  },
+  searchBarInput: {
+    flex: 1,
+    fontSize: 12,
+    color: T.textMain,
+    fontWeight: '600',
   },
   catGrid: {
     flexDirection: 'row',
@@ -949,7 +1054,6 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: T.bgLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -979,13 +1083,29 @@ const s = StyleSheet.create({
     elevation: 3,
     marginBottom: 24,
   },
+  formHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   formHeading: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     color: T.textMain,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 14,
+  },
+  categoryTagPill: {
+    backgroundColor: T.navyDark,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  categoryTagPillText: {
+    color: T.gold,
+    fontSize: 10,
+    fontWeight: '800',
   },
   fieldGroup: {
     marginBottom: 14,
@@ -1019,8 +1139,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: T.textSub,
     fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
   },
   selectBtnTextFilled: {
     color: T.textMain,
@@ -1131,6 +1249,10 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
   },
+  qtyChipActive: {
+    backgroundColor: T.navyDark,
+    borderColor: T.navyDark,
+  },
   qtyChipText: {
     fontSize: 10,
     fontWeight: '800',
@@ -1142,7 +1264,7 @@ const s = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: '#334155',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   summaryHeaderRow: {
     flexDirection: 'row',
@@ -1211,6 +1333,42 @@ const s = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
+  balanceCheckCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  balanceCheckCardOk: {
+    backgroundColor: T.successBg,
+    borderColor: '#A7F3D0',
+  },
+  balanceCheckCardLow: {
+    backgroundColor: T.dangerBg,
+    borderColor: '#FCA5A5',
+  },
+  balanceCheckText: {
+    fontSize: 11,
+    fontWeight: '800',
+    flex: 1,
+    marginLeft: 6,
+  },
+  fundShortcutBtn: {
+    backgroundColor: T.danger,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  fundShortcutBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
   submitBtn: {
     backgroundColor: T.navyDark,
     borderRadius: 16,
@@ -1241,9 +1399,9 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
   },
   submitIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(245, 158, 11, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
