@@ -35,7 +35,7 @@ const T = {
     purpleBg: 'rgba(192, 132, 252, 0.15)',
 };
 
-// Schema Interface
+// Schema Interfaces
 interface UserProfile {
     id: string;
     full_name: string;
@@ -73,6 +73,33 @@ interface UserProfile {
     corporate_email?: string | null;
 }
 
+interface UserVirtualCard {
+    id: string;
+    user_id: string;
+    card_id: string;
+    card_number: string;
+    card_name: string;
+    expiry: string;
+    cvv: string;
+    balance: number;
+    currency: string;
+    brand: string;
+    status: 'active' | 'frozen' | 'terminated';
+    created_at: string;
+}
+
+interface KycRequest {
+    id: string;
+    user_id: string;
+    id_type: string;
+    id_number?: string;
+    status: 'pending' | 'approved' | 'rejected';
+    rejection_reason?: string;
+    document_url?: string;
+    created_at: string;
+    updated_at?: string;
+}
+
 interface Transaction {
     id: string;
     amount: number;
@@ -103,16 +130,22 @@ export default function UserManagement() {
     // Selection & Modal States
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [modalTab, setModalTab] = useState<'overview' | 'kyc' | 'controls' | 'notify' | 'logs'>('overview');
+    
+    // Dynamic User History States
     const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
+    const [userVirtualCards, setUserVirtualCards] = useState<UserVirtualCard[]>([]);
+    const [userKycRequests, setUserKycRequests] = useState<KycRequest[]>([]);
     const [userLogs, setUserLogs] = useState<LoginLog[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [unmaskedCardIds, setUnmaskedCardIds] = useState<Record<string, boolean>>({});
 
     const [showSecurity, setShowSecurity] = useState(false);
     const [pendingAction, setPendingAction] = useState<{ 
-        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'send_email' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards' | 'toggle_services' | 'upgrade_tier' | 'verify_nin' | 'verify_cac', 
+        type: 'fund' | 'debit' | 'block' | 'promote' | 'reset_pin' | 'edit_profile' | 'notify' | 'send_email' | 'kyc' | 'set_limit' | 'save_notes' | 'impersonate' | 'generate_account' | 'delete_user' | 'reset_tx_pin' | 'clear_device' | 'toggle_crypto' | 'toggle_cards' | 'toggle_services' | 'upgrade_tier' | 'verify_nin' | 'verify_cac' | 'toggle_virtual_card', 
         amount?: number, 
         role?: string, 
         tier?: number,
+        cardId?: string,
         payload?: any 
     } | null>(null);
     
@@ -141,7 +174,6 @@ export default function UserManagement() {
 
     const [notifyMessage, setNotifyMessage] = useState('');
     const [notifyTitle, setNotifyTitle] = useState('');
-    const [showNotifyInput, setShowNotifyInput] = useState(false);
     
     // Email Composer State
     const [emailSubject, setEmailSubject] = useState('');
@@ -151,7 +183,6 @@ export default function UserManagement() {
     const [limitInput, setLimitInput] = useState('');
     const [adminNotes, setAdminNotes] = useState('');
     const [rcInput, setRcInput] = useState('');
-    const [cardFrozen, setCardFrozen] = useState(false);
 
     // Multi-Selection
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -174,9 +205,6 @@ export default function UserManagement() {
         next_of_kin_phone: ''
     });
     const [creatingUser, setCreatingUser] = useState(false);
-
-    // AI Intelligence
-    const [aiInsight, setAiInsight] = useState<{ risk: 'Low' | 'Medium' | 'High', loyalty: 'Bronze' | 'Silver' | 'Gold', nextAction: string, score: number } | null>(null);
 
     // Dynamic Executive KPIs
     const stats = {
@@ -219,20 +247,6 @@ export default function UserManagement() {
         setSelectedIds(newSet);
     };
 
-    const runSmartScan = (user: UserProfile) => {
-        const balance = user.balance || user.credit_balance || 0;
-        const risk = user.status === 'suspended' ? 'High' : (balance > 1000000 ? 'Medium' : 'Low');
-        const loyalty = balance > 500000 ? 'Gold' : (balance > 50000 ? 'Silver' : 'Bronze');
-        const score = Math.min(100, Math.max(20, Math.floor((balance / 10000) + (user.kyc_verified ? 30 : 0) + (user.status === 'active' ? 20 : 0))));
-        
-        let next = 'All Systems Normal';
-        if (risk === 'High') next = 'Review Security Activity';
-        else if (loyalty === 'Gold') next = 'Eligible for VIP Cashback';
-        else if (!user.kyc_verified) next = 'Request BVN/NIN Verification';
-
-        setAiInsight({ risk, loyalty, nextAction: next, score });
-    };
-
     const executeBulkAction = async (action: 'block' | 'unblock' | 'verify') => {
         if (selectedIds.size === 0) return;
         
@@ -261,7 +275,6 @@ export default function UserManagement() {
         if (selectedUser) {
             fetchUserHistory(selectedUser.id);
             generateForensics(selectedUser.id);
-            runSmartScan(selectedUser);
             setModalTab('overview');
             setEditForm({
                 full_name: selectedUser.full_name || '',
@@ -324,23 +337,38 @@ export default function UserManagement() {
         }
     };
 
+    // Fetch Real User History (Purchased Virtual Cards, KYC Verification History, Transactions)
     const fetchUserHistory = async (userId: string) => {
         setLoadingHistory(true);
         try {
-            const { data, error } = await supabase
+            // 1. Fetch User Financial Transactions
+            const { data: txData } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(10);
-            
-            if (!error && data) {
-                setUserTransactions(data);
-            } else {
-                setUserTransactions([]);
-            }
+                .limit(20);
+            setUserTransactions(txData || []);
+
+            // 2. Fetch User Purchased Virtual Cards from user_virtual_cards
+            const { data: cardsData } = await supabase
+                .from('user_virtual_cards')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+            setUserVirtualCards(cardsData || []);
+
+            // 3. Fetch User KYC Requests & Verification History from kyc_requests
+            const { data: kycData } = await supabase
+                .from('kyc_requests')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+            setUserKycRequests(kycData || []);
         } catch (error) {
             setUserTransactions([]);
+            setUserVirtualCards([]);
+            setUserKycRequests([]);
         } finally {
             setLoadingHistory(false);
         }
@@ -425,6 +453,16 @@ export default function UserManagement() {
                 setFundAmount('');
                 fetchUsers();
             }
+            else if (pendingAction.type === 'toggle_virtual_card' && pendingAction.cardId) {
+                const targetCard = userVirtualCards.find(c => c.id === pendingAction.cardId);
+                if (targetCard) {
+                    const newStatus = targetCard.status === 'active' ? 'frozen' : 'active';
+                    const { error } = await supabase.from('user_virtual_cards').update({ status: newStatus }).eq('id', targetCard.id);
+                    if (error) throw error;
+                    Alert.alert("Card Updated 💳", `Virtual card is now ${newStatus.toUpperCase()}`);
+                    fetchUserHistory(selectedUser.id);
+                }
+            }
             else if (pendingAction.type === 'block') {
                 const newStatus = selectedUser.status === 'active' ? 'suspended' : 'active';
                 const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', selectedUser.id);
@@ -457,14 +495,6 @@ export default function UserManagement() {
                 setSelectedUser({ ...selectedUser, virtual_cards_enabled: newStatus });
                 fetchUsers();
             }
-            else if (pendingAction.type === 'toggle_services') {
-                const newStatus = !(selectedUser.services_enabled ?? true);
-                const { error } = await supabase.from('profiles').update({ services_enabled: newStatus }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("VTU Services 📱", `Airtime & Data Purchases are now ${newStatus ? 'ENABLED' : 'DISABLED'} for this user`);
-                setSelectedUser({ ...selectedUser, services_enabled: newStatus });
-                fetchUsers();
-            }
             else if (pendingAction.type === 'upgrade_tier') {
                 const targetTier = pendingAction.tier || 2;
                 const { error } = await supabase.from('profiles').update({ kyc_tier: targetTier, kyc_verified: targetTier > 1 }).eq('id', selectedUser.id);
@@ -476,15 +506,35 @@ export default function UserManagement() {
             else if (pendingAction.type === 'verify_nin') {
                 const { error } = await supabase.from('profiles').update({ kyc_verified: true, kyc_tier: 3 }).eq('id', selectedUser.id);
                 if (error) throw error;
+                
+                await supabase.from('kyc_requests').insert({
+                    user_id: selectedUser.id,
+                    id_type: 'NIN Verification',
+                    id_number: selectedUser.nin || 'NIN-VERIFIED-ADMIN',
+                    status: 'approved',
+                    created_at: new Date().toISOString()
+                });
+
                 Alert.alert("NIN Verified 🆔", `National Identity Number verified for ${selectedUser.full_name}. Tier 3 granted.`);
                 setSelectedUser({ ...selectedUser, kyc_verified: true, kyc_tier: 3 });
+                fetchUserHistory(selectedUser.id);
                 fetchUsers();
             }
             else if (pendingAction.type === 'verify_cac') {
                 const { error } = await supabase.from('profiles').update({ cac_registered: true, cac_rc_number: rcInput || 'RC-1928471' }).eq('id', selectedUser.id);
                 if (error) throw error;
+
+                await supabase.from('kyc_requests').insert({
+                    user_id: selectedUser.id,
+                    id_type: 'CAC Corporate Verification',
+                    id_number: rcInput || 'RC-1928471',
+                    status: 'approved',
+                    created_at: new Date().toISOString()
+                });
+
                 Alert.alert("CAC Corporate Verified 🏢", `Corporate Business Registration verified.`);
                 setSelectedUser({ ...selectedUser, cac_registered: true, cac_rc_number: rcInput || 'RC-1928471' });
+                fetchUserHistory(selectedUser.id);
                 fetchUsers();
             }
             else if (pendingAction.type === 'send_email') {
@@ -523,34 +573,8 @@ export default function UserManagement() {
                 Alert.alert("Success", "Profile Information Updated Successfully");
                 setIsEditing(false);
             }
-            else if (pendingAction.type === 'generate_account') {
-                const { data, error } = await supabase.functions.invoke('create-virtual-account', {
-                    body: { userId: selectedUser.id, bvn: bvnInput }
-                });
-                
-                if (error) throw new Error(error.message || "Failed to generate account");
-                if (data?.error) throw new Error(data.error);
-
-                Alert.alert("Success", "Virtual account generated successfully!");
-                setBvnInput('');
-                
-                const { data: updatedProfile } = await supabase.from('profiles').select('account_number').eq('id', selectedUser.id).single();
-                if (updatedProfile) {
-                    setSelectedUser({ ...selectedUser, account_number: updatedProfile.account_number });
-                }
-            }
             else if (pendingAction.type === 'delete_user') {
                 await handleDeleteUser();
-            }
-            else if (pendingAction.type === 'reset_tx_pin') {
-                const { error } = await supabase.from('profiles').update({ transaction_pin: null }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Transaction PIN Reset", `Transaction PIN for ${selectedUser.full_name} has been cleared.`);
-            }
-            else if (pendingAction.type === 'clear_device') {
-                const { error } = await supabase.from('profiles').update({ push_token: null }).eq('id', selectedUser.id);
-                if (error) throw error;
-                Alert.alert("Device Cleared", `Push token/device unlinked from ${selectedUser.full_name}.`);
             }
             else if (pendingAction.type === 'notify') {
                 await supabase.from('notifications').insert({
@@ -566,7 +590,7 @@ export default function UserManagement() {
             }
 
             fetchUsers();
-            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes', 'verify_nin', 'verify_cac', 'send_email'].includes(pendingAction.type)) {
+            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes', 'verify_nin', 'verify_cac', 'send_email', 'toggle_virtual_card'].includes(pendingAction.type)) {
                  if (pendingAction.type === 'edit_profile' && selectedUser) setSelectedUser({ ...selectedUser, ...editForm, kyc_tier: parseInt(editForm.kyc_tier) || 1 });
             } else {
                  setSelectedUser(null);
@@ -639,22 +663,6 @@ export default function UserManagement() {
         setShowSecurity(true);
     };
 
-    const initiateResetTxPin = () => {
-        setPendingAction({ type: 'reset_tx_pin' });
-        Alert.alert("Reset Tx PIN", `Are you sure you want to reset Transaction PIN for ${selectedUser?.full_name}?`, [
-            { text: "Cancel", style: "cancel" },
-            { text: "Reset", onPress: () => setShowSecurity(true) }
-        ]);
-    };
-
-    const initiateClearDevice = () => {
-        setPendingAction({ type: 'clear_device' });
-        Alert.alert("Clear Device", `This will unlink current device (Push Token) from ${selectedUser?.full_name}'s account. Continue?`, [
-            { text: "Cancel", style: "cancel" },
-            { text: "Clear", onPress: () => setShowSecurity(true) }
-        ]);
-    };
-
     const initiateDelete = () => {
         setPendingAction({ type: 'delete_user' });
         Alert.alert("Delete User", `Are you sure you want to PERMANENTLY delete ${selectedUser?.full_name}? This action cannot be undone.`, [
@@ -710,6 +718,8 @@ Financials:
 - Balance: ₦${(selectedUser.credit_balance || 0).toLocaleString()}
 - Account: ${selectedUser.account_number || 'N/A'} [${selectedUser.bank_name || 'Wema'}]
 - Limit: ${selectedUser.transfer_limit ? '₦'+selectedUser.transfer_limit : 'Unlimited'}
+- Purchased Cards Count: ${userVirtualCards.length}
+- Verification Requests Count: ${userKycRequests.length}
 
 Metadata:
 - Joined: ${new Date(selectedUser.created_at || '').toLocaleString()}
@@ -760,6 +770,10 @@ Metadata:
             if (supported) Linking.openURL(link);
             else Alert.alert("Error", "Cannot open link");
         });
+    };
+
+    const toggleCardMask = (cardId: string) => {
+        setUnmaskedCardIds(prev => ({ ...prev, [cardId]: !prev[cardId] }));
     };
 
     // Executive Command Center Modal
@@ -847,7 +861,7 @@ Metadata:
                     </View>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        {/* TAB 1: OVERVIEW & WALLET */}
+                        {/* TAB 1: OVERVIEW, WALLET & PURCHASED VIRTUAL CARDS */}
                         {modalTab === 'overview' && (
                             <View style={{ padding: 14 }}>
                                 {/* Vault Balance Card */}
@@ -861,22 +875,62 @@ Metadata:
                                     <Text style={{ fontSize: 10, color: T.textSub, marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
                                 </View>
 
-                                {/* Virtual ATM Card Preview */}
-                                <View style={s.virtualAtmCard}>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Text style={{ color: T.gold, fontWeight: '900', fontSize: 11 }}>VIRTUAL ATM CARD (MASTERCARD)</Text>
-                                        <TouchableOpacity onPress={() => setCardFrozen(!cardFrozen)} style={[s.statusBadge, cardFrozen ? s.statusBadgeSuspended : s.statusBadgeActive]}>
-                                            <Text style={[s.statusBadgeText, cardFrozen ? { color: T.danger } : { color: T.success }]}>{cardFrozen ? 'FROZEN ❄️' : 'ACTIVE 💳'}</Text>
-                                        </TouchableOpacity>
+                                {/* Real Purchased Virtual Cards Carousel / List */}
+                                <Text style={s.sectionHeading}>Purchased Virtual Cards ({userVirtualCards.length}) 💳</Text>
+                                {loadingHistory ? (
+                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
+                                ) : userVirtualCards.length === 0 ? (
+                                    <View style={s.noCardsCard}>
+                                        <Ionicons name="card-outline" size={28} color={T.gold} />
+                                        <Text style={s.noCardsTitle}>No Purchased Virtual Cards</Text>
+                                        <Text style={s.noCardsSub}>User has not issued any virtual card yet.</Text>
                                     </View>
-                                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 2, marginVertical: 6 }}>
-                                        5399 •••• •••• {selectedUser?.id?.slice(0, 4) || '9281'}
-                                    </Text>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Text style={{ color: T.textSub, fontSize: 10 }}>EXP: 08/28  CVV: 891</Text>
-                                        <Text style={{ color: T.gold, fontWeight: '800', fontSize: 11 }}>{selectedUser?.full_name?.toUpperCase()}</Text>
-                                    </View>
-                                </View>
+                                ) : (
+                                    userVirtualCards.map((card) => {
+                                        const isUnmasked = !!unmaskedCardIds[card.id];
+                                        const formattedNum = isUnmasked 
+                                            ? card.card_number 
+                                            : `•••• •••• •••• ${card.card_number?.slice(-4) || '9281'}`;
+
+                                        return (
+                                            <View key={card.id} style={s.virtualAtmCard}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Ionicons name="card" size={14} color={T.gold} />
+                                                        <Text style={{ color: T.gold, fontWeight: '900', fontSize: 11 }}>
+                                                            {(card.brand || 'VIRTUAL CARD').toUpperCase()} ({card.currency || 'USD'})
+                                                        </Text>
+                                                    </View>
+                                                    <TouchableOpacity 
+                                                        onPress={() => {
+                                                            setPendingAction({ type: 'toggle_virtual_card', cardId: card.id });
+                                                            setShowSecurity(true);
+                                                        }} 
+                                                        style={[s.statusBadge, card.status === 'frozen' ? s.statusBadgeSuspended : s.statusBadgeActive]}
+                                                    >
+                                                        <Text style={[s.statusBadgeText, card.status === 'frozen' ? { color: T.danger } : { color: T.success }]}>
+                                                            {card.status === 'frozen' ? 'FROZEN ❄️' : 'ACTIVE 💳'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
+                                                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 }}>
+                                                        {formattedNum}
+                                                    </Text>
+                                                    <TouchableOpacity onPress={() => toggleCardMask(card.id)} style={{ paddingHorizontal: 6 }}>
+                                                        <Ionicons name={isUnmasked ? "eye-off" : "eye"} size={16} color={T.gold} />
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text style={{ color: T.textSub, fontSize: 10 }}>EXP: {card.expiry || '08/28'}  CVV: {isUnmasked ? card.cvv : '•••'}</Text>
+                                                    <Text style={{ color: T.gold, fontWeight: '800', fontSize: 11 }}>BAL: ${card.balance || 0}</Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })
+                                )}
 
                                 {/* Quick Wallet Funding / Debit Control */}
                                 <View style={s.controlCard}>
@@ -950,10 +1004,10 @@ Metadata:
                             </View>
                         )}
 
-                        {/* TAB 2: IDENTITY, NIN & CAC */}
+                        {/* TAB 2: IDENTITY, NIN, BVN & CAC VERIFICATION HISTORY */}
                         {modalTab === 'kyc' && (
                             <View style={{ padding: 14 }}>
-                                <Text style={s.sectionHeading}>Identity Verification, NIN & CAC</Text>
+                                <Text style={s.sectionHeading}>Identity Verification & Documents</Text>
                                 
                                 <View style={s.kycDetailCard}>
                                     <View style={s.kycItemRow}>
@@ -990,6 +1044,52 @@ Metadata:
                                         <Text style={[s.gridBtnText, { color: T.warning }]}>Verify CAC</Text>
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* Real Verification History Timeline */}
+                                <Text style={s.sectionHeading}>Verification History & Document Submissions 📜</Text>
+                                {loadingHistory ? (
+                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
+                                ) : userKycRequests.length === 0 ? (
+                                    <View style={s.noCardsCard}>
+                                        <Ionicons name="shield-outline" size={26} color={T.gold} />
+                                        <Text style={s.noCardsTitle}>No Verification Attempts Submitted</Text>
+                                        <Text style={s.noCardsSub}>User has not submitted identity documents yet.</Text>
+                                    </View>
+                                ) : (
+                                    userKycRequests.map((req) => (
+                                        <View key={req.id} style={s.kycHistoryItem}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Ionicons name="document-text-outline" size={14} color={T.gold} />
+                                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>{req.id_type}</Text>
+                                                </View>
+                                                <View style={[s.statusBadge, req.status === 'approved' ? s.statusBadgeActive : req.status === 'rejected' ? s.statusBadgeSuspended : { backgroundColor: T.warningBg, borderColor: T.warning }]}>
+                                                    <Text style={[s.statusBadgeText, req.status === 'approved' ? { color: T.success } : req.status === 'rejected' ? { color: T.danger } : { color: T.warning }]}>
+                                                        {req.status?.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={{ marginVertical: 4 }}>
+                                                <Text style={{ color: T.textSub, fontSize: 10 }}>Doc Number: {req.id_number || 'N/A'}</Text>
+                                                <Text style={{ color: T.textSub, fontSize: 10 }}>Date Submitted: {new Date(req.created_at).toLocaleString()}</Text>
+                                                {req.rejection_reason && (
+                                                    <Text style={{ color: T.danger, fontSize: 10, marginTop: 2 }}>Reason: {req.rejection_reason}</Text>
+                                                )}
+                                            </View>
+
+                                            {req.document_url && (
+                                                <TouchableOpacity 
+                                                    onPress={() => Linking.openURL(req.document_url || '')}
+                                                    style={s.viewDocBtn}
+                                                >
+                                                    <Ionicons name="eye-outline" size={12} color={T.navyDark} />
+                                                    <Text style={s.viewDocBtnText}>View Verified Document</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    ))
+                                )}
 
                                 {/* Tier Upgrade Selectors */}
                                 <Text style={s.sectionHeading}>Set KYC Tier</Text>
@@ -1068,11 +1168,6 @@ Metadata:
                                         <MaterialCommunityIcons name="lock-reset" size={16} color={T.textSub} />
                                         <Text style={s.gridBtnText}>Reset Auth PIN</Text>
                                     </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={initiateResetTxPin} style={[s.gridBtn, { backgroundColor: T.warningBg, borderColor: T.warning }]}>
-                                        <Ionicons name="keypad" size={16} color={T.warning} />
-                                        <Text style={[s.gridBtnText, { color: T.warning }]}>Reset Tx PIN</Text>
-                                    </TouchableOpacity>
                                 </View>
 
                                 {/* Danger Zone */}
@@ -1142,7 +1237,7 @@ Metadata:
                         {/* TAB 5: LOGS */}
                         {modalTab === 'logs' && (
                             <View style={{ padding: 14 }}>
-                                <Text style={s.sectionHeading}>Recent Transactions</Text>
+                                <Text style={s.sectionHeading}>Recent Transactions & Services Activity</Text>
                                 <View style={s.txCard}>
                                     {loadingHistory ? (
                                         <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
@@ -1369,7 +1464,7 @@ Metadata:
                 </View>
             )}
 
-            {/* Mobile-First Stacked User Cards (100% No Overlap!) */}
+            {/* Mobile-First Stacked User Cards */}
             <FlatList
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
@@ -1389,7 +1484,7 @@ Metadata:
                         onLongPress={() => handleLongPress(item.id)}
                         style={[s.userCard, selectedIds.has(item.id) ? s.userCardSelected : null]}
                     >
-                        {/* Section 1: Top Row (Avatar + Name/Acct + Status Badge) */}
+                        {/* Section 1: Top Row */}
                         <View style={s.userCardTopRow}>
                             {isSelectionMode && (
                                 <View style={[s.checkBox, selectedIds.has(item.id) ? s.checkBoxActive : null]}>
@@ -1423,7 +1518,7 @@ Metadata:
                             </View>
                         </View>
 
-                        {/* Section 2: Badges Row (Role, Corporate Email, KYC Status) */}
+                        {/* Section 2: Badges Row */}
                         <View style={s.badgesRow}>
                             {item.role === 'admin' && (
                                 <View style={s.badgeGold}>
@@ -1445,7 +1540,7 @@ Metadata:
                             )}
                         </View>
 
-                        {/* Section 3: Bottom Dedicated Vault Balance Pill (Navy & Gold Accent) */}
+                        {/* Section 3: Bottom Vault Balance Bar */}
                         <View style={s.vaultBalanceBar}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Ionicons name="wallet-outline" size={14} color={T.gold} />
@@ -1639,7 +1734,6 @@ const s = StyleSheet.create({
         paddingTop: 8,
         paddingBottom: 100,
     },
-    // Stacked User Card (100% Mobile-First!)
     userCard: {
         backgroundColor: T.card,
         borderRadius: 14,
@@ -2005,6 +2099,50 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: T.gold,
         marginBottom: 10,
+    },
+    noCardsCard: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        marginBottom: 10,
+    },
+    noCardsTitle: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 4,
+    },
+    noCardsSub: {
+        color: T.textSub,
+        fontSize: 11,
+        textAlign: 'center',
+    },
+    kycHistoryItem: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        marginBottom: 8,
+    },
+    viewDocBtn: {
+        backgroundColor: T.gold,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        alignSelf: 'flex-start',
+        marginTop: 4,
+    },
+    viewDocBtnText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: T.navyDark,
     },
     controlCard: {
         backgroundColor: T.card,
