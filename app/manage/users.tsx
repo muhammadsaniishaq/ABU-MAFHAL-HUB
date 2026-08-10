@@ -121,7 +121,7 @@ interface LoginLog {
 export default function UserManagement() {
     const router = useRouter();
     const [users, setUsers] = useState<UserProfile[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended' | 'admin' | 'verified' | 'corporate' | 'high_bal'>('all');

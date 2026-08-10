@@ -118,7 +118,7 @@ export default function AdminBento() {
         chats: 0
     });
     const [adminProfile, setAdminProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [logoIconUrl, setLogoIconUrl] = useState<string | null>(null);
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
         operations: true,

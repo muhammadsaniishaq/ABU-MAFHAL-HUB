@@ -9,29 +9,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminLayout() {
     const router = useRouter();
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [checkingRole, setCheckingRole] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [isAuthorized, setIsAuthorized] = useState(true);
+    const [checkingRole, setCheckingRole] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(true);
 
     useEffect(() => {
         const checkAdminRole = async () => {
             try {
-                // 1. Instant check from local session / storage
+                // Non-blocking background verification
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
                     router.replace('/');
                     return;
                 }
 
-                // Check local cache first for instant opening
                 const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
                 if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
                     setIsAdmin(true);
                     setIsAuthorized(true);
-                    setCheckingRole(false);
                 }
 
-                // 2. Fetch profile resilience (using maybeSingle to prevent 0-row PGRST116 errors)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('role, email')
@@ -51,24 +48,12 @@ export default function AdminLayout() {
                 }
             } catch (e) {
                 console.error("Admin verification error:", e);
-                // Fallback authorize to prevent admin lockout
                 setIsAdmin(true);
                 setIsAuthorized(true);
-            } finally {
-                setCheckingRole(false);
             }
         };
         checkAdminRole();
     }, []);
-
-    if (checkingRole) {
-        return (
-            <View style={{ flex: 1, backgroundColor: '#0A1128', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#D4AF37" />
-                <Text style={{ color: '#D4AF37', marginTop: 12, fontWeight: '700', fontSize: 13 }}>Verifying Admin Clearance...</Text>
-            </View>
-        );
-    }
 
     if (!isAdmin) {
         return null;
