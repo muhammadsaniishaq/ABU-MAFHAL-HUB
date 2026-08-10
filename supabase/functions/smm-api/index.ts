@@ -125,16 +125,10 @@ Deno.serve(async (req) => {
             // Calculate authoritative price on server
             const finalPrice = (expectedPrice && parseFloat(expectedPrice) > 0) ? parseFloat(expectedPrice) : totalUserPrice;
 
-            // 2. Check User Balance (Checking both balance and credit_balance columns)
-            const { data: profile } = await supabaseAdmin.from('profiles').select('id, balance, credit_balance').eq('id', user.id).single();
-            const bal1 = profile?.balance != null ? parseFloat(String(profile.balance)) : NaN;
-            const bal2 = profile?.credit_balance != null ? parseFloat(String(profile.credit_balance)) : NaN;
-            
-            let userBalance = 0;
-            if (!isNaN(bal1) && bal1 > 0) userBalance = bal1;
-            else if (!isNaN(bal2) && bal2 > 0) userBalance = bal2;
-            else if (!isNaN(bal1)) userBalance = bal1;
-            else if (!isNaN(bal2)) userBalance = bal2;
+            // 2. Check User Balance
+            const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', user.id).maybeSingle();
+            const rawBal = profile?.balance ?? profile?.credit_balance ?? profile?.wallet_balance ?? 0;
+            const userBalance = parseFloat(String(rawBal)) || 0;
 
             if (!profile || userBalance < finalPrice) {
                 return new Response(JSON.stringify({ error: `Insufficient wallet balance. Total cost is ₦${finalPrice.toLocaleString()}, but your balance is ₦${userBalance.toLocaleString()}.` }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -107,33 +107,41 @@ export default function SocialBoostScreen() {
       }
 
       // 2. Fetch active authenticated user
-      const { data: { session } } = await supabase.auth.getSession();
-      let userId = session?.user?.id;
+      const { data: { user } } = await supabase.auth.getUser();
+      let userId = user?.id;
       if (!userId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id;
+        const { data: { session } } = await supabase.auth.getSession();
+        userId = session?.user?.id;
       }
       if (!userId) return 0;
 
-      // 3. Query profiles table directly
-      const { data: profile } = await supabase
+      // 3. Query profiles table with select('*') so PostgreSQL never fails on column names
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select('balance, credit_balance')
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
 
       if (profile) {
-        const bal1 = profile.balance != null ? parseFloat(String(profile.balance)) : NaN;
-        const bal2 = profile.credit_balance != null ? parseFloat(String(profile.credit_balance)) : NaN;
+        const rawBal = profile.balance ?? profile.credit_balance ?? profile.wallet_balance ?? 0;
+        const parsedBal = parseFloat(String(rawBal)) || 0;
+        setWalletBalance(parsedBal);
         
-        let finalBal = 0;
-        if (!isNaN(bal1) && bal1 > 0) finalBal = bal1;
-        else if (!isNaN(bal2) && bal2 > 0) finalBal = bal2;
-        else if (!isNaN(bal1)) finalBal = bal1;
-        else if (!isNaN(bal2)) finalBal = bal2;
+        // Keep @dashboard_cache updated
+        try {
+          const currentCacheStr = await AsyncStorage.getItem('@dashboard_cache');
+          const currentCache = currentCacheStr ? JSON.parse(currentCacheStr) : {};
+          const newCache = { 
+            ...currentCache, 
+            userData: { ...(currentCache.userData || {}), balance: parsedBal },
+            updatedAt: Date.now() 
+          };
+          await AsyncStorage.setItem('@dashboard_cache', JSON.stringify(newCache));
+        } catch (e) {}
 
-        setWalletBalance(finalBal);
-        return finalBal;
+        return parsedBal;
+      } else if (error) {
+        console.error("Profile query error:", error);
       }
     } catch (e) {
       console.error("Balance fetch error:", e);
