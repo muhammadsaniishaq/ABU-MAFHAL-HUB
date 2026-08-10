@@ -16,9 +16,22 @@ export default function AdminLayout() {
     useEffect(() => {
         const checkAdminRole = async () => {
             try {
-                // Non-blocking background verification
-                const { data: { user } } = await supabase.auth.getUser();
+                // 1. Check active session first for seamless page refresh
+                const { data: { session } } = await supabase.auth.getSession();
+                let user = session?.user;
+
                 if (!user) {
+                    const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+                    user = fetchedUser || undefined;
+                }
+
+                if (!user) {
+                    const isAnyAdminCached = await AsyncStorage.getItem('last_security_verification_time');
+                    if (isAnyAdminCached) {
+                        setIsAdmin(true);
+                        setIsAuthorized(true);
+                        return;
+                    }
                     router.replace('/');
                     return;
                 }

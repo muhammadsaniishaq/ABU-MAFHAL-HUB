@@ -304,13 +304,6 @@ export default function UserManagement() {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            await supabase
-                .from('profiles')
-                .update({ status: 'inactive' })
-                .eq('status', 'active')
-                .lt('last_login', sevenDaysAgo);
-
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*, virtual_accounts(account_number, bank_name)')
@@ -667,65 +660,87 @@ export default function UserManagement() {
         if (!selectedUser) return;
         setFundingProcessing(true);
         try {
-            const amount = type === 'fund' ? Math.abs(amountVal) : -Math.abs(amountVal);
-            const currentBalance = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
-            const newBalance = Math.max(0, currentBalance + amount);
+            const amount = type === 'fund' ? Math.abs(amountVal) : Math.abs(amountVal);
+            let rpcSuccess = false;
 
-            // Step 1: Try RPC credit_balance / deduct_balance functions
+            // Step 1: Execute Supabase Postgres RPC with exact parameter signature (p_user_id & p_amount)
             try {
                 if (type === 'fund') {
-                    await supabase.rpc('credit_balance', { user_id: selectedUser.id, amount: Math.abs(amountVal) });
+                    // Try credit_balance with p_user_id & p_amount
+                    const { error: rpcErr1 } = await supabase.rpc('credit_balance', { p_user_id: selectedUser.id, p_amount: amount });
+                    if (!rpcErr1) rpcSuccess = true;
+                    else {
+                        // Try fund_wallet with p_user_id & p_amount
+                        const { error: rpcErr2 } = await supabase.rpc('fund_wallet', { p_user_id: selectedUser.id, p_amount: amount });
+                        if (!rpcErr2) rpcSuccess = true;
+                    }
                 } else {
-                    await supabase.rpc('deduct_balance', { user_id: selectedUser.id, amount: Math.abs(amountVal) });
+                    // Try deduct_balance with p_user_id & p_amount
+                    const { error: rpcErr1 } = await supabase.rpc('deduct_balance', { p_user_id: selectedUser.id, p_amount: amount });
+                    if (!rpcErr1) rpcSuccess = true;
                 }
-            } catch (rpcErr) {}
-            
-            // Step 2: Direct Supabase Update on profiles table
-            let { error: errFull } = await supabase.from('profiles').update({ 
-                balance: newBalance,
-                credit_balance: newBalance 
-            }).eq('id', selectedUser.id);
+            } catch (e) {}
 
-            if (errFull) {
-                // Retry updating balance column alone
-                let { error: errBal } = await supabase.from('profiles').update({ 
-                    balance: newBalance 
+            // Step 2: Fallback param signature variations & direct update
+            if (!rpcSuccess) {
+                try {
+                    if (type === 'fund') {
+                        await supabase.rpc('credit_balance', { user_id: selectedUser.id, amount: amount });
+                    } else {
+                        await supabase.rpc('deduct_balance', { user_id: selectedUser.id, amount: amount });
+                    }
+                } catch (e) {}
+
+                // Direct Supabase Update on profiles table
+                const currentBal = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
+                const updatedBal = type === 'fund' ? currentBal + amount : Math.max(0, currentBal - amount);
+
+                let { error: errFull } = await supabase.from('profiles').update({ 
+                    balance: updatedBal,
+                    credit_balance: updatedBal 
                 }).eq('id', selectedUser.id);
 
-                if (errBal) {
-                    // Retry updating credit_balance column alone
-                    let { error: errCred } = await supabase.from('profiles').update({ 
-                        credit_balance: newBalance 
-                    }).eq('id', selectedUser.id);
-
-                    if (errCred) throw errCred;
+                if (errFull) {
+                    let { error: errBal } = await supabase.from('profiles').update({ balance: updatedBal }).eq('id', selectedUser.id);
+                    if (errBal) {
+                        let { error: errCred } = await supabase.from('profiles').update({ credit_balance: updatedBal }).eq('id', selectedUser.id);
+                        if (errCred) throw errCred;
+                    }
                 }
             }
-            
+
             // Step 3: Insert transaction audit log in Supabase
             try {
                 await supabase.from('transactions').insert({
                     user_id: selectedUser.id,
                     type: type === 'fund' ? 'topup' : 'withdrawal',
                     title: `Admin Wallet ${type === 'fund' ? 'Credit' : 'Debit'}`,
-                    amount: Math.abs(amountVal),
+                    amount: amount,
                     status: 'completed',
                     description: `Admin Wallet ${type === 'fund' ? 'Funding' : 'Debit'}`,
                     reference: `admin_${type}_${Date.now()}`
                 });
             } catch (txErr) {}
 
-            // Step 4: Native Alert confirmation
+            // Step 4: Re-fetch updated profile directly from database to get authoritative new balance
+            const { data: freshProfile } = await supabase.from('profiles').select('balance, credit_balance').eq('id', selectedUser.id).single();
+            const authoritativeBalance = freshProfile?.balance ?? freshProfile?.credit_balance ?? (
+                type === 'fund' 
+                    ? (Number(selectedUser.balance || selectedUser.credit_balance || 0) + amount)
+                    : Math.max(0, Number(selectedUser.balance || selectedUser.credit_balance || 0) - amount)
+            );
+
+            // Step 5: Native Alert confirmation
             Alert.alert(
                 "Wallet Updated 🎉", 
                 type === 'fund'
-                    ? `Successfully funded ₦${Math.abs(amountVal).toLocaleString()} to ${selectedUser.full_name}'s vault balance!` 
-                    : `Successfully debited ₦${Math.abs(amountVal).toLocaleString()} from ${selectedUser.full_name}'s vault balance!`
+                    ? `Successfully funded ₦${amount.toLocaleString()} to ${selectedUser.full_name}'s vault balance!` 
+                    : `Successfully debited ₦${amount.toLocaleString()} from ${selectedUser.full_name}'s vault balance!`
             );
 
-            // Step 5: Update local state immediately
-            setSelectedUser(prev => prev ? { ...prev, balance: newBalance, credit_balance: newBalance } : null);
-            setUsers(prevUsers => prevUsers.map(u => u.id === selectedUser.id ? { ...u, balance: newBalance, credit_balance: newBalance } : u));
+            // Step 6: Update local UI states immediately with authoritative new balance
+            setSelectedUser(prev => prev ? { ...prev, balance: authoritativeBalance, credit_balance: authoritativeBalance } : null);
+            setUsers(prevUsers => prevUsers.map(u => u.id === selectedUser.id ? { ...u, balance: authoritativeBalance, credit_balance: authoritativeBalance } : u));
             setFundAmount('');
             fetchUserHistory(selectedUser.id);
             fetchUsers();
