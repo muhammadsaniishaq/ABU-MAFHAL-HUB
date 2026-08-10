@@ -12,25 +12,25 @@ import * as Clipboard from 'expo-clipboard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Executive Compact Design System Tokens
+// Deluxe Dark Navy & Metallic Gold Design System Tokens
 const T = {
-  navyDark: '#0F172A',
-  navyMid: '#1E293B',
+  navyDark: '#0B132B',
+  navyCard: '#1C2541',
+  navySubCard: '#0A0F1D',
   gold: '#F59E0B',
-  goldLight: '#FEF3C7',
-  bgLight: '#F8FAFC',
-  cardBg: '#FFFFFF',
-  textMain: '#0F172A',
-  textSub: '#64748B',
-  border: '#E2E8F0',
+  goldBright: '#FBBF24',
+  goldDark: '#D97706',
+  goldLightBg: 'rgba(245, 158, 11, 0.12)',
+  textMain: '#F8FAFC',
+  textSub: '#94A3B8',
+  borderGold: 'rgba(245, 158, 11, 0.35)',
+  borderDark: '#334155',
   success: '#10B981',
-  successBg: '#D1FAE5',
+  successBg: 'rgba(16, 185, 129, 0.15)',
   danger: '#EF4444',
-  dangerBg: '#FEE2E2',
+  dangerBg: 'rgba(239, 68, 68, 0.15)',
   info: '#3B82F6',
-  infoBg: '#DBEAFE',
-  purple: '#8B5CF6',
-  purpleBg: '#F3E8FF',
+  infoBg: 'rgba(59, 130, 246, 0.15)',
 };
 
 interface SMMService {
@@ -242,7 +242,7 @@ export default function SocialBoostScreen() {
     if (l.includes('twitter.com') || l.includes('x.com')) return { platform: 'Twitter/X', icon: 'logo-twitter', color: '#1DA1F2', example: 'https://x.com/username/status/123' };
     if (l.includes('t.me') || l.includes('telegram.org')) return { platform: 'Telegram', icon: 'paper-plane', color: '#0088CC', example: 'https://t.me/channel/123' };
     if (l.includes('spotify.com')) return { platform: 'Spotify', icon: 'musical-notes', color: '#1DB954', example: 'https://open.spotify.com/track/123' };
-    return { platform: 'Web Link', icon: 'link-outline', color: '#64748b', example: 'https://example.com' };
+    return { platform: 'Web Link', icon: 'link-outline', color: T.gold, example: 'https://example.com' };
   }, [link]);
 
   const handleSubmit = async () => {
@@ -309,15 +309,15 @@ export default function SocialBoostScreen() {
 
   const getPlatformIcon = (cat: string) => {
     const l = cat.toLowerCase();
-    if (l.includes('instagram') || l.includes('ig')) return { name: 'logo-instagram', color: '#E1306C', bg: '#FCE7F3' };
-    if (l.includes('facebook') || l.includes('fb')) return { name: 'logo-facebook', color: '#1877F2', bg: '#DBEAFE' };
-    if (l.includes('youtube') || l.includes('yt')) return { name: 'logo-youtube', color: '#FF0000', bg: '#FEE2E2' };
-    if (l.includes('tiktok') || l.includes('tik')) return { name: 'logo-tiktok', color: '#000000', bg: '#F1F5F9' };
-    if (l.includes('twitter') || l.includes('x')) return { name: 'logo-twitter', color: '#1DA1F2', bg: '#E0F2FE' };
-    if (l.includes('telegram') || l.includes('tg')) return { name: 'paper-plane', color: '#0088CC', bg: '#E0F2FE' };
-    if (l.includes('spotify')) return { name: 'musical-notes', color: '#1DB954', bg: '#DCFCE7' };
-    if (l.includes('linkedin')) return { name: 'logo-linkedin', color: '#0A66C2', bg: '#DBEAFE' };
-    return { name: 'globe-outline', color: T.textSub, bg: T.bgLight };
+    if (l.includes('instagram') || l.includes('ig')) return { name: 'logo-instagram', color: '#E1306C', bg: 'rgba(225, 48, 108, 0.15)' };
+    if (l.includes('facebook') || l.includes('fb')) return { name: 'logo-facebook', color: '#1877F2', bg: 'rgba(24, 119, 242, 0.15)' };
+    if (l.includes('youtube') || l.includes('yt')) return { name: 'logo-youtube', color: '#FF0000', bg: 'rgba(255, 0, 0, 0.15)' };
+    if (l.includes('tiktok') || l.includes('tik')) return { name: 'logo-tiktok', color: '#FFFFFF', bg: 'rgba(255, 255, 255, 0.15)' };
+    if (l.includes('twitter') || l.includes('x')) return { name: 'logo-twitter', color: '#1DA1F2', bg: 'rgba(29, 161, 242, 0.15)' };
+    if (l.includes('telegram') || l.includes('tg')) return { name: 'paper-plane', color: '#0088CC', bg: 'rgba(0, 136, 204, 0.15)' };
+    if (l.includes('spotify')) return { name: 'musical-notes', color: '#1DB954', bg: 'rgba(29, 185, 84, 0.15)' };
+    if (l.includes('linkedin')) return { name: 'logo-linkedin', color: '#0A66C2', bg: 'rgba(10, 102, 194, 0.15)' };
+    return { name: 'sparkles', color: T.gold, bg: T.goldLightBg };
   };
 
   if (loading) {
@@ -333,9 +333,9 @@ export default function SocialBoostScreen() {
     <View style={s.container}>
       <Stack.Screen options={{ headerShown: false }} />
       
-      {/* Executive Dark Navy Header with Generous Top Padding */}
+      {/* Executive Dark Navy & Gold Header */}
       <LinearGradient 
-        colors={['#0F172A', '#1E293B', '#334155']} 
+        colors={['#0B132B', '#1C2541', '#334155']} 
         style={[s.header, { paddingTop: insets.top + 16, paddingBottom: 18 }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -346,7 +346,10 @@ export default function SocialBoostScreen() {
           </TouchableOpacity>
 
           <View style={s.headerTitleCol}>
-            <Text style={s.headerTitle}>Social Boost Hub</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="sparkles" size={13} color={T.gold} style={{ marginRight: 4 }} />
+              <Text style={s.headerTitle}>Social Boost Hub</Text>
+            </View>
             <TouchableOpacity 
               onPress={fetchUserBalance} 
               activeOpacity={0.8}
@@ -408,7 +411,7 @@ export default function SocialBoostScreen() {
                   activeOpacity={0.8}
                   style={[s.filterPill, isActive ? s.filterPillActive : null]}
                 >
-                  <Ionicons name={tab.icon as any} size={12} color={isActive ? T.gold : T.textSub} />
+                  <Ionicons name={tab.icon as any} size={12} color={isActive ? T.navyDark : T.gold} />
                   <Text style={[s.filterPillText, isActive ? s.filterPillTextActive : null]}>{tab.name}</Text>
                 </TouchableOpacity>
               );
@@ -417,7 +420,7 @@ export default function SocialBoostScreen() {
 
           {/* Direct Category Search Bar */}
           <View style={s.searchBarRow}>
-            <Ionicons name="search" size={14} color={T.textSub} style={{ marginRight: 6 }} />
+            <Ionicons name="search" size={14} color={T.gold} style={{ marginRight: 6 }} />
             <TextInput
               style={s.searchBarInput}
               placeholder="Search category (e.g. Followers, Likes, Views)..."
@@ -442,7 +445,7 @@ export default function SocialBoostScreen() {
             )}
           </View>
           
-          {/* Category Cards Grid with Generous Spacing */}
+          {/* Category Cards Grid with Dark Navy & Gold Border */}
           <View style={s.catGrid}>
             {categories.map((cat, i) => {
               const isSelected = selectedCategory === cat;
@@ -458,7 +461,7 @@ export default function SocialBoostScreen() {
                   style={[s.catCard, isSelected ? s.catCardActive : null]}
                 >
                   <View style={[s.catIconBox, isSelected ? s.catIconBoxActive : { backgroundColor: icon.bg }]}>
-                    <Ionicons name={icon.name as any} size={16} color={isSelected ? '#FFFFFF' : icon.color} />
+                    <Ionicons name={icon.name as any} size={16} color={isSelected ? T.navyDark : icon.color} />
                   </View>
                   <Text style={[s.catCardText, isSelected ? s.catCardTextActive : null]} numberOfLines={2}>
                     {cat}
@@ -533,7 +536,7 @@ export default function SocialBoostScreen() {
                         activeOpacity={0.7}
                         style={s.pasteBtn}
                       >
-                        <Ionicons name="clipboard-outline" size={12} color={T.gold} />
+                        <Ionicons name="clipboard-outline" size={12} color={T.navyDark} />
                         <Text style={s.pasteBtnText}>Paste</Text>
                       </TouchableOpacity>
                     </View>
@@ -559,13 +562,13 @@ export default function SocialBoostScreen() {
                           activeOpacity={0.7}
                           style={[s.qtyChip, quantity === val ? s.qtyChipActive : null]}
                         >
-                          <Text style={[s.qtyChipText, quantity === val ? { color: '#FFFFFF' } : null]}>+{parseInt(val).toLocaleString()}</Text>
+                          <Text style={[s.qtyChipText, quantity === val ? { color: T.navyDark } : null]}>+{parseInt(val).toLocaleString()}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   </View>
 
-                  {/* Executive Dark Summary Breakdown */}
+                  {/* Executive Dark Navy & Gold Summary Breakdown */}
                   <View style={s.summaryCard}>
                     <View style={s.summaryHeaderRow}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -619,23 +622,23 @@ export default function SocialBoostScreen() {
                     )}
                   </View>
 
-                  {/* Glowing Submit Button */}
+                  {/* Glowing Gold Submit Button */}
                   <TouchableOpacity 
                     onPress={handleSubmit}
                     disabled={isSubmitting}
                     activeOpacity={0.85}
-                    style={[s.submitBtn, isSubmitting ? { backgroundColor: T.navyMid } : null]}
+                    style={[s.submitBtn, isSubmitting ? { backgroundColor: T.navyCard } : null]}
                   >
                     {isSubmitting ? (
                       <View style={s.submittingRow}>
-                        <ActivityIndicator size="small" color={T.gold} />
+                        <ActivityIndicator size="small" color={T.navyDark} />
                         <Text style={s.submittingText}>Launching Order...</Text>
                       </View>
                     ) : (
                       <>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <View style={s.submitIconBox}>
-                            <Ionicons name="rocket" size={16} color={T.gold} />
+                            <Ionicons name="rocket" size={16} color={T.navyDark} />
                           </View>
                           <View>
                             <Text style={s.submitBtnTitle}>Submit Order Now</Text>
@@ -675,7 +678,7 @@ export default function SocialBoostScreen() {
 
             {/* Modal Search Bar */}
             <View style={s.modalSearchBox}>
-              <Ionicons name="search" size={14} color={T.textSub} />
+              <Ionicons name="search" size={14} color={T.gold} />
               <TextInput 
                 style={s.modalSearchInput}
                 placeholder="Search packages (e.g. Real Followers, Likes, Views)..."
@@ -707,7 +710,7 @@ export default function SocialBoostScreen() {
               contentContainerStyle={{ paddingBottom: 24 }}
               ListEmptyComponent={() => (
                 <View style={s.emptyBox}>
-                  <Ionicons name="search-outline" size={32} color={T.border} />
+                  <Ionicons name="search-outline" size={32} color={T.borderDark} />
                   <Text style={s.emptyText}>No matching services found</Text>
                 </View>
               )}
@@ -723,12 +726,12 @@ export default function SocialBoostScreen() {
                     }}
                   >
                     <View style={{ flex: 1, marginRight: 10 }}>
-                      <Text style={[s.serviceOptionName, isSelected ? { color: '#FFFFFF' } : null]}>{item.name}</Text>
+                      <Text style={[s.serviceOptionName, isSelected ? { color: T.gold } : null]}>{item.name}</Text>
                       <View style={s.serviceOptionMetaRow}>
                         <View style={s.instantBadge}>
                           <Text style={s.instantBadgeText}>⚡ Instant</Text>
                         </View>
-                        <Text style={[s.serviceOptionLimits, isSelected ? { color: '#94A3B8' } : null]}>
+                        <Text style={[s.serviceOptionLimits, isSelected ? { color: '#CBD5E1' } : null]}>
                           Min: {item.min} • Max: {item.max}
                         </Text>
                       </View>
@@ -763,7 +766,7 @@ export default function SocialBoostScreen() {
             </View>
 
             <View style={s.confirmReceiptCard}>
-              <View style={{ marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+              <View style={{ marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: T.borderDark }}>
                 <Text style={s.receiptItemLabel}>Selected Package</Text>
                 <Text style={s.receiptItemValueTitle}>{selectedService?.name}</Text>
               </View>
@@ -790,8 +793,8 @@ export default function SocialBoostScreen() {
             </View>
 
             <View style={s.balanceCheckPill}>
-              <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600' }}>Wallet After Order:</Text>
-              <Text style={{ color: '#F8FAFC', fontSize: 11, fontWeight: '800' }}>₦{(walletBalance - totalPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+              <Text style={{ color: T.textSub, fontSize: 11, fontWeight: '600' }}>Wallet After Order:</Text>
+              <Text style={{ color: T.textMain, fontSize: 11, fontWeight: '800' }}>₦{(walletBalance - totalPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
             </View>
 
             <View style={s.modalBtnRow}>
@@ -829,8 +832,8 @@ export default function SocialBoostScreen() {
           <View style={s.alertModalCard}>
             <View style={[
               s.alertIconBox,
-              alertModal.type === 'success' ? { backgroundColor: '#D1FAE5', borderColor: '#34D399' } :
-              alertModal.type === 'error' ? { backgroundColor: '#FEE2E2', borderColor: '#F87171' } : { backgroundColor: '#FEF3C7', borderColor: '#FBBF24' }
+              alertModal.type === 'success' ? { backgroundColor: T.successBg, borderColor: T.success } :
+              alertModal.type === 'error' ? { backgroundColor: T.dangerBg, borderColor: T.danger } : { backgroundColor: T.goldLightBg, borderColor: T.gold }
             ]}>
               <Ionicons 
                 name={
@@ -906,16 +909,16 @@ export default function SocialBoostScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navyDark,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navyDark,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: T.textSub,
+    color: T.gold,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -926,6 +929,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: T.borderGold,
   },
   headerRow: {
     flexDirection: 'row',
@@ -936,30 +941,30 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: T.goldLightBg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: T.borderGold,
   },
   headerTitleCol: {
     alignItems: 'center',
   },
   headerTitle: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontWeight: '800',
     fontSize: 14,
   },
   balanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 16,
     marginTop: 3,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: T.borderGold,
   },
   balanceChipText: {
     color: T.gold,
@@ -973,15 +978,15 @@ const s = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: 'rgba(245, 158, 11, 0.15)',
   },
   topFeaturePill: {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(11, 19, 43, 0.7)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(245, 158, 11, 0.2)',
   },
   topFeaturePillText: {
     fontSize: 8.5,
@@ -1001,7 +1006,7 @@ const s = StyleSheet.create({
     marginTop: 6,
   },
   sectionLabel: {
-    color: T.textMain,
+    color: T.gold,
     fontSize: 9.5,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1010,7 +1015,7 @@ const s = StyleSheet.create({
     marginLeft: 2,
   },
   clearCategoryText: {
-    color: T.gold,
+    color: T.goldBright,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -1024,13 +1029,13 @@ const s = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: T.navyCard,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
   },
   filterPillActive: {
-    backgroundColor: T.navyDark,
-    borderColor: T.navyDark,
+    backgroundColor: T.gold,
+    borderColor: T.goldBright,
   },
   filterPillText: {
     color: T.textSub,
@@ -1039,17 +1044,18 @@ const s = StyleSheet.create({
     marginLeft: 5,
   },
   filterPillTextActive: {
-    color: '#FFFFFF',
+    color: T.navyDark,
+    fontWeight: '900',
   },
   searchBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: T.navyCard,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderGold,
     marginBottom: 12,
   },
   searchBarInput: {
@@ -1068,22 +1074,23 @@ const s = StyleSheet.create({
   catCard: {
     width: (SCREEN_WIDTH - 52) / 4,
     aspectRatio: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: T.navyCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.2,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
   },
   catCardActive: {
-    backgroundColor: T.navyDark,
-    borderColor: T.navyDark,
+    backgroundColor: T.navyCard,
+    borderColor: T.gold,
+    borderWidth: 1.5,
   },
   catIconBox: {
     width: 28,
@@ -1094,7 +1101,7 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   catIconBoxActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: T.gold,
   },
   catCardText: {
     fontSize: 8.5,
@@ -1105,18 +1112,19 @@ const s = StyleSheet.create({
   },
   catCardTextActive: {
     color: T.gold,
+    fontWeight: '900',
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: T.navyCard,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: T.border,
-    shadowColor: '#000',
+    borderColor: T.borderGold,
+    shadowColor: T.gold,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.1,
     shadowRadius: 5,
-    elevation: 2,
+    elevation: 3,
     marginBottom: 20,
   },
   formHeaderRow: {
@@ -1128,15 +1136,17 @@ const s = StyleSheet.create({
   formHeading: {
     fontSize: 11,
     fontWeight: '900',
-    color: T.textMain,
+    color: T.gold,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   categoryTagPill: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: T.borderGold,
   },
   categoryTagPillText: {
     color: T.gold,
@@ -1161,7 +1171,7 @@ const s = StyleSheet.create({
     marginBottom: 3,
   },
   selectBtn: {
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1169,7 +1179,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
   },
   selectBtnText: {
     fontSize: 11,
@@ -1181,11 +1191,11 @@ const s = StyleSheet.create({
     fontWeight: '800',
   },
   rateInfoBox: {
-    backgroundColor: T.infoBg,
+    backgroundColor: T.goldLightBg,
     padding: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: T.borderGold,
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1194,23 +1204,23 @@ const s = StyleSheet.create({
   rateInfoLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#1E40AF',
+    color: T.gold,
   },
   rateInfoValue: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#1E3A8A',
+    color: T.textMain,
     marginTop: 1,
   },
   rateInfoSubLabel: {
     fontSize: 8.5,
     fontWeight: '800',
-    color: '#2563EB',
+    color: T.goldBright,
   },
   rateInfoSubValue: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#1E40AF',
+    color: T.textMain,
     marginTop: 1,
   },
   detectedChip: {
@@ -1221,10 +1231,10 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: T.success,
   },
   detectedChipText: {
-    color: '#065F46',
+    color: T.success,
     fontSize: 8.5,
     fontWeight: '800',
     marginLeft: 3,
@@ -1232,12 +1242,12 @@ const s = StyleSheet.create({
   inputWithBtnContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
   },
   inputWithBtn: {
     flex: 1,
@@ -1247,7 +1257,7 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
   pasteBtn: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.gold,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
@@ -1255,14 +1265,14 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   pasteBtnText: {
-    color: T.gold,
+    color: T.navyDark,
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '900',
     textTransform: 'uppercase',
     marginLeft: 3,
   },
   standardInput: {
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1270,36 +1280,36 @@ const s = StyleSheet.create({
     color: T.textMain,
     fontWeight: '700',
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
   },
   qtyChipsRow: {
     flexDirection: 'row',
     marginTop: 6,
   },
   qtyChip: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: T.navySubCard,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,
     marginRight: 5,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
   },
   qtyChipActive: {
-    backgroundColor: T.navyDark,
-    borderColor: T.navyDark,
+    backgroundColor: T.gold,
+    borderColor: T.goldBright,
   },
   qtyChipText: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: T.textMain,
+    color: T.textSub,
   },
   summaryCard: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.navySubCard,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderGold,
     marginBottom: 10,
   },
   summaryHeaderRow: {
@@ -1308,11 +1318,11 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: T.borderDark,
     marginBottom: 8,
   },
   summaryHeadingText: {
-    color: '#CBD5E1',
+    color: T.gold,
     fontSize: 9.5,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1320,12 +1330,12 @@ const s = StyleSheet.create({
     marginLeft: 5,
   },
   deliveryBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: T.borderGold,
   },
   deliveryBadgeText: {
     color: T.gold,
@@ -1340,12 +1350,12 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   summaryItemLabel: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '600',
   },
   summaryItemValue: {
-    color: '#E2E8F0',
+    color: T.textMain,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -1355,11 +1365,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: T.borderDark,
     marginTop: 4,
   },
   summaryTotalLabel: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -1381,11 +1391,11 @@ const s = StyleSheet.create({
   },
   balanceCheckCardOk: {
     backgroundColor: T.successBg,
-    borderColor: '#A7F3D0',
+    borderColor: T.success,
   },
   balanceCheckCardLow: {
     backgroundColor: T.dangerBg,
-    borderColor: '#FCA5A5',
+    borderColor: T.danger,
   },
   balanceCheckText: {
     fontSize: 10,
@@ -1406,7 +1416,7 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
   },
   submitBtn: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.gold,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -1414,12 +1424,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: T.gold,
+    borderColor: T.goldBright,
     shadowColor: T.gold,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 5,
   },
   submittingRow: {
     flexDirection: 'row',
@@ -1428,9 +1438,9 @@ const s = StyleSheet.create({
     width: '100%',
   },
   submittingText: {
-    color: T.gold,
+    color: T.navyDark,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '900',
     marginLeft: 6,
     textTransform: 'uppercase',
   },
@@ -1438,52 +1448,52 @@ const s = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: 'rgba(11, 19, 43, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
   },
   submitBtnTitle: {
-    color: '#FFFFFF',
+    color: T.navyDark,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   submitBtnSub: {
-    color: '#94A3B8',
+    color: '#334155',
     fontSize: 8.5,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   submitPricePill: {
-    backgroundColor: T.gold,
+    backgroundColor: T.navyDark,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
   },
   submitPricePillText: {
-    color: T.navyDark,
+    color: T.gold,
     fontSize: 11,
     fontWeight: '900',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(11, 19, 43, 0.85)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: T.navyCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
     maxHeight: '82%',
+    borderWidth: 1,
+    borderColor: T.borderGold,
   },
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: T.border,
+    backgroundColor: T.borderDark,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 12,
@@ -1498,13 +1508,13 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: T.goldLightBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
   },
   modalHeaderTitle: {
-    color: T.navyDark,
+    color: T.textMain,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1512,19 +1522,19 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalSearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderGold,
     marginBottom: 10,
   },
   modalSearchInput: {
@@ -1536,11 +1546,13 @@ const s = StyleSheet.create({
   },
   categoryBadgePill: {
     alignSelf: 'flex-start',
-    backgroundColor: T.navyDark,
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 5,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: T.borderGold,
   },
   categoryBadgePillText: {
     color: T.gold,
@@ -1560,19 +1572,20 @@ const s = StyleSheet.create({
     marginTop: 6,
   },
   serviceOptionItem: {
-    backgroundColor: T.bgLight,
+    backgroundColor: T.navySubCard,
     borderRadius: 12,
     padding: 10,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: T.border,
+    borderColor: T.borderDark,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   serviceOptionItemActive: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.navySubCard,
     borderColor: T.gold,
+    borderWidth: 1.5,
   },
   serviceOptionName: {
     fontSize: 11,
@@ -1592,10 +1605,10 @@ const s = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: T.success,
   },
   instantBadgeText: {
-    color: '#047857',
+    color: T.success,
     fontSize: 8.5,
     fontWeight: '800',
   },
@@ -1605,12 +1618,12 @@ const s = StyleSheet.create({
     color: T.textSub,
   },
   serviceRateTag: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderGold,
   },
   serviceRateTagText: {
     color: T.gold,
@@ -1626,20 +1639,20 @@ const s = StyleSheet.create({
   },
   modalOverlayCenter: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: 'rgba(11, 19, 43, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
   },
   confirmModalCard: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.navyCard,
     width: '100%',
     maxWidth: 360,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    shadowColor: '#000',
+    borderColor: T.borderGold,
+    shadowColor: T.gold,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
@@ -1649,42 +1662,42 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: T.goldLightBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderColor: T.borderGold,
   },
   confirmModalTitle: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontSize: 15,
     fontWeight: '900',
   },
   confirmModalSub: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 2,
   },
   confirmReceiptCard: {
-    backgroundColor: '#020617',
+    backgroundColor: T.navySubCard,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: T.borderDark,
     marginBottom: 12,
   },
   receiptItemLabel: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 8.5,
     fontWeight: '800',
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   receiptItemValueTitle: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontSize: 11,
     fontWeight: '800',
     lineHeight: 16,
@@ -1696,18 +1709,18 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   receiptLabel: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '600',
   },
   receiptValText: {
-    color: '#E2E8F0',
+    color: T.textMain,
     fontSize: 10,
     fontWeight: '800',
     maxWidth: 150,
   },
   speedText: {
-    color: '#34D399',
+    color: T.success,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -1717,11 +1730,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: T.borderDark,
     marginTop: 4,
   },
   receiptTotalLabel: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontSize: 10,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -1732,12 +1745,12 @@ const s = StyleSheet.create({
     fontWeight: '900',
   },
   balanceCheckPill: {
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    backgroundColor: T.navySubCard,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderDark,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1751,14 +1764,14 @@ const s = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#1E293B',
+    backgroundColor: T.navySubCard,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderDark,
   },
   cancelBtnText: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1779,13 +1792,13 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
   },
   alertModalCard: {
-    backgroundColor: T.navyDark,
+    backgroundColor: T.navyCard,
     width: '100%',
     maxWidth: 340,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderGold,
     alignItems: 'center',
   },
   alertIconBox: {
@@ -1798,14 +1811,14 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   alertModalTitle: {
-    color: '#FFFFFF',
+    color: T.textMain,
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 4,
   },
   alertModalMessage: {
-    color: '#CBD5E1',
+    color: T.textSub,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
@@ -1813,12 +1826,12 @@ const s = StyleSheet.create({
     lineHeight: 16,
   },
   orderIdBox: {
-    backgroundColor: '#020617',
+    backgroundColor: T.navySubCard,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: T.borderDark,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1826,17 +1839,19 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
   orderIdText: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '700',
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: T.goldLightBg,
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 5,
+    borderWidth: 1,
+    borderColor: T.borderGold,
   },
   copyBtnText: {
     color: T.gold,
@@ -1853,14 +1868,14 @@ const s = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#1E293B',
+    backgroundColor: T.navySubCard,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: T.borderDark,
   },
   alertCloseBtnText: {
-    color: '#94A3B8',
+    color: T.textSub,
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1884,14 +1899,12 @@ const s = StyleSheet.create({
     width: '100%',
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: T.navyDark,
-    borderWidth: 1,
-    borderColor: T.gold,
+    backgroundColor: T.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
   alertOkBtnText: {
-    color: T.gold,
+    color: T.navyDark,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
