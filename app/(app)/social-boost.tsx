@@ -108,9 +108,16 @@ export default function SocialBoostScreen() {
         .maybeSingle();
 
       if (profile) {
-        const rawBal = profile.balance ?? profile.credit_balance ?? 0;
-        const parsedBal = parseFloat(String(rawBal)) || 0;
-        setWalletBalance(parsedBal);
+        const bal1 = profile.balance != null ? parseFloat(String(profile.balance)) : NaN;
+        const bal2 = profile.credit_balance != null ? parseFloat(String(profile.credit_balance)) : NaN;
+        
+        let finalBal = 0;
+        if (!isNaN(bal1) && bal1 > 0) finalBal = bal1;
+        else if (!isNaN(bal2) && bal2 > 0) finalBal = bal2;
+        else if (!isNaN(bal1)) finalBal = bal1;
+        else if (!isNaN(bal2)) finalBal = bal2;
+
+        setWalletBalance(finalBal);
       }
     } catch (e) {
       console.error("Balance fetch error:", e);
@@ -621,7 +628,7 @@ export default function SocialBoostScreen() {
             </View>
 
             <View style={s.confirmReceiptCard}>
-              <View style={{ marginBottom: 10, pb: 10, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
+              <View style={{ marginBottom: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#334155' }}>
                 <Text style={s.receiptItemLabel}>Selected Service</Text>
                 <Text style={s.receiptItemValueTitle}>{selectedService?.name}</Text>
               </View>
