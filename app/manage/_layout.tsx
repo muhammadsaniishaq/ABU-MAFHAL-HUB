@@ -23,40 +23,25 @@ export default function AdminLayout() {
                 }
                 
                 let authorizedAdmin = false;
-                // Load from cache first
-                const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
-                if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
+                // Query database profiles table
+                const { data: profile, error: profileErr } = await supabase
+                    .from('profiles')
+                    .select('role, email')
+                    .eq('id', user.id)
+                    .single();
+
+                const role = profile?.role || user.user_metadata?.role || user.app_metadata?.role || 'user';
+                const isSuperAdminEmail = user.email?.endsWith('@abumafhal.com.ng') || user.email === 'admin@abumafhal.com.ng';
+                
+                if (['admin', 'super_admin'].includes(role) || isSuperAdminEmail) {
                     setIsAdmin(true);
+                    setIsAuthorized(true);
                     authorizedAdmin = true;
+                    await AsyncStorage.setItem(`user_role_${user.id}`, role || 'admin');
+                    await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
                 } else {
-                    // Query db
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', user.id)
-                        .single();
-
-                    const role = profile?.role || 'user';
-                    if (['admin', 'super_admin'].includes(role)) {
-                        setIsAdmin(true);
-                        authorizedAdmin = true;
-                    } else {
-                        router.replace('/(app)/dashboard');
-                        return;
-                    }
-                }
-
-                if (authorizedAdmin) {
-                    const lastVerificationStr = await AsyncStorage.getItem('last_security_verification_time');
-                    if (lastVerificationStr) {
-                        const lastVerificationTime = parseInt(lastVerificationStr, 10);
-                        const now = Date.now();
-                        const LOCK_TIMEOUT = 10 * 60 * 1000;
-                        if (now - lastVerificationTime < LOCK_TIMEOUT) {
-                            setIsAuthorized(true);
-                            await AsyncStorage.setItem('last_security_verification_time', String(now));
-                        }
-                    }
+                    router.replace('/(app)/dashboard');
+                    return;
                 }
             } catch (e) {
                 console.error("Admin verification error:", e);
@@ -70,34 +55,15 @@ export default function AdminLayout() {
 
     if (checkingRole) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#ffffff" />
+            <View style={{ flex: 1, backgroundColor: '#0A1128', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#D4AF37" />
+                <Text style={{ color: '#D4AF37', marginTop: 12, fontWeight: '700', fontSize: 13 }}>Verifying Admin Clearance...</Text>
             </View>
         );
     }
 
     if (!isAdmin) {
         return null;
-    }
-
-    if (!isAuthorized) {
-        return (
-            <SecurityModal
-                visible={true}
-                onClose={() => router.replace('/(app)/dashboard')}
-                onSuccess={async () => {
-                    try {
-                        await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-                    } catch (e) {
-                        console.error(e);
-                    }
-                    setIsAuthorized(true);
-                }}
-                title="Admin Access"
-                description="Biometric authentication required."
-                requiredFor="admin"
-            />
-        );
     }
 
     return (

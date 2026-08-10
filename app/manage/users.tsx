@@ -668,23 +668,41 @@ export default function UserManagement() {
         setFundingProcessing(true);
         try {
             const amount = type === 'fund' ? Math.abs(amountVal) : -Math.abs(amountVal);
-            const currentBalance = Number(selectedUser.credit_balance) || Number(selectedUser.balance) || 0;
+            const currentBalance = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
             const newBalance = Math.max(0, currentBalance + amount);
+
+            // Step 1: Try RPC credit_balance / deduct_balance functions
+            try {
+                if (type === 'fund') {
+                    await supabase.rpc('credit_balance', { user_id: selectedUser.id, amount: Math.abs(amountVal) });
+                } else {
+                    await supabase.rpc('deduct_balance', { user_id: selectedUser.id, amount: Math.abs(amountVal) });
+                }
+            } catch (rpcErr) {}
             
-            // 1. Attempt Supabase Update (Handling both credit_balance and balance columns)
-            let { error: err1 } = await supabase.from('profiles').update({ 
-                credit_balance: newBalance,
-                balance: newBalance 
+            // Step 2: Direct Supabase Update on profiles table
+            let { error: errFull } = await supabase.from('profiles').update({ 
+                balance: newBalance,
+                credit_balance: newBalance 
             }).eq('id', selectedUser.id);
 
-            if (err1) {
-                const { error: err2 } = await supabase.from('profiles').update({ 
-                    credit_balance: newBalance 
+            if (errFull) {
+                // Retry updating balance column alone
+                let { error: errBal } = await supabase.from('profiles').update({ 
+                    balance: newBalance 
                 }).eq('id', selectedUser.id);
-                if (err2) throw err2;
+
+                if (errBal) {
+                    // Retry updating credit_balance column alone
+                    let { error: errCred } = await supabase.from('profiles').update({ 
+                        credit_balance: newBalance 
+                    }).eq('id', selectedUser.id);
+
+                    if (errCred) throw errCred;
+                }
             }
             
-            // 2. Log transaction in Supabase
+            // Step 3: Insert transaction audit log in Supabase
             try {
                 await supabase.from('transactions').insert({
                     user_id: selectedUser.id,
@@ -693,22 +711,24 @@ export default function UserManagement() {
                     amount: Math.abs(amountVal),
                     status: 'completed',
                     description: `Admin Wallet ${type === 'fund' ? 'Funding' : 'Debit'}`,
-                    reference: `admin_${type}__${Date.now()}`
+                    reference: `admin_${type}_${Date.now()}`
                 });
             } catch (txErr) {}
 
+            // Step 4: Native Alert confirmation
             Alert.alert(
                 "Wallet Updated 🎉", 
                 type === 'fund'
-                    ? `Successfully funded ₦${Math.abs(amountVal).toLocaleString()} to ${selectedUser.full_name}'s vault!` 
-                    : `Successfully debited ₦${Math.abs(amountVal).toLocaleString()} from ${selectedUser.full_name}'s vault!`
+                    ? `Successfully funded ₦${Math.abs(amountVal).toLocaleString()} to ${selectedUser.full_name}'s vault balance!` 
+                    : `Successfully debited ₦${Math.abs(amountVal).toLocaleString()} from ${selectedUser.full_name}'s vault balance!`
             );
 
-            // 3. Update local user states immediately
+            // Step 5: Update local state immediately
             setSelectedUser(prev => prev ? { ...prev, balance: newBalance, credit_balance: newBalance } : null);
             setUsers(prevUsers => prevUsers.map(u => u.id === selectedUser.id ? { ...u, balance: newBalance, credit_balance: newBalance } : u));
             setFundAmount('');
             fetchUserHistory(selectedUser.id);
+            fetchUsers();
         } catch (e: any) {
             Alert.alert("Funding Error ❌", e.message || "Failed to update wallet balance.");
         } finally {
