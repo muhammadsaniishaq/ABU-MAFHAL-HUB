@@ -663,24 +663,75 @@ export default function UserManagement() {
         }
     };
 
+    const handleDirectFundOrDebit = async (type: 'fund' | 'debit', amountVal: number) => {
+        if (!selectedUser) return;
+        setFundingProcessing(true);
+        try {
+            const amount = type === 'fund' ? Math.abs(amountVal) : -Math.abs(amountVal);
+            const currentBalance = Number(selectedUser.credit_balance) || Number(selectedUser.balance) || 0;
+            const newBalance = Math.max(0, currentBalance + amount);
+            
+            // 1. Attempt Supabase Update (Handling both credit_balance and balance columns)
+            let { error: err1 } = await supabase.from('profiles').update({ 
+                credit_balance: newBalance,
+                balance: newBalance 
+            }).eq('id', selectedUser.id);
+
+            if (err1) {
+                const { error: err2 } = await supabase.from('profiles').update({ 
+                    credit_balance: newBalance 
+                }).eq('id', selectedUser.id);
+                if (err2) throw err2;
+            }
+            
+            // 2. Log transaction in Supabase
+            try {
+                await supabase.from('transactions').insert({
+                    user_id: selectedUser.id,
+                    type: type === 'fund' ? 'topup' : 'withdrawal',
+                    title: `Admin Wallet ${type === 'fund' ? 'Credit' : 'Debit'}`,
+                    amount: Math.abs(amountVal),
+                    status: 'completed',
+                    description: `Admin Wallet ${type === 'fund' ? 'Funding' : 'Debit'}`,
+                    reference: `admin_${type}__${Date.now()}`
+                });
+            } catch (txErr) {}
+
+            Alert.alert(
+                "Wallet Updated 🎉", 
+                type === 'fund'
+                    ? `Successfully funded ₦${Math.abs(amountVal).toLocaleString()} to ${selectedUser.full_name}'s vault!` 
+                    : `Successfully debited ₦${Math.abs(amountVal).toLocaleString()} from ${selectedUser.full_name}'s vault!`
+            );
+
+            // 3. Update local user states immediately
+            setSelectedUser(prev => prev ? { ...prev, balance: newBalance, credit_balance: newBalance } : null);
+            setUsers(prevUsers => prevUsers.map(u => u.id === selectedUser.id ? { ...u, balance: newBalance, credit_balance: newBalance } : u));
+            setFundAmount('');
+            fetchUserHistory(selectedUser.id);
+        } catch (e: any) {
+            Alert.alert("Funding Error ❌", e.message || "Failed to update wallet balance.");
+        } finally {
+            setFundingProcessing(false);
+        }
+    };
+
     const initiateFundOrDebit = () => {
         if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
             Alert.alert("Invalid Amount", "Please enter a valid positive amount.");
             return;
         }
-        let amount = Number(fundAmount);
+        const amountVal = Number(fundAmount);
+        const actionType = isDebit ? 'debit' : 'fund';
         
         Alert.alert(
             isDebit ? "Confirm Wallet Debit 🔻" : "Confirm Wallet Funding 💵",
-            `Are you sure you want to ${isDebit ? 'DEBIT' : 'FUND'} ₦${amount.toLocaleString()} ${isDebit ? 'from' : 'to'} ${selectedUser?.full_name}'s vault balance?`,
+            `Are you sure you want to ${isDebit ? 'DEBIT' : 'FUND'} ₦${amountVal.toLocaleString()} ${isDebit ? 'from' : 'to'} ${selectedUser?.full_name}'s vault balance?`,
             [
                 { text: "Cancel", style: "cancel" },
                 { 
                     text: isDebit ? "Debit Now" : "Fund Now", 
-                    onPress: () => {
-                        setPendingAction({ type: isDebit ? 'debit' : 'fund', amount: amount });
-                        executeAction();
-                    } 
+                    onPress: () => handleDirectFundOrDebit(actionType, amountVal)
                 }
             ]
         );
