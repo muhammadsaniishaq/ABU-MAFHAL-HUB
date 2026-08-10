@@ -91,16 +91,31 @@ export default function SocialBoostScreen() {
 
   const insets = useSafeAreaInsets();
 
-  const fetchUserBalance = async () => {
+  const fetchUserBalance = async (): Promise<number> => {
     try {
+      // 1. Instant Cache Fallback from @dashboard_cache
+      const cachedDashboard = await AsyncStorage.getItem('@dashboard_cache');
+      if (cachedDashboard) {
+        try {
+          const parsed = JSON.parse(cachedDashboard);
+          const cachedBal = parsed?.userData?.balance ?? parsed?.userData?.credit_balance;
+          if (cachedBal != null) {
+            const numBal = parseFloat(String(cachedBal)) || 0;
+            setWalletBalance(numBal);
+          }
+        } catch (e) {}
+      }
+
+      // 2. Fetch active authenticated user
       const { data: { session } } = await supabase.auth.getSession();
       let userId = session?.user?.id;
       if (!userId) {
         const { data: { user } } = await supabase.auth.getUser();
         userId = user?.id;
       }
-      if (!userId) return;
+      if (!userId) return 0;
 
+      // 3. Query profiles table directly
       const { data: profile } = await supabase
         .from('profiles')
         .select('balance, credit_balance')
@@ -118,15 +133,28 @@ export default function SocialBoostScreen() {
         else if (!isNaN(bal2)) finalBal = bal2;
 
         setWalletBalance(finalBal);
+        return finalBal;
       }
     } catch (e) {
       console.error("Balance fetch error:", e);
     }
+    return 0;
   };
 
   useEffect(() => {
     fetchUserBalance();
     fetchData();
+
+    // Listen to Auth State changes so hydrated session updates balance instantly
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchUserBalance();
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const fetchData = async () => {
@@ -199,7 +227,7 @@ export default function SocialBoostScreen() {
     return { platform: 'Web', icon: 'link-outline', color: '#64748b' };
   }, [link]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedService) {
       showAlert("Service Required", "Please select a boost service type before proceeding.", "info");
       return;
@@ -215,8 +243,16 @@ export default function SocialBoostScreen() {
       return;
     }
 
-    if (walletBalance < totalPrice) {
-      showAlert("Insufficient Wallet Balance", "Please fund your wallet balance to launch this boost order.", "error");
+    // Re-verify balance from DB before client check
+    const freshBal = await fetchUserBalance();
+    const effectiveBal = Math.max(walletBalance, freshBal);
+
+    if (effectiveBal < totalPrice) {
+      showAlert(
+        "Insufficient Wallet Balance", 
+        `Your current wallet balance is ₦${effectiveBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}, but this order costs ₦${totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Please fund your wallet.`, 
+        "error"
+      );
       return;
     }
 
