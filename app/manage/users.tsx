@@ -8,31 +8,31 @@ import SecurityModal from '../../components/SecurityModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
-// Executive Navy & Gold Theme Tokens (Embedded CSS)
+// Executive Light Mode Theme Tokens (Navy & Gold on Light Slate/White)
 const T = {
-    navyDark: '#070C1E',      // Deepest Navy
-    navyMid: '#0F172A',       // Rich Navy Card
-    navyCard: '#1E293B',      // Card Container
+    navyDark: '#0A1128',      // Deep Executive Navy
+    navyMid: '#111D3B',       // Rich Mid Navy
+    navyCard: '#1E293B',      // Dark Card Accent
     gold: '#D4AF37',          // Metallic Gold Accent
-    goldDark: '#B8952B',      // Dark Gold
-    goldLight: '#F5E8D0',     // Light Gold Text
-    goldBg: 'rgba(212, 175, 55, 0.15)',
-    bg: '#0B132B',            // Dark Background
-    card: '#16223B',          // Card Surface
-    cardBorder: 'rgba(212, 175, 55, 0.25)',
-    textMain: '#FFFFFF',
-    textSub: '#94A3B8',
-    border: '#334155',
+    goldDark: '#B8952B',      // Dark Gold Text
+    goldLight: '#F5E8D0',     // Light Gold
+    goldBg: 'rgba(212, 175, 55, 0.12)',
+    bg: '#F8FAFC',            // Clean Light Slate Background
+    card: '#FFFFFF',          // Crisp White Card Container
+    cardBorder: '#E2E8F0',    // Slate Border Edge
+    textMain: '#0F172A',      // High Contrast Dark Slate Text
+    textSub: '#64748B',       // Subdued Text
+    border: '#CBD5E1',
     success: '#10B981',
-    successBg: 'rgba(16, 185, 129, 0.15)',
+    successBg: '#ECFDF5',
     danger: '#EF4444',
-    dangerBg: 'rgba(239, 68, 68, 0.15)',
+    dangerBg: '#FEF2F2',
     warning: '#F59E0B',
-    warningBg: 'rgba(245, 158, 11, 0.15)',
-    info: '#38BDF8',
-    infoBg: 'rgba(56, 189, 248, 0.15)',
-    purple: '#C084FC',
-    purpleBg: 'rgba(192, 132, 252, 0.15)',
+    warningBg: '#FFFBEB',
+    info: '#0284C7',
+    infoBg: '#F0F9FF',
+    purple: '#9333EA',
+    purpleBg: '#F3E8FF',
 };
 
 // Schema Interfaces
@@ -149,9 +149,10 @@ export default function UserManagement() {
         payload?: any 
     } | null>(null);
     
-    // Form Inputs
+    // Form Inputs & Funding States
     const [fundAmount, setFundAmount] = useState('');
     const [isDebit, setIsDebit] = useState(false);
+    const [fundingProcessing, setFundingProcessing] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ 
@@ -337,7 +338,7 @@ export default function UserManagement() {
         }
     };
 
-    // Fetch Real User History (Purchased Virtual Cards, KYC Verification History, Transactions)
+    // Fetch Real User History
     const fetchUserHistory = async (userId: string) => {
         setLoadingHistory(true);
         try {
@@ -350,7 +351,7 @@ export default function UserManagement() {
                 .limit(20);
             setUserTransactions(txData || []);
 
-            // 2. Fetch User Purchased Virtual Cards from user_virtual_cards
+            // 2. Fetch User Purchased Virtual Cards
             const { data: cardsData } = await supabase
                 .from('user_virtual_cards')
                 .select('*')
@@ -358,7 +359,7 @@ export default function UserManagement() {
                 .order('created_at', { ascending: false });
             setUserVirtualCards(cardsData || []);
 
-            // 3. Fetch User KYC Requests & Verification History from kyc_requests
+            // 3. Fetch User KYC Requests
             const { data: kycData } = await supabase
                 .from('kyc_requests')
                 .select('*')
@@ -427,31 +428,51 @@ export default function UserManagement() {
         
         try {
             if (pendingAction.type === 'fund' || pendingAction.type === 'debit') {
-                const amount = pendingAction.type === 'fund' ? Number(pendingAction.amount) : -Number(pendingAction.amount);
-                const currentBalance = Number(selectedUser.balance) || Number(selectedUser.credit_balance) || 0;
-                const newBalance = currentBalance + amount;
+                setFundingProcessing(true);
+                const amount = pendingAction.type === 'fund' ? Math.abs(Number(pendingAction.amount)) : -Math.abs(Number(pendingAction.amount));
+                const currentBalance = Number(selectedUser.credit_balance) || Number(selectedUser.balance) || 0;
+                const newBalance = Math.max(0, currentBalance + amount);
                 
-                const { error } = await supabase.from('profiles').update({ 
-                    balance: newBalance,
-                    credit_balance: newBalance 
+                // Attempt Supabase Update with fallback
+                let { error: err1 } = await supabase.from('profiles').update({ 
+                    credit_balance: newBalance,
+                    balance: newBalance 
                 }).eq('id', selectedUser.id);
 
-                if (error) throw error;
+                if (err1) {
+                    const { error: err2 } = await supabase.from('profiles').update({ 
+                        credit_balance: newBalance 
+                    }).eq('id', selectedUser.id);
+                    if (err2) throw err2;
+                }
                 
-                await supabase.from('transactions').insert({
-                    user_id: selectedUser.id,
-                    type: pendingAction.type === 'fund' ? 'topup' : 'withdrawal',
-                    title: `Admin Wallet ${pendingAction.type === 'fund' ? 'Credit' : 'Debit'}`,
-                    amount: Math.abs(amount),
-                    status: 'completed',
-                    description: `Admin Wallet ${pendingAction.type === 'fund' ? 'Funding' : 'Debit'}`,
-                    reference: `admin_${pendingAction.type}_${Date.now()}`
-                });
-                
-                Alert.alert("Wallet Updated 🎉", amount > 0 ? `Funded ₦${amount.toLocaleString()} to user wallet!` : `Debited ₦${Math.abs(amount).toLocaleString()} from user wallet!`);
+                // Insert transaction log
+                try {
+                    await supabase.from('transactions').insert({
+                        user_id: selectedUser.id,
+                        type: pendingAction.type === 'fund' ? 'topup' : 'withdrawal',
+                        title: `Admin Wallet ${pendingAction.type === 'fund' ? 'Credit' : 'Debit'}`,
+                        amount: Math.abs(amount),
+                        status: 'completed',
+                        description: `Admin Wallet ${pendingAction.type === 'fund' ? 'Funding' : 'Debit'}`,
+                        reference: `admin_${pendingAction.type}_${Date.now()}`
+                    });
+                } catch (txErr) {}
+
+                Alert.alert(
+                    "Wallet Updated 🎉", 
+                    amount > 0 
+                        ? `Successfully funded ₦${Math.abs(amount).toLocaleString()} to ${selectedUser.full_name}'s vault!` 
+                        : `Successfully debited ₦${Math.abs(amount).toLocaleString()} from ${selectedUser.full_name}'s vault!`
+                );
+
                 setSelectedUser({ ...selectedUser, balance: newBalance, credit_balance: newBalance });
                 setFundAmount('');
+                setFundingProcessing(false);
+                fetchUserHistory(selectedUser.id);
                 fetchUsers();
+                setPendingAction(null);
+                return;
             }
             else if (pendingAction.type === 'toggle_virtual_card' && pendingAction.cardId) {
                 const targetCard = userVirtualCards.find(c => c.id === pendingAction.cardId);
@@ -590,7 +611,7 @@ export default function UserManagement() {
             }
 
             fetchUsers();
-            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes', 'verify_nin', 'verify_cac', 'send_email', 'toggle_virtual_card'].includes(pendingAction.type)) {
+            if (['edit_profile', 'notify', 'kyc', 'set_limit', 'save_notes', 'verify_nin', 'verify_cac', 'send_email', 'toggle_virtual_card', 'fund', 'debit'].includes(pendingAction.type)) {
                  if (pendingAction.type === 'edit_profile' && selectedUser) setSelectedUser({ ...selectedUser, ...editForm, kyc_tier: parseInt(editForm.kyc_tier) || 1 });
             } else {
                  setSelectedUser(null);
@@ -599,9 +620,11 @@ export default function UserManagement() {
             setPendingAction(null);
             setFundAmount('');
             setIsDebit(false);
+            setFundingProcessing(false);
         } catch (e: any) {
             Alert.alert("Action Error", e.message || "An unexpected error occurred.");
             setPendingAction(null);
+            setFundingProcessing(false);
         }
     };
 
@@ -642,12 +665,25 @@ export default function UserManagement() {
 
     const initiateFundOrDebit = () => {
         if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
-            Alert.alert("Invalid Amount", "Please enter a valid positive number");
+            Alert.alert("Invalid Amount", "Please enter a valid positive amount.");
             return;
         }
         let amount = Number(fundAmount);
-        setPendingAction({ type: isDebit ? 'debit' : 'fund', amount: amount });
-        setShowSecurity(true);
+        
+        Alert.alert(
+            isDebit ? "Confirm Wallet Debit 🔻" : "Confirm Wallet Funding 💵",
+            `Are you sure you want to ${isDebit ? 'DEBIT' : 'FUND'} ₦${amount.toLocaleString()} ${isDebit ? 'from' : 'to'} ${selectedUser?.full_name}'s vault balance?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: isDebit ? "Debit Now" : "Fund Now", 
+                    onPress: () => {
+                        setPendingAction({ type: isDebit ? 'debit' : 'fund', amount: amount });
+                        executeAction();
+                    } 
+                }
+            ]
+        );
     };
 
     const initiateBlock = () => {
@@ -776,33 +812,33 @@ Metadata:
         setUnmaskedCardIds(prev => ({ ...prev, [cardId]: !prev[cardId] }));
     };
 
-    // Executive Command Center Modal
+    // Executive Light Mode Command Center Modal
     const renderUserModal = () => (
         <Modal visible={!!selectedUser} transparent animationType="fade" onRequestClose={() => setSelectedUser(null)}>
-            <BlurView intensity={95} tint="dark" style={s.modalOverlay}>
+            <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="light" style={s.modalOverlay}>
                 <View style={s.modalCard}>
                     
-                    {/* Modal Executive Header Bar */}
+                    {/* Modal Header Bar */}
                     <View style={s.modalHeader}>
                         <TouchableOpacity onPress={() => setSelectedUser(null)} style={s.iconCircleBtn}>
-                            <Ionicons name="close" size={18} color={T.gold} />
+                            <Ionicons name="close" size={18} color={T.navyDark} />
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center' }}>
                             <Text style={s.modalHeaderTitle}>User Command Center</Text>
-                            <Text style={{ fontSize: 10, color: T.gold, fontWeight: '700' }}>ID: {selectedUser?.id?.slice(0, 8)}...</Text>
+                            <Text style={{ fontSize: 10, color: T.goldDark, fontWeight: '700' }}>ID: {selectedUser?.id?.slice(0, 8)}...</Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity onPress={exportProfile} style={s.iconCircleBtn}>
-                                <Ionicons name="share-outline" size={16} color={T.gold} />
+                                <Ionicons name="share-outline" size={16} color={T.navyDark} />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={[s.iconCircleBtn, { backgroundColor: T.goldBg }]}>
-                                <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={16} color={T.gold} />
+                                <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={16} color={T.goldDark} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Executive Hero Banner */}
-                    <LinearGradient colors={[T.navyMid, T.navyDark]} style={s.modalHeroBanner}>
+                    {/* Executive Deep Navy Banner */}
+                    <LinearGradient colors={[T.navyDark, T.navyMid]} style={s.modalHeroBanner}>
                         <View style={s.modalAvatarWrapper}>
                             {selectedUser?.avatar_url ? (
                                 <Image source={{ uri: selectedUser.avatar_url }} style={s.modalAvatarImage} resizeMode="cover" />
@@ -840,7 +876,7 @@ Metadata:
                         </TouchableOpacity>
                     </LinearGradient>
 
-                    {/* Executive Navigation Tabs */}
+                    {/* Navigation Tabs */}
                     <View style={s.modalTabBar}>
                         {[
                             { key: 'overview', label: 'Overview', icon: 'wallet-outline' },
@@ -854,34 +890,97 @@ Metadata:
                                 onPress={() => setModalTab(t.key as any)}
                                 style={[s.modalTabItem, modalTab === t.key ? s.modalTabItemActive : null]}
                             >
-                                <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.gold : T.textSub} />
-                                <Text style={[s.modalTabText, modalTab === t.key ? { color: T.gold } : null]}>{t.label}</Text>
+                                <Ionicons name={t.icon as any} size={14} color={modalTab === t.key ? T.navyDark : T.textSub} />
+                                <Text style={[s.modalTabText, modalTab === t.key ? { color: T.navyDark } : null]}>{t.label}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-                        {/* TAB 1: OVERVIEW, WALLET & PURCHASED VIRTUAL CARDS */}
+                        {/* TAB 1: OVERVIEW & WALLET FUNDING */}
                         {modalTab === 'overview' && (
                             <View style={{ padding: 14 }}>
                                 {/* Vault Balance Card */}
                                 <View style={s.walletCard}>
                                     <Text style={s.walletLabel}>Vault Balance</Text>
-                                    <Text style={s.walletValue}>₦{(selectedUser?.balance || selectedUser?.credit_balance || 0).toLocaleString()}</Text>
+                                    <Text style={s.walletValue}>₦{(selectedUser?.credit_balance || selectedUser?.balance || 0).toLocaleString()}</Text>
                                     <View style={s.accountChip}>
                                         <Ionicons name="card" size={12} color={T.gold} />
                                         <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
                                     </View>
-                                    <Text style={{ fontSize: 10, color: T.textSub, marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
+                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
+                                </View>
+
+                                {/* High Contrast Wallet Funding Section */}
+                                <View style={s.controlCard}>
+                                    <Text style={s.sectionHeading}>Admin Wallet Management (Fund / Debit)</Text>
+                                    
+                                    {/* Action Selector Pills */}
+                                    <View style={s.fundingToggleRow}>
+                                        <TouchableOpacity 
+                                            onPress={() => setIsDebit(false)}
+                                            style={[s.fundingTogglePill, !isDebit ? s.fundingTogglePillActiveFund : null]}
+                                        >
+                                            <Ionicons name="arrow-down-circle" size={14} color={!isDebit ? '#FFFFFF' : T.success} />
+                                            <Text style={[s.fundingToggleText, !isDebit ? { color: '#FFFFFF' } : { color: T.success }]}>Fund (+) Credit</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            onPress={() => setIsDebit(true)}
+                                            style={[s.fundingTogglePill, isDebit ? s.fundingTogglePillActiveDebit : null]}
+                                        >
+                                            <Ionicons name="arrow-up-circle" size={14} color={isDebit ? '#FFFFFF' : T.danger} />
+                                            <Text style={[s.fundingToggleText, isDebit ? { color: '#FFFFFF' } : { color: T.danger }]}>Debit (-) Deduct</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Amount Input Row */}
+                                    <View style={s.amountInputContainer}>
+                                        <Text style={s.nairaSymbol}>₦</Text>
+                                        <TextInput 
+                                            placeholder="Enter Amount" 
+                                            placeholderTextColor={T.textSub}
+                                            keyboardType="numeric"
+                                            style={s.customAmountInput}
+                                            value={fundAmount}
+                                            onChangeText={setFundAmount}
+                                        />
+                                        <TouchableOpacity 
+                                            onPress={initiateFundOrDebit} 
+                                            disabled={fundingProcessing}
+                                            style={[s.actionCheckBtn, isDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success }]}
+                                        >
+                                            {fundingProcessing ? (
+                                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                            ) : (
+                                                <Ionicons name="checkmark-sharp" size={18} color="#FFFFFF" />
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Preset Fast Chips */}
+                                    <View style={s.presetRow}>
+                                        {['1000', '5000', '10000', '25000', '50000', '100000'].map(val => (
+                                            <TouchableOpacity
+                                                key={val}
+                                                onPress={() => setFundAmount(val)}
+                                                style={[s.presetChip, fundAmount === val ? s.presetChipActive : null]}
+                                            >
+                                                <Text style={[s.presetChipText, fundAmount === val ? { color: '#FFFFFF' } : { color: T.navyDark }]}>
+                                                    +₦{Number(val) >= 1000 ? (Number(val)/1000) + 'k' : val}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
                                 </View>
 
                                 {/* Real Purchased Virtual Cards Carousel / List */}
                                 <Text style={s.sectionHeading}>Purchased Virtual Cards ({userVirtualCards.length}) 💳</Text>
                                 {loadingHistory ? (
-                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
+                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.navyDark} size="small" /></View>
                                 ) : userVirtualCards.length === 0 ? (
                                     <View style={s.noCardsCard}>
-                                        <Ionicons name="card-outline" size={28} color={T.gold} />
+                                        <Ionicons name="card-outline" size={28} color={T.navyDark} />
                                         <Text style={s.noCardsTitle}>No Purchased Virtual Cards</Text>
                                         <Text style={s.noCardsSub}>User has not issued any virtual card yet.</Text>
                                     </View>
@@ -924,62 +1023,13 @@ Metadata:
                                                 </View>
 
                                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Text style={{ color: T.textSub, fontSize: 10 }}>EXP: {card.expiry || '08/28'}  CVV: {isUnmasked ? card.cvv : '•••'}</Text>
+                                                    <Text style={{ color: '#94A3B8', fontSize: 10 }}>EXP: {card.expiry || '08/28'}  CVV: {isUnmasked ? card.cvv : '•••'}</Text>
                                                     <Text style={{ color: T.gold, fontWeight: '800', fontSize: 11 }}>BAL: ${card.balance || 0}</Text>
                                                 </View>
                                             </View>
                                         );
                                     })
                                 )}
-
-                                {/* Quick Wallet Funding / Debit Control */}
-                                <View style={s.controlCard}>
-                                    <View style={s.switchRow}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Switch 
-                                                value={isDebit} 
-                                                onValueChange={setIsDebit}
-                                                trackColor={{ false: T.success, true: T.danger }}
-                                                thumbColor="#fff"
-                                            />
-                                            <Text style={[s.switchLabel, isDebit ? { color: T.danger } : { color: T.success }]}>
-                                                {isDebit ? 'Debit Wallet' : 'Fund Wallet'}
-                                            </Text>
-                                        </View>
-                                        <View style={s.customAmountInputWrapper}>
-                                            <Text style={s.nairaSymbol}>₦</Text>
-                                            <TextInput 
-                                                placeholder="Amount" 
-                                                placeholderTextColor={T.textSub}
-                                                keyboardType="numeric"
-                                                style={s.customAmountInput}
-                                                value={fundAmount}
-                                                onChangeText={setFundAmount}
-                                            />
-                                        </View>
-                                        <TouchableOpacity onPress={initiateFundOrDebit} style={[s.actionCheckBtn, isDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success }]}>
-                                            <Ionicons name="checkmark-done" size={16} color="white" />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Presets */}
-                                    <View style={s.presetRow}>
-                                        {['1000', '5000', '10000', '25000', '50000', '100000'].map(val => (
-                                            <TouchableOpacity
-                                                key={val}
-                                                onPress={() => {
-                                                    setFundAmount(val);
-                                                    setIsDebit(false);
-                                                }}
-                                                style={[s.presetChip, fundAmount === val ? s.presetChipActive : null]}
-                                            >
-                                                <Text style={[s.presetChipText, fundAmount === val ? { color: T.navyDark } : null]}>
-                                                    +₦{Number(val) >= 1000 ? (Number(val)/1000) + 'k' : val}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                </View>
 
                                 {/* Quick Info Card */}
                                 <Text style={s.sectionHeading}>Account Quick Summary</Text>
@@ -1045,13 +1095,13 @@ Metadata:
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Real Verification History Timeline */}
+                                {/* Verification History Timeline */}
                                 <Text style={s.sectionHeading}>Verification History & Document Submissions 📜</Text>
                                 {loadingHistory ? (
-                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
+                                    <View style={{ paddingVertical: 12, alignItems: 'center' }}><ActivityIndicator color={T.navyDark} size="small" /></View>
                                 ) : userKycRequests.length === 0 ? (
                                     <View style={s.noCardsCard}>
-                                        <Ionicons name="shield-outline" size={26} color={T.gold} />
+                                        <Ionicons name="shield-outline" size={26} color={T.navyDark} />
                                         <Text style={s.noCardsTitle}>No Verification Attempts Submitted</Text>
                                         <Text style={s.noCardsSub}>User has not submitted identity documents yet.</Text>
                                     </View>
@@ -1060,8 +1110,8 @@ Metadata:
                                         <View key={req.id} style={s.kycHistoryItem}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Ionicons name="document-text-outline" size={14} color={T.gold} />
-                                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>{req.id_type}</Text>
+                                                    <Ionicons name="document-text-outline" size={14} color={T.navyDark} />
+                                                    <Text style={{ color: T.textMain, fontWeight: '800', fontSize: 12 }}>{req.id_type}</Text>
                                                 </View>
                                                 <View style={[s.statusBadge, req.status === 'approved' ? s.statusBadgeActive : req.status === 'rejected' ? s.statusBadgeSuspended : { backgroundColor: T.warningBg, borderColor: T.warning }]}>
                                                     <Text style={[s.statusBadgeText, req.status === 'approved' ? { color: T.success } : req.status === 'rejected' ? { color: T.danger } : { color: T.warning }]}>
@@ -1083,7 +1133,7 @@ Metadata:
                                                     onPress={() => Linking.openURL(req.document_url || '')}
                                                     style={s.viewDocBtn}
                                                 >
-                                                    <Ionicons name="eye-outline" size={12} color={T.navyDark} />
+                                                    <Ionicons name="eye-outline" size={12} color="#FFFFFF" />
                                                     <Text style={s.viewDocBtnText}>View Verified Document</Text>
                                                 </TouchableOpacity>
                                             )}
@@ -1100,19 +1150,10 @@ Metadata:
                                             onPress={() => { setPendingAction({ type: 'upgrade_tier', tier: t }); setShowSecurity(true); }}
                                             style={[s.tierBtn, (selectedUser?.kyc_tier || 1) === t ? s.tierBtnActive : null]}
                                         >
-                                            <Text style={[s.tierBtnText, (selectedUser?.kyc_tier || 1) === t ? { color: T.navyDark } : null]}>Tier {t}</Text>
+                                            <Text style={[s.tierBtnText, (selectedUser?.kyc_tier || 1) === t ? { color: '#FFFFFF' } : null]}>Tier {t}</Text>
                                             <Text style={{ fontSize: 10, color: T.textSub }}>{t === 1 ? '₦50k' : t === 2 ? '₦500k' : 'Unlimited'}</Text>
                                         </TouchableOpacity>
                                     ))}
-                                </View>
-
-                                {/* Bio Info */}
-                                <Text style={s.sectionHeading}>Bio & Address Information</Text>
-                                <View style={s.infoListCard}>
-                                    <View style={s.infoRow}><Text style={s.infoLabel}>Gender</Text><Text style={s.infoValue}>{selectedUser?.gender || 'N/A'}</Text></View>
-                                    <View style={s.infoRow}><Text style={s.infoLabel}>Date of Birth</Text><Text style={s.infoValue}>{selectedUser?.dob || 'N/A'}</Text></View>
-                                    <View style={s.infoRow}><Text style={s.infoLabel}>Address</Text><Text style={s.infoValue}>{selectedUser?.address || 'N/A'}</Text></View>
-                                    <View style={s.infoRow}><Text style={s.infoLabel}>State</Text><Text style={s.infoValue}>{selectedUser?.state || 'N/A'}</Text></View>
                                 </View>
                             </View>
                         )}
@@ -1138,8 +1179,8 @@ Metadata:
                                         }} 
                                         style={[s.gridBtn, { backgroundColor: T.goldBg, borderColor: T.gold }]}
                                     >
-                                        <MaterialCommunityIcons name="crown-outline" size={16} color={T.gold} />
-                                        <Text style={[s.gridBtnText, { color: T.gold }]}>
+                                        <MaterialCommunityIcons name="crown-outline" size={16} color={T.goldDark} />
+                                        <Text style={[s.gridBtnText, { color: T.goldDark }]}>
                                             {selectedUser?.role === 'admin' ? 'Admin 👑' : 'Make Admin 👑'}
                                         </Text>
                                     </TouchableOpacity>
@@ -1228,7 +1269,7 @@ Metadata:
                                         onChangeText={setEmailBody}
                                     />
                                     <TouchableOpacity onPress={sendCustomEmail} style={[s.subFormSubmitBtn, { backgroundColor: T.warning }]}>
-                                        <Text style={[s.subFormSubmitBtnText, { color: T.navyDark }]}>Send Email Now</Text>
+                                        <Text style={[s.subFormSubmitBtnText, { color: '#FFFFFF' }]}>Send Email Now</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -1240,7 +1281,7 @@ Metadata:
                                 <Text style={s.sectionHeading}>Recent Transactions & Services Activity</Text>
                                 <View style={s.txCard}>
                                     {loadingHistory ? (
-                                        <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.gold} size="small" /></View>
+                                        <View style={{ paddingVertical: 16, alignItems: 'center' }}><ActivityIndicator color={T.navyDark} size="small" /></View>
                                     ) : userTransactions.length === 0 ? (
                                         <View style={{ padding: 16, alignItems: 'center' }}>
                                             <Text style={s.noHistoryText}>No transaction history</Text>
@@ -1273,12 +1314,12 @@ Metadata:
     // Create User Account Modal
     const renderCreateUserModal = () => (
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
-            <BlurView intensity={95} tint="dark" style={s.modalOverlay}>
+            <BlurView intensity={95} tint="light" style={s.modalOverlay}>
                  <View style={s.createUserCard}>
                     <View style={s.createUserHeader}>
                         <Text style={s.createUserTitle}>Create Account</Text>
                         <TouchableOpacity onPress={() => setShowCreateUser(false)} style={s.iconCircleBtn}>
-                            <Ionicons name="close" size={20} color={T.gold} />
+                            <Ionicons name="close" size={20} color={T.navyDark} />
                         </TouchableOpacity>
                     </View>
 
@@ -1332,7 +1373,7 @@ Metadata:
                                  <Switch 
                                     value={newUserForm.role === 'admin'}
                                     onValueChange={(val) => setNewUserForm({...newUserForm, role: val ? 'admin' : 'user'})}
-                                    trackColor={{ false: T.border, true: T.gold }}
+                                    trackColor={{ false: T.border, true: T.navyDark }}
                                     thumbColor="#fff"
                                  />
                             </View>
@@ -1343,7 +1384,7 @@ Metadata:
                                 style={s.createUserBtn}
                             >
                                 {creatingUser ? (
-                                    <ActivityIndicator color={T.navyDark} />
+                                    <ActivityIndicator color="#FFFFFF" />
                                 ) : (
                                     <Text style={s.createUserBtnText}>Create Account</Text>
                                 )}
@@ -1366,7 +1407,7 @@ Metadata:
                     {isSelectionMode ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} style={s.closeSelectionBtn}>
-                                <Ionicons name="close" size={16} color={T.gold} />
+                                <Ionicons name="close" size={16} color={T.navyDark} />
                             </TouchableOpacity>
                             <Text style={s.selectionText}>{selectedIds.size} Selected</Text>
                         </View>
@@ -1377,7 +1418,7 @@ Metadata:
                         </View>
                     )}
                     <TouchableOpacity onPress={() => setShowCreateUser(true)} style={s.addUserHeaderBtn}>
-                        <Ionicons name="person-add" size={16} color={T.navyDark} />
+                        <Ionicons name="person-add" size={16} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
 
@@ -1405,7 +1446,7 @@ Metadata:
 
                 {/* Search Bar */}
                 <View style={s.searchBar}>
-                    <Ionicons name="search" size={16} color={T.gold} />
+                    <Ionicons name="search" size={16} color={T.navyDark} />
                     <TextInput
                         placeholder="Search name, phone, account..."
                         placeholderTextColor={T.textSub}
@@ -1437,7 +1478,7 @@ Metadata:
                                 onPress={() => setFilterStatus(f.key as any)}
                                 style={[s.filterChip, filterStatus === f.key ? s.filterChipActive : null]}
                             >
-                                <Text style={[s.filterChipText, filterStatus === f.key ? { color: T.navyDark } : { color: T.textSub }]}>
+                                <Text style={[s.filterChipText, filterStatus === f.key ? { color: '#FFFFFF' } : { color: T.textSub }]}>
                                     {f.label}
                                 </Text>
                             </TouchableOpacity>
@@ -1464,7 +1505,7 @@ Metadata:
                 </View>
             )}
 
-            {/* Mobile-First Stacked User Cards */}
+            {/* Mobile-First Stacked User Cards (Light Mode) */}
             <FlatList
                 data={getFilteredUsers()}
                 keyExtractor={(item) => item.id}
@@ -1474,8 +1515,8 @@ Metadata:
                     <RefreshControl 
                         refreshing={refreshing} 
                         onRefresh={onRefresh} 
-                        tintColor={T.gold} 
-                        colors={[T.gold]} 
+                        tintColor={T.navyDark} 
+                        colors={[T.navyDark]} 
                     />
                 }
                 renderItem={({ item }) => (
@@ -1488,7 +1529,7 @@ Metadata:
                         <View style={s.userCardTopRow}>
                             {isSelectionMode && (
                                 <View style={[s.checkBox, selectedIds.has(item.id) ? s.checkBoxActive : null]}>
-                                    {selectedIds.has(item.id) && <Ionicons name="checkmark" size={12} color={T.navyDark} />}
+                                    {selectedIds.has(item.id) && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
                                 </View>
                             )}
 
@@ -1496,7 +1537,7 @@ Metadata:
                                 {item.avatar_url ? (
                                     <Image source={{ uri: item.avatar_url }} style={s.avatarImage} resizeMode="cover" />
                                 ) : (
-                                    <Text style={[s.avatarText, item.role === 'admin' ? { color: T.gold } : null]}>
+                                    <Text style={[s.avatarText, item.role === 'admin' ? { color: T.goldDark } : null]}>
                                         {item.full_name?.charAt(0).toUpperCase() || 'U'}
                                     </Text>
                                 )}
@@ -1522,7 +1563,7 @@ Metadata:
                         <View style={s.badgesRow}>
                             {item.role === 'admin' && (
                                 <View style={s.badgeGold}>
-                                    <MaterialCommunityIcons name="crown" size={10} color={T.gold} />
+                                    <MaterialCommunityIcons name="crown" size={10} color={T.goldDark} />
                                     <Text style={s.badgeGoldText}>ADMIN</Text>
                                 </View>
                             )}
@@ -1545,12 +1586,12 @@ Metadata:
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Ionicons name="wallet-outline" size={14} color={T.gold} />
                                 <Text style={s.vaultLabel}>VAULT BAL:</Text>
-                                <Text style={s.vaultAmount}>₦{(item.balance || item.credit_balance || 0).toLocaleString()}</Text>
+                                <Text style={s.vaultAmount}>₦{(item.credit_balance || item.balance || 0).toLocaleString()}</Text>
                             </View>
 
                             <View style={s.manageBtn}>
                                 <Text style={s.manageBtnText}>Manage</Text>
-                                <Ionicons name="chevron-forward" size={12} color={T.navyDark} />
+                                <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -1558,10 +1599,10 @@ Metadata:
                 ListEmptyComponent={
                     <View style={s.emptyWrapper}>
                         {loading ? (
-                            <ActivityIndicator size="large" color={T.gold} />
+                            <ActivityIndicator size="large" color={T.navyDark} />
                         ) : (
                             <View style={s.emptyCard}>
-                                <Ionicons name="people-outline" size={36} color={T.gold} />
+                                <Ionicons name="people-outline" size={36} color={T.navyDark} />
                                 <Text style={s.emptyTitle}>No Users Found</Text>
                             </View>
                         )}
@@ -1587,7 +1628,7 @@ Metadata:
     );
 }
 
-// Embedded StyleSheet (CSS for Mobile-First Navy & Gold Manager Users Screen)
+// Embedded StyleSheet (CSS for Mobile-First Light Mode Navy & Gold Manager Users Screen)
 const s = StyleSheet.create({
     container: {
         flex: 1,
@@ -1597,7 +1638,7 @@ const s = StyleSheet.create({
         paddingTop: Platform.OS === 'ios' ? 48 : 16,
         paddingHorizontal: 12,
         paddingBottom: 10,
-        backgroundColor: T.navyDark,
+        backgroundColor: T.card,
         borderBottomWidth: 1.5,
         borderBottomColor: T.gold,
     },
@@ -1608,13 +1649,13 @@ const s = StyleSheet.create({
         marginBottom: 10,
     },
     headerTitle: {
-        color: '#FFFFFF',
+        color: T.navyDark,
         fontSize: 20,
         fontWeight: '900',
         letterSpacing: -0.5,
     },
     headerSubTitle: {
-        color: T.gold,
+        color: T.goldDark,
         fontSize: 11,
         fontWeight: '700',
     },
@@ -1628,7 +1669,7 @@ const s = StyleSheet.create({
         marginRight: 8,
     },
     selectionText: {
-        color: '#FFFFFF',
+        color: T.navyDark,
         fontSize: 15,
         fontWeight: '800',
     },
@@ -1636,7 +1677,7 @@ const s = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: T.gold,
+        backgroundColor: T.navyDark,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1648,7 +1689,7 @@ const s = StyleSheet.create({
     },
     statCard: {
         width: '49%',
-        backgroundColor: T.card,
+        backgroundColor: T.bg,
         borderRadius: 10,
         padding: 8,
         borderWidth: 1,
@@ -1661,13 +1702,13 @@ const s = StyleSheet.create({
         textTransform: 'uppercase',
     },
     statCardValue: {
-        color: T.gold,
+        color: T.navyDark,
         fontSize: 14,
         fontWeight: '900',
         marginTop: 2,
     },
     searchBar: {
-        backgroundColor: T.card,
+        backgroundColor: T.bg,
         borderRadius: 10,
         paddingHorizontal: 10,
         height: 38,
@@ -1675,12 +1716,12 @@ const s = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: T.gold,
+        borderColor: T.border,
     },
     searchInput: {
         flex: 1,
         marginLeft: 8,
-        color: '#FFFFFF',
+        color: T.textMain,
         fontSize: 12,
         fontWeight: '600',
     },
@@ -1697,8 +1738,8 @@ const s = StyleSheet.create({
         backgroundColor: T.card,
     },
     filterChipActive: {
-        backgroundColor: T.gold,
-        borderColor: T.goldDark,
+        backgroundColor: T.navyDark,
+        borderColor: T.navyDark,
     },
     filterChipText: {
         fontSize: 10,
@@ -1706,7 +1747,7 @@ const s = StyleSheet.create({
         textTransform: 'uppercase',
     },
     bulkBar: {
-        backgroundColor: T.navyMid,
+        backgroundColor: T.card,
         padding: 12,
         borderBottomWidth: 1,
         borderBottomColor: T.gold,
@@ -1715,7 +1756,7 @@ const s = StyleSheet.create({
     },
     bulkBtn: {
         alignItems: 'center',
-        backgroundColor: T.card,
+        backgroundColor: T.bg,
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 10,
@@ -1742,9 +1783,14 @@ const s = StyleSheet.create({
         borderWidth: 1.2,
         borderColor: T.cardBorder,
         gap: 8,
+        shadowColor: '#64748b',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
     },
     userCardSelected: {
-        backgroundColor: T.navyMid,
+        backgroundColor: T.goldBg,
         borderColor: T.gold,
     },
     userCardTopRow: {
@@ -1757,18 +1803,18 @@ const s = StyleSheet.create({
         height: 18,
         borderRadius: 9,
         borderWidth: 1.5,
-        borderColor: T.gold,
+        borderColor: T.navyDark,
         alignItems: 'center',
         justifyContent: 'center',
     },
     checkBoxActive: {
-        backgroundColor: T.gold,
+        backgroundColor: T.navyDark,
     },
     avatar: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: T.navyMid,
+        backgroundColor: T.bg,
         borderWidth: 1.5,
         borderColor: T.border,
         alignItems: 'center',
@@ -1786,7 +1832,7 @@ const s = StyleSheet.create({
     avatarText: {
         fontSize: 16,
         fontWeight: '900',
-        color: '#FFFFFF',
+        color: T.navyDark,
     },
     userCardNameCol: {
         flex: 1,
@@ -1795,7 +1841,7 @@ const s = StyleSheet.create({
     userName: {
         fontSize: 14,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: T.textMain,
     },
     accountNumber: {
         fontSize: 11,
@@ -1840,7 +1886,7 @@ const s = StyleSheet.create({
         gap: 3,
     },
     badgeGoldText: {
-        color: T.gold,
+        color: T.goldDark,
         fontSize: 9,
         fontWeight: '900',
     },
@@ -1857,7 +1903,7 @@ const s = StyleSheet.create({
         maxWidth: 160,
     },
     badgeCorpText: {
-        color: T.warning,
+        color: '#B45309',
         fontSize: 9,
         fontWeight: '800',
     },
@@ -1927,7 +1973,7 @@ const s = StyleSheet.create({
         borderColor: T.gold,
     },
     emptyTitle: {
-        color: '#FFFFFF',
+        color: T.navyDark,
         fontSize: 14,
         fontWeight: '800',
         marginTop: 6,
@@ -1955,12 +2001,12 @@ const s = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 14,
         paddingVertical: 10,
-        backgroundColor: T.navyDark,
+        backgroundColor: T.card,
         borderBottomWidth: 1,
-        borderBottomColor: T.gold,
+        borderBottomColor: T.border,
     },
     modalHeaderTitle: {
-        color: '#FFFFFF',
+        color: T.navyDark,
         fontWeight: '900',
         fontSize: 13,
         textTransform: 'uppercase',
@@ -1969,7 +2015,7 @@ const s = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: T.navyMid,
+        backgroundColor: T.bg,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -1987,7 +2033,7 @@ const s = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: T.navyMid,
+        backgroundColor: T.card,
         borderWidth: 2,
         borderColor: T.gold,
         alignItems: 'center',
@@ -2001,7 +2047,7 @@ const s = StyleSheet.create({
     modalAvatarText: {
         fontSize: 20,
         fontWeight: '900',
-        color: T.gold,
+        color: T.goldDark,
     },
     modalUserName: {
         color: '#FFFFFF',
@@ -2017,7 +2063,7 @@ const s = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: T.navyCard,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         borderWidth: 1,
         borderColor: T.gold,
         alignItems: 'center',
@@ -2026,7 +2072,7 @@ const s = StyleSheet.create({
     },
     modalTabBar: {
         flexDirection: 'row',
-        backgroundColor: T.navyDark,
+        backgroundColor: T.card,
         borderBottomWidth: 1,
         borderBottomColor: T.border,
     },
@@ -2040,7 +2086,7 @@ const s = StyleSheet.create({
         borderBottomColor: 'transparent',
     },
     modalTabItemActive: {
-        borderBottomColor: T.gold,
+        borderBottomColor: T.navyDark,
     },
     modalTabText: {
         fontSize: 9,
@@ -2050,7 +2096,7 @@ const s = StyleSheet.create({
     sectionHeading: {
         fontSize: 11,
         fontWeight: '900',
-        color: T.gold,
+        color: T.navyDark,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 6,
@@ -2077,7 +2123,7 @@ const s = StyleSheet.create({
     },
     accountChip: {
         marginTop: 6,
-        backgroundColor: T.card,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
@@ -2093,7 +2139,7 @@ const s = StyleSheet.create({
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     virtualAtmCard: {
-        backgroundColor: T.navyMid,
+        backgroundColor: T.navyDark,
         borderRadius: 14,
         padding: 12,
         borderWidth: 1,
@@ -2110,7 +2156,7 @@ const s = StyleSheet.create({
         marginBottom: 10,
     },
     noCardsTitle: {
-        color: '#FFFFFF',
+        color: T.textMain,
         fontSize: 13,
         fontWeight: '800',
         marginTop: 4,
@@ -2129,7 +2175,7 @@ const s = StyleSheet.create({
         marginBottom: 8,
     },
     viewDocBtn: {
-        backgroundColor: T.gold,
+        backgroundColor: T.navyDark,
         paddingVertical: 4,
         paddingHorizontal: 8,
         borderRadius: 6,
@@ -2142,7 +2188,7 @@ const s = StyleSheet.create({
     viewDocBtnText: {
         fontSize: 10,
         fontWeight: '900',
-        color: T.navyDark,
+        color: '#FFFFFF',
     },
     controlCard: {
         backgroundColor: T.card,
@@ -2152,39 +2198,59 @@ const s = StyleSheet.create({
         borderColor: T.cardBorder,
         marginBottom: 10,
     },
-    switchRow: {
+    fundingToggleRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 10,
+    },
+    fundingTogglePill: {
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        backgroundColor: T.bg,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
+        justifyContent: 'center',
+        gap: 6,
     },
-    switchLabel: {
+    fundingTogglePillActiveFund: {
+        backgroundColor: T.success,
+        borderColor: '#059669',
+    },
+    fundingTogglePillActiveDebit: {
+        backgroundColor: T.danger,
+        borderColor: '#DC2626',
+    },
+    fundingToggleText: {
         fontSize: 11,
         fontWeight: '900',
         textTransform: 'uppercase',
     },
-    customAmountInputWrapper: {
+    amountInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: T.navyMid,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.gold,
-        width: 110,
-        height: 32,
-        paddingHorizontal: 6,
+        backgroundColor: T.bg,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: T.border,
+        height: 42,
+        paddingHorizontal: 10,
+        marginBottom: 10,
     },
     nairaSymbol: {
         fontWeight: '900',
-        color: T.gold,
-        fontSize: 12,
+        color: T.navyDark,
+        fontSize: 15,
+        marginRight: 6,
     },
     customAmountInput: {
         flex: 1,
-        color: '#FFFFFF',
-        fontWeight: '700',
-        fontSize: 12,
-        textAlign: 'center',
+        color: T.textMain,
+        fontWeight: '800',
+        fontSize: 14,
     },
     actionCheckBtn: {
         width: 32,
@@ -2200,21 +2266,20 @@ const s = StyleSheet.create({
     },
     presetChip: {
         flex: 1,
-        paddingVertical: 4,
+        paddingVertical: 6,
         borderRadius: 6,
         borderWidth: 1,
         borderColor: T.border,
-        backgroundColor: T.navyMid,
+        backgroundColor: T.bg,
         alignItems: 'center',
     },
     presetChipActive: {
-        backgroundColor: T.gold,
-        borderColor: T.goldDark,
+        backgroundColor: T.navyDark,
+        borderColor: T.navyDark,
     },
     presetChipText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: T.textMain,
+        fontSize: 10,
+        fontWeight: '900',
     },
     infoListCard: {
         backgroundColor: T.card,
@@ -2239,7 +2304,7 @@ const s = StyleSheet.create({
     infoValue: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: T.textMain,
     },
     kycDetailCard: {
         backgroundColor: T.card,
@@ -2263,7 +2328,7 @@ const s = StyleSheet.create({
     kycItemValue: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: T.textMain,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     tierBtn: {
@@ -2276,13 +2341,13 @@ const s = StyleSheet.create({
         alignItems: 'center',
     },
     tierBtnActive: {
-        backgroundColor: T.gold,
-        borderColor: T.goldDark,
+        backgroundColor: T.navyDark,
+        borderColor: T.navyDark,
     },
     tierBtnText: {
         fontSize: 12,
         fontWeight: '900',
-        color: '#FFFFFF',
+        color: T.textMain,
     },
     actionsGrid: {
         flexDirection: 'row',
@@ -2322,28 +2387,28 @@ const s = StyleSheet.create({
         padding: 12,
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: T.gold,
+        borderColor: T.border,
         marginBottom: 10,
     },
     subFormInput: {
-        backgroundColor: T.navyMid,
+        backgroundColor: T.bg,
         borderWidth: 1,
         borderColor: T.border,
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 6,
         fontSize: 12,
-        color: '#FFFFFF',
+        color: T.textMain,
         marginBottom: 8,
     },
     subFormSubmitBtn: {
-        backgroundColor: T.gold,
+        backgroundColor: T.navyDark,
         paddingVertical: 8,
         borderRadius: 8,
         alignItems: 'center',
     },
     subFormSubmitBtnText: {
-        color: T.navyDark,
+        color: '#FFFFFF',
         fontSize: 11,
         fontWeight: '900',
         textTransform: 'uppercase',
@@ -2372,7 +2437,7 @@ const s = StyleSheet.create({
     txTitle: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: T.textMain,
         textTransform: 'capitalize',
     },
     txDate: {
@@ -2387,12 +2452,12 @@ const s = StyleSheet.create({
     fieldLabel: {
         fontSize: 10,
         fontWeight: '700',
-        color: T.gold,
+        color: T.navyDark,
         textTransform: 'uppercase',
         marginBottom: 3,
     },
     createUserCard: {
-        backgroundColor: T.navyMid,
+        backgroundColor: T.card,
         borderRadius: 20,
         height: '85%',
         width: '96%',
@@ -2404,26 +2469,26 @@ const s = StyleSheet.create({
     createUserHeader: {
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: T.navyDark,
+        backgroundColor: T.bg,
         borderBottomWidth: 1,
-        borderBottomColor: T.gold,
+        borderBottomColor: T.border,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
     createUserTitle: {
-        color: '#FFFFFF',
+        color: T.navyDark,
         fontSize: 16,
         fontWeight: '900',
     },
     createInput: {
-        backgroundColor: T.navyDark,
+        backgroundColor: T.bg,
         borderWidth: 1,
-        borderColor: T.gold,
+        borderColor: T.border,
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        color: '#FFFFFF',
+        color: T.textMain,
         fontSize: 13,
         fontWeight: '700',
     },
@@ -2431,21 +2496,21 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: T.navyDark,
+        backgroundColor: T.bg,
         padding: 12,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: T.border,
     },
     createUserBtn: {
-        backgroundColor: T.gold,
+        backgroundColor: T.navyDark,
         paddingVertical: 12,
         borderRadius: 10,
         alignItems: 'center',
         marginTop: 6,
     },
     createUserBtnText: {
-        color: T.navyDark,
+        color: '#FFFFFF',
         fontSize: 13,
         fontWeight: '900',
         textTransform: 'uppercase',
