@@ -1007,7 +1007,7 @@ Metadata:
                                             onPress={() => setIsDebit(false)}
                                             style={[s.fundingTogglePill, !isDebit ? s.fundingTogglePillActiveFund : null]}
                                         >
-                                            <Ionicons name="arrow-down-circle" size={14} color={!isDebit ? '#FFFFFF' : T.success} />
+                                            <Ionicons name="arrow-down-circle" size={16} color={!isDebit ? '#FFFFFF' : T.success} />
                                             <Text style={[s.fundingToggleText, !isDebit ? { color: '#FFFFFF' } : { color: T.success }]}>Fund (+) Credit</Text>
                                         </TouchableOpacity>
 
@@ -1015,7 +1015,7 @@ Metadata:
                                             onPress={() => setIsDebit(true)}
                                             style={[s.fundingTogglePill, isDebit ? s.fundingTogglePillActiveDebit : null]}
                                         >
-                                            <Ionicons name="arrow-up-circle" size={14} color={isDebit ? '#FFFFFF' : T.danger} />
+                                            <Ionicons name="arrow-up-circle" size={16} color={isDebit ? '#FFFFFF' : T.danger} />
                                             <Text style={[s.fundingToggleText, isDebit ? { color: '#FFFFFF' } : { color: T.danger }]}>Debit (-) Deduct</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -1024,24 +1024,18 @@ Metadata:
                                     <View style={s.amountInputContainer}>
                                         <Text style={s.nairaSymbol}>₦</Text>
                                         <TextInput 
-                                            placeholder="Enter Amount" 
+                                            placeholder="Enter Amount (e.g. 5000)" 
                                             placeholderTextColor={T.textSub}
                                             keyboardType="numeric"
                                             style={s.customAmountInput}
                                             value={fundAmount}
                                             onChangeText={setFundAmount}
                                         />
-                                        <TouchableOpacity 
-                                            onPress={initiateFundOrDebit} 
-                                            disabled={fundingProcessing}
-                                            style={[s.actionCheckBtn, isDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success }]}
-                                        >
-                                            {fundingProcessing ? (
-                                                <ActivityIndicator size="small" color="#FFFFFF" />
-                                            ) : (
-                                                <Ionicons name="checkmark-sharp" size={18} color="#FFFFFF" />
-                                            )}
-                                        </TouchableOpacity>
+                                        {fundAmount.length > 0 && (
+                                            <TouchableOpacity onPress={() => setFundAmount('')} style={{ padding: 4 }}>
+                                                <Ionicons name="close-circle" size={18} color={T.textSub} />
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
 
                                     {/* Preset Fast Chips */}
@@ -1058,6 +1052,37 @@ Metadata:
                                             </TouchableOpacity>
                                         ))}
                                     </View>
+
+                                    {/* Prominent, Big, Bold Action Execution Button */}
+                                    <TouchableOpacity 
+                                        onPress={() => {
+                                            if (!fundAmount || isNaN(Number(fundAmount)) || Number(fundAmount) <= 0) {
+                                                Alert.alert("Invalid Amount", "Please enter a valid positive amount.");
+                                                return;
+                                            }
+                                            handleDirectFundOrDebit(isDebit ? 'debit' : 'fund', Number(fundAmount));
+                                        }}
+                                        disabled={fundingProcessing || !fundAmount || Number(fundAmount) <= 0}
+                                        style={[
+                                            s.executeFundingBtn, 
+                                            isDebit ? { backgroundColor: T.danger } : { backgroundColor: T.success },
+                                            (!fundAmount || Number(fundAmount) <= 0) ? { opacity: 0.5 } : { opacity: 1 }
+                                        ]}
+                                    >
+                                        {fundingProcessing ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name={isDebit ? "arrow-up-circle" : "checkmark-circle"} size={20} color="#FFFFFF" />
+                                                <Text style={s.executeFundingBtnText}>
+                                                    {isDebit 
+                                                        ? `CONFIRM DEBIT ${fundAmount ? '(₦' + Number(fundAmount).toLocaleString() + ')' : ''}` 
+                                                        : `CONFIRM FUNDING ${fundAmount ? '(₦' + Number(fundAmount).toLocaleString() + ')' : ''}`
+                                                    }
+                                                </Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
                                 </View>
 
                                 {/* Real Purchased Virtual Cards Carousel / List */}
@@ -2498,6 +2523,28 @@ const s = StyleSheet.create({
         fontSize: 11,
         fontWeight: '900',
         textTransform: 'uppercase',
+    },
+    executeFundingBtn: {
+        marginTop: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    executeFundingBtnText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     txCard: {
         backgroundColor: T.card,
