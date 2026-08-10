@@ -91,7 +91,34 @@ export default function SocialBoostScreen() {
 
   const insets = useSafeAreaInsets();
 
+  const fetchUserBalance = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let userId = session?.user?.id;
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+      }
+      if (!userId) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('balance, credit_balance')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile) {
+        const rawBal = profile.balance ?? profile.credit_balance ?? 0;
+        const parsedBal = parseFloat(String(rawBal)) || 0;
+        setWalletBalance(parsedBal);
+      }
+    } catch (e) {
+      console.error("Balance fetch error:", e);
+    }
+  };
+
   useEffect(() => {
+    fetchUserBalance();
     fetchData();
   }, []);
 
@@ -104,18 +131,7 @@ export default function SocialBoostScreen() {
         setLoading(false);
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      // Fetch Wallet Balance in background
-      (async () => {
-        try {
-          const { data } = await supabase.from('profiles').select('balance, credit_balance').eq('id', session.user.id).single();
-          if (data) setWalletBalance(data.balance ?? data.credit_balance ?? 0);
-        } catch (err: any) {
-          console.error("Balance fetch error:", err);
-        }
-      })();
+      await fetchUserBalance();
 
       // Fetch Services from Edge Function in background to get latest prices
       const data = await api.smm.invoke({ action: 'services' });
@@ -220,7 +236,7 @@ export default function SocialBoostScreen() {
       setLink('');
       setQuantity('');
       setSelectedService(null);
-      setWalletBalance(prev => prev - totalPrice);
+      await fetchUserBalance();
     } catch (error: any) {
       const msg = error.message || "Could not place order";
       showAlert("Order Failed ❌", msg, "error");
