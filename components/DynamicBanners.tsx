@@ -42,20 +42,20 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
 
   const fetchActiveBanners = async () => {
     try {
-      let query = supabase
+      const { data } = await supabase
         .from('banners')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-        
-      if (placement === 'dashboard') {
-         query = query.or(`placement.ilike.%dashboard%,placement.is.null`);
-      } else {
-         query = query.ilike('placement', `%${placement}%`);
-      }
 
-      const { data } = await query;
-      if (data) setActiveBanners(data);
+      if (data && data.length > 0) {
+        const matched = data.filter((b: any) => {
+          if (!b.placement || b.placement.toLowerCase().includes('all') || b.placement.toLowerCase().includes('dashboard')) return true;
+          if (placement && b.placement.toLowerCase().includes(placement.toLowerCase())) return true;
+          return false;
+        });
+        setActiveBanners(matched.length > 0 ? matched : data);
+      }
     } catch (e) {
       console.warn("Error fetching banners", e);
     }
