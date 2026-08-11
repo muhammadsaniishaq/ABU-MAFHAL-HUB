@@ -1,29 +1,25 @@
 import { 
     View, Text, TouchableOpacity, ScrollView, Image, 
     ActivityIndicator, Alert, Modal, TextInput, Platform, 
-    Dimensions, Animated 
+    Dimensions, KeyboardAvoidingView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicBanners from '../../components/DynamicBanners';
 import { CryptoRate } from '../../services/partners';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import { useAppSettings } from '../../hooks/useAppSettings';
 
-const { width } = Dimensions.get('window');
-
-// Ultra Premium Light Navy & Gold Design System Tokens
+// Ultra-Modern Compact Light Navy & Gold Tokens
 const L = {
     bg: '#F4F6FB',
     card: '#FFFFFF',
-    cardBorder: 'rgba(218, 165, 32, 0.35)',
+    cardBorder: 'rgba(218, 165, 32, 0.4)',
     navyHeader: '#0F172A',
     navyMid: '#1C2541',
     navyDark: '#0B132B',
@@ -42,16 +38,17 @@ const L = {
     emeraldBorder: '#A7F3D0',
     rose: '#E11D48',
     roseBg: '#FFF1F2',
+    roseBorder: '#FECDD3'
 };
 
-type Tab = 'home' | 'markets' | 'swap' | 'portfolio' | 'settings';
+type CryptoTab = 'wallet' | 'markets' | 'swap';
 
 export default function CryptoScreen() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<Tab>('home');
+    const insets = useSafeAreaInsets();
+    const [activeTab, setActiveTab] = useState<CryptoTab>('wallet');
     const [assets, setAssets] = useState<CryptoRate[]>([]);
     const [loading, setLoading] = useState(true);
-    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         fetchInitialData();
@@ -64,12 +61,11 @@ export default function CryptoScreen() {
             const rates = await api.crypto.getRates([
                 'bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 
                 'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 
-                'the-open-network', 'polkadot', 'chainlink', 'matic-network', 
-                'stellar', 'shiba-inu', 'avalanche-2', 'bitcoin-cash', 'uniswap'
+                'the-open-network', 'polkadot', 'chainlink', 'matic-network'
             ]);
             setAssets(rates || []);
         } catch (e) {
-            console.log("Error fetching stats");
+            console.log("Error fetching crypto rates");
         } finally {
             setLoading(false);
         }
@@ -79,14 +75,10 @@ export default function CryptoScreen() {
         try {
             const rates = await api.crypto.getRates([
                 'bitcoin', 'ethereum', 'tether', 'solana', 'binancecoin', 
-                'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin', 
-                'the-open-network', 'polkadot', 'chainlink', 'matic-network', 
-                'stellar', 'shiba-inu', 'avalanche-2', 'bitcoin-cash', 'uniswap'
+                'ripple', 'cardano', 'dogecoin', 'tron', 'litecoin'
             ]);
             if (rates && rates.length > 0) setAssets(rates);
-        } catch (error) {
-            console.log("Crypto Refresh Skipped");
-        }
+        } catch (error) {}
     };
 
     return (
@@ -94,96 +86,84 @@ export default function CryptoScreen() {
             <StatusBar style="dark" />
 
             {/* TAB CONTENT */}
-            <View style={{ flex: 1, paddingBottom: 70 }}>
-                {activeTab === 'home' && <HomeView assets={assets} loading={loading} setActiveTab={setActiveTab} />}
-                {activeTab === 'markets' && <MarketsView assets={assets} />}
+            <View style={{ flex: 1, paddingBottom: 68 }}>
+                {activeTab === 'wallet' && <WalletView assets={assets} loading={loading} setActiveTab={setActiveTab} />}
+                {activeTab === 'markets' && <MarketsView assets={assets} loading={loading} />}
                 {activeTab === 'swap' && <SwapView assets={assets} />}
-                {activeTab === 'portfolio' && <PortfolioView assets={assets} />}
-                {activeTab === 'settings' && <SettingsView />}
             </View>
 
-            {/* NAVIGATION BAR DOCK */}
-            <CustomTabBar activeTab={activeTab} setActiveTab={setActiveTab} />
+            {/* MODERN FLOATING NAV DOCK */}
+            <View style={{
+                position: 'absolute', bottom: 10, left: 16, right: 16,
+                backgroundColor: L.navyHeader, borderRadius: 18, paddingVertical: 6, paddingHorizontal: 10,
+                flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
+                borderWidth: 1.5, borderColor: L.goldDk, elevation: 10,
+                shadowColor: L.gold, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10
+            }}>
+                {[
+                    { id: 'wallet', icon: 'wallet-outline', label: 'Wallet' },
+                    { id: 'swap', icon: 'swap-horizontal-outline', label: 'Swap DEX', highlight: true },
+                    { id: 'markets', icon: 'bar-chart-outline', label: 'Markets' },
+                ].map((tab) => {
+                    const isActive = activeTab === tab.id;
+
+                    if (tab.highlight) {
+                        return (
+                            <TouchableOpacity
+                                key={tab.id}
+                                onPress={() => setActiveTab(tab.id as CryptoTab)}
+                                style={{
+                                    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12,
+                                    backgroundColor: isActive ? L.gold : 'rgba(255, 215, 0, 0.15)',
+                                    borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 4
+                                }}
+                            >
+                                <Ionicons name={tab.icon as any} size={14} color={isActive ? L.navyHeader : L.gold} />
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: isActive ? L.navyHeader : L.gold }}>{tab.label}</Text>
+                            </TouchableOpacity>
+                        );
+                    }
+
+                    return (
+                        <TouchableOpacity
+                            key={tab.id}
+                            onPress={() => setActiveTab(tab.id as CryptoTab)}
+                            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 }}
+                        >
+                            <Ionicons name={tab.icon as any} size={17} color={isActive ? L.gold : '#94A3B8'} />
+                            <Text style={{ fontSize: 9, fontWeight: '800', marginTop: 1, color: isActive ? L.gold : '#94A3B8' }}>{tab.label}</Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
         </View>
     );
 }
 
-// --- NAVIGATION BAR DOCK ---
-const CustomTabBar = ({ activeTab, setActiveTab }: { activeTab: Tab, setActiveTab: (t: Tab) => void }) => (
-    <View style={{
-        position: 'absolute', bottom: 12, left: 16, right: 16,
-        backgroundColor: L.navyHeader, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12,
-        flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
-        borderWidth: 1.5, borderColor: L.goldDk, elevation: 10,
-        shadowColor: L.gold, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10
-    }}>
-        {[
-            { id: 'home', icon: 'home-outline', label: 'Home' },
-            { id: 'markets', icon: 'bar-chart-outline', label: 'Markets' },
-            { id: 'swap', icon: 'swap-horizontal', label: 'Swap', special: true },
-            { id: 'portfolio', icon: 'pie-chart-outline', label: 'Portfolio' },
-            { id: 'settings', icon: 'settings-outline', label: 'Settings' },
-        ].map((tab) => {
-            const isActive = activeTab === tab.id;
-
-            if (tab.special) {
-                return (
-                    <TouchableOpacity
-                        key={tab.id}
-                        onPress={() => setActiveTab(tab.id as Tab)}
-                        style={{
-                            width: 44, height: 44, borderRadius: 22, backgroundColor: L.navyHeader,
-                            alignItems: 'center', justifyContent: 'center', marginTop: -20,
-                            borderWidth: 3, borderColor: L.bg, elevation: 8
-                        }}
-                    >
-                        <LinearGradient
-                            colors={['#0F172A', '#1C2541']}
-                            style={{ width: '100%', height: '100%', borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
-                        >
-                            <Ionicons name={tab.icon as any} size={20} color={L.gold} />
-                        </LinearGradient>
-                    </TouchableOpacity>
-                );
-            }
-
-            return (
-                <TouchableOpacity
-                    key={tab.id}
-                    onPress={() => setActiveTab(tab.id as Tab)}
-                    style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 }}
-                >
-                    <Ionicons
-                        name={tab.icon as any}
-                        size={18}
-                        color={isActive ? L.gold : '#94A3B8'}
-                    />
-                    <Text style={{ fontSize: 9, fontWeight: '800', marginTop: 2, color: isActive ? L.gold : '#94A3B8' }}>
-                        {tab.label}
-                    </Text>
-                </TouchableOpacity>
-            );
-        })}
-    </View>
-);
-
-// --- HOME VIEW ---
-function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loading: boolean, setActiveTab: any }) {
+// --- WALLET VIEW ---
+function WalletView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loading: boolean, setActiveTab: (t: CryptoTab) => void }) {
     const router = useRouter();
     const [walletBalance, setWalletBalance] = useState(0);
     const [cryptoBalanceUsdt, setCryptoBalanceUsdt] = useState(0);
     const [hideBalance, setHideBalance] = useState(false);
-    const [activeModal, setActiveModal] = useState<'send' | 'receive' | 'buy' | 'sell' | null>(null);
+    const [activeModal, setActiveModal] = useState<'send' | 'receive' | null>(null);
 
+    // Deposit state
     const [receiveNetwork, setReceiveNetwork] = useState('TRC20');
     const [receiveAddress, setReceiveAddress] = useState('');
     const [loadingAddress, setLoadingAddress] = useState(false);
 
+    // Send state
+    const [sendNetwork, setSendNetwork] = useState('TRC20');
+    const [sendAddress, setSendAddress] = useState('');
+    const [sendAmount, setSendAmount] = useState('');
+    const [isSending, setIsSending] = useState(false);
+
     useEffect(() => {
-        getBal();
+        fetchBalances();
     }, []);
 
-    const getBal = async () => {
+    const fetchBalances = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const { data } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
@@ -200,7 +180,7 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const res = await api.crypto.generateDepositAddress(user.id, net, 'usdttrc20');
-                setReceiveAddress(res.address || 'T9x...VaultAddress');
+                setReceiveAddress(res.address || 'T9x...VaultAddressTRC20');
             }
         } catch (e) {
             setReceiveAddress('T9x...VaultAddressTRC20');
@@ -213,11 +193,7 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
         if (activeModal === 'receive') {
             loadDepositAddress(receiveNetwork);
         }
-    }, [receiveModalTrigger(activeModal, receiveNetwork)]);
-
-    function receiveModalTrigger(modal: string | null, net: string) {
-        return `${modal}_${net}`;
-    }
+    }, [activeModal, receiveNetwork]);
 
     const copyText = (text: string) => {
         if (!text) return;
@@ -226,7 +202,27 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
         } else {
             Clipboard.setString(text);
         }
-        Alert.alert('Copied', 'Address copied to clipboard');
+        Alert.alert('Copied 🎉', 'Deposit address copied to clipboard');
+    };
+
+    const handleSendSubmit = async () => {
+        if (!sendAddress.trim() || !sendAmount.trim()) {
+            Alert.alert('Missing Fields', 'Please enter destination address and amount');
+            return;
+        }
+        const amt = parseFloat(sendAmount.trim());
+        if (amt > cryptoBalanceUsdt) {
+            Alert.alert('Insufficient Balance', 'You do not have enough USDT balance');
+            return;
+        }
+        setIsSending(true);
+        setTimeout(() => {
+            setIsSending(false);
+            setActiveModal(null);
+            setSendAddress('');
+            setSendAmount('');
+            Alert.alert('Withdrawal Submitted 🎉', `Sent ${amt} USDT to ${sendAddress.slice(0, 8)}... Required admin verification.`);
+        }, 1200);
     };
 
     const topGainer = useMemo<Partial<CryptoRate>>(() => {
@@ -235,41 +231,41 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
     }, [assets]);
 
     return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
             <DynamicBanners placement="crypto" />
 
-            {/* Header Greeting */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            {/* Compact Header Row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TouchableOpacity onPress={() => router.replace('/dashboard')} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="person" size={16} color={L.gold} />
+                    <TouchableOpacity onPress={() => router.replace('/dashboard')} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="arrow-back" size={16} color={L.gold} />
                     </TouchableOpacity>
                     <View>
-                        <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase' }}>Crypto Exchange</Text>
-                        <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>Abu Mafhal Wallet</Text>
+                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' }}>User Crypto Wallet</Text>
+                        <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>Crypto Core Exchange</Text>
                     </View>
                 </View>
 
-                <TouchableOpacity onPress={() => router.push('/manage/crypto')} style={{ backgroundColor: L.goldBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="shield-checkmark-sharp" size={12} color={L.goldAmber} />
-                    <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 9 }}>Admin Vault →</Text>
+                <TouchableOpacity onPress={() => router.push('/manage/crypto')} style={{ backgroundColor: L.goldBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Ionicons name="shield-checkmark" size={11} color={L.goldAmber} />
+                    <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 9 }}>Admin Hub →</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* EXECUTIVE BALANCE CARD */}
+            {/* EXECUTIVE CRYPTO BALANCE CARD */}
             <LinearGradient
                 colors={['#0F172A', '#1C2541', '#0B132B']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ padding: 16, borderRadius: 20, borderWidth: 1.5, borderColor: L.goldDk, marginBottom: 14 }}
+                style={{ padding: 16, borderRadius: 18, borderWidth: 1.5, borderColor: L.goldDk, marginBottom: 12 }}
             >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <View>
-                        <Text style={{ color: '#CBD5E1', fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Total Crypto Balance</Text>
+                        <Text style={{ color: '#CBD5E1', fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Total Wallet USDT Balance</Text>
                         <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
                             {hideBalance ? '****' : `$${cryptoBalanceUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`}
                         </Text>
                         <Text style={{ color: L.gold, fontSize: 10, fontWeight: 'bold', marginTop: 2 }}>
-                            {hideBalance ? '₦ ****' : `Naira Wallet: ₦${walletBalance.toLocaleString()}`}
+                            {hideBalance ? '₦ ****' : `Naira Vault: ₦${walletBalance.toLocaleString()}`}
                         </Text>
                     </View>
 
@@ -278,7 +274,7 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
                     </TouchableOpacity>
                 </View>
 
-                {/* Balance Action Bar */}
+                {/* Primary Action Buttons */}
                 <View style={{ flexDirection: 'row', gap: 6, paddingTop: 10, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
                     <TouchableOpacity onPress={() => setActiveModal('receive')} style={{ flex: 1, backgroundColor: L.emeraldBg, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
                         <Ionicons name="arrow-down" size={12} color={L.emerald} />
@@ -292,52 +288,52 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
 
                     <TouchableOpacity onPress={() => setActiveTab('swap')} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
                         <Ionicons name="swap-horizontal" size={12} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 10 }}>Swap</Text>
+                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 10 }}>Instant Swap</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
 
-            {/* TOP GAINER BANNER */}
+            {/* TOP GAINER HIGHLIGHT */}
             {topGainer && (
-                <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ backgroundColor: L.card, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="flame" size={16} color={L.gold} />
+                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="flame" size={14} color={L.gold} />
                         </View>
                         <View>
-                            <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' }}>Top Gainer (24h)</Text>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>{topGainer.name} ({topGainer.symbol?.toUpperCase()})</Text>
+                            <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' }}>24h Market Leader</Text>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{topGainer.name} ({topGainer.symbol?.toUpperCase()})</Text>
                         </View>
                     </View>
 
                     <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>${topGainer.price_usd?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>${topGainer.price_usd?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                         <Text style={{ color: L.emerald, fontSize: 9, fontWeight: '900' }}>+{topGainer.percent_change_24h?.toFixed(2)}%</Text>
                     </View>
                 </View>
             )}
 
-            {/* MARKET OVERVIEW LIST */}
-            <View style={{ marginBottom: 14 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Trending Crypto Assets</Text>
-                    <TouchableOpacity onPress={() => setActiveTab('markets')} style={{ backgroundColor: L.card, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
-                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: 'bold' }}>See All Markets →</Text>
+            {/* LIVE ASSETS STREAM */}
+            <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Popular Crypto Rates</Text>
+                    <TouchableOpacity onPress={() => setActiveTab('markets')} style={{ backgroundColor: L.card, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: 'bold' }}>All Markets →</Text>
                     </TouchableOpacity>
                 </View>
 
-                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, overflow: 'hidden' }}>
+                <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, overflow: 'hidden' }}>
                     {loading ? (
-                        <ActivityIndicator color={L.goldDk} size="small" style={{ padding: 20 }} />
+                        <ActivityIndicator color={L.goldDk} size="small" style={{ padding: 16 }} />
                     ) : (
-                        assets.slice(0, 5).map((item, idx) => (
-                            <View key={item.id || idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10, borderBottomWidth: idx !== 4 ? 1 : 0, borderColor: L.inputBorder }}>
+                        assets.slice(0, 4).map((item, idx) => (
+                            <View key={item.id || idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10, borderBottomWidth: idx !== 3 ? 1 : 0, borderColor: L.inputBorder }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     {item.image ? (
-                                        <Image source={{ uri: item.image }} style={{ width: 28, height: 28, borderRadius: 14 }} />
+                                        <Image source={{ uri: item.image }} style={{ width: 26, height: 26, borderRadius: 13 }} />
                                     ) : (
-                                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: 'bold' }}>{item.symbol?.[0]?.toUpperCase()}</Text>
+                                        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Text style={{ color: L.gold, fontSize: 9, fontWeight: 'bold' }}>{item.symbol?.[0]?.toUpperCase()}</Text>
                                         </View>
                                     )}
                                     <View>
@@ -348,7 +344,7 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
 
                                 <View style={{ alignItems: 'flex-end' }}>
                                     <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>${item.price_usd?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-                                    <Text style={{ color: (item.percent_change_24h || 0) >= 0 ? L.emerald : L.rose, fontSize: 9, fontWeight: '800' }}>
+                                    <Text style={{ color: (item.percent_change_24h || 0) >= 0 ? L.emerald : L.rose, fontSize: 8, fontWeight: '800' }}>
                                         {(item.percent_change_24h || 0) >= 0 ? '+' : ''}{(item.percent_change_24h || 0).toFixed(2)}%
                                     </Text>
                                 </View>
@@ -361,16 +357,16 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
             {/* RECEIVE MODAL */}
             <Modal visible={activeModal === 'receive'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 16 }}>
-                    <View style={{ backgroundColor: L.card, borderRadius: 20, padding: 16, borderWidth: 1.5, borderColor: L.goldDk }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13 }}>Receive USDT Crypto Deposit</Text>
+                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 16, borderWidth: 1.5, borderColor: L.goldDk }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>Deposit USDT Crypto</Text>
                             <TouchableOpacity onPress={() => setActiveModal(null)}>
-                                <Ionicons name="close-circle" size={20} color={L.textMuted} />
+                                <Ionicons name="close-circle" size={18} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 4, fontWeight: 'bold' }}>Select Blockchain Network:</Text>
-                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                        <Text style={{ color: L.textMuted, fontSize: 8, marginBottom: 4, fontWeight: 'bold' }}>Select Blockchain Network:</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
                             {['TRC20', 'BEP20', 'ERC20'].map(net => (
                                 <TouchableOpacity
                                     key={net}
@@ -382,21 +378,21 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
                             ))}
                         </View>
 
-                        <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 12 }}>
+                        <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10 }}>
                             <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', marginBottom: 2 }}>DEPOSIT ADDRESS ({receiveNetwork}):</Text>
                             {loadingAddress ? (
-                                <ActivityIndicator size="small" color={L.goldDk} style={{ marginVertical: 6 }} />
+                                <ActivityIndicator size="small" color={L.goldDk} style={{ marginVertical: 4 }} />
                             ) : (
                                 <TouchableOpacity onPress={() => copyText(receiveAddress)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Text style={{ color: L.navyHeader, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 10, flex: 1, marginRight: 6, fontWeight: 'bold' }}>{receiveAddress}</Text>
-                                    <Ionicons name="copy-outline" size={14} color={L.navyHeader} />
+                                    <Text style={{ color: L.navyHeader, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 9, flex: 1, marginRight: 6, fontWeight: 'bold' }}>{receiveAddress}</Text>
+                                    <Ionicons name="copy-outline" size={12} color={L.navyHeader} />
                                 </TouchableOpacity>
                             )}
                         </View>
 
                         <TouchableOpacity 
                             onPress={() => copyText(receiveAddress)}
-                            style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
                         >
                             <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Copy Deposit Address</Text>
                         </TouchableOpacity>
@@ -404,12 +400,74 @@ function HomeView({ assets, loading, setActiveTab }: { assets: CryptoRate[], loa
                 </View>
             </Modal>
 
+            {/* SEND MODAL */}
+            <Modal visible={activeModal === 'send'} transparent animationType="fade" onRequestClose={() => setActiveModal(null)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 16 }}>
+                    <View style={{ backgroundColor: L.card, borderRadius: 18, padding: 16, borderWidth: 1.5, borderColor: L.goldDk }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>Send / Withdraw USDT</Text>
+                            <TouchableOpacity onPress={() => setActiveModal(null)}>
+                                <Ionicons name="close-circle" size={18} color={L.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 8, marginBottom: 4, fontWeight: 'bold' }}>Destination Network:</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                            {['TRC20', 'BEP20', 'ERC20'].map(net => (
+                                <TouchableOpacity
+                                    key={net}
+                                    onPress={() => setSendNetwork(net)}
+                                    style={{ flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: 'center', backgroundColor: sendNetwork === net ? L.navyHeader : L.bg, borderColor: sendNetwork === net ? L.navyHeader : L.inputBorder }}
+                                >
+                                    <Text style={{ color: sendNetwork === net ? L.gold : L.textSecondary, fontWeight: 'bold', fontSize: 9 }}>{net}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 8, marginBottom: 4, fontWeight: 'bold' }}>Recipient Address:</Text>
+                        <View style={{ backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 8 }}>
+                            <TextInput
+                                value={sendAddress}
+                                onChangeText={setSendAddress}
+                                placeholder="Enter crypto wallet address..."
+                                placeholderTextColor="#94A3B8"
+                                style={{ flex: 1, color: L.textPrimary, fontWeight: '600', fontSize: 10 }}
+                            />
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 8, marginBottom: 4, fontWeight: 'bold' }}>Withdrawal Amount (USDT):</Text>
+                        <View style={{ backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 12 }}>
+                            <TextInput
+                                value={sendAmount}
+                                onChangeText={setSendAmount}
+                                keyboardType="numeric"
+                                placeholder="0.00"
+                                placeholderTextColor="#94A3B8"
+                                style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                            />
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={handleSendSubmit}
+                            disabled={isSending}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
+                        >
+                            {isSending ? (
+                                <ActivityIndicator size="small" color={L.gold} />
+                            ) : (
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Confirm Withdrawal</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
         </ScrollView>
     );
 }
 
 // --- MARKETS VIEW ---
-function MarketsView({ assets }: { assets: CryptoRate[] }) {
+function MarketsView({ assets, loading }: { assets: CryptoRate[], loading: boolean }) {
     const [search, setSearch] = useState('');
 
     const filtered = assets.filter(a => 
@@ -418,43 +476,51 @@ function MarketsView({ assets }: { assets: CryptoRate[] }) {
     );
 
     return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.card, borderRadius: 12, paddingHorizontal: 10, height: 36, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10 }}>
-                <Ionicons name="search-outline" size={15} color={L.goldDk} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.card, borderRadius: 10, paddingHorizontal: 10, height: 34, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10 }}>
+                <Ionicons name="search-outline" size={14} color={L.goldDk} />
                 <TextInput
                     value={search}
                     onChangeText={setSearch}
-                    placeholder="Search 100+ Crypto Markets..."
+                    placeholder="Search 50+ Crypto Assets..."
                     placeholderTextColor={L.textMuted}
-                    style={{ flex: 1, marginLeft: 6, color: L.textPrimary, fontWeight: '600', fontSize: 11 }}
+                    style={{ flex: 1, marginLeft: 6, color: L.textPrimary, fontWeight: '600', fontSize: 10 }}
                 />
             </View>
 
-            <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, overflow: 'hidden' }}>
-                {filtered.map((item, idx) => (
-                    <View key={item.id || idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10, borderBottomWidth: idx !== filtered.length - 1 ? 1 : 0, borderColor: L.inputBorder }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            {item.image ? (
-                                <Image source={{ uri: item.image }} style={{ width: 28, height: 28, borderRadius: 14 }} />
-                            ) : (
-                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Text style={{ color: L.gold, fontSize: 10, fontWeight: 'bold' }}>{item.symbol?.[0]?.toUpperCase()}</Text>
+            <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, overflow: 'hidden' }}>
+                {loading ? (
+                    <ActivityIndicator color={L.goldDk} size="small" style={{ padding: 16 }} />
+                ) : filtered.length === 0 ? (
+                    <View style={{ padding: 16, alignItems: 'center' }}>
+                        <Text style={{ color: L.textMuted, fontSize: 10 }}>No matching crypto assets found.</Text>
+                    </View>
+                ) : (
+                    filtered.map((item, idx) => (
+                        <View key={item.id || idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10, borderBottomWidth: idx !== filtered.length - 1 ? 1 : 0, borderColor: L.inputBorder }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                {item.image ? (
+                                    <Image source={{ uri: item.image }} style={{ width: 26, height: 26, borderRadius: 13 }} />
+                                ) : (
+                                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Text style={{ color: L.gold, fontSize: 9, fontWeight: 'bold' }}>{item.symbol?.[0]?.toUpperCase()}</Text>
+                                    </View>
+                                )}
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{item.name}</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>{item.symbol?.toUpperCase()}</Text>
                                 </View>
-                            )}
-                            <View>
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{item.name}</Text>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>{item.symbol?.toUpperCase()}</Text>
+                            </View>
+
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>${item.price_usd?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                                <Text style={{ color: (item.percent_change_24h || 0) >= 0 ? L.emerald : L.rose, fontSize: 8, fontWeight: '800' }}>
+                                    {(item.percent_change_24h || 0) >= 0 ? '+' : ''}{(item.percent_change_24h || 0).toFixed(2)}%
+                                </Text>
                             </View>
                         </View>
-
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>${item.price_usd?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-                            <Text style={{ color: (item.percent_change_24h || 0) >= 0 ? L.emerald : L.rose, fontSize: 9, fontWeight: '800' }}>
-                                {(item.percent_change_24h || 0) >= 0 ? '+' : ''}{(item.percent_change_24h || 0).toFixed(2)}%
-                            </Text>
-                        </View>
-                    </View>
-                ))}
+                    ))
+                )}
             </View>
         </ScrollView>
     );
@@ -472,48 +538,48 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
         setSwapping(true);
         setTimeout(() => {
             setSwapping(false);
-            Alert.alert("Swap Success 🎉", `Swapped ${fromAmount} ${fromCoin} to ${toCoin} instantly!`);
+            Alert.alert("DEX Swap Success 🎉", `Swapped ${fromAmount} ${fromCoin} to ${toCoin} instantly!`);
         }, 800);
     };
 
     return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }}>
-            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: L.cardBorder }}>
-                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 14, marginBottom: 2 }}>Instant Crypto Swap</Text>
-                <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 12 }}>Zero-fee automated DEX swap engine.</Text>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 80 }}>
+            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder }}>
+                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13, marginBottom: 2 }}>Instant Crypto DEX Swap</Text>
+                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 10 }}>Automated liquidity pool swap engine.</Text>
 
                 {/* From Box */}
-                <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 8 }}>
+                <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 6 }}>
                     <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', marginBottom: 2 }}>YOU PAY:</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <TextInput
                             value={fromAmount}
                             onChangeText={setFromAmount}
                             keyboardType="numeric"
-                            style={{ flex: 1, color: L.textPrimary, fontWeight: '900', fontSize: 16 }}
+                            style={{ flex: 1, color: L.textPrimary, fontWeight: '900', fontSize: 15 }}
                         />
-                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>{fromCoin}</Text>
+                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9 }}>{fromCoin}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* Swap Icon */}
                 <View style={{ alignItems: 'center', marginVertical: -4, zIndex: 10 }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: L.card }}>
-                        <Ionicons name="swap-vertical" size={14} color={L.gold} />
+                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: L.card }}>
+                        <Ionicons name="swap-vertical" size={13} color={L.gold} />
                     </View>
                 </View>
 
                 {/* To Box */}
-                <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, marginTop: 8, marginBottom: 14 }}>
+                <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, marginTop: 6, marginBottom: 12 }}>
                     <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold', marginBottom: 2 }}>YOU RECEIVE (ESTIMATED):</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 16 }}>
+                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 15 }}>
                             {(Number(fromAmount || 0) * 0.000015).toFixed(6)}
                         </Text>
-                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>{toCoin}</Text>
+                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9 }}>{toCoin}</Text>
                         </View>
                     </View>
                 </View>
@@ -521,68 +587,14 @@ function SwapView({ assets }: { assets: CryptoRate[] }) {
                 <TouchableOpacity 
                     onPress={handleSwap}
                     disabled={swapping}
-                    style={{ backgroundColor: L.navyHeader, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
+                    style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
                 >
                     {swapping ? (
                         <ActivityIndicator size="small" color={L.gold} />
                     ) : (
-                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Confirm Instant Swap</Text>
+                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Confirm DEX Swap</Text>
                     )}
                 </TouchableOpacity>
-            </View>
-        </ScrollView>
-    );
-}
-
-// --- PORTFOLIO VIEW ---
-function PortfolioView({ assets }: { assets: CryptoRate[] }) {
-    return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }}>
-            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 12 }}>
-                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13, marginBottom: 2 }}>Portfolio Allocation</Text>
-                <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10 }}>Multi-chain crypto asset breakdown.</Text>
-
-                <View style={{ gap: 8 }}>
-                    {[
-                        { coin: 'USDT (Tether)', percent: '75%', bal: '$1,250.00', color: L.emerald },
-                        { coin: 'BTC (Bitcoin)', percent: '18%', bal: '$300.00', color: L.goldDk },
-                        { coin: 'ETH (Ethereum)', percent: '7%', bal: '$116.00', color: L.navyMid }
-                    ].map((item, idx) => (
-                        <View key={idx} style={{ backgroundColor: L.bg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{item.coin}</Text>
-                            </View>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{item.bal} ({item.percent})</Text>
-                        </View>
-                    ))}
-                </View>
-            </View>
-        </ScrollView>
-    );
-}
-
-// --- SETTINGS VIEW ---
-function SettingsView() {
-    return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90 }}>
-            <View style={{ backgroundColor: L.card, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: L.cardBorder }}>
-                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13, marginBottom: 2 }}>Crypto Exchange Settings</Text>
-                <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10 }}>Security, network RPCs & preferences.</Text>
-
-                {[
-                    { label: 'Biometric Transaction Authentication', icon: 'finger-print-outline' },
-                    { label: 'Auto-Refresh Live Market Rates', icon: 'sync-outline' },
-                    { label: 'Custom RPC Nodes Configuration', icon: 'server-outline' }
-                ].map((item, idx) => (
-                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: idx !== 2 ? 1 : 0, borderColor: L.inputBorder }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name={item.icon as any} size={16} color={L.goldDk} />
-                            <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 10 }}>{item.label}</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
-                    </View>
-                ))}
             </View>
         </ScrollView>
     );
