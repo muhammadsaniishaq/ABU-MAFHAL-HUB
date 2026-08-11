@@ -389,10 +389,10 @@ export default function AdminBento() {
         <View style={s.container}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
                 
-                {/* Header Gradient */}
+                {/* Futuristic Admin Header */}
                 <View style={s.headerWrapper}>
                     <LinearGradient
-                        colors={['#020617', '#0f172a', '#1e293b']}
+                        colors={['#020617', '#0F172A', '#1E293B']}
                         locations={[0, 0.6, 1]}
                         start={{ x: 0.5, y: 0 }}
                         end={{ x: 0.5, y: 1 }}
@@ -405,7 +405,7 @@ export default function AdminBento() {
                         {/* Top Bar Brand & User Row */}
                         <View style={s.topBarBrandRow}>
                             <View style={s.brandRow}>
-                                <View style={{ padding: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                <View style={{ padding: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)' }}>
                                     <Image 
                                         source={logoIconUrl ? { uri: logoIconUrl } : require('../../assets/images/logo-icon.png')} 
                                         style={s.brandLogo as any}
@@ -413,8 +413,8 @@ export default function AdminBento() {
                                     />
                                 </View>
                                 <View style={s.brandTextContainer}>
-                                    <Text style={s.brandTxtTitle}>MAFHAL</Text>
-                                    <Text style={s.brandTxtSub}>ADMIN CENTRE</Text>
+                                    <Text style={s.brandTxtTitle}>ABU MAFHAL</Text>
+                                    <Text style={s.brandTxtSub}>ADMIN COMMAND CENTRE</Text>
                                 </View>
                             </View>
 
@@ -424,14 +424,14 @@ export default function AdminBento() {
                                     style={s.logoutBtn}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="apps-outline" size={14} color="#e2e8f0" />
+                                    <Ionicons name="apps-outline" size={12} color="#FFD700" />
                                     <Text style={s.logoutBtnText}>User App</Text>
                                 </TouchableOpacity>
                                 
                                 {/* Double Gold Ring Avatar */}
                                 <TouchableOpacity 
                                     style={{ position: 'relative' }}
-                                    activeOpacity={0.8}
+                                    activeOpacity={0.85}
                                     onPress={() => router.push('/manage/profile')}
                                 >
                                     <View style={s.avatarDoubleRing}>
@@ -453,16 +453,16 @@ export default function AdminBento() {
                             </View>
                         </View>
 
-                        {/* Welcome & Status Bar Row */}
+                        {/* Welcome & Status Bar Row (No Collision Layout) */}
                         <View style={s.welcomeStatusRow}>
-                            <View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 3 }}>
                                     <Text style={s.welcomeText}>Welcome back, {adminProfile?.full_name?.split(' ')[0] || 'Admin'} 👋</Text>
-                                     <View style={[s.adminBadgePill, adminProfile?.role === 'super_admin' && { backgroundColor: 'rgba(245, 166, 35, 0.25)', borderColor: '#f5a623' }]}>
-                                         <Text style={[s.adminBadgeText, adminProfile?.role === 'super_admin' && { color: '#f5a623', fontWeight: '900' }]}>
-                                             {adminProfile?.role === 'super_admin' ? '👑 SUPER ADMIN (MASTER KEY)' : 'STAFF ADMIN'}
-                                         </Text>
-                                     </View>
+                                    <View style={[s.adminBadgePill, adminProfile?.role === 'super_admin' && { backgroundColor: 'rgba(255, 215, 0, 0.2)', borderColor: '#FFD700' }]}>
+                                        <Text style={[s.adminBadgeText, adminProfile?.role === 'super_admin' && { color: '#FFD700', fontWeight: '900' }]}>
+                                            {adminProfile?.role === 'super_admin' ? '👑 MASTER KEY' : 'STAFF ADMIN'}
+                                        </Text>
+                                    </View>
                                 </View>
                                 <View style={s.liveRow}>
                                     <View style={s.statusDot} />
@@ -473,10 +473,10 @@ export default function AdminBento() {
 
                         {/* Global Search Bar */}
                         <View style={s.searchBarContainer}>
-                            <Ionicons name="search-outline" size={18} color="#94a3b8" />
+                            <Ionicons name="search-outline" size={15} color="#FFD700" />
                             <TextInput 
                                 placeholder="Search users, transactions, logs..." 
-                                placeholderTextColor="#64748b"
+                                placeholderTextColor="#94A3B8"
                                 style={s.searchInput}
                                 selectionColor={T.gold}
                             />
@@ -492,26 +492,26 @@ export default function AdminBento() {
                 <View style={s.floatingCardContainer}>
                     <View style={s.floatingCard}>
                         <View style={s.statCol}>
-                            <Ionicons name="people-outline" size={16} color={T.gold} />
+                            <Ionicons name="people-outline" size={14} color={T.gold} />
                             <Text style={s.statNum}>{loading ? '...' : counts.users.toLocaleString()}</Text>
-                            <Text style={s.statLabel}>Total Users</Text>
+                            <Text style={s.statLabel}>Users</Text>
                         </View>
                         <View style={s.verticalDivider} />
                         <View style={s.statCol}>
-                            <Ionicons name="scan-outline" size={16} color={counts.kyc > 0 ? '#ef4444' : T.gold} />
-                            <Text style={[s.statNum, counts.kyc > 0 && { color: '#ef4444' }]}>{loading ? '...' : counts.kyc}</Text>
+                            <Ionicons name="scan-outline" size={14} color={counts.kyc > 0 ? '#EF4444' : T.gold} />
+                            <Text style={[s.statNum, counts.kyc > 0 && { color: '#EF4444' }]}>{loading ? '...' : counts.kyc}</Text>
                             <Text style={s.statLabel}>Pending KYC</Text>
                         </View>
                         <View style={s.verticalDivider} />
                         <View style={s.statCol}>
-                            <Ionicons name="chatbubbles-outline" size={16} color={T.gold} />
+                            <Ionicons name="chatbubbles-outline" size={14} color={T.gold} />
                             <Text style={s.statNum}>{loading ? '...' : counts.tickets}</Text>
                             <Text style={s.statLabel}>Tickets</Text>
                         </View>
                         <View style={s.verticalDivider} />
                         <View style={s.statCol}>
-                            <Ionicons name="server-outline" size={16} color="#10b981" />
-                            <Text style={[s.statNum, { color: '#10b981' }]}>99.9%</Text>
+                            <Ionicons name="server-outline" size={14} color="#10B981" />
+                            <Text style={[s.statNum, { color: '#10B981' }]}>99.9%</Text>
                             <Text style={s.statLabel}>Server</Text>
                         </View>
                     </View>
@@ -640,18 +640,18 @@ const s = StyleSheet.create({
     },
     headerWrapper: {
         position: 'relative',
-        shadowColor: T.navy,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
-        elevation: 10,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 8,
     },
     headerGradient: {
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 56 : 36,
-        paddingBottom: 48,
-        borderBottomLeftRadius: 36,
-        borderBottomRightRadius: 36,
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 52 : 32,
+        paddingBottom: 38,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
         overflow: 'hidden',
         position: 'relative',
     },
@@ -664,7 +664,6 @@ const s = StyleSheet.create({
         borderRadius: 150,
         backgroundColor: '#4F46E5',
         opacity: 0.15,
-        filter: 'blur(40px)',
     },
     orbLeft: {
         position: 'absolute',
@@ -675,109 +674,117 @@ const s = StyleSheet.create({
         borderRadius: 125,
         backgroundColor: '#10B981',
         opacity: 0.1,
-        filter: 'blur(40px)',
     },
     goldBottomStrip: {
-        height: 4,
-        backgroundColor: '#f5a623',
+        height: 3,
+        backgroundColor: '#FFD700',
         width: '100%',
         position: 'absolute',
         bottom: 0,
-        borderBottomLeftRadius: 36,
-        borderBottomRightRadius: 36,
-        shadowColor: '#f5a623',
-        shadowOffset: { width: 0, height: 4 },
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.6,
-        shadowRadius: 12,
+        shadowRadius: 8,
     },
     topBarBrandRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 18,
+        marginBottom: 12,
     },
     brandRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     brandLogo: {
-        width: 32,
-        height: 32,
+        width: 26,
+        height: 26,
     },
     brandTextContainer: {
         flexDirection: 'column',
         justifyContent: 'center',
     },
     brandTxtTitle: {
-        color: '#ffffff',
-        fontSize: 16,
+        color: '#FFFFFF',
+        fontSize: 14,
         fontWeight: '900',
         letterSpacing: 0.5,
-        lineHeight: 18,
-        textShadowColor: 'rgba(245, 166, 35, 0.4)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
+        lineHeight: 16,
     },
     brandTxtSub: {
         color: T.gold,
-        fontSize: 12,
+        fontSize: 8,
         fontWeight: '900',
-        letterSpacing: 1.5,
+        letterSpacing: 1,
         lineHeight: 10,
     },
     headerActionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     logoutBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(255, 215, 0, 0.12)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 12,
-        gap: 5,
+        borderColor: 'rgba(255, 215, 0, 0.35)',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        gap: 4,
+        height: 28,
     },
     logoutBtnText: {
-        color: '#cbd5e1',
-        fontSize: 12,
-        fontWeight: '700',
+        color: '#FFD700',
+        fontSize: 10,
+        fontWeight: '800',
     },
     welcomeStatusRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginBottom: 18,
+        alignItems: 'center',
+        marginBottom: 12,
     },
     welcomeText: {
-        color: '#94a3b8',
-        fontSize: 12,
-        fontWeight: '600',
+        color: '#F8FAFC',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    adminBadgePill: {
+        backgroundColor: 'rgba(255, 215, 0, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.4)',
+        paddingHorizontal: 6,
+        paddingVertical: 1.5,
+        borderRadius: 6,
+    },
+    adminBadgeText: {
+        color: T.gold,
+        fontSize: 8,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     liveRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 4,
+        marginTop: 2,
     },
     statusDot: {
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#10b981',
-        marginRight: 6,
-        shadowColor: '#10b981',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 4,
+        backgroundColor: '#10B981',
+        marginRight: 5,
     },
     liveText: {
-        color: '#10b981',
-        fontSize: 12,
-        fontWeight: '800',
+        color: '#10B981',
+        fontSize: 9,
+        fontWeight: '900',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
@@ -820,150 +827,117 @@ const s = StyleSheet.create({
         backgroundColor: '#ef4444',
     },
     avatarDoubleRing: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        padding: 2,
-        backgroundColor: T.gold,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    avatarMiddleRing: {
         width: 34,
         height: 34,
         borderRadius: 17,
         padding: 1.5,
-        backgroundColor: '#0d1b3e',
+        backgroundColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarMiddleRing: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        padding: 1,
+        backgroundColor: '#0F172A',
         alignItems: 'center',
         justifyContent: 'center',
     },
     avatarInnerCircle: {
-        width: 29,
-        height: 29,
-        borderRadius: 14.5,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     avatarLetters: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 11,
         letterSpacing: 0.5,
     },
     avatarActiveDot: {
         position: 'absolute',
-        bottom: 1,
-        right: 1,
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#10b981',
-        borderWidth: 2,
-        borderColor: '#0d1b3e',
-        shadowColor: '#10b981',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 2,
-    },
-    adminBadgePill: {
-        backgroundColor: 'rgba(245, 166, 35, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.4)',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-        marginLeft: 8,
-    },
-    adminBadgeText: {
-        color: T.gold,
-        fontSize: 12,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        bottom: 0,
+        right: 0,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#10B981',
+        borderWidth: 1.5,
+        borderColor: '#0F172A',
     },
     searchBarContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(13, 27, 62, 0.6)',
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        paddingVertical: Platform.OS === 'ios' ? 10 : 6,
-        borderWidth: 1.5,
-        borderColor: 'rgba(245, 166, 35, 0.3)',
-        shadowColor: T.gold,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
+        backgroundColor: '#060B19',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        height: 36,
+        borderWidth: 1,
+        borderColor: 'rgba(218, 165, 32, 0.35)',
     },
     searchInput: {
         flex: 1,
-        marginLeft: 8,
-        color: '#ffffff',
-        fontSize: 13,
+        marginLeft: 6,
+        color: '#FFFFFF',
+        fontSize: 11,
         fontWeight: '500',
     },
     cmdBadge: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
     },
     cmdText: {
-        color: 'rgba(255, 255, 255, 0.4)',
-        fontSize: 12,
-        fontWeight: '700',
+        color: '#CBD5E1',
+        fontSize: 9,
+        fontWeight: '800',
     },
     floatingCardContainer: {
-        paddingHorizontal: 16,
-        marginTop: -26,
+        paddingHorizontal: 12,
+        marginTop: -18,
         zIndex: 20,
     },
     floatingCard: {
-        backgroundColor: '#0d1b3e',
-        borderRadius: 20,
-        paddingVertical: 14,
-        paddingHorizontal: 10,
+        backgroundColor: '#0F172A',
+        borderRadius: 16,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        shadowColor: T.gold,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 6,
         borderWidth: 1.5,
-        borderColor: T.gold,
+        borderColor: T.goldDk,
+        elevation: 6,
     },
     statCol: {
         alignItems: 'center',
         flex: 1,
     },
     statNum: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: '900',
-        color: '#ffffff',
-        marginTop: 4,
+        color: '#FFFFFF',
+        marginTop: 2,
         marginBottom: 1,
     },
     statLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#cbd5e1',
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#94A3B8',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
     verticalDivider: {
         width: 1,
-        height: 28,
-        backgroundColor: 'rgba(245, 166, 35, 0.25)',
+        height: 22,
+        backgroundColor: 'rgba(218, 165, 32, 0.3)',
     },
     quickActionsSection: {
         marginTop: 20,
