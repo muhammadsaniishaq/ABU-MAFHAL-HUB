@@ -520,10 +520,10 @@ export default function AdminBento() {
                 {/* Dynamic Quick Actions / Master Control Panel */}
                 {adminProfile?.role === 'super_admin' ? (
                     <View style={s.quickActionsSection}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingRight: 16 }}>
                             <Text style={s.sectionHeader}>👑 Super Admin Master Controls</Text>
-                            <View style={{ backgroundColor: 'rgba(245, 166, 35, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
-                                <Text style={{ color: T.gold, fontSize: 12, fontWeight: 'bold' }}>ROOT PERMISSIONS</Text>
+                            <View style={{ backgroundColor: 'rgba(255, 215, 0, 0.15)', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.4)' }}>
+                                <Text style={{ color: T.gold, fontSize: 8, fontWeight: '900' }}>ROOT PERMISSIONS</Text>
                             </View>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickActionsScroll}>
@@ -532,8 +532,8 @@ export default function AdminBento() {
                                 onPress={() => router.push('/manage/super-admin' as any)}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.superIconBox, { backgroundColor: '#fffbeb', borderColor: '#fde68a' }]}>
-                                    <Ionicons name="ribbon" size={22} color="#d97706" />
+                                <View style={[s.superIconBox, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                                    <Ionicons name="ribbon" size={16} color="#D97706" />
                                 </View>
                                 <Text style={s.superCardLabel}>Master Hub</Text>
                             </TouchableOpacity>
@@ -543,8 +543,8 @@ export default function AdminBento() {
                                 onPress={() => router.push('/manage/staff')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.superIconBox, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
-                                    <Ionicons name="people" size={22} color="#2563eb" />
+                                <View style={[s.superIconBox, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                                    <Ionicons name="people" size={16} color="#2563EB" />
                                 </View>
                                 <Text style={s.superCardLabel}>Staff & Roles</Text>
                             </TouchableOpacity>
@@ -554,8 +554,8 @@ export default function AdminBento() {
                                 onPress={() => router.push('/manage/features')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.superIconBox, { backgroundColor: '#fff7ed', borderColor: '#ffedd5' }]}>
-                                    <Ionicons name="toggle" size={22} color="#ea580c" />
+                                <View style={[s.superIconBox, { backgroundColor: '#FFF7ED', borderColor: '#FFEDD5' }]}>
+                                    <Ionicons name="toggle" size={16} color="#EA580C" />
                                 </View>
                                 <Text style={s.superCardLabel}>Feature Flags</Text>
                             </TouchableOpacity>
@@ -565,8 +565,8 @@ export default function AdminBento() {
                                 onPress={() => router.push('/manage/security')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.superIconBox, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
-                                    <Ionicons name="shield-checkmark" size={22} color="#16a34a" />
+                                <View style={[s.superIconBox, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                                    <Ionicons name="shield-checkmark" size={16} color="#16A34A" />
                                 </View>
                                 <Text style={s.superCardLabel}>Security Hub</Text>
                             </TouchableOpacity>
@@ -576,8 +576,8 @@ export default function AdminBento() {
                                 onPress={() => router.push('/manage/panic')}
                                 activeOpacity={0.8}
                             >
-                                <View style={[s.superIconBox, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
-                                    <Ionicons name="warning" size={22} color="#dc2626" />
+                                <View style={[s.superIconBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                                    <Ionicons name="warning" size={16} color="#DC2626" />
                                 </View>
                                 <Text style={s.superCardLabel}>Panic Room</Text>
                             </TouchableOpacity>
@@ -595,7 +595,7 @@ export default function AdminBento() {
                                     activeOpacity={0.8}
                                 >
                                     <View style={s.quickActionIconCircle}>
-                                        <Ionicons name={action.icon as any} size={22} color={T.navy} />
+                                        <Ionicons name={action.icon as any} size={16} color={T.navy} />
                                     </View>
                                     <Text style={s.quickActionLabel}>{action.label}</Text>
                                 </TouchableOpacity>
@@ -604,7 +604,7 @@ export default function AdminBento() {
                     </View>
                 )}
 
-                {/* Bento Categories Accordion Grid (Filtered for Staff Admins) */}
+                {/* Bento Categories Accordion Grid */}
                 <View style={s.bentoGridSection}>
                     {renderSectionAccordion('operations')}
                     {renderSectionAccordion('banking')}
@@ -625,7 +625,7 @@ export default function AdminBento() {
                         style={s.dockItem}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name={item.icon as any} size={22} color={T.gold} />
+                        <Ionicons name={item.icon as any} size={18} color={T.gold} />
                     </TouchableOpacity>
                 ))}
             </View>
@@ -940,161 +940,146 @@ const s = StyleSheet.create({
         backgroundColor: 'rgba(218, 165, 32, 0.3)',
     },
     quickActionsSection: {
-        marginTop: 20,
-        paddingLeft: 16,
+        marginTop: 16,
+        paddingLeft: 12,
     },
     quickActionsScroll: {
-        paddingRight: 16,
-        gap: 10,
-        marginTop: 8,
+        paddingRight: 12,
+        gap: 8,
+        marginTop: 4,
     },
     superControlCard: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 18,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)',
-        shadowColor: T.navy,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        elevation: 2,
+        borderColor: 'rgba(218, 165, 32, 0.3)',
+        elevation: 1,
     },
     superIconBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        marginBottom: 6,
+        marginBottom: 4,
     },
     superCardLabel: {
         color: T.navy,
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '800',
     },
     quickActionBtn: {
         alignItems: 'center',
-        marginRight: 6,
+        marginRight: 4,
     },
     quickActionIconCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 18,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: 'rgba(245, 166, 35, 0.25)',
-        backgroundColor: '#ffffff',
-        shadowColor: T.navy,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(218, 165, 32, 0.3)',
+        backgroundColor: '#FFFFFF',
+        elevation: 1,
     },
     quickActionLabel: {
         color: T.text,
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '700',
-        marginTop: 6,
+        marginTop: 4,
     },
     bentoGridSection: {
-        paddingHorizontal: 16,
-        marginTop: 24,
+        paddingHorizontal: 12,
+        marginTop: 16,
     },
     accordionCard: {
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        marginBottom: 12,
+        marginBottom: 10,
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)',
+        borderColor: 'rgba(218, 165, 32, 0.35)',
         overflow: 'hidden',
-        shadowColor: T.navy,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.03,
-        shadowRadius: 8,
         elevation: 2,
     },
     accordionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        backgroundColor: '#ffffff',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: '#FFFFFF',
     },
     accordionHeaderExpanded: {
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(245, 166, 35, 0.15)',
-        backgroundColor: 'rgba(13, 27, 62, 0.01)',
+        borderBottomColor: 'rgba(218, 165, 32, 0.2)',
+        backgroundColor: '#F8FAFC',
     },
     accordionHeaderLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     accordionIconBg: {
-        width: 36,
-        height: 36,
-        borderRadius: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
     accordionTitle: {
-        fontSize: 13,
-        fontWeight: '800',
+        fontSize: 11,
+        fontWeight: '900',
         color: T.navy,
+        letterSpacing: -0.2,
     },
     accordionSubtitle: {
-        fontSize: 12,
+        fontSize: 9,
         color: T.textSub,
-        fontWeight: '500',
+        fontWeight: '700',
         marginTop: 1,
     },
     accordionHeaderRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     sectionBadgeContainer: {
-        backgroundColor: '#ef4444',
-        borderRadius: 10,
+        backgroundColor: '#EF4444',
+        borderRadius: 6,
         paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingVertical: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
     },
     sectionBadgeText: {
-        color: '#ffffff',
-        fontSize: 12,
+        color: '#FFFFFF',
+        fontSize: 8,
         fontWeight: '900',
     },
     accordionBody: {
-        padding: 12,
-        backgroundColor: '#fcfdfe',
+        padding: 10,
+        backgroundColor: '#F8FAFC',
     },
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'flex-start',
-        gap: 8,
+        gap: 6,
     },
     gridCard: {
         width: '31%',
-        height: 78,
-        backgroundColor: '#ffffff',
+        height: 66,
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
-        padding: 8,
+        padding: 6,
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.15)',
-        shadowColor: T.navy,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.02,
-        shadowRadius: 4,
+        borderColor: 'rgba(218, 165, 32, 0.2)',
         elevation: 1,
     },
     gridCardHeader: {
@@ -1103,79 +1088,78 @@ const s = StyleSheet.create({
         alignItems: 'center',
     },
     iconBg: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
+        width: 24,
+        height: 24,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
     badgeContainer: {
-        backgroundColor: '#ef4444',
-        borderRadius: 8,
-        minWidth: 14,
-        height: 14,
-        paddingHorizontal: 3,
+        backgroundColor: '#EF4444',
+        borderRadius: 4,
+        minWidth: 12,
+        height: 12,
+        paddingHorizontal: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#ffffff',
     },
     badgeText: {
-        color: '#ffffff',
-        fontSize: 12,
-        fontWeight: '800',
+        color: '#FFFFFF',
+        fontSize: 8,
+        fontWeight: '900',
     },
     gridCardFooter: {
         alignItems: 'flex-start',
     },
     statText: {
-        color: '#10b981',
-        fontSize: 12,
-        fontWeight: '700',
+        color: '#10B981',
+        fontSize: 8,
+        fontWeight: '900',
         marginBottom: 1,
     },
     gridCardTitle: {
-        fontWeight: '700',
-        fontSize: 12,
+        fontWeight: '800',
+        fontSize: 10,
         color: T.navy,
     },
     sectionHeader: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: T.textSub,
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#64748B',
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
-        marginBottom: 10,
-        paddingLeft: 4,
+        letterSpacing: 1,
+        marginBottom: 4,
+        paddingLeft: 2,
     },
     dockContainer: {
         position: 'absolute',
-        bottom: 24,
-        left: 20,
-        right: 20,
-        backgroundColor: 'rgba(13, 27, 62, 0.96)',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 24,
+        bottom: 16,
+        left: 16,
+        right: 16,
+        backgroundColor: '#0F172A',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 18,
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderColor: '#f5a62380',
-        shadowColor: '#f5a623',
-        shadowOffset: { width: 0, height: 8 },
+        borderColor: '#DAA520',
+        elevation: 10,
+        shadowColor: '#DAA520',
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 12,
+        shadowRadius: 10,
     },
     dockItem: {
-        width: 44,
-        height: 44,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        backgroundColor: 'rgba(255, 215, 0, 0.12)',
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)',
+        borderColor: 'rgba(218, 165, 32, 0.35)',
     },
 });
+
