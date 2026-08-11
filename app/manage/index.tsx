@@ -121,15 +121,7 @@ export default function AdminBento() {
     const [adminProfile, setAdminProfile] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [logoIconUrl, setLogoIconUrl] = useState<string | null>(null);
-    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-        operations: true,
-        banking: false,
-        finance: false,
-        technical: false,
-        internal: false,
-        redZone: false,
-    });
-
+    const [activeCategoryTab, setActiveCategoryTab] = useState<string>('all');
     const [hiddenAdminModules, setHiddenAdminModules] = useState<string[]>([]);
 
     useEffect(() => {
@@ -253,15 +245,7 @@ export default function AdminBento() {
     modules.banking[1].badge = counts.loans;
     modules.internal[3].badge = counts.chats;
 
-    const toggleSection = (key: string) => {
-        setExpandedSections(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
-    };
-
     const isModuleHiddenForStaff = (itemRoute: string) => {
-        // By default, if loading or if user is any admin/owner, SHOW ALL MODULES
         if (!adminProfile || ['admin', 'super_admin'].includes(adminProfile?.role)) return false;
         
         const userEmail = adminProfile?.email?.toLowerCase() || '';
@@ -284,37 +268,31 @@ export default function AdminBento() {
         return !!(moduleKey && hiddenAdminModules.includes(moduleKey));
     };
 
-    const renderSectionAccordion = (key: keyof typeof modules) => {
+    // Fixed Structured Section Panels (Zero Accordion Jumping/Collapsing)
+    const renderSectionPanel = (key: keyof typeof modules) => {
         const meta = categoryMeta[key];
         const allItems = modules[key];
 
         const isOwnerOrAdmin = !adminProfile || ['admin', 'super_admin'].includes(adminProfile?.role) || adminProfile?.email?.toLowerCase().includes('abumafhal') || adminProfile?.email?.toLowerCase().includes('admin');
         const items = isOwnerOrAdmin ? allItems : allItems.filter(item => !isModuleHiddenForStaff(item.route));
 
-        const isExpanded = expandedSections[key];
+        if (items.length === 0) return null;
         
         return (
             <View key={key} style={s.accordionCard}>
-                <TouchableOpacity
-                    onPress={() => toggleSection(key)}
-                    style={[
-                        s.accordionHeader,
-                        isExpanded && s.accordionHeaderExpanded
-                    ]}
-                    activeOpacity={0.85}
-                >
+                <View style={s.accordionHeader}>
                     <View style={s.accordionHeaderLeft}>
                         <View style={[
                             s.accordionIconBg,
-                            { backgroundColor: key === 'redZone' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 166, 35, 0.1)' }
+                            { backgroundColor: key === 'redZone' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(15, 23, 42, 0.06)' }
                         ]}>
                             <Ionicons 
                                 name={meta.icon as any} 
-                                size={18} 
-                                color={meta.color} 
+                                size={14} 
+                                color={key === 'redZone' ? '#EF4444' : '#0F172A'} 
                             />
                         </View>
-                        <View style={{ marginLeft: 12 }}>
+                        <View style={{ marginLeft: 10 }}>
                             <Text style={s.accordionTitle}>{meta.title}</Text>
                             <Text style={s.accordionSubtitle}>
                                 {items.length} module{items.length !== 1 ? 's' : ''}
@@ -330,60 +308,65 @@ export default function AdminBento() {
                                 </Text>
                             </View>
                         )}
-                        <Ionicons 
-                            name={isExpanded ? "chevron-up" : "chevron-down"} 
-                            size={18} 
-                            color={T.gold} 
-                        />
                     </View>
-                </TouchableOpacity>
+                </View>
 
-                {isExpanded && (
-                    <View style={s.accordionBody}>
-                        <View style={s.gridContainer}>
-                            {items.map((item, i) => {
-                                const isRedZoneModule = key === 'redZone' || item.route === '/manage/staff' || item.route === '/manage/features';
-                                const isLockedForAdmin = isRedZoneModule && adminProfile?.role !== 'super_admin';
+                <View style={s.accordionBody}>
+                    <View style={s.gridContainer}>
+                        {items.map((item, i) => {
+                            const isRedZoneModule = key === 'redZone' || item.route === '/manage/staff' || item.route === '/manage/features';
+                            const isLockedForAdmin = isRedZoneModule && adminProfile?.role !== 'super_admin';
 
-                                return (
-                                    <TouchableOpacity
-                                        key={i}
-                                        onPress={() => {
-                                            if (isLockedForAdmin) {
-                                                Alert.alert(
-                                                    'Access Restricted 🔒',
-                                                    'Only Super Admin (Master Key) has permission to access Security RedZone, Panic Room, or Staff HR.'
-                                                );
-                                                return;
-                                            }
-                                            router.push(item.route as any);
-                                        }}
-                                        style={[s.gridCard, isLockedForAdmin && { opacity: 0.6 }]}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={s.gridCardHeader}>
-                                            <View style={[s.iconBg, { backgroundColor: isLockedForAdmin ? '#ef444415' : item.color + '12' }]}>
-                                                <Ionicons name={isLockedForAdmin ? "lock-closed" : (item.icon as any)} size={14} color={isLockedForAdmin ? "#ef4444" : item.color} />
+                            return (
+                                <TouchableOpacity
+                                    key={i}
+                                    onPress={() => {
+                                        if (isLockedForAdmin) {
+                                            Alert.alert(
+                                                'Access Restricted 🔒',
+                                                'Only Super Admin (Master Key) has permission to access Security RedZone, Panic Room, or Staff HR.'
+                                            );
+                                            return;
+                                        }
+                                        router.push(item.route as any);
+                                    }}
+                                    style={[s.gridCard, isLockedForAdmin && { opacity: 0.55 }]}
+                                    activeOpacity={0.75}
+                                >
+                                    <View style={s.gridCardHeader}>
+                                        <View style={[s.iconBg, { backgroundColor: isLockedForAdmin ? 'rgba(239, 68, 68, 0.1)' : 'rgba(15, 23, 42, 0.05)' }]}>
+                                            <Ionicons name={isLockedForAdmin ? "lock-closed" : (item.icon as any)} size={13} color={isLockedForAdmin ? "#EF4444" : "#0F172A"} />
+                                        </View>
+                                        {(item as any).badge > 0 && (
+                                            <View style={s.badgeContainer}>
+                                                <Text style={s.badgeText}>{(item as any).badge}</Text>
                                             </View>
-                                            {(item as any).badge > 0 && (
-                                                <View style={s.badgeContainer}>
-                                                    <Text style={s.badgeText}>{(item as any).badge}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <View style={s.gridCardFooter}>
-                                            {(item as any).stat && <Text style={s.statText}>{(item as any).stat}</Text>}
-                                            <Text style={s.gridCardTitle} numberOfLines={1}>{item.title}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
+                                        )}
+                                    </View>
+                                    <View style={s.gridCardFooter}>
+                                        {(item as any).stat && <Text style={s.statText}>{(item as any).stat}</Text>}
+                                        <Text style={s.gridCardTitle} numberOfLines={1}>{item.title}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
-                )}
+                </View>
             </View>
         );
     };
+
+    const categoryTabs = [
+        { id: 'all', label: 'All Modules', icon: 'grid-outline' },
+        { id: 'operations', label: 'Operations', icon: 'options-outline' },
+        { id: 'banking', label: 'Banking', icon: 'wallet-outline' },
+        { id: 'finance', label: 'Finance', icon: 'stats-chart-outline' },
+        { id: 'technical', label: 'Technical', icon: 'terminal-outline', superOnly: true },
+        { id: 'internal', label: 'Internal', icon: 'business-outline' },
+        { id: 'redZone', label: 'Security', icon: 'shield-checkmark-outline', superOnly: true },
+    ];
+
+    const filteredCategoryTabs = categoryTabs.filter(t => !t.superOnly || adminProfile?.role === 'super_admin');
 
     return (
         <View style={s.container}>
@@ -453,7 +436,7 @@ export default function AdminBento() {
                             </View>
                         </View>
 
-                        {/* Welcome & Status Bar Row (No Collision Layout) */}
+                        {/* Welcome & Status Bar Row */}
                         <View style={s.welcomeStatusRow}>
                             <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 3 }}>
@@ -604,14 +587,46 @@ export default function AdminBento() {
                     </View>
                 )}
 
-                {/* Bento Categories Accordion Grid */}
+                {/* Enterprise Category Segment Tabs */}
+                <View style={{ marginTop: 14, marginBottom: 4, paddingHorizontal: 12 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                        {filteredCategoryTabs.map(tab => {
+                            const isSelected = activeCategoryTab === tab.id;
+                            return (
+                                <TouchableOpacity
+                                    key={tab.id}
+                                    onPress={() => setActiveCategoryTab(tab.id)}
+                                    style={{
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 5,
+                                        borderRadius: 10,
+                                        borderWidth: 1,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        backgroundColor: isSelected ? '#0F172A' : '#FFFFFF',
+                                        borderColor: isSelected ? '#0F172A' : 'rgba(218, 165, 32, 0.3)'
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name={tab.icon as any} size={12} color={isSelected ? '#FFD700' : '#64748B'} />
+                                    <Text style={{ fontSize: 10, fontWeight: '800', color: isSelected ? '#FFD700' : '#334155' }}>
+                                        {tab.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
+                {/* Fixed Non-Collapsible Category Panels */}
                 <View style={s.bentoGridSection}>
-                    {renderSectionAccordion('operations')}
-                    {renderSectionAccordion('banking')}
-                    {renderSectionAccordion('finance')}
-                    {adminProfile?.role === 'super_admin' && renderSectionAccordion('technical')}
-                    {renderSectionAccordion('internal')}
-                    {adminProfile?.role === 'super_admin' && renderSectionAccordion('redZone')}
+                    {(activeCategoryTab === 'all' || activeCategoryTab === 'operations') && renderSectionPanel('operations')}
+                    {(activeCategoryTab === 'all' || activeCategoryTab === 'banking') && renderSectionPanel('banking')}
+                    {(activeCategoryTab === 'all' || activeCategoryTab === 'finance') && renderSectionPanel('finance')}
+                    {adminProfile?.role === 'super_admin' && (activeCategoryTab === 'all' || activeCategoryTab === 'technical') && renderSectionPanel('technical')}
+                    {(activeCategoryTab === 'all' || activeCategoryTab === 'internal') && renderSectionPanel('internal')}
+                    {adminProfile?.role === 'super_admin' && (activeCategoryTab === 'all' || activeCategoryTab === 'redZone') && renderSectionPanel('redZone')}
                 </View>
 
             </ScrollView>
