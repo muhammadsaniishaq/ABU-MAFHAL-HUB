@@ -884,8 +884,8 @@ export default function SuperAdminMasterHubScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                onPress={() => router.push('/manage/secrets')}
-                style={[s.redCard, { borderColor: '#ddd6fe' }]}
+                onPress={() => router.push('/manage/api')}
+                style={[s.redCard, { borderColor: '#DAA520' }]}
                 activeOpacity={0.8}
               >
                 <View style={[s.redIconCircle, { backgroundColor: '#f5f3ff' }]}>
