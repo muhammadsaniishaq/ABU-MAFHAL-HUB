@@ -1,24 +1,44 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, SafeAreaView, StyleSheet, Dimensions, Switch, TextInput } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { 
+    View, Text, TouchableOpacity, ScrollView, Platform, 
+    ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCryptoManager } from '../../hooks/useCryptoManager';
+import * as Clipboard from 'expo-clipboard';
 
-const { width } = Dimensions.get('window');
-const T = {
-    navy: '#0d1b3e',
-    navyDark: '#060d21',
-    gold: '#f5a623',
-    goldLight: '#fde047',
-    green: '#10B981',
-    red: '#EF4444',
-    bg: '#f8fafc',
-    card: '#ffffff'
+// Ultra Premium Compact LIGHT Navy & Gold Design Tokens
+const L = {
+    bg: '#F4F6FB',
+    card: '#FFFFFF',
+    cardBorder: 'rgba(218, 165, 32, 0.4)',
+    navyHeader: '#0F172A',
+    navyMid: '#1C2541',
+    navyDark: '#0B132B',
+    gold: '#FFD700',
+    goldDk: '#DAA520',
+    goldAmber: '#D97706',
+    goldLight: '#FEF3C7',
+    goldBg: 'rgba(254, 243, 199, 0.65)',
+    textPrimary: '#0F172A',
+    textSecondary: '#334155',
+    textMuted: '#64748B',
+    inputBg: '#FFFFFF',
+    inputBorder: '#E2E8F0',
+    emerald: '#10B981',
+    emeraldBg: '#ECFDF5',
+    emeraldBorder: '#A7F3D0',
+    rose: '#E11D48',
+    roseBg: '#FFF1F2',
+    roseBorder: '#FECDD3',
 };
 
-export default function CryptoManager() {
+export default function CryptoManagerScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { 
         settings, 
         stats, 
@@ -31,21 +51,26 @@ export default function CryptoManager() {
         updateUserBalance,
         livePrices,
         p2pOrders,
-        fetchP2pOrders,
         resolveP2pDispute
     } = useCryptoManager();
     
     const [activeTab, setActiveTab] = useState('overview');
-
-    // State for new features
     const [tradeHistory, setTradeHistory] = useState<any[]>([]);
     const [userWallets, setUserWallets] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
     const [isFetchingData, setIsFetchingData] = useState(false);
 
-    // Local state for text inputs to avoid jumping during typing
+    // Fee settings local state
     const [feeTrc20, setFeeTrc20] = useState('');
     const [feeBtc, setFeeBtc] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // Fund user modal state
+    const [selectedUserForFund, setSelectedUserForFund] = useState<any | null>(null);
+    const [fundCoin, setFundCoin] = useState('USDT');
+    const [fundAmount, setFundAmount] = useState('');
+    const [fundingUser, setFundingUser] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'history') loadHistory();
@@ -53,643 +78,581 @@ export default function CryptoManager() {
         if (activeTab === 'withdrawals') loadWithdrawals();
     }, [activeTab]);
 
-    const loadHistory = async () => { setIsFetchingData(true); setTradeHistory(await fetchTradeHistory()); setIsFetchingData(false); };
-    const loadWallets = async () => { setIsFetchingData(true); setUserWallets(await fetchUserWallets()); setIsFetchingData(false); };
-    const loadWithdrawals = async () => { setIsFetchingData(true); setWithdrawals(await fetchPendingWithdrawalsList()); setIsFetchingData(false); };
-
-    const handleApprove = async (id: string) => {
-        await approveWithdrawal(id);
-        loadWithdrawals(); // refresh list
-    };
-
-    const handleFundUser = async (userId: string, coin: string, amount: number) => {
-        await updateUserBalance(userId, coin, amount);
-        loadWallets(); // refresh balances
-    };
-
     useEffect(() => {
         setFeeTrc20(settings.crypto_fee_trc20_usdt || '1.5');
         setFeeBtc(settings.crypto_fee_btc || '0.0005');
     }, [settings.crypto_fee_trc20_usdt, settings.crypto_fee_btc]);
 
+    const showToast = (msg: string) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
+    };
+
+    const loadHistory = async () => { 
+        setIsFetchingData(true); 
+        const h = await fetchTradeHistory();
+        setTradeHistory(h || []); 
+        setIsFetchingData(false); 
+    };
+
+    const loadWallets = async () => { 
+        setIsFetchingData(true); 
+        const w = await fetchUserWallets();
+        setUserWallets(w || []); 
+        setIsFetchingData(false); 
+    };
+
+    const loadWithdrawals = async () => { 
+        setIsFetchingData(true); 
+        const list = await fetchPendingWithdrawalsList();
+        setWithdrawals(list || []); 
+        setIsFetchingData(false); 
+    };
+
+    const handleApproveWithdrawal = async (id: string) => {
+        await approveWithdrawal(id);
+        showToast("Withdrawal approved successfully! ⚡");
+        loadWithdrawals();
+    };
+
+    const handleFundUserSubmit = async () => {
+        if (!selectedUserForFund || !fundAmount.trim()) {
+            Alert.alert('Error', 'Please enter a valid amount');
+            return;
+        }
+        setFundingUser(true);
+        try {
+            const amt = parseFloat(fundAmount.trim());
+            await updateUserBalance(selectedUserForFund.user_id, fundCoin.toLowerCase(), amt);
+            Alert.alert('Success 🎉', `Updated ${fundCoin} balance for ${selectedUserForFund.user?.email || 'user'}`);
+            setSelectedUserForFund(null);
+            setFundAmount('');
+            loadWallets();
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not update user balance');
+        } finally {
+            setFundingUser(false);
+        }
+    };
+
     const handleSaveFees = () => {
         updateSetting('crypto_fee_trc20_usdt', feeTrc20);
         updateSetting('crypto_fee_btc', feeBtc);
-        alert('Fees Updated Successfully!');
+        Alert.alert('Success 🎉', 'Crypto Transaction Fees Updated!');
+        showToast("Fees Updated! ⚡");
     };
 
+    const copyText = (text: string, label: string) => {
+        if (!text) return;
+        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(text);
+        } else {
+            Clipboard.setString(text);
+        }
+        showToast(`Copied ${label}! ✨`);
+    };
+
+    const tabs = [
+        { id: 'overview', label: 'Overview', icon: 'pie-chart-outline' },
+        { id: 'users', label: 'Wallets', icon: 'people-outline' },
+        { id: 'history', label: 'Trades', icon: 'swap-horizontal-outline' },
+        { id: 'withdrawals', label: `Pending (${stats.pendingWithdrawals || 0})`, icon: 'time-outline', badge: stats.pendingWithdrawals },
+        { id: 'rates', label: 'Fees & Rates', icon: 'options-outline' },
+        { id: 'p2p', label: 'P2P Escrow', icon: 'shield-checkmark-outline' },
+        { id: 'networks', label: 'Nodes RPC', icon: 'server-outline' }
+    ];
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: L.bg, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator color={L.goldDk} size="small" />
+                <Text style={{ color: L.navyHeader, marginTop: 10, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>Loading Crypto Command...</Text>
+            </View>
+        );
+    }
+
     return (
-        <View style={s.container}>
+        <View style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Ultra Premium Cinematic Header */}
-            <LinearGradient colors={[T.navyDark, '#0f172a', '#1e293b']} style={s.header}>
-                <View style={s.glowOrb} />
-                <View style={s.glowOrb2} />
-                <View style={s.glowOrb3} />
-                <SafeAreaView>
-                    <View style={s.headerContent}>
-                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-                            <Ionicons name="arrow-back" size={20} color="#ffffff" />
-                        </TouchableOpacity>
-                        <View style={{ flex: 1, alignItems: 'center' }}>
-                            <Text style={s.headerScreenTitle}>Crypto Command</Text>
-                            <Text style={s.headerScreenSubtitle}>Advanced Asset Management</Text>
-                        </View>
-                        <TouchableOpacity style={s.headerActionBtn}>
-                            <Ionicons name="notifications-outline" size={20} color={T.gold} />
-                            {stats.pendingWithdrawals > 0 && <View style={s.badge} />}
-                        </TouchableOpacity>
-                    </View>
-
-                </SafeAreaView>
-                <View style={s.headerBottomStrip} />
-            </LinearGradient>
-
-            {/* Custom Tab Bar */}
-            <View style={s.tabBarContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
-                    {['overview', 'users', 'history', 'withdrawals', 'rates', 'p2p', 'networks'].map((tab) => (
-                        <TouchableOpacity 
-                            key={tab} 
-                            onPress={() => setActiveTab(tab)}
-                            style={[s.tabBtn, activeTab === tab && s.tabBtnActive]}
-                        >
-                            <Text style={[s.tabTxt, activeTab === tab && s.tabTxtActive]}>
-                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            <ScrollView style={s.scrollView} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                 
-                {activeTab === 'overview' && (
-                    <>
-                        {/* Elite Stats View */}
-                        <View style={s.statsCard}>
-                            <View style={s.statBox}>
-                                <Text style={s.statLabel}>24h Volume</Text>
-                                <Text style={s.statValueDark}>₦ {stats.totalVolume24h.toLocaleString()}</Text>
-                                <View style={s.trendTag}>
-                                    <Ionicons name="caret-up" size={10} color="#10B981" />
-                                    <Text style={s.trendTagTxt}>Live</Text>
-                                </View>
-                            </View>
-                            <View style={s.statDividerDark} />
-                            <View style={s.statBox}>
-                                <Text style={s.statLabel}>Total Liquidity</Text>
-                                <Text style={s.statValueDark}>${stats.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-                                <View style={[s.trendTag, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-                                    <Ionicons name="checkmark-circle" size={10} color="#10B981" />
-                                    <Text style={[s.trendTagTxt, { color: '#10B981' }]}>Live</Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={s.chartCard}>
-                            <View style={s.chartHeader}>
-                                <Text style={s.chartTitle}>Platform Revenue (7D)</Text>
-                                <Ionicons name="bar-chart" size={20} color="#64748B" />
-                            </View>
-                            <LinearGradient colors={['rgba(245,166,35,0.2)', 'transparent']} style={s.chartGraphBox}>
-                                <Text style={s.chartAmount}>₦ {stats.totalRevenue7d.toLocaleString()}</Text>
-                                <Text style={s.chartSub}>Total accumulated fees from transactions</Text>
-                                <View style={s.graphLine} />
-                            </LinearGradient>
-                        </View>
-
-                        <View style={s.quickGrid}>
-                            <TouchableOpacity style={s.quickCard}>
-                                <LinearGradient colors={['rgba(59,130,246,0.1)', 'transparent']} style={s.quickCardBg} />
-                                <View style={[s.quickIconBox, { backgroundColor: '#3B82F6' }]}>
-                                    <Ionicons name="wallet" size={20} color="#fff" />
-                                </View>
-                                <Text style={s.quickCardTitle}>User Balances</Text>
-                                <Text style={s.quickCardSub}>View active wallets</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={s.quickCard}>
-                                <LinearGradient colors={['rgba(239,68,68,0.1)', 'transparent']} style={s.quickCardBg} />
-                                <View style={[s.quickIconBox, { backgroundColor: '#EF4444' }]}>
-                                    <Ionicons name="warning" size={20} color="#fff" />
-                                </View>
-                                <Text style={s.quickCardTitle}>Disputes</Text>
-                                <Text style={s.quickCardSub}>{stats.p2pDisputed} Escrow claims</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {stats.pendingWithdrawals > 0 && (
-                            <View style={s.alertCard}>
-                                <LinearGradient colors={['#FEF2F2', '#FEF2F2']} style={[StyleSheet.absoluteFillObject, { borderRadius: 16 }]} />
-                                <View style={s.alertIconBox}>
-                                    <Ionicons name="time" size={24} color="#EF4444" />
-                                </View>
-                                <View style={{ flex: 1, paddingLeft: 12 }}>
-                                    <Text style={s.alertTitle}>{stats.pendingWithdrawals} Pending Withdrawals</Text>
-                                    <Text style={s.alertDesc}>High value withdrawals requiring manual approval from admin.</Text>
-                                    <TouchableOpacity style={s.alertAction}>
-                                        <Text style={s.alertActionTxt}>Review Queue</Text>
-                                        <Ionicons name="arrow-forward" size={14} color="#EF4444" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        )}
-                    </>
-                )}
-                {activeTab === 'history' && (
-                    <View style={{ gap: 16 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text style={s.sectionTitle}>Recent Trades & Swaps</Text>
-                            <TouchableOpacity style={{ backgroundColor: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#475569' }}>View All</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={s.card}>
-                            {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading history...</Text> : tradeHistory.map((trade: any, index: number) => (
-                                <View key={trade.id || index} style={s.historyRow}>
-                                    <View style={[s.historyIcon, { backgroundColor: trade.trade_type === 'buy' ? '#D1FAE5' : '#FEE2E2' }]}>
-                                        <Ionicons name={trade.trade_type === 'buy' ? 'arrow-down' : 'arrow-up'} size={18} color={trade.trade_type === 'buy' ? T.green : T.red} />
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={s.historyTitle}>{trade.trade_type.toUpperCase()} {trade.coin}</Text>
-                                        <Text style={s.historySub}>{trade.user?.email || 'Unknown User'}</Text>
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
-                                        <Text style={s.historyAmt}>₦{trade.fiat_value?.toLocaleString()}</Text>
-                                        <View style={[s.statusBadge, { backgroundColor: trade.status === 'completed' ? '#D1FAE5' : '#FEF3C7' }]}>
-                                            <Text style={[s.historyStatus, { color: trade.status === 'completed' ? T.green : '#D97706', marginTop: 0 }]}>{trade.status}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            ))}
-                            {tradeHistory.length === 0 && !isFetchingData && <Text style={{padding: 20, textAlign: 'center', color: '#64748B'}}>No trade history found</Text>}
-                        </View>
+                {/* Toast Notification */}
+                {toastMsg && (
+                    <View style={{ position: 'absolute', top: insets.top + 6, left: 12, right: 12, zIndex: 60, backgroundColor: L.navyHeader, borderColor: L.gold, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 8 }}>
+                        <Ionicons name="sparkles" size={14} color={L.gold} />
+                        <Text style={{ color: L.goldLight, fontWeight: 'bold', fontSize: 10, flex: 1 }}>{toastMsg}</Text>
                     </View>
                 )}
 
-                {activeTab === 'users' && (
-                    <View style={{ gap: 16 }}>
-                        <Text style={s.sectionTitle}>User Balances Management</Text>
-                        {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading wallets...</Text> : userWallets.map((wallet: any, index: number) => (
-                            <View key={wallet.user_id || index} style={[s.card, { padding: 0, overflow: 'hidden' }]}>
-                                <LinearGradient colors={[T.navy, '#1e3a8a']} style={{ padding: 16 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#ffffff30', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="person" size={20} color="#fff" />
-                                        </View>
-                                        <View style={{ marginLeft: 12 }}>
-                                            <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>User Account</Text>
-                                            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{wallet.user?.email || 'Unknown User'}</Text>
-                                            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '600', marginTop: 2 }}>
-                                                Total Est: ${(
-                                                    (Number(wallet.usdt_balance) || 0) + 
-                                                    ((Number(wallet.btc_balance) || 0) * livePrices.btc) + 
-                                                    ((Number(wallet.eth_balance) || 0) * livePrices.eth) + 
-                                                    ((Number(wallet.fiat_balance) || 0) / 1600)
-                                                ).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                            </Text>
-                                        </View>
+                {/* Compact Royal Navy Header */}
+                <LinearGradient 
+                    colors={['#0F172A', '#1C2541', '#0B132B']} 
+                    style={{ paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 14, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, borderBottomWidth: 1.5, borderColor: L.goldDk }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <TouchableOpacity onPress={() => router.back()} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="arrow-back" size={16} color={L.gold} />
+                        </TouchableOpacity>
+                        
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Ionicons name="logo-bitcoin" size={12} color={L.gold} />
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Crypto Core</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => router.push('/manage/api')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <Ionicons name="key" size={12} color={L.gold} />
+                                <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 9 }}>API Keys →</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <Text style={{ color: L.gold, fontSize: 16, fontWeight: '900', letterSpacing: -0.3, marginBottom: 1 }}>CRYPTO ASSETS & TRADING CONTROL</Text>
+                    <Text style={{ color: '#CBD5E1', fontSize: 10 }}>Live exchange rates, multi-chain wallets, pending withdrawals & P2P escrow.</Text>
+                </LinearGradient>
+
+                {/* Compact Horizontal Category Tab Navigation */}
+                <View style={{ backgroundColor: L.bg, borderBottomWidth: 1, borderColor: L.inputBorder, paddingVertical: 6 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 12 }} contentContainerStyle={{ gap: 6 }}>
+                        {tabs.map((tab) => {
+                            const isSelected = activeTab === tab.id;
+                            return (
+                                <TouchableOpacity 
+                                    key={tab.id}
+                                    onPress={() => setActiveTab(tab.id)}
+                                    style={{
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 5,
+                                        borderRadius: 10,
+                                        borderWidth: 1,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        backgroundColor: isSelected ? L.navyHeader : L.card,
+                                        borderColor: isSelected ? L.navyHeader : L.inputBorder
+                                    }}
+                                >
+                                    <Ionicons name={tab.icon as any} size={12} color={isSelected ? L.gold : L.textSecondary} />
+                                    <Text style={{ fontSize: 10, fontWeight: '800', color: isSelected ? L.gold : L.textSecondary }}>
+                                        {tab.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
+                {/* Tab Content Body */}
+                <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 10 }} contentContainerStyle={{ paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
+
+                    {/* OVERVIEW TAB */}
+                    {activeTab === 'overview' && (
+                        <View style={{ gap: 10 }}>
+                            {/* Stats Summary Grid */}
+                            <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+                                <View style={{ alignItems: 'center', flex: 1 }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>24h Trading Vol</Text>
+                                    <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>₦{stats.totalVolume24h.toLocaleString()}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginTop: 3 }}>
+                                        <Ionicons name="caret-up" size={8} color={L.emerald} />
+                                        <Text style={{ color: L.emerald, fontSize: 8, fontWeight: 'bold', marginLeft: 2 }}>Live</Text>
                                     </View>
-                                </LinearGradient>
-                                <View style={{ padding: 16 }}>
-                                    <View style={s.balanceGrid}>
-                                        <View style={s.balanceItem}>
-                                            <Text style={s.balLabel}>BTC</Text>
-                                            <Text style={s.balValue}>{wallet.btc_balance || 0}</Text>
-                                        </View>
-                                        <View style={s.balanceItem}>
-                                            <Text style={s.balLabel}>USDT</Text>
-                                            <Text style={s.balValue}>{wallet.usdt_balance || 0}</Text>
-                                        </View>
-                                        <View style={s.balanceItem}>
-                                            <Text style={s.balLabel}>ETH</Text>
-                                            <Text style={s.balValue}>{wallet.eth_balance || 0}</Text>
-                                        </View>
-                                    </View>
-                                    <View style={s.fundActions}>
-                                        <TouchableOpacity style={[s.fundBtn, { backgroundColor: '#F0F9FF' }]} onPress={() => handleFundUser(wallet.user_id, 'USDT', 10)}>
-                                            <Ionicons name="add-circle" size={16} color="#0284C7" style={{ marginBottom: 4 }} />
-                                            <Text style={[s.fundBtnTxt, { color: '#0284C7' }]}>Credit 10 USDT</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={[s.fundBtn, { backgroundColor: '#FEF2F2' }]} onPress={() => handleFundUser(wallet.user_id, 'USDT', -10)}>
-                                            <Ionicons name="remove-circle" size={16} color="#DC2626" style={{ marginBottom: 4 }} />
-                                            <Text style={[s.fundBtnTxt, { color: '#DC2626' }]}>Debit 10 USDT</Text>
-                                        </TouchableOpacity>
+                                </View>
+                                <View style={{ width: 1, height: 26, backgroundColor: L.inputBorder }} />
+                                <View style={{ alignItems: 'center', flex: 1 }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Total Liquidity</Text>
+                                    <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>${stats.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.emeraldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginTop: 3 }}>
+                                        <Ionicons name="checkmark-circle" size={8} color={L.emerald} />
+                                        <Text style={{ color: L.emerald, fontSize: 8, fontWeight: 'bold', marginLeft: 2 }}>Synced</Text>
                                     </View>
                                 </View>
                             </View>
-                        ))}
-                        {userWallets.length === 0 && !isFetchingData && <Text style={{padding: 20, textAlign: 'center', color: '#64748B'}}>No wallets found</Text>}
-                    </View>
-                )}
 
-                {activeTab === 'withdrawals' && (
-                    <View style={{ gap: 16 }}>
-                        <Text style={s.sectionTitle}>Withdrawals Queue</Text>
-                        <View style={s.card}>
-                            {isFetchingData ? <Text style={{padding: 20, textAlign: 'center'}}>Loading withdrawals...</Text> : withdrawals.map((tx: any, index: number) => (
-                                <View key={tx.id || index} style={s.historyRow}>
-                                    <View style={[s.historyIcon, { backgroundColor: '#FEF3C7' }]}>
-                                        <Ionicons name="time" size={18} color="#D97706" />
-                                    </View>
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={s.historyTitle}>Withdrawal Request</Text>
-                                        <Text style={s.historySub}>{tx.user?.email || 'Unknown User'}</Text>
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                                        <Text style={s.historyAmt}>₦{tx.amount?.toLocaleString()}</Text>
-                                        <TouchableOpacity style={s.approveBtn} onPress={() => handleApprove(tx.id)}>
-                                            <Ionicons name="checkmark-circle" size={14} color="#fff" />
-                                            <Text style={s.approveBtnTxt}>Approve</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                            {/* Revenue Card */}
+                            <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>PLATFORM CRYPTO REVENUE (7D)</Text>
+                                    <Ionicons name="bar-chart-outline" size={14} color={L.goldDk} />
                                 </View>
-                            ))}
-                            {withdrawals.length === 0 && !isFetchingData && (
-                                <View style={{ padding: 40, alignItems: 'center' }}>
-                                    <Ionicons name="checkmark-done-circle-outline" size={48} color="#E2E8F0" />
-                                    <Text style={{ marginTop: 12, color: '#94A3B8', fontWeight: '600' }}>Queue is empty. You're all caught up!</Text>
+                                <Text style={{ color: L.goldAmber, fontSize: 20, fontWeight: '900' }}>₦{stats.totalRevenue7d.toLocaleString()}</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>Accumulated fees from user trades, swaps & withdrawals.</Text>
+                            </View>
+
+                            {/* Pending Alert Banner */}
+                            {stats.pendingWithdrawals > 0 && (
+                                <TouchableOpacity 
+                                    onPress={() => setActiveTab('withdrawals')}
+                                    style={{ backgroundColor: L.roseBg, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: L.roseBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.rose, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="warning" size={14} color="#FFFFFF" />
+                                        </View>
+                                        <View>
+                                            <Text style={{ color: L.rose, fontWeight: '900', fontSize: 11 }}>{stats.pendingWithdrawals} Pending Withdrawals</Text>
+                                            <Text style={{ color: L.textSecondary, fontSize: 9 }}>Requires manual admin review & approval</Text>
+                                        </View>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={15} color={L.rose} />
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Quick Action Navigation Buttons */}
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity 
+                                    onPress={() => setActiveTab('users')}
+                                    style={{ flex: 1, backgroundColor: L.card, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                >
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="wallet-outline" size={14} color={L.gold} />
+                                    </View>
+                                    <View>
+                                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10 }}>User Wallets</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Manage balances</Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    onPress={() => setActiveTab('p2p')}
+                                    style={{ flex: 1, backgroundColor: L.card, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                >
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="shield-checkmark-outline" size={14} color={L.gold} />
+                                    </View>
+                                    <View>
+                                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10 }}>P2P Escrow</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>{stats.p2pDisputed || 0} Disputes</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* USER WALLETS TAB */}
+                    {activeTab === 'users' && (
+                        <View style={{ gap: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>User Crypto Wallets</Text>
+                                <TouchableOpacity onPress={loadWallets} style={{ backgroundColor: L.card, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: 'bold' }}>Refresh</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {isFetchingData ? (
+                                <ActivityIndicator size="small" color={L.goldDk} style={{ marginTop: 20 }} />
+                            ) : userWallets.length === 0 ? (
+                                <View style={{ backgroundColor: L.card, padding: 20, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 10 }}>No user wallets loaded.</Text>
                                 </View>
+                            ) : (
+                                userWallets.map((wallet: any, idx: number) => {
+                                    const usdt = Number(wallet.usdt_balance) || 0;
+                                    const btc = Number(wallet.btc_balance) || 0;
+                                    const eth = Number(wallet.eth_balance) || 0;
+                                    const fiat = Number(wallet.fiat_balance) || 0;
+                                    const estVal = (usdt + (btc * (livePrices.btc || 65000)) + (eth * (livePrices.eth || 3500)) + (fiat / 1600)).toFixed(2);
+
+                                    return (
+                                        <View key={wallet.user_id || idx} style={{ backgroundColor: L.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{wallet.user?.email || 'Unknown User'}</Text>
+                                                    <Text style={{ color: L.goldAmber, fontWeight: '800', fontSize: 9, marginTop: 1 }}>Est. Value: ~${estVal}</Text>
+                                                </View>
+                                                <TouchableOpacity 
+                                                    onPress={() => setSelectedUserForFund(wallet)}
+                                                    style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                                                >
+                                                    <Ionicons name="cash-outline" size={10} color={L.gold} />
+                                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9 }}>Update Balance</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Balances Grid */}
+                                            <View style={{ flexDirection: 'row', backgroundColor: L.bg, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, justifyContent: 'space-around' }}>
+                                                <View style={{ alignItems: 'center' }}>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>USDT</Text>
+                                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', marginTop: 1 }}>{usdt.toFixed(2)}</Text>
+                                                </View>
+                                                <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
+                                                <View style={{ alignItems: 'center' }}>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>BTC</Text>
+                                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', marginTop: 1 }}>{btc.toFixed(4)}</Text>
+                                                </View>
+                                                <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
+                                                <View style={{ alignItems: 'center' }}>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>ETH</Text>
+                                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', marginTop: 1 }}>{eth.toFixed(4)}</Text>
+                                                </View>
+                                                <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
+                                                <View style={{ alignItems: 'center' }}>
+                                                    <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>FIAT (NGN)</Text>
+                                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', marginTop: 1 }}>₦{fiat.toLocaleString()}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })
                             )}
                         </View>
-                    </View>
-                )}
+                    )}
 
-                {activeTab === 'rates' && (
-                    <>
-                        <Text style={s.sectionTitle}>Asset Listing & Margins</Text>
-                        <View style={s.card}>
-                            {/* BTC */}
-                            <View style={s.coinRow}>
-                                <View style={s.coinInfo}>
-                                    <View style={[s.coinIcon, { backgroundColor: '#FFF7E6' }]}>
-                                        <Ionicons name="logo-bitcoin" size={22} color="#F7931A" />
-                                    </View>
-                                    <View>
-                                        <Text style={s.coinName}>Bitcoin (BTC)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_btc_buy || '86.5M'} | Sell: ₦{settings.crypto_rate_btc_sell || '85.0M'}</Text>
-                                    </View>
-                                </View>
-                                <Switch 
-                                    value={settings.crypto_enabled_btc} 
-                                    onValueChange={(v) => updateSetting('crypto_enabled_btc', v)}
-                                    trackColor={{ false: '#e2e8f0', true: '#10B981' }}
-                                    thumbColor="#fff"
-                                    disabled={loading}
-                                />
-                            </View>
-                            <View style={s.divider} />
-
-                            {/* USDT */}
-                            <View style={s.coinRow}>
-                                <View style={s.coinInfo}>
-                                    <View style={[s.coinIcon, { backgroundColor: '#E6F6EC' }]}>
-                                        <Ionicons name="logo-usd" size={22} color="#26A17B" />
-                                    </View>
-                                    <View>
-                                        <Text style={s.coinName}>Tether (USDT)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_usdt_buy || '1,480'} | Sell: ₦{settings.crypto_rate_usdt_sell || '1,460'}</Text>
-                                    </View>
-                                </View>
-                                <Switch 
-                                    value={settings.crypto_enabled_usdt} 
-                                    onValueChange={(v) => updateSetting('crypto_enabled_usdt', v)}
-                                    trackColor={{ false: '#e2e8f0', true: '#10B981' }}
-                                    thumbColor="#fff"
-                                    disabled={loading}
-                                />
-                            </View>
-                            <View style={s.divider} />
-
-                            {/* ETH */}
-                            <View style={s.coinRow}>
-                                <View style={s.coinInfo}>
-                                    <View style={[s.coinIcon, { backgroundColor: '#F1F5F9' }]}>
-                                        <MaterialCommunityIcons name="ethereum" size={22} color="#627EEA" />
-                                    </View>
-                                    <View>
-                                        <Text style={s.coinName}>Ethereum (ETH)</Text>
-                                        <Text style={s.coinRate}>Buy: ₦{settings.crypto_rate_eth_buy || '4.5M'} | Sell: ₦{settings.crypto_rate_eth_sell || '4.3M'}</Text>
-                                    </View>
-                                </View>
-                                <Switch 
-                                    value={settings.crypto_enabled_eth} 
-                                    onValueChange={(v) => updateSetting('crypto_enabled_eth', v)}
-                                    trackColor={{ false: '#e2e8f0', true: '#10B981' }}
-                                    thumbColor="#fff"
-                                />
+                    {/* TRADE HISTORY TAB */}
+                    {activeTab === 'history' && (
+                        <View style={{ gap: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Recent Trades & Swaps</Text>
+                                <TouchableOpacity onPress={loadHistory} style={{ backgroundColor: L.card, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: 'bold' }}>Refresh</Text>
+                                </TouchableOpacity>
                             </View>
 
-                            <TouchableOpacity style={s.updateRatesBtn}>
-                                <Ionicons name="create-outline" size={16} color="#fff" />
-                                <Text style={s.updateRatesTxt}>Update Market Rates</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                )}
-
-                {activeTab === 'networks' && (
-                    <>
-                        <Text style={s.sectionTitle}>Global Engine Control</Text>
-                        <View style={s.card}>
-                            <View style={s.coinRow}>
-                                <View style={s.coinInfo}>
-                                    <View style={[s.coinIcon, { backgroundColor: '#FEE2E2' }]}>
-                                        <Ionicons name="power" size={22} color="#EF4444" />
-                                    </View>
-                                    <View>
-                                        <Text style={[s.coinName, { color: '#EF4444' }]}>Maintenance Mode</Text>
-                                        <Text style={s.coinRate}>Disable all crypto features for users</Text>
-                                    </View>
+                            {isFetchingData ? (
+                                <ActivityIndicator size="small" color={L.goldDk} style={{ marginTop: 20 }} />
+                            ) : tradeHistory.length === 0 ? (
+                                <View style={{ backgroundColor: L.card, padding: 20, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 10 }}>No trade history found.</Text>
                                 </View>
-                                <Switch 
-                                    value={settings.crypto_maintenance_mode} 
-                                    onValueChange={(v) => updateSetting('crypto_maintenance_mode', v)}
-                                    trackColor={{ false: '#e2e8f0', true: '#EF4444' }}
-                                    thumbColor="#fff"
-                                />
-                            </View>
-                        </View>
-
-                        <Text style={s.sectionTitle}>Feature Modules Control</Text>
-                        <View style={s.card}>
-                            {[
-                                { key: 'crypto_receive_enabled', name: 'Receive Crypto', desc: 'Allow users to generate deposit addresses', icon: 'arrow-down-circle' },
-                                { key: 'crypto_send_enabled', name: 'Send Crypto', desc: 'Allow users to withdraw to external wallets', icon: 'paper-plane' },
-                                { key: 'crypto_buy_enabled', name: 'Buy Crypto', desc: 'Allow purchasing crypto with fiat', icon: 'cart' },
-                                { key: 'crypto_sell_enabled', name: 'Sell Crypto', desc: 'Allow selling crypto for fiat', icon: 'cash' },
-                                { key: 'crypto_swap_enabled', name: 'Swap Crypto', desc: 'Allow exchanging between crypto assets', icon: 'swap-horizontal' },
-                                { key: 'crypto_earn_enabled', name: 'Earn', desc: 'Reward and earning features', icon: 'diamond' },
-                                { key: 'crypto_cards_enabled', name: 'Cards', desc: 'Crypto virtual cards', icon: 'card' },
-                                { key: 'crypto_stake_enabled', name: 'Stake', desc: 'Staking investments', icon: 'leaf' },
-                                { key: 'crypto_loan_enabled', name: 'Loan', desc: 'Crypto backed loans', icon: 'wallet' },
-                                { key: 'crypto_gift_enabled', name: 'Gift', desc: 'Send crypto gifts', icon: 'gift' },
-                                { key: 'crypto_gas_enabled', name: 'Gas', desc: 'Buy gas with fiat', icon: 'flame' },
-                                { key: 'crypto_qrpay_enabled', name: 'QR Pay', desc: 'Pay via QR code', icon: 'qr-code' },
-                                { key: 'crypto_history_enabled', name: 'History', desc: 'Transaction history', icon: 'time' },
-                                { key: 'crypto_support_enabled', name: 'Support', desc: 'Customer support chat', icon: 'chatbubbles' },
-                                { key: 'crypto_more_enabled', name: 'More', desc: 'Additional features menu', icon: 'apps' }
-                            ].map((feat, index) => (
-                                <View key={feat.key}>
-                                    <View style={s.coinRow}>
-                                        <View style={s.coinInfo}>
-                                            <View style={[s.coinIcon, { backgroundColor: '#F1F5F9' }]}>
-                                                <Ionicons name={feat.icon as any} size={18} color={T.navy} />
+                            ) : (
+                                tradeHistory.map((trade: any, idx: number) => (
+                                    <View key={trade.id || idx} style={{ backgroundColor: L.card, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: trade.trade_type === 'buy' ? L.emeraldBg : L.roseBg, alignItems: 'center', justifyContent: 'center' }}>
+                                                <Ionicons name={trade.trade_type === 'buy' ? "arrow-down" : "arrow-up"} size={14} color={trade.trade_type === 'buy' ? L.emerald : L.rose} />
                                             </View>
                                             <View>
-                                                <Text style={[s.coinName, { fontSize: 13 }]}>{feat.name}</Text>
-                                                <Text style={s.coinRate}>{feat.desc}</Text>
+                                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10 }}>{trade.trade_type?.toUpperCase()} {trade.coin}</Text>
+                                                <Text style={{ color: L.textMuted, fontSize: 8 }}>{trade.user?.email || 'User'}</Text>
                                             </View>
                                         </View>
-                                        <Switch 
-                                            value={settings[feat.key]} 
-                                            onValueChange={(v) => updateSetting(feat.key, v)}
-                                            trackColor={{ false: '#e2e8f0', true: '#10B981' }}
-                                            thumbColor="#fff"
-                                        />
+
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10 }}>₦{trade.fiat_value?.toLocaleString()}</Text>
+                                            <View style={{ backgroundColor: trade.status === 'completed' ? L.emeraldBg : L.goldLight, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginTop: 2 }}>
+                                                <Text style={{ color: trade.status === 'completed' ? L.emerald : L.goldAmber, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' }}>{trade.status}</Text>
+                                            </View>
+                                        </View>
                                     </View>
-                                    {index < 14 && <View style={s.divider} />}
-                                </View>
-                            ))}
+                                ))
+                            )}
                         </View>
+                    )}
 
-                        <Text style={s.sectionTitle}>Network & Gas Fees</Text>
-                        <View style={s.card}>
-                            <View style={s.feeRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.feeLabel}>TRC20 Withdrawal Fee</Text>
-                                    <Text style={s.feeSubLabel}>Tron Network</Text>
-                                </View>
-                                <View style={s.feeInputBox}>
-                                    <TextInput style={s.feeInput} value={feeTrc20} onChangeText={setFeeTrc20} keyboardType="numeric" />
-                                    <Text style={s.feeSuffix}>USDT</Text>
-                                </View>
+                    {/* PENDING WITHDRAWALS TAB */}
+                    {activeTab === 'withdrawals' && (
+                        <View style={{ gap: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Pending Crypto Withdrawals</Text>
+                                <TouchableOpacity onPress={loadWithdrawals} style={{ backgroundColor: L.card, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: 'bold' }}>Refresh</Text>
+                                </TouchableOpacity>
                             </View>
-                            <View style={s.divider} />
-                            <View style={s.feeRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.feeLabel}>BTC Withdrawal Fee</Text>
-                                    <Text style={s.feeSubLabel}>Bitcoin Network</Text>
-                                </View>
-                                <View style={s.feeInputBox}>
-                                    <TextInput style={s.feeInput} value={feeBtc} onChangeText={setFeeBtc} keyboardType="numeric" />
-                                    <Text style={s.feeSuffix}>BTC</Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity style={s.saveFeesBtn} onPress={handleSaveFees}>
-                                <Text style={s.saveFeesTxt}>{loading ? 'Saving...' : 'Save Fee Config'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                        
-                        <Text style={s.sectionTitle}>Exchange API Nodes</Text>
-                        <View style={s.card}>
-                            <View style={s.nodeRow}>
-                                <Ionicons name="server" size={18} color="#10B981" />
-                                <Text style={s.nodeTxt}>Binance Node (Primary)</Text>
-                                <View style={s.nodeStatus}><Text style={s.nodeStatusTxt}>Connected</Text></View>
-                            </View>
-                            <View style={s.nodeRow}>
-                                <Ionicons name="server" size={18} color="#64748B" />
-                                <Text style={s.nodeTxt}>Kraken Node (Backup)</Text>
-                                <View style={[s.nodeStatus, { backgroundColor: '#F1F5F9' }]}><Text style={[s.nodeStatusTxt, { color: '#64748B' }]}>Standby</Text></View>
-                            </View>
-                        </View>
-                    </>
-                )}
 
-                {activeTab === 'p2p' && (
-                    <>
-                        <Text style={s.sectionTitle}>P2P Engine Controls</Text>
-                        <View style={s.card}>
-                            <View style={s.p2pStatRow}>
-                                <View style={s.p2pStat}>
-                                    <Text style={s.p2pStatVal}>{stats.p2pCompleted}</Text>
-                                    <Text style={s.p2pStatLabel}>Completed</Text>
+                            {isFetchingData ? (
+                                <ActivityIndicator size="small" color={L.goldDk} style={{ marginTop: 20 }} />
+                            ) : withdrawals.length === 0 ? (
+                                <View style={{ backgroundColor: L.card, padding: 20, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Ionicons name="checkmark-circle-outline" size={24} color={L.emerald} />
+                                    <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 10, marginTop: 4 }}>No pending withdrawal approvals!</Text>
                                 </View>
-                                <View style={s.statDivider} />
-                                <View style={s.p2pStat}>
-                                    <Text style={[s.p2pStatVal, { color: '#f5a623' }]}>{stats.p2pPending}</Text>
-                                    <Text style={s.p2pStatLabel}>Pending</Text>
-                                </View>
-                                <View style={s.statDivider} />
-                                <View style={s.p2pStat}>
-                                    <Text style={[s.p2pStatVal, { color: '#EF4444' }]}>{stats.p2pDisputed}</Text>
-                                    <Text style={s.p2pStatLabel}>Disputed</Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity style={s.updateRatesBtn} onPress={() => fetchP2pOrders()}>
-                                <Ionicons name="refresh" size={16} color="#fff" />
-                                <Text style={s.updateRatesTxt}>Refresh P2P Orders</Text>
-                            </TouchableOpacity>
-
-                            <View style={{ marginTop: 24, gap: 16 }}>
-                                {p2pOrders.map((order) => (
-                                    <View key={order.id} style={[s.card, { padding: 16 }]}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                            <Text style={{ fontWeight: '800', color: T.navy }}>{order.coin || 'USDT'} Trade</Text>
-                                            <View style={[s.statusBadge, { backgroundColor: order.status === 'disputed' ? '#FEE2E2' : '#F1F5F9' }]}>
-                                                <Text style={[s.historyStatus, { color: order.status === 'disputed' ? T.red : '#64748B' }]}>{order.status.toUpperCase()}</Text>
+                            ) : (
+                                withdrawals.map((w: any, idx: number) => (
+                                    <View key={w.id || idx} style={{ backgroundColor: L.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.roseBorder }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            <View>
+                                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{w.amount} {w.coin?.toUpperCase()}</Text>
+                                                <Text style={{ color: L.textMuted, fontSize: 9 }}>User: {w.user?.email || w.user_id}</Text>
+                                            </View>
+                                            <View style={{ backgroundColor: L.roseBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: L.roseBorder }}>
+                                                <Text style={{ color: L.rose, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>PENDING REVIEW</Text>
                                             </View>
                                         </View>
-                                        <View style={{ gap: 4, marginBottom: 16 }}>
-                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Crypto Amount: <Text style={{ fontWeight: '700', color: T.navy }}>{order.crypto_amount} {order.coin}</Text></Text>
-                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Fiat Amount: <Text style={{ fontWeight: '700', color: T.navy }}>₦{order.fiat_amount?.toLocaleString()}</Text></Text>
-                                            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Buyer: <Text style={{ fontWeight: '600', color: '#000' }}>{order.buyer?.email || order.buyer_id}</Text></Text>
-                                            <Text style={{ fontSize: 12, color: '#64748B' }}>Seller: <Text style={{ fontWeight: '600', color: '#000' }}>{order.seller?.email || order.seller_id}</Text></Text>
+
+                                        <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 8 }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>DESTINATION ADDRESS ({w.network || 'TRC20'}):</Text>
+                                            <TouchableOpacity onPress={() => copyText(w.destination_address, 'Address')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                                                <Text style={{ color: L.navyHeader, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 9, flex: 1, marginRight: 6 }}>{w.destination_address}</Text>
+                                                <Ionicons name="copy-outline" size={12} color={L.navyHeader} />
+                                            </TouchableOpacity>
                                         </View>
+
+                                        <TouchableOpacity 
+                                            onPress={() => handleApproveWithdrawal(w.id)}
+                                            style={{ backgroundColor: L.navyHeader, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}
+                                        >
+                                            <Ionicons name="checkmark-circle-sharp" size={12} color={L.gold} />
+                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Approve & Dispatch</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))
+                            )}
+                        </View>
+                    )}
+
+                    {/* RATES & FEES TAB */}
+                    {activeTab === 'rates' && (
+                        <View style={{ gap: 10 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 }}>Crypto Exchange Fees & Profit Margins</Text>
+
+                            <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder }}>
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>USDT TRC20 Transaction Fee</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Fixed network fee deducted on USDT payouts.</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 10 }}>
+                                    <TextInput
+                                        value={feeTrc20}
+                                        onChangeText={setFeeTrc20}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>USDT</Text>
+                                </View>
+
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, marginBottom: 2 }}>Bitcoin (BTC) Transaction Fee</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 6 }}>Network miner fee for BTC transfers.</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 12 }}>
+                                    <TextInput
+                                        value={feeBtc}
+                                        onChangeText={setFeeBtc}
+                                        keyboardType="numeric"
+                                        style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                                    />
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>BTC</Text>
+                                </View>
+
+                                <TouchableOpacity 
+                                    onPress={handleSaveFees}
+                                    style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}
+                                >
+                                    <Ionicons name="save-outline" size={14} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Save Fee Settings</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* P2P ESCROW TAB */}
+                    {activeTab === 'p2p' && (
+                        <View style={{ gap: 10 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 }}>P2P Escrow Orders & Disputes</Text>
+
+                            {p2pOrders.length === 0 ? (
+                                <View style={{ backgroundColor: L.card, padding: 20, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 10 }}>No active P2P escrow disputes.</Text>
+                                </View>
+                            ) : (
+                                p2pOrders.map((order: any, idx: number) => (
+                                    <View key={order.id || idx} style={{ backgroundColor: L.card, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.cardBorder }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Order #{order.id?.slice(0, 8)}</Text>
+                                            <View style={{ backgroundColor: order.status === 'disputed' ? L.roseBg : L.goldLight, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                                                <Text style={{ color: order.status === 'disputed' ? L.rose : L.goldAmber, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' }}>{order.status}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={{ color: L.textSecondary, fontSize: 10 }}>Amount: {order.amount} {order.coin} (₦{order.fiat_amount?.toLocaleString()})</Text>
+
                                         {order.status === 'disputed' && (
-                                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                                                <TouchableOpacity style={[s.approveBtn, { flex: 1, backgroundColor: '#10B981' }]} onPress={() => resolveP2pDispute(order.id, 'buyer')}>
-                                                    <Text style={[s.approveBtnTxt, { color: '#fff' }]}>Resolve to Buyer</Text>
+                                            <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                                                <TouchableOpacity onPress={() => resolveP2pDispute(order.id, 'buyer')} style={{ flex: 1, backgroundColor: L.emeraldBg, paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                                    <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 9 }}>Release Buyer</Text>
                                                 </TouchableOpacity>
-                                                <TouchableOpacity style={[s.approveBtn, { flex: 1, backgroundColor: '#3b82f6' }]} onPress={() => resolveP2pDispute(order.id, 'seller')}>
-                                                    <Text style={[s.approveBtnTxt, { color: '#fff' }]}>Resolve to Seller</Text>
+                                                <TouchableOpacity onPress={() => resolveP2pDispute(order.id, 'seller')} style={{ flex: 1, backgroundColor: L.roseBg, paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: L.roseBorder }}>
+                                                    <Text style={{ color: L.rose, fontWeight: 'bold', fontSize: 9 }}>Refund Seller</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}
                                     </View>
-                                ))}
-                                {p2pOrders.length === 0 && <Text style={{ textAlign: 'center', padding: 20, color: '#64748B' }}>No P2P orders available.</Text>}
-                            </View>
+                                ))
+                            )}
                         </View>
-                    </>
-                )}
+                    )}
 
-            </ScrollView>
+                    {/* BLOCKCHAIN NODES RPC TAB */}
+                    {activeTab === 'networks' && (
+                        <View style={{ gap: 10 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 }}>Blockchain RPC Nodes Status</Text>
+
+                            {[
+                                { name: 'TRON TRC20 Node', rpc: 'https://api.trongrid.io', status: 'Healthy' },
+                                { name: 'Ethereum ERC20 Node (Alchemy)', rpc: 'https://eth-mainnet.g.alchemy.com/v2/...', status: 'Healthy' },
+                                { name: 'Bitcoin Network RPC', rpc: 'https://btc.blockbook.api', status: 'Healthy' },
+                                { name: 'Binance Smart Chain (BEP20)', rpc: 'https://bsc-dataseed.binance.org', status: 'Healthy' }
+                            ].map((node, idx) => (
+                                <View key={idx} style={{ backgroundColor: L.card, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Ionicons name="server-outline" size={16} color={L.goldDk} />
+                                        <View>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10 }}>{node.name}</Text>
+                                            <Text style={{ color: L.textMuted, fontSize: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{node.rpc}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                        <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>{node.status}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                </ScrollView>
+            </KeyboardAvoidingView>
+
+            {/* FUND USER BALANCE MODAL */}
+            <Modal visible={selectedUserForFund !== null} transparent animationType="fade" onRequestClose={() => setSelectedUserForFund(null)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 16 }}>
+                    <View style={{ backgroundColor: L.card, borderRadius: 20, padding: 16, borderWidth: 1.5, borderColor: L.goldDk }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13 }}>Adjust User Balance</Text>
+                            <TouchableOpacity onPress={() => setSelectedUserForFund(null)}>
+                                <Ionicons name="close-circle" size={20} color={L.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 2 }}>Target User:</Text>
+                        <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 11, marginBottom: 10 }}>{selectedUserForFund?.user?.email || selectedUserForFund?.user_id}</Text>
+
+                        {/* Select Coin Pill */}
+                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 4, fontWeight: 'bold' }}>Select Asset:</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                            {['USDT', 'BTC', 'ETH', 'FIAT'].map(coin => (
+                                <TouchableOpacity 
+                                    key={coin} 
+                                    onPress={() => setFundCoin(coin)}
+                                    style={{ flex: 1, paddingVertical: 6, borderRadius: 8, borderWidth: 1, alignItems: 'center', backgroundColor: fundCoin === coin ? L.navyHeader : L.bg, borderColor: fundCoin === coin ? L.navyHeader : L.inputBorder }}
+                                >
+                                    <Text style={{ color: fundCoin === coin ? L.gold : L.textSecondary, fontWeight: 'bold', fontSize: 9 }}>{coin}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 4, fontWeight: 'bold' }}>New Balance Amount:</Text>
+                        <View style={{ backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36, marginBottom: 12 }}>
+                            <TextInput
+                                value={fundAmount}
+                                onChangeText={setFundAmount}
+                                keyboardType="numeric"
+                                placeholder="Enter amount..."
+                                placeholderTextColor="#94A3B8"
+                                style={{ flex: 1, color: L.textPrimary, fontWeight: '700', fontSize: 11 }}
+                            />
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={handleFundUserSubmit}
+                            disabled={fundingUser}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.gold }}
+                        >
+                            {fundingUser ? (
+                                <ActivityIndicator size="small" color={L.gold} />
+                            ) : (
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Confirm Balance Update</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
-
-
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: T.bg },
-    scrollView: { flex: 1 },
-    header: {
-        paddingBottom: 24,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        elevation: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        zIndex: 10,
-        overflow: 'hidden',
-    },
-    glowOrb: {
-        position: 'absolute', top: -50, right: -50, width: 250, height: 250, borderRadius: 125, backgroundColor: '#4F46E5', opacity: 0.2, filter: 'blur(40px)',
-    },
-    glowOrb2: {
-        position: 'absolute', bottom: -50, left: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: '#10B981', opacity: 0.15, filter: 'blur(35px)',
-    },
-    glowOrb3: {
-        position: 'absolute', top: '20%', left: '30%', width: 100, height: 100, borderRadius: 50, backgroundColor: '#f5a623', opacity: 0.1, filter: 'blur(20px)',
-    },
-    headerContent: {
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 50 : 20, paddingBottom: 10,
-    },
-    backBtn: {
-        width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
-    },
-    headerActionBtn: {
-        width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(245,166,35,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(245,166,35,0.2)'
-    },
-    badge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1, borderColor: T.navyDark },
-    headerScreenTitle: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
-    headerScreenSubtitle: { fontSize: 12, color: T.goldLight, marginTop: 2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-    
-    statsCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
-    statBox: { alignItems: 'center', flex: 1 },
-    statLabel: { color: '#64748B', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-    statValue: { color: '#fff', fontSize: 16, fontWeight: '900' },
-    statValueDark: { color: T.navy, fontSize: 16, fontWeight: '900' },
-    statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'center' },
-    statDividerDark: { width: 1, height: 30, backgroundColor: '#E2E8F0', alignSelf: 'center' },
-    trendTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 6 },
-    trendTagTxt: { color: '#10B981', fontSize: 12, fontWeight: '800', marginLeft: 2 },
-    
-    headerBottomStrip: { height: 4, backgroundColor: T.gold, width: '100%', position: 'absolute', bottom: 0 },
-
-    tabBarContainer: { paddingHorizontal: 0, marginTop: -20, paddingBottom: 10, zIndex: 20 },
-    tabBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
-    tabBtn: { height: 40, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 20, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3, borderWidth: 1, borderColor: '#F1F5F9' },
-    tabBtnActive: { backgroundColor: T.navy, borderColor: T.navy },
-    tabTxt: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-    tabTxtActive: { color: '#fff' },
-
-    chartCard: { backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden', marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9', shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-    chartHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingBottom: 10 },
-    chartTitle: { fontSize: 14, fontWeight: '800', color: T.navy },
-    chartGraphBox: { padding: 20, paddingTop: 10, minHeight: 120 },
-    chartAmount: { fontSize: 28, fontWeight: '900', color: T.navy },
-    chartSub: { fontSize: 12, color: '#64748B', fontWeight: '600' },
-    graphLine: { height: 3, backgroundColor: T.gold, width: '80%', marginTop: 20, borderRadius: 2, transform: [{ rotate: '-5deg' }] },
-
-    quickGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
-    quickCard: { width: (width - 44) / 2, backgroundColor: '#fff', borderRadius: 24, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, overflow: 'hidden' },
-    quickCardBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-    quickIconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#000', shadowOffset: {width:0,height:4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-    quickCardTitle: { fontSize: 15, fontWeight: '800', color: T.navy },
-    quickCardSub: { fontSize: 12, color: '#64748B', marginTop: 4, fontWeight: '600' },
-
-    sectionTitle: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
-    card: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: 'rgba(0,0,0,0.02)' },
-    
-    coinRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-    coinInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    coinIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-    coinName: { fontSize: 14, fontWeight: '800', color: T.navy, marginBottom: 2 },
-    coinRate: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-    divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 14, width: '100%' },
-
-    updateRatesBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: T.navy, paddingVertical: 16, borderRadius: 16, marginTop: 20, gap: 8, shadowColor: T.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-    updateRatesTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
-
-    feeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    feeLabel: { fontSize: 14, fontWeight: '800', color: '#334155' },
-    feeSubLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
-    feeInputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12 },
-    feeInput: { paddingVertical: 10, fontSize: 14, fontWeight: '800', color: T.navy, width: 60, textAlign: 'right' },
-    feeSuffix: { fontSize: 12, fontWeight: '800', color: '#94A3B8', marginLeft: 8 },
-    saveFeesBtn: { backgroundColor: '#F1F5F9', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 20 },
-    saveFeesTxt: { color: T.navy, fontWeight: '800', fontSize: 14 },
-
-    nodeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    nodeTxt: { fontSize: 14, fontWeight: '700', color: '#334155', flex: 1, marginLeft: 12 },
-    nodeStatus: { backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    nodeStatusTxt: { color: '#059669', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-
-    p2pStatRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    p2pStat: { flex: 1, alignItems: 'center' },
-    p2pStatVal: { fontSize: 24, fontWeight: '900', color: T.green },
-    p2pStatLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', marginTop: 4, textTransform: 'uppercase' },
-
-    alertCard: { flexDirection: 'row', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FECACA', marginBottom: 20, overflow: 'hidden' },
-    alertIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
-    alertTitle: { fontSize: 14, fontWeight: '800', color: '#991B1B', marginBottom: 2 },
-    alertDesc: { fontSize: 12, color: '#B91C1C', lineHeight: 16, marginBottom: 8 },
-    alertAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    alertActionTxt: { fontSize: 12, fontWeight: '800', color: '#EF4444' },
-
-    historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-    historyIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-    historyTitle: { fontSize: 13, fontWeight: '800', color: '#1E293B' },
-    historySub: { fontSize: 12, color: '#64748B', marginTop: 2, fontWeight: '600' },
-    historyAmt: { fontSize: 13, fontWeight: '900', color: T.navy },
-    statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 4, alignSelf: 'flex-end' },
-    historyStatus: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
-
-    userEmail: { fontSize: 13, fontWeight: '800', color: T.navy, marginBottom: 8 },
-    balanceGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
-    balanceItem: { alignItems: 'center', flex: 1 },
-    balLabel: { fontSize: 12, color: '#64748B', fontWeight: '800', textTransform: 'uppercase' },
-    balValue: { fontSize: 15, fontWeight: '900', color: '#0F172A', marginTop: 4 },
-    fundActions: { flexDirection: 'row', gap: 10 },
-    fundBtn: { flex: 1, backgroundColor: '#D1FAE5', paddingVertical: 10, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
-    fundBtnTxt: { color: '#059669', fontSize: 12, fontWeight: '800' },
-
-    approveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: T.navy, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    approveBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' }
-});
