@@ -190,10 +190,22 @@ export default function AdminBento() {
 
     const fetchCounts = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            let user = session?.user;
+            if (!user) {
+                const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+                user = fetchedUser || undefined;
+            }
+
             if (user) {
-                const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-                setAdminProfile(profile);
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+                setAdminProfile(profile || {
+                    id: user.id,
+                    full_name: user.user_metadata?.full_name || 'Super Admin',
+                    email: user.email,
+                    role: user.user_metadata?.role || 'admin',
+                    avatar_url: user.user_metadata?.avatar_url || null
+                });
             }
 
             const [

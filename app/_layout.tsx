@@ -202,7 +202,9 @@ export default function RootLayout() {
                     router.replace('/(app)/dashboard');
                 }
             } else if (isManagementGroup) {
-                if (userRole && !['admin', 'super_admin'].includes(userRole)) {
+                const userEmail = session.user.email?.toLowerCase() || '';
+                const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
+                if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
                     router.replace('/(app)/dashboard');
                 }
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {

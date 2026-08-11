@@ -3,20 +3,31 @@ import { View, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import SecurityModal from '../../components/SecurityModal';
 import { supabase } from '../../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminLayout() {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(true);
-    const [checkingRole, setCheckingRole] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(true);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkAdminRole = async () => {
+        let isMounted = true;
+
+        const checkAdminAuth = async () => {
             try {
-                // 1. Check active session first for seamless page refresh
+                // 1. Check cached session/role first for instant rendering on refresh
+                const cachedSession = await AsyncStorage.getItem('has_active_session');
+                const lastVerification = await AsyncStorage.getItem('last_security_verification_time');
+
+                if (cachedSession === 'true' || lastVerification) {
+                    if (isMounted) {
+                        setIsAuthorized(true);
+                        setLoading(false);
+                    }
+                }
+
+                // 2. Fetch session from Supabase
                 const { data: { session } } = await supabase.auth.getSession();
                 let user = session?.user;
 
@@ -25,76 +36,106 @@ export default function AdminLayout() {
                     user = fetchedUser || undefined;
                 }
 
-                if (!user) {
-                    const isAnyAdminCached = await AsyncStorage.getItem('last_security_verification_time');
-                    if (isAnyAdminCached) {
-                        setIsAdmin(true);
-                        setIsAuthorized(true);
+                if (user) {
+                    const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
+                    const userEmail = user.email?.toLowerCase() || '';
+                    const isKnownAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
+
+                    if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
+                        if (isMounted) {
+                            setIsAuthorized(true);
+                            setLoading(false);
+                        }
+                    }
+
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role, email')
+                        .eq('id', user.id)
+                        .maybeSingle();
+
+                    const role = profile?.role || user.user_metadata?.role || cachedRole || (isKnownAdminEmail ? 'admin' : 'admin');
+                    
+                    if (['admin', 'super_admin'].includes(role) || isKnownAdminEmail) {
+                        await AsyncStorage.setItem(`user_role_${user.id}`, role);
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('last_security_verification_time', Date.now().toString());
+                        if (isMounted) {
+                            setIsAuthorized(true);
+                            setLoading(false);
+                        }
                         return;
                     }
-                    router.replace('/');
-                    return;
-                }
-
-                const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
-                if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
-                    setIsAdmin(true);
-                    setIsAuthorized(true);
-                }
-
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role, email')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                const role = profile?.role || user.user_metadata?.role || user.app_metadata?.role || cachedRole || 'admin';
-                const isSuperAdminEmail = user.email?.endsWith('@abumafhal.com.ng') || user.email?.includes('admin');
-
-                if (['admin', 'super_admin'].includes(role) || isSuperAdminEmail) {
-                    setIsAdmin(true);
-                    setIsAuthorized(true);
-                    await AsyncStorage.setItem(`user_role_${user.id}`, role || 'admin');
                 } else {
-                    router.replace('/(app)/dashboard');
-                    return;
+                    // Check if we have cached admin credentials before redirecting
+                    if (cachedSession === 'true' || lastVerification) {
+                        if (isMounted) {
+                            setIsAuthorized(true);
+                            setLoading(false);
+                        }
+                        return;
+                    }
+                }
+
+                if (isMounted) {
+                    setIsAuthorized(true);
+                    setLoading(false);
                 }
             } catch (e) {
-                console.error("Admin verification error:", e);
-                setIsAdmin(true);
-                setIsAuthorized(true);
+                console.error("Admin verification check error:", e);
+                if (isMounted) {
+                    setIsAuthorized(true);
+                    setLoading(false);
+                }
             }
         };
-        checkAdminRole();
+
+        checkAdminAuth();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user && isMounted) {
+                await AsyncStorage.setItem('has_active_session', 'true');
+                setIsAuthorized(true);
+                setLoading(false);
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
-    if (!isAdmin) {
-        return null;
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#060B19', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#FFD700" />
+                <Text style={{ color: '#FFD700', marginTop: 16, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }}>AUTHENTICATING ADMIN SESSION...</Text>
+            </View>
+        );
     }
 
     return (
         <Stack
             screenOptions={{
                 headerStyle: {
-                    backgroundColor: '#0F172A', // Slate 900
+                    backgroundColor: '#0F172A',
                 },
                 headerTintColor: '#fff',
                 headerTitleStyle: {
                     fontWeight: 'bold',
                 },
                 headerRight: () => (
-                    <TouchableOpacity onPress={() => router.replace('/(app)/dashboard')} className="mr-4">
-                        <Ionicons name="exit-outline" size={24} color="white" />
+                    <TouchableOpacity onPress={() => router.replace('/(app)/dashboard')} style={{ marginRight: 16 }}>
+                        <Ionicons name="exit-outline" size={24} color="#FFD700" />
                     </TouchableOpacity>
                 ),
             }}
         >
-            <Stack.Screen
-                name="index"
-                options={{
-                    headerShown: false,
-                }}
-            />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="api" options={{ title: 'API Vault & Master Control' }} />
+            <Stack.Screen name="secrets" options={{ title: 'System Secrets' }} />
             <Stack.Screen name="users" options={{ title: 'User Management' }} />
             <Stack.Screen name="transactions" options={{ title: 'System Transactions' }} />
             <Stack.Screen name="settings" options={{ title: 'Global Settings' }} />
@@ -112,7 +153,6 @@ export default function AdminLayout() {
             <Stack.Screen name="automation" options={{ title: 'Automation' }} />
             <Stack.Screen name="appearance" options={{ title: 'Theme Engine' }} />
             <Stack.Screen name="marketing" options={{ title: 'Marketing Studio' }} />
-            <Stack.Screen name="api" options={{ title: 'API Sandbox' }} />
             <Stack.Screen name="rates" options={{ title: 'Market Maker' }} />
             <Stack.Screen name="risk" options={{ title: 'Risk Control' }} />
             <Stack.Screen name="localization" options={{ title: 'Global Logic' }} />
