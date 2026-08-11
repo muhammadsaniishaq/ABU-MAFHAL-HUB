@@ -5,6 +5,26 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Ultra Navy & Gold Theme Tokens
+const C = {
+    bg: '#060B19',
+    card: '#0F172A',
+    cardBorder: 'rgba(218, 165, 32, 0.35)',
+    cardLight: '#162447',
+    gold: '#FFD700',
+    goldDk: '#DAA520',
+    goldAmber: '#F59E0B',
+    goldLight: '#FBE6A2',
+    white: '#FFFFFF',
+    textMuted: '#94A3B8',
+    textDim: '#64748B',
+    inputBg: '#0A1128',
+    inputBorder: '#1E293B',
+    emerald: '#10B981',
+    emeraldBg: 'rgba(16, 185, 129, 0.15)',
+    emeraldBorder: 'rgba(16, 185, 129, 0.4)',
+};
+
 interface SecretItem {
     id: string;
     keyName: string;
@@ -70,7 +90,6 @@ export default function APIVaultScreen() {
 
     const fetchApiVaultData = async () => {
         try {
-            // 1. Fetch app_settings
             const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
                 settings.forEach((s) => {
@@ -95,7 +114,6 @@ export default function APIVaultScreen() {
                 });
             }
 
-            // 2. Fetch system_secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
                 secrets.forEach((s) => {
@@ -456,113 +474,108 @@ export default function APIVaultScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 bg-[#060B19] justify-center items-center">
-                <ActivityIndicator color="#FFD700" size="large" />
-                <Text className="text-[#DAA520] mt-4 text-xs font-bold tracking-widest uppercase">Loading Ultra Navy Gold API Vault...</Text>
+            <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator color={C.gold} size="large" />
+                <Text style={{ color: C.goldDk, marginTop: 16, fontSize: 12, fontWeight: 'bold', letterSpacing: 1.5, textTransform: 'uppercase' }}>Loading Ultra Navy Gold API Vault...</Text>
             </View>
         );
     }
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-[#060B19]">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
             <Stack.Screen options={{
                 title: 'API Vault & Master Control',
                 headerStyle: { backgroundColor: '#0A1128' },
-                headerTintColor: '#FFD700',
-                headerTitleStyle: { fontWeight: '900', color: '#FFD700' }
+                headerTintColor: C.gold,
+                headerTitleStyle: { fontWeight: '900', color: C.gold }
             }} />
 
             {/* Toast Notification Banner */}
             {toastMessage && (
-                <View className="absolute top-4 left-4 right-4 z-50 bg-[#162447] border border-[#FFD700] rounded-2xl p-3.5 shadow-2xl flex-row items-center justify-between">
-                    <View className="flex-row items-center gap-2.5 flex-1">
-                        <Ionicons name="sparkles" size={20} color="#FFD700" />
-                        <Text className="text-[#FBE6A2] font-bold text-xs flex-1">{toastMessage}</Text>
+                <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 50, backgroundColor: C.cardLight, borderColor: C.gold, borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                        <Ionicons name="sparkles" size={20} color={C.gold} />
+                        <Text style={{ color: C.goldLight, fontWeight: 'bold', fontSize: 12, flex: 1 }}>{toastMessage}</Text>
                     </View>
                 </View>
             )}
 
-            <ScrollView className="flex-1 px-4 pt-4 pb-32">
+            <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16 }} contentContainerStyle={{ paddingBottom: 130 }}>
 
                 {/* Ultra Modern Hero Banner - Gold & Navy */}
                 <LinearGradient
                     colors={['#0B132B', '#1C2541', '#0A1128']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    className="p-5.5 rounded-3xl border-2 border-[#DAA520]/50 mb-6 shadow-2xl relative overflow-hidden"
-                    style={{ shadowColor: '#FFD700', shadowOpacity: 0.2, shadowRadius: 18 }}
+                    style={{ padding: 20, borderRadius: 24, borderWidth: 2, borderColor: 'rgba(218, 165, 32, 0.5)', marginBottom: 24, position: 'relative', overflow: 'hidden' }}
                 >
-                    {/* Background Decorative Metallic Glow Ring */}
-                    <View className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-[#FFD700]/10 blur-xl" />
-
-                    <View className="flex-row items-center justify-between mb-3.5">
-                        <View className="flex-row items-center gap-3">
-                            <View className="w-11 h-11 rounded-2xl bg-[#DAA520]/25 items-center justify-center border-2 border-[#FFD700]">
-                                <Ionicons name="shield-checkmark-sharp" size={24} color="#FFD700" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(218, 165, 32, 0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.gold }}>
+                                <Ionicons name="shield-checkmark-sharp" size={24} color={C.gold} />
                             </View>
                             <View>
-                                <Text className="text-[#FFD700] font-black text-xl tracking-tight">ULTRA API VAULT</Text>
-                                <View className="flex-row items-center gap-1.5 mt-0.5">
-                                    <View className="w-2 h-2 rounded-full bg-emerald-400" />
-                                    <Text className="text-slate-300 text-[10px] font-extrabold tracking-widest uppercase">Encryption Active • High Security Zone</Text>
+                                <Text style={{ color: C.gold, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>ULTRA API VAULT</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.emerald }} />
+                                    <Text style={{ color: '#CBD5E1', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Encryption Active • High Security</Text>
                                 </View>
                             </View>
                         </View>
 
                         <TouchableOpacity
                             onPress={() => router.push('/manage/liquidity')}
-                            className="bg-[#DAA520]/20 px-3 py-1.5 rounded-xl border border-[#FFD700] flex-row items-center gap-1 shadow-md"
+                            style={{ backgroundColor: 'rgba(218, 165, 32, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: C.gold, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         >
-                            <Ionicons name="wallet-outline" size={14} color="#FFD700" />
-                            <Text className="text-[#FFD700] font-black text-xs">Balances →</Text>
+                            <Ionicons name="wallet-outline" size={14} color={C.gold} />
+                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 12 }}>Balances →</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Vault Health Progress Bar */}
-                    <View className="bg-[#060B19] p-3.5 rounded-2xl border border-[#DAA520]/30 mb-4">
-                        <View className="flex-row items-center justify-between mb-1.5">
-                            <Text className="text-slate-300 font-bold text-xs">Vault Health & Readiness Score</Text>
-                            <Text className="text-[#FFD700] font-black text-xs">{healthPercent}% ({activeCount}/{totalCount} Configured)</Text>
+                    <View style={{ backgroundColor: C.bg, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)', marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Text style={{ color: '#CBD5E1', fontWeight: 'bold', fontSize: 12 }}>Vault Health & Readiness Score</Text>
+                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 12 }}>{healthPercent}% ({activeCount}/{totalCount} Configured)</Text>
                         </View>
-                        <View className="w-full h-2.5 bg-[#101935] rounded-full overflow-hidden border border-[#DAA520]/30">
+                        <View style={{ width: '100%', height: 10, backgroundColor: '#101935', borderRadius: 5, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}>
                             <View
-                                style={{ width: `${healthPercent}%` }}
-                                className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full"
+                                style={{ width: `${healthPercent}%`, height: '100%', backgroundColor: C.gold, borderRadius: 5 }}
                             />
                         </View>
                     </View>
 
                     {/* Quick Vault Action Buttons */}
-                    <View className="flex-row items-center justify-between gap-2 pt-1 border-t border-[#DAA520]/20">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 6, borderTopWidth: 1, borderColor: 'rgba(218, 165, 32, 0.2)' }}>
                         <TouchableOpacity
                             onPress={testAllConnections}
                             disabled={testingAll}
-                            className="flex-1 bg-[#1C2852] py-2 rounded-xl border border-[#FFD700]/40 flex-row items-center justify-center gap-1.5"
+                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                         >
                             {testingAll ? (
-                                <ActivityIndicator size="small" color="#FFD700" />
+                                <ActivityIndicator size="small" color={C.gold} />
                             ) : (
                                 <>
-                                    <Ionicons name="flash" size={13} color="#FFD700" />
-                                    <Text className="text-[#FFD700] font-bold text-xs">Ping All APIs</Text>
+                                    <Ionicons name="flash" size={14} color={C.gold} />
+                                    <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12 }}>Ping All APIs</Text>
                                 </>
                             )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             onPress={copyVaultManifest}
-                            className="flex-1 bg-[#1C2852] py-2 rounded-xl border border-[#FFD700]/40 flex-row items-center justify-center gap-1.5"
+                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                         >
-                            <Ionicons name="code-download-outline" size={13} color="#FFD700" />
-                            <Text className="text-[#FFD700] font-bold text-xs">Export JSON</Text>
+                            <Ionicons name="code-download-outline" size={14} color={C.gold} />
+                            <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12 }}>Export JSON</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             onPress={toggleShowAllKeys}
-                            className="bg-[#101935] px-3 py-2 rounded-xl border border-[#DAA520]/30 flex-row items-center justify-center gap-1"
+                            style={{ backgroundColor: '#101935', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                         >
-                            <Ionicons name={Object.keys(visibleKeys).length > 0 ? "eye-off" : "eye"} size={13} color="#FFD700" />
-                            <Text className="text-[#FBE6A2] font-semibold text-xs">
+                            <Ionicons name={Object.keys(visibleKeys).length > 0 ? "eye-off" : "eye"} size={14} color={C.gold} />
+                            <Text style={{ color: C.goldLight, fontWeight: '600', fontSize: 12 }}>
                                 {Object.keys(visibleKeys).length > 0 ? "Hide" : "Show"}
                             </Text>
                         </TouchableOpacity>
@@ -570,40 +583,40 @@ export default function APIVaultScreen() {
                 </LinearGradient>
 
                 {/* Multi-API Active Failover Switchboard */}
-                <View className="bg-[#0F172A] p-5 rounded-3xl border-2 border-[#DAA520]/35 mb-6 shadow-xl">
-                    <View className="flex-row items-center justify-between mb-2.5">
-                        <View className="flex-row items-center gap-2">
-                            <Ionicons name="flash-sharp" size={20} color="#FFD700" />
-                            <Text className="text-[#FFD700] font-black text-sm uppercase tracking-wide">⚡ Failover & Load Balancing Strategy</Text>
+                <View style={{ backgroundColor: C.card, padding: 20, borderRadius: 24, borderWidth: 2, borderColor: 'rgba(218, 165, 32, 0.35)', marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="flash-sharp" size={20} color={C.gold} />
+                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>⚡ Failover & Routing Strategy</Text>
                         </View>
-                        <View className="bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/50">
-                            <Text className="text-amber-300 font-extrabold text-[10px]">ROUTING ENGINE</Text>
+                        <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.5)' }}>
+                            <Text style={{ color: '#FCD34D', fontWeight: '900', fontSize: 10 }}>ROUTING ENGINE</Text>
                         </View>
                     </View>
 
                     {/* Mode Toggle Switch */}
-                    <View className="flex-row bg-[#060B19] p-1 rounded-2xl border border-slate-800 mb-4">
+                    <View style={{ flexDirection: 'row', backgroundColor: C.bg, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 }}>
                         <TouchableOpacity
                             onPress={() => setFailoverMode('smart')}
-                            className={`flex-1 py-2 rounded-xl items-center justify-center flex-row gap-1 ${failoverMode === 'smart' ? 'bg-[#FFD700]' : ''}`}
+                            style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: failoverMode === 'smart' ? C.gold : 'transparent' }}
                         >
-                            <Ionicons name="sparkles" size={13} color={failoverMode === 'smart' ? '#060B19' : '#94A3B8'} />
-                            <Text className={`font-black text-xs ${failoverMode === 'smart' ? 'text-[#060B19]' : 'text-slate-400'}`}>Smart Load-Balance</Text>
+                            <Ionicons name="sparkles" size={13} color={failoverMode === 'smart' ? C.bg : C.textMuted} />
+                            <Text style={{ fontWeight: '900', fontSize: 12, color: failoverMode === 'smart' ? C.bg : C.textMuted }}>Smart Load-Balance</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => setFailoverMode('sequential')}
-                            className={`flex-1 py-2 rounded-xl items-center justify-center flex-row gap-1 ${failoverMode === 'sequential' ? 'bg-[#FFD700]' : ''}`}
+                            style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: failoverMode === 'sequential' ? C.gold : 'transparent' }}
                         >
-                            <Ionicons name="swap-vertical" size={13} color={failoverMode === 'sequential' ? '#060B19' : '#94A3B8'} />
-                            <Text className={`font-black text-xs ${failoverMode === 'sequential' ? 'text-[#060B19]' : 'text-slate-400'}`}>Sequential Priority</Text>
+                            <Ionicons name="swap-vertical" size={13} color={failoverMode === 'sequential' ? C.bg : C.textMuted} />
+                            <Text style={{ fontWeight: '900', fontSize: 12, color: failoverMode === 'sequential' ? C.bg : C.textMuted }}>Sequential Priority</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text className="text-slate-400 text-xs mb-3.5">
+                    <Text style={{ color: C.textMuted, fontSize: 12, marginBottom: 14 }}>
                         Select active VTU providers enabled for instant automatic failover:
                     </Text>
 
-                    <View className="gap-2.5">
+                    <View style={{ gap: 10 }}>
                         {[
                             { id: 'bilalsadasub', rank: 'PRIORITY #1', name: 'BilalSadaSub API', domain: 'bilalsadasub.com', desc: 'Data, Airtime, Cable TV & Telecom' },
                             { id: 'bigi', rank: 'PRIORITY #2', name: 'Bigi VTU API', domain: 'bigidata.com', desc: 'SME & Gifting Data Provider' },
@@ -614,22 +627,22 @@ export default function APIVaultScreen() {
                                 <TouchableOpacity
                                     key={item.id}
                                     onPress={() => toggleVendorSelect(item.id)}
-                                    className={`flex-row items-center p-3.5 rounded-2xl border ${checked ? 'bg-[#1A294C] border-[#FFD700]' : 'bg-[#0A1128] border-slate-800'}`}
+                                    style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1, backgroundColor: checked ? '#1A294C' : C.bg, borderColor: checked ? C.gold : '#1E293B' }}
                                     activeOpacity={0.85}
                                 >
-                                    <View className={`w-6 h-6 rounded-lg border items-center justify-center mr-3 ${checked ? 'bg-[#FFD700] border-[#FFD700]' : 'border-slate-600 bg-[#060B19]'}`}>
-                                        {checked && <Ionicons name="checkmark" size={16} color="#060B19" />}
+                                    <View style={{ width: 24, height: 24, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: checked ? C.gold : C.bg, borderColor: checked ? C.gold : '#475569' }}>
+                                        {checked && <Ionicons name="checkmark" size={16} color={C.bg} />}
                                     </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center gap-2">
-                                            <Text className={`font-extrabold text-xs ${checked ? 'text-[#FFD700]' : 'text-slate-300'}`}>{item.name}</Text>
-                                            <Text className="text-amber-400 text-[9px] font-black tracking-wider uppercase bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">{item.rank}</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Text style={{ fontWeight: '900', fontSize: 12, color: checked ? C.gold : C.white }}>{item.name}</Text>
+                                            <Text style={{ color: C.goldAmber, fontSize: 9, fontWeight: '900', textTransform: 'uppercase', backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)' }}>{item.rank}</Text>
                                         </View>
-                                        <Text className="text-slate-400 text-[11px] mt-0.5">{item.desc}</Text>
+                                        <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>{item.desc}</Text>
                                     </View>
                                     {checked && (
-                                        <View className="bg-[#FFD700]/20 px-2 py-0.5 rounded-lg border border-[#FFD700]/50">
-                                            <Text className="text-[#FFD700] font-extrabold text-[10px]">ENABLED</Text>
+                                        <View style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.5)' }}>
+                                            <Text style={{ color: C.gold, fontWeight: '900', fontSize: 10 }}>ENABLED</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -639,19 +652,19 @@ export default function APIVaultScreen() {
                 </View>
 
                 {/* Search Bar & Category Filter */}
-                <View className="mb-6">
-                    <View className="flex-row items-center bg-[#0F172A] border-2 border-[#DAA520]/35 rounded-2xl px-4 h-12 mb-3 shadow-md">
-                        <Ionicons name="search-outline" size={18} color="#FFD700" />
+                <View style={{ marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 2, borderColor: 'rgba(218, 165, 32, 0.35)', borderRadius: 16, paddingHorizontal: 16, height: 48, marginBottom: 12 }}>
+                        <Ionicons name="search-outline" size={18} color={C.gold} />
                         <TextInput
-                            className="flex-1 ml-3 text-white font-medium text-xs"
+                            style={{ flex: 1, marginLeft: 12, color: C.white, fontWeight: '500', fontSize: 12 }}
                             placeholder="Search API keys by provider or title..."
-                            placeholderTextColor="#64748B"
+                            placeholderTextColor={C.textDim}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={18} color="#64748B" />
+                                <Ionicons name="close-circle" size={18} color={C.textDim} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -664,9 +677,9 @@ export default function APIVaultScreen() {
                                 <TouchableOpacity
                                     key={cat}
                                     onPress={() => setSelectedCategory(cat)}
-                                    className={`px-4 py-2 rounded-xl border ${isSelected ? 'bg-[#FFD700] border-[#FFD700]' : 'bg-[#0F172A] border-slate-800'}`}
+                                    style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1, backgroundColor: isSelected ? C.gold : C.card, borderColor: isSelected ? C.gold : '#1E293B' }}
                                 >
-                                    <Text className={`text-xs font-bold ${isSelected ? 'text-[#060B19]' : 'text-slate-300'}`}>
+                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: isSelected ? C.bg : C.white }}>
                                         {cat}
                                     </Text>
                                 </TouchableOpacity>
@@ -676,7 +689,7 @@ export default function APIVaultScreen() {
                 </View>
 
                 {/* Credential Cards List */}
-                <View className="gap-4.5 mb-28">
+                <View style={{ gap: 16 }}>
                     {filteredSecrets.map((item) => {
                         const isConfigured = item.value && item.value.trim() !== '';
                         const showSecret = visibleKeys[item.keyName];
@@ -686,73 +699,70 @@ export default function APIVaultScreen() {
                         return (
                             <View
                                 key={item.id}
-                                className="bg-[#0F172A] p-4.5 rounded-3xl border-2 border-[#DAA520]/30 shadow-xl relative overflow-hidden"
-                                style={{ shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10 }}
+                                style={{ backgroundColor: C.card, padding: 18, borderRadius: 24, borderWidth: 2, borderColor: C.cardBorder, position: 'relative', overflow: 'hidden' }}
                             >
                                 {/* Card Ribbon Badge */}
                                 {item.badgeTag && (
-                                    <View className="absolute top-0 right-0 bg-[#DAA520]/25 px-3 py-0.5 rounded-bl-xl border-l border-b border-[#FFD700]/50">
-                                        <Text className="text-[#FFD700] text-[9px] font-black tracking-widest">{item.badgeTag}</Text>
+                                    <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(218, 165, 32, 0.25)', paddingHorizontal: 12, paddingVertical: 3, borderBottomLeftRadius: 12, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255, 215, 0, 0.5)' }}>
+                                        <Text style={{ color: C.gold, fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>{item.badgeTag}</Text>
                                     </View>
                                 )}
 
                                 {/* Card Header */}
-                                <View className="flex-row items-center justify-between mb-3.5 pt-1">
-                                    <View className="flex-row items-center gap-3 flex-1">
-                                        <View className="w-10 h-10 rounded-2xl bg-[#1C2852] border-2 border-[#DAA520]/50 items-center justify-center shadow-md">
-                                            <Ionicons name={item.icon} size={20} color="#FFD700" />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingTop: 4 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                        <View style={{ width: 40, height: 40, borderRadius: 16, backgroundColor: '#1C2852', borderWidth: 2, borderColor: 'rgba(218, 165, 32, 0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name={item.icon} size={20} color={C.gold} />
                                         </View>
-                                        <View className="flex-1 pr-14">
-                                            <View className="flex-row items-center gap-2">
-                                                <Text className="text-white font-black text-xs">{item.title}</Text>
-                                            </View>
-                                            <Text className="text-[#DAA520] text-[10px] font-extrabold">{item.provider} • {item.category}</Text>
+                                        <View style={{ flex: 1, paddingRight: 50 }}>
+                                            <Text style={{ color: C.white, fontWeight: '900', fontSize: 13 }}>{item.title}</Text>
+                                            <Text style={{ color: C.goldDk, fontSize: 10, fontWeight: '900' }}>{item.provider} • {item.category}</Text>
                                         </View>
                                     </View>
                                 </View>
 
-                                <Text className="text-slate-300 text-[11px] leading-4 mb-3">{item.description}</Text>
+                                <Text style={{ color: '#CBD5E1', fontSize: 11, lineHeight: 16, marginBottom: 12 }}>{item.description}</Text>
 
                                 {/* Input Field 1 */}
-                                <View className="mb-2">
-                                    <View className="flex-row items-center justify-between mb-1">
-                                        <Text className="text-slate-400 text-[10px] font-mono">KEY: {item.keyName}</Text>
+                                <View style={{ marginBottom: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                        <Text style={{ color: C.textMuted, fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>KEY: {item.keyName}</Text>
                                         {ping && (
-                                            <View className="flex-row items-center gap-1 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/40">
-                                                <Ionicons name="checkmark-circle" size={10} color="#34d399" />
-                                                <Text className="text-emerald-400 text-[9px] font-bold">200 OK ({ping.ms}ms)</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: C.emeraldBorder }}>
+                                                <Ionicons name="checkmark-circle" size={10} color={C.emerald} />
+                                                <Text style={{ color: C.emerald, fontSize: 9, fontWeight: 'bold' }}>200 OK ({ping.ms}ms)</Text>
                                             </View>
                                         )}
                                     </View>
-                                    <View className="flex-row items-center bg-[#060B19] rounded-2xl border border-slate-800 px-3 py-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.inputBg, borderRadius: 16, borderWidth: 1, borderColor: C.inputBorder, paddingHorizontal: 12, paddingVertical: 4 }}>
                                         <TextInput
                                             value={item.value}
                                             onChangeText={item.setValue}
                                             placeholder={item.placeholder}
                                             placeholderTextColor="#475569"
                                             secureTextEntry={item.isSecret && !showSecret}
-                                            className="flex-1 text-white py-2.5 text-xs font-mono"
+                                            style={{ flex: 1, color: C.white, paddingVertical: 10, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
                                         />
                                         
                                         {/* Input Actions */}
-                                        <View className="flex-row items-center gap-1.5 ml-2">
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
                                             {item.isSecret && (
                                                 <TouchableOpacity
                                                     onPress={() => toggleVisibility(item.keyName)}
-                                                    className="p-2 rounded-xl bg-[#16224F] border border-[#DAA520]/30"
+                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: '#16224F', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}
                                                 >
-                                                    <Ionicons name={showSecret ? "eye-off-outline" : "eye-outline"} size={16} color="#FFD700" />
+                                                    <Ionicons name={showSecret ? "eye-off-outline" : "eye-outline"} size={16} color={C.gold} />
                                                 </TouchableOpacity>
                                             )}
 
                                             <TouchableOpacity
                                                 onPress={() => copyValue(item.keyName, item.value)}
-                                                className="p-2 rounded-xl bg-[#16224F] border border-[#DAA520]/30"
+                                                style={{ padding: 8, borderRadius: 10, backgroundColor: '#16224F', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}
                                             >
                                                 <Ionicons
                                                     name={copiedKey === item.keyName ? "checkmark-sharp" : "copy-outline"}
                                                     size={16}
-                                                    color={copiedKey === item.keyName ? "#10b981" : "#FFD700"}
+                                                    color={copiedKey === item.keyName ? C.emerald : C.gold}
                                                 />
                                             </TouchableOpacity>
                                         </View>
@@ -761,34 +771,34 @@ export default function APIVaultScreen() {
 
                                 {/* Optional Secondary Input Field */}
                                 {item.secondaryKeyName && item.setSecondaryValue && (
-                                    <View className="mt-2.5 pt-2.5 border-t border-slate-800/60">
-                                        <Text className="text-slate-400 text-[10px] font-mono mb-1.5">SECONDARY KEY: {item.secondaryKeyName}</Text>
-                                        <View className="flex-row items-center bg-[#060B19] rounded-2xl border border-slate-800 px-3 py-1">
+                                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                        <Text style={{ color: C.textMuted, fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginBottom: 6 }}>SECONDARY KEY: {item.secondaryKeyName}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.inputBg, borderRadius: 16, borderWidth: 1, borderColor: C.inputBorder, paddingHorizontal: 12, paddingVertical: 4 }}>
                                             <TextInput
                                                 value={item.secondaryValue || ''}
                                                 onChangeText={item.setSecondaryValue}
                                                 placeholder={item.secondaryPlaceholder || 'Enter key...'}
                                                 placeholderTextColor="#475569"
                                                 secureTextEntry={item.isSecret && !showSecondarySecret}
-                                                className="flex-1 text-white py-2.5 text-xs font-mono"
+                                                style={{ flex: 1, color: C.white, paddingVertical: 10, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
                                             />
 
-                                            <View className="flex-row items-center gap-1.5 ml-2">
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
                                                 <TouchableOpacity
                                                     onPress={() => toggleVisibility(item.secondaryKeyName!)}
-                                                    className="p-2 rounded-xl bg-[#16224F] border border-[#DAA520]/30"
+                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: '#16224F', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}
                                                 >
-                                                    <Ionicons name={showSecondarySecret ? "eye-off-outline" : "eye-outline"} size={16} color="#FFD700" />
+                                                    <Ionicons name={showSecondarySecret ? "eye-off-outline" : "eye-outline"} size={16} color={C.gold} />
                                                 </TouchableOpacity>
 
                                                 <TouchableOpacity
                                                     onPress={() => copyValue(item.secondaryKeyName!, item.secondaryValue || '')}
-                                                    className="p-2 rounded-xl bg-[#16224F] border border-[#DAA520]/30"
+                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: '#16224F', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}
                                                 >
                                                     <Ionicons
                                                         name={copiedKey === item.secondaryKeyName ? "checkmark-sharp" : "copy-outline"}
                                                         size={16}
-                                                        color={copiedKey === item.secondaryKeyName ? "#10b981" : "#FFD700"}
+                                                        color={copiedKey === item.secondaryKeyName ? C.emerald : C.gold}
                                                     />
                                                 </TouchableOpacity>
                                             </View>
@@ -797,23 +807,23 @@ export default function APIVaultScreen() {
                                 )}
 
                                 {/* Bottom Card Controls */}
-                                <View className="flex-row items-center justify-between mt-3 pt-2 border-t border-slate-800/80">
-                                    <View className="flex-row items-center gap-2">
-                                        <View className={`px-2.5 py-0.5 rounded-full border flex-row items-center gap-1 ${isConfigured ? 'bg-emerald-950/60 border-emerald-500/50' : 'bg-slate-900 border-slate-700'}`}>
-                                            <View className={`w-1.5 h-1.5 rounded-full ${isConfigured ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                                            <Text className={`font-black text-[9px] ${isConfigured ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={{ paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isConfigured ? C.emeraldBg : C.bg, borderColor: isConfigured ? C.emeraldBorder : '#334155' }}>
+                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isConfigured ? C.emerald : C.textDim }} />
+                                            <Text style={{ fontWeight: '900', fontSize: 9, color: isConfigured ? C.emerald : C.textDim }}>
                                                 {isConfigured ? 'ACTIVE' : 'NOT SET'}
                                             </Text>
                                         </View>
                                     </View>
 
-                                    <View className="flex-row items-center gap-2">
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <TouchableOpacity
                                             onPress={() => testSingleConnection(item.id, item.value)}
-                                            className="bg-[#16224F] px-2.5 py-1 rounded-xl border border-[#DAA520]/30 flex-row items-center gap-1"
+                                            style={{ backgroundColor: '#16224F', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                                         >
-                                            <Ionicons name="flash-outline" size={12} color="#FFD700" />
-                                            <Text className="text-[#FFD700] font-bold text-[10px]">Ping Test</Text>
+                                            <Ionicons name="flash-outline" size={12} color={C.gold} />
+                                            <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 10 }}>Ping Test</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -827,10 +837,10 @@ export default function APIVaultScreen() {
                                                 secondaryKey: item.secondaryKeyName,
                                                 secondaryValue: item.secondaryValue
                                             })}
-                                            className="bg-[#1C2852] px-2.5 py-1 rounded-xl border border-[#FFD700]/50 flex-row items-center gap-1"
+                                            style={{ backgroundColor: '#1C2852', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.5)', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                                         >
-                                            <Ionicons name="information-circle-outline" size={12} color="#FFD700" />
-                                            <Text className="text-[#FFD700] font-bold text-[10px]">Audit Specs</Text>
+                                            <Ionicons name="information-circle-outline" size={12} color={C.gold} />
+                                            <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 10 }}>Audit Specs</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -841,7 +851,7 @@ export default function APIVaultScreen() {
             </ScrollView>
 
             {/* Floating Gold Save Bar */}
-            <View className="absolute bottom-0 left-0 right-0 p-4 bg-[#0A1128]/95 border-t-2 border-[#DAA520]/50 shadow-2xl">
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: 'rgba(10, 17, 40, 0.95)', borderTopWidth: 2, borderColor: 'rgba(218, 165, 32, 0.5)', elevation: 20 }}>
                 <TouchableOpacity
                     onPress={handleSaveVault}
                     disabled={saving}
@@ -851,14 +861,14 @@ export default function APIVaultScreen() {
                         colors={['#FFD700', '#F59E0B', '#D97706']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        className="py-4 rounded-2xl items-center justify-center shadow-2xl flex-row gap-2 border-2 border-[#FFF8DC]"
+                        style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 2, borderColor: '#FFF8DC' }}
                     >
                         {saving ? (
-                            <ActivityIndicator color="#060B19" />
+                            <ActivityIndicator color={C.bg} />
                         ) : (
                             <>
-                                <Ionicons name="shield-checkmark-sharp" size={20} color="#060B19" />
-                                <Text className="text-[#060B19] font-black text-sm uppercase tracking-wider">
+                                <Ionicons name="shield-checkmark-sharp" size={20} color={C.bg} />
+                                <Text style={{ color: C.bg, fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>
                                     💾 Save All Vault Credentials
                                 </Text>
                             </>
@@ -874,62 +884,62 @@ export default function APIVaultScreen() {
                 animationType="slide"
                 onRequestClose={() => setSelectedSecretDetail(null)}
             >
-                <View className="flex-1 bg-black/85 justify-end">
-                    <View className="bg-[#0F172A] border-t-4 border-[#FFD700] rounded-t-3xl p-6 shadow-2xl max-h-[85%]">
-                        <View className="flex-row items-center justify-between mb-3">
-                            <View className="flex-row items-center gap-2">
-                                <Ionicons name="key-sharp" size={22} color="#FFD700" />
-                                <Text className="text-[#FFD700] font-black text-base">API Security & Audit Spec</Text>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: C.card, borderTopWidth: 4, borderColor: C.gold, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="key-sharp" size={22} color={C.gold} />
+                                <Text style={{ color: C.gold, fontWeight: '900', fontSize: 16 }}>API Security & Audit Spec</Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setSelectedSecretDetail(null)}
-                                className="w-8 h-8 rounded-full bg-[#16224F] items-center justify-center border border-[#FFD700]/40"
+                                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16224F', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)' }}
                             >
-                                <Ionicons name="close" size={18} color="#fff" />
+                                <Ionicons name="close" size={18} color={C.white} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Modal Tabs */}
-                        <View className="flex-row bg-[#060B19] p-1 rounded-2xl border border-slate-800 mb-4">
+                        <View style={{ flexDirection: 'row', backgroundColor: C.bg, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', marginBottom: 16 }}>
                             {(['info', 'webhooks', 'audit'] as const).map(tab => (
                                 <TouchableOpacity
                                     key={tab}
                                     onPress={() => setModalTab(tab)}
-                                    className={`flex-1 py-2 rounded-xl items-center ${modalTab === tab ? 'bg-[#FFD700]' : ''}`}
+                                    style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', backgroundColor: modalTab === tab ? C.gold : 'transparent' }}
                                 >
-                                    <Text className={`font-black text-xs uppercase ${modalTab === tab ? 'text-[#060B19]' : 'text-slate-400'}`}>{tab}</Text>
+                                    <Text style={{ fontWeight: '900', fontSize: 12, textTransform: 'uppercase', color: modalTab === tab ? C.bg : C.textMuted }}>{tab}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
                         {selectedSecretDetail && (
-                            <ScrollView className="gap-3 mb-2">
+                            <ScrollView style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 12 }}>
                                 {modalTab === 'info' && (
                                     <>
-                                        <View className="bg-[#060B19] p-4 rounded-2xl border border-slate-800">
-                                            <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">Provider & Category</Text>
-                                            <Text className="text-white font-extrabold text-sm">{selectedSecretDetail.provider} ({selectedSecretDetail.category})</Text>
+                                        <View style={{ backgroundColor: C.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Provider & Category</Text>
+                                            <Text style={{ color: C.white, fontWeight: '800', fontSize: 14 }}>{selectedSecretDetail.provider} ({selectedSecretDetail.category})</Text>
                                         </View>
 
-                                        <View className="bg-[#060B19] p-4 rounded-2xl border border-slate-800">
-                                            <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">Key Name</Text>
-                                            <Text className="text-[#DAA520] font-mono text-xs mb-1">{selectedSecretDetail.key}</Text>
-                                            <Text className="text-slate-300 text-xs leading-5">{selectedSecretDetail.desc}</Text>
+                                        <View style={{ backgroundColor: C.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Key Name</Text>
+                                            <Text style={{ color: C.goldDk, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, marginBottom: 4 }}>{selectedSecretDetail.key}</Text>
+                                            <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 18 }}>{selectedSecretDetail.desc}</Text>
                                         </View>
 
-                                        <View className="bg-[#060B19] p-4 rounded-2xl border border-slate-800">
-                                            <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">Status & Length</Text>
-                                            <View className="flex-row items-center justify-between">
-                                                <Text className="text-emerald-400 font-bold text-xs">
+                                        <View style={{ backgroundColor: C.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Status & Length</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Text style={{ color: C.emerald, fontWeight: 'bold', fontSize: 12 }}>
                                                     {selectedSecretDetail.value ? `✓ Set (${selectedSecretDetail.value.length} chars)` : '❌ Not Configured'}
                                                 </Text>
                                                 {selectedSecretDetail.value && (
                                                     <TouchableOpacity
                                                         onPress={() => copyValue(selectedSecretDetail.key, selectedSecretDetail.value)}
-                                                        className="bg-[#FFD700]/20 px-3 py-1 rounded-lg border border-[#FFD700]/40 flex-row items-center gap-1"
+                                                        style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                                                     >
-                                                        <Ionicons name="copy-outline" size={12} color="#FFD700" />
-                                                        <Text className="text-[#FFD700] font-bold text-xs">Copy Key</Text>
+                                                        <Ionicons name="copy-outline" size={12} color={C.gold} />
+                                                        <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12 }}>Copy Key</Text>
                                                     </TouchableOpacity>
                                                 )}
                                             </View>
@@ -938,31 +948,31 @@ export default function APIVaultScreen() {
                                 )}
 
                                 {modalTab === 'webhooks' && (
-                                    <View className="bg-[#060B19] p-4 rounded-2xl border border-slate-800 gap-2">
-                                        <Text className="text-[#FFD700] font-bold text-xs mb-1">⚡ Webhook Callback URL</Text>
-                                        <Text className="text-slate-300 font-mono text-[11px] bg-[#101935] p-2.5 rounded-xl border border-slate-800">
+                                    <View style={{ backgroundColor: C.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', gap: 8 }}>
+                                        <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>⚡ Webhook Callback URL</Text>
+                                        <Text style={{ color: '#CBD5E1', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, backgroundColor: '#101935', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#1E293B' }}>
                                             https://sljydbtydwyygzoxerpw.supabase.co/functions/v1/{selectedSecretDetail.provider.toLowerCase().replace(/[^a-z0-9]/g, '')}-webhook
                                         </Text>
-                                        <Text className="text-slate-400 text-[11px] mt-1 leading-4">
+                                        <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 }}>
                                             Paste this webhook URL into your {selectedSecretDetail.provider} developer dashboard to receive automated transaction notifications.
                                         </Text>
                                     </View>
                                 )}
 
                                 {modalTab === 'audit' && (
-                                    <View className="bg-[#060B19] p-4 rounded-2xl border border-slate-800 gap-2">
-                                        <Text className="text-[#FFD700] font-bold text-xs mb-1">🛡️ Security Audit Log</Text>
-                                        <View className="flex-row items-center justify-between py-1 border-b border-slate-800">
-                                            <Text className="text-slate-400 text-xs">Encryption</Text>
-                                            <Text className="text-emerald-400 font-bold text-xs">AES-256 System Vault</Text>
+                                    <View style={{ backgroundColor: C.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B', gap: 8 }}>
+                                        <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>🛡️ Security Audit Log</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderColor: '#1E293B' }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 12 }}>Encryption</Text>
+                                            <Text style={{ color: C.emerald, fontWeight: 'bold', fontSize: 12 }}>AES-256 System Vault</Text>
                                         </View>
-                                        <View className="flex-row items-center justify-between py-1 border-b border-slate-800">
-                                            <Text className="text-slate-400 text-xs">Environment</Text>
-                                            <Text className="text-white font-bold text-xs">Production Live</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderColor: '#1E293B' }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 12 }}>Environment</Text>
+                                            <Text style={{ color: C.white, fontWeight: 'bold', fontSize: 12 }}>Production Live</Text>
                                         </View>
-                                        <View className="flex-row items-center justify-between py-1">
-                                            <Text className="text-slate-400 text-xs">Admin Access</Text>
-                                            <Text className="text-amber-400 font-bold text-xs">Super Admin Only</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+                                            <Text style={{ color: C.textMuted, fontSize: 12 }}>Admin Access</Text>
+                                            <Text style={{ color: C.goldAmber, fontWeight: 'bold', fontSize: 12 }}>Super Admin Only</Text>
                                         </View>
                                     </View>
                                 )}
@@ -971,9 +981,9 @@ export default function APIVaultScreen() {
 
                         <TouchableOpacity
                             onPress={() => setSelectedSecretDetail(null)}
-                            className="bg-[#1C2852] py-3.5 rounded-2xl items-center border border-[#DAA520]/40 mt-3"
+                            style={{ backgroundColor: '#1C2852', paddingVertical: 14, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.4)', marginTop: 12 }}
                         >
-                            <Text className="text-[#FFD700] font-bold text-xs uppercase">Close Security Modal</Text>
+                            <Text style={{ color: C.gold, fontWeight: 'bold', fontSize: 12, textTransform: 'uppercase' }}>Close Security Modal</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -981,5 +991,3 @@ export default function APIVaultScreen() {
         </KeyboardAvoidingView>
     );
 }
-
-
