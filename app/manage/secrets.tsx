@@ -158,10 +158,10 @@ export default function SecretsManager() {
                                 <Ionicons name={REQUIRED_SECRETS.every(s => visibleKeys[s.key]) ? "eye-off" : "eye"} size={14} color="#ffffff" />
                                 <Text className="text-white font-semibold text-xs tracking-wide">Toggle All</Text>
                             </TouchableOpacity>
-                            <View className="bg-rose-500/20 px-3 py-1.5 rounded-full border border-rose-500/30 flex-row items-center gap-1.5">
-                                <Ionicons name="shield-checkmark" size={14} color="#f43f5e" />
-                                <Text className="text-rose-400 font-bold text-xs uppercase tracking-widest">Vault</Text>
-                            </View>
+                            <TouchableOpacity onPress={() => router.push('/manage/api')} className="bg-amber-500/20 px-3 py-1.5 rounded-full border border-amber-500/40 flex-row items-center gap-1.5">
+                                <Ionicons name="key-outline" size={14} color="#f59e0b" />
+                                <Text className="text-amber-300 font-bold text-xs uppercase tracking-wider">Active API Vault →</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                     
