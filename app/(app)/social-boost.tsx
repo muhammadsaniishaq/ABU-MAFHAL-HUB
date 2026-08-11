@@ -52,6 +52,15 @@ export default function SocialBoostScreen() {
   const [selectedService, setSelectedService] = useState<SMMService | null>(null);
   const [link, setLink] = useState('');
   const [quantity, setQuantity] = useState('');
+
+  // New Features State: Drip-Feed, Favorites, & Live Orders Drawer
+  const [isDripFeed, setIsDripFeed] = useState(false);
+  const [dripRuns, setDripRuns] = useState('5');
+  const [dripInterval, setDripInterval] = useState('60');
+  const [favoriteServices, setFavoriteServices] = useState<string[]>([]);
+  const [recentOrdersModal, setRecentOrdersModal] = useState(false);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   
   // UI State
   const [serviceModal, setServiceModal] = useState(false);
@@ -154,8 +163,8 @@ export default function SocialBoostScreen() {
   useEffect(() => {
     fetchUserBalance();
     fetchData();
+    loadFavorites();
 
-    // Listen to Auth State changes so hydrated session updates balance instantly
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         fetchUserBalance();
@@ -166,6 +175,46 @@ export default function SocialBoostScreen() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  const loadFavorites = async () => {
+    try {
+      const favStr = await AsyncStorage.getItem('@smm_favorites');
+      if (favStr) setFavoriteServices(JSON.parse(favStr));
+    } catch (e) {}
+  };
+
+  const toggleFavorite = async (serviceId: string | number) => {
+    const sId = String(serviceId);
+    let updated = [...favoriteServices];
+    if (updated.includes(sId)) {
+      updated = updated.filter(id => id !== sId);
+      showAlert("Removed from Favorites", "Package removed from your favorites list", "info");
+    } else {
+      updated.push(sId);
+      showAlert("Added to Favorites ⭐", "Package saved for quick 1-tap re-ordering!", "success");
+    }
+    setFavoriteServices(updated);
+    await AsyncStorage.setItem('@smm_favorites', JSON.stringify(updated));
+  };
+
+  const fetchRecentOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('smm_orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setRecentOrders(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -563,6 +612,48 @@ export default function SocialBoostScreen() {
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
+                  </View>
+
+                  {/* Feature: Drip-Feed Organic Speed Controls */}
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                    <TouchableOpacity 
+                      onPress={() => setIsDripFeed(!isDripFeed)} 
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="time" size={14} color={T.gold} />
+                        <View>
+                          <Text style={{ fontSize: 11, fontWeight: '900', color: T.navyDark }}>Natural Drip-Feed Delivery</Text>
+                          <Text style={{ fontSize: 9, color: T.textSub }}>Deliver in gradual organic batches over time</Text>
+                        </View>
+                      </View>
+                      <View style={{ backgroundColor: isDripFeed ? T.gold : '#CBD5E1', width: 34, height: 18, borderRadius: 9, padding: 2, alignItems: isDripFeed ? 'flex-end' : 'flex-start' }}>
+                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' }} />
+                      </View>
+                    </TouchableOpacity>
+
+                    {isDripFeed && (
+                      <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.textSub, marginBottom: 2 }}>Runs (Times):</Text>
+                          <TextInput
+                            value={dripRuns}
+                            onChangeText={setDripRuns}
+                            keyboardType="numeric"
+                            style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 8, height: 32, fontSize: 11, fontWeight: 'bold', color: T.navyDark }}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.textSub, marginBottom: 2 }}>Interval (Mins):</Text>
+                          <TextInput
+                            value={dripInterval}
+                            onChangeText={setDripInterval}
+                            keyboardType="numeric"
+                            style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 8, height: 32, fontSize: 11, fontWeight: 'bold', color: T.navyDark }}
+                          />
+                        </View>
+                      </View>
+                    )}
                   </View>
 
                   {/* Executive Dark Navy & Gold Summary Breakdown */}
