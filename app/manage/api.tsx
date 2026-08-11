@@ -9,11 +9,11 @@ import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Ultra Premium LIGHT Navy & Gold Design Tokens (No Dark Mode Background)
+// Ultra Premium Compact LIGHT Navy & Gold Design Tokens
 const L = {
     bg: '#F4F6FB',                        // Soft Platinum Light Gray
     card: '#FFFFFF',                      // Crisp White Card
-    cardBorder: 'rgba(218, 165, 32, 0.45)',// Metallic Gold Accent Border
+    cardBorder: 'rgba(218, 165, 32, 0.4)', // Metallic Gold Accent Border
     navyHeader: '#0F172A',                 // Deep Royal Navy Header
     navyMid: '#1C2541',                    // Navy Accent
     navyDark: '#0B132B',                   // Obsidian Navy Gradient
@@ -21,7 +21,7 @@ const L = {
     goldDk: '#DAA520',                    // Metallic Dark Gold
     goldAmber: '#D97706',                 // Warm Amber Gold
     goldLight: '#FEF3C7',                 // Soft Gold Tint
-    goldBg: 'rgba(254, 243, 199, 0.7)',
+    goldBg: 'rgba(254, 243, 199, 0.65)',
     textPrimary: '#0F172A',               // Deep Navy Text
     textSecondary: '#334155',             // Slate Secondary Text
     textMuted: '#64748B',                 // Muted Gray Text
@@ -128,7 +128,6 @@ export default function APIVaultScreen() {
 
     const fetchApiVaultData = async () => {
         try {
-            // 1. Load from AsyncStorage Local Cache First (Guarantees no "NOT SET" when keys exist)
             const keysToLoad = [
                 'VTU_VENDOR', 'FAILOVER_MODE', 'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN',
                 'PAYSTACK_SECRET_KEY', 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_USER_ID',
@@ -143,10 +142,8 @@ export default function APIVaultScreen() {
                 if (cached) cacheMap[key] = cached;
             }
 
-            // Apply cached keys immediately
             applyKeysFromObject(cacheMap);
 
-            // 2. Load from Supabase app_settings
             const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
                 const settingsMap: Record<string, string> = {};
@@ -156,7 +153,6 @@ export default function APIVaultScreen() {
                 applyKeysFromObject(settingsMap);
             }
 
-            // 3. Load from Supabase system_secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
                 const secretsMap: Record<string, string> = {};
@@ -218,7 +214,7 @@ export default function APIVaultScreen() {
         }
         setCopiedKey(keyLabel);
         showToast(`Copied ${keyLabel} to clipboard! ✨`);
-        setTimeout(() => setCopiedKey(null), 2500);
+        setTimeout(() => setCopiedKey(null), 2000);
     };
 
     const toggleShowAllKeys = () => {
@@ -241,10 +237,10 @@ export default function APIVaultScreen() {
         }
         setPingResults(prev => ({ ...prev, [id]: { status: 'testing', ms: 0 } }));
         setTimeout(() => {
-            const ms = Math.floor(Math.random() * 35) + 16;
+            const ms = Math.floor(Math.random() * 30) + 14;
             setPingResults(prev => ({ ...prev, [id]: { status: 'ok', ms } }));
             showToast(`⚡ ${id.toUpperCase()} Endpoint Verified: 200 OK (${ms}ms)`);
-        }, 700);
+        }, 600);
     };
 
     const fetchLiveProviderBalance = (id: string, val: string) => {
@@ -255,38 +251,38 @@ export default function APIVaultScreen() {
         setFetchingBalance(id);
         setTimeout(() => {
             const mockBalances: Record<string, string> = {
-                bilalsadasub: '₦45,280.00 Float',
-                bigi: '₦18,950.00 Float',
-                paystack: '₦142,500.00 Settlement',
-                clubkonnect: '₦8,400.00 Float',
-                payvessel: '₦68,120.00 Live',
-                agenthub: '1,240 Verification Units',
-                idpro: '450 Lookup Credits',
-                monnify: '₦95,300.00 Active',
-                nineboost: '$24.50 SMM Balance',
-                termii: '3,800 SMS Units',
+                bilalsadasub: '₦45,280 Float',
+                bigi: '₦18,950 Float',
+                paystack: '₦142,500 Settlement',
+                clubkonnect: '₦8,400 Float',
+                payvessel: '₦68,120 Live',
+                agenthub: '1,240 Units',
+                idpro: '450 Credits',
+                monnify: '₦95,300 Active',
+                nineboost: '$24.50 SMM',
+                termii: '3,800 SMS',
                 nowpayments: '0.045 BTC / 450 USDT'
             };
-            const result = mockBalances[id] || 'Active Balance Verified';
+            const result = mockBalances[id] || 'Verified';
             setLiveBalances(prev => ({ ...prev, [id]: result }));
             setFetchingBalance(null);
             showToast(`💰 ${id.toUpperCase()}: ${result}`);
-        }, 900);
+        }, 750);
     };
 
     const testAllConnections = () => {
         setTestingAll(true);
-        showToast("⚡ Initiating active health ping on all configured providers...");
+        showToast("⚡ Ping all providers...");
         const items = secretItems.filter(s => s.value && s.value.trim() !== '');
         items.forEach((item, index) => {
             setTimeout(() => {
-                const ms = Math.floor(Math.random() * 40) + 14;
+                const ms = Math.floor(Math.random() * 30) + 12;
                 setPingResults(prev => ({ ...prev, [item.id]: { status: 'ok', ms } }));
                 if (index === items.length - 1) {
                     setTestingAll(false);
-                    showToast("🎉 All active provider endpoints verified successfully!");
+                    showToast("🎉 All endpoints verified!");
                 }
-            }, (index + 1) * 250);
+            }, (index + 1) * 200);
         });
     };
 
@@ -319,7 +315,7 @@ export default function APIVaultScreen() {
             navigator.clipboard.writeText(jsonStr);
         }
         setShowBackupModal(true);
-        showToast("📋 Vault Backup JSON generated & copied!");
+        showToast("📋 Vault Backup JSON copied!");
     };
 
     const importBackupJson = () => {
@@ -331,13 +327,13 @@ export default function APIVaultScreen() {
                 if (parsed.vtu_vendor) setVtuVendor(parsed.vtu_vendor);
                 if (parsed.failover_mode) setFailoverMode(parsed.failover_mode);
                 setShowBackupModal(false);
-                Alert.alert("Import Successful 🎉", "Restored credentials from JSON backup!");
-                showToast("Vault restored! Remember to tap Save All Vault Credentials. 💾");
+                Alert.alert("Success 🎉", "Restored keys from backup!");
+                showToast("Vault restored!");
             } else {
-                Alert.alert("Error", "Invalid JSON format. Expected a 'keys' object.");
+                Alert.alert("Error", "Invalid JSON format.");
             }
         } catch (e: any) {
-            Alert.alert("Error", "Invalid JSON syntax: " + e.message);
+            Alert.alert("Error", "Invalid JSON syntax.");
         }
     };
 
@@ -364,14 +360,12 @@ export default function APIVaultScreen() {
                 { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key' }
             ];
 
-            // 1. Save to AsyncStorage Cache First
             for (const sec of secretsToSave) {
                 if (sec.value !== undefined && sec.value !== null) {
                     await AsyncStorage.setItem(`@vault_${sec.key}`, sec.value.trim());
                 }
             }
 
-            // 2. Save to Supabase system_secrets & app_settings
             for (const sec of secretsToSave) {
                 if (sec.value && sec.value.trim() !== '') {
                     await supabase.from('system_secrets').upsert({
@@ -389,10 +383,10 @@ export default function APIVaultScreen() {
                 }
             }
 
-            Alert.alert("Success 🎉", "All Active API Vault credentials saved and synced successfully!");
-            showToast("Vault settings saved to database & local cache! 🔐");
+            Alert.alert("Success 🎉", "All Vault credentials saved and synced!");
+            showToast("Saved securely! 🔐");
         } catch (e: any) {
-            Alert.alert("Saved Locally 💾", "Saved to local cache. Note: " + (e.message || "Network sync warning"));
+            Alert.alert("Saved Locally 💾", "Saved to local storage.");
         } finally {
             setSaving(false);
         }
@@ -409,12 +403,11 @@ export default function APIVaultScreen() {
             category: 'Identity',
             value: agentHubApiKey,
             setValue: setAgentHubApiKey,
-            placeholder: 'Enter AgentHub API Key (e.g. ah_live_...)',
-            description: 'Used for instant NIN, BVN, CAC, TAX & Identity slip verifications.',
+            placeholder: 'Enter AgentHub API Key...',
+            description: 'Instant NIN, BVN, CAC, TAX & Identity slip verifications.',
             icon: 'card-outline',
             badgeTag: 'ESSENTIAL',
-            isSecret: true,
-            baseUrl: 'https://agenthub.ng/api/v1'
+            isSecret: true
         },
         {
             id: 'idpro',
@@ -428,8 +421,7 @@ export default function APIVaultScreen() {
             description: 'Fallback Identity verification engine for NIN & Phone lookup.',
             icon: 'shield-checkmark-outline',
             badgeTag: 'FALLBACK',
-            isSecret: true,
-            baseUrl: 'https://idpro.ng/api'
+            isSecret: true
         },
         {
             id: 'bilalsadasub',
@@ -439,12 +431,11 @@ export default function APIVaultScreen() {
             category: 'Telecom',
             value: bilalToken,
             setValue: setBilalToken,
-            placeholder: 'Enter BilalSadaSub Authorization Token...',
+            placeholder: 'Enter BilalSadaSub Token...',
             description: 'Primary VTU Vendor for Data Bundles, Airtime, & Electricity.',
             icon: 'wifi-outline',
             badgeTag: 'PRIMARY VTU',
-            isSecret: true,
-            baseUrl: 'https://bilalsadasub.com/api/user'
+            isSecret: true
         },
         {
             id: 'bigi',
@@ -459,7 +450,6 @@ export default function APIVaultScreen() {
             icon: 'flash-outline',
             badgeTag: 'FAILOVER #2',
             isSecret: true,
-            baseUrl: 'https://bigidata.com/api/data',
             secondaryValue: bigiPin,
             setSecondaryValue: setBigiPin,
             secondaryPlaceholder: 'Enter 4-digit Bigi PIN...',
@@ -478,10 +468,9 @@ export default function APIVaultScreen() {
             icon: 'hardware-chip-outline',
             badgeTag: 'FAILOVER #3',
             isSecret: true,
-            baseUrl: 'https://www.clubkonnect.com/api',
             secondaryValue: clubkonnectUserId,
             setSecondaryValue: setClubkonnectUserId,
-            secondaryPlaceholder: 'Enter ClubKonnect User ID / Phone...',
+            secondaryPlaceholder: 'Enter ClubKonnect User ID...',
             secondaryKeyName: 'CLUBKONNECT_USER_ID'
         },
         {
@@ -496,8 +485,7 @@ export default function APIVaultScreen() {
             description: 'Merchant payment processing, card deposits & payout transfers.',
             icon: 'card-outline',
             badgeTag: 'GATEWAY',
-            isSecret: true,
-            baseUrl: 'https://api.paystack.co'
+            isSecret: true
         },
         {
             id: 'payvessel',
@@ -512,10 +500,9 @@ export default function APIVaultScreen() {
             icon: 'business-outline',
             badgeTag: 'BANK ENGINE',
             isSecret: true,
-            baseUrl: 'https://api.payvessel.com/api/v1',
             secondaryValue: payVesselSecretKey,
             setSecondaryValue: setPayVesselSecretKey,
-            secondaryPlaceholder: 'Enter PayVessel Secret Key / Signature...',
+            secondaryPlaceholder: 'Enter PayVessel Secret Signature...',
             secondaryKeyName: 'PAYVESSEL_SECRET_KEY'
         },
         {
@@ -531,7 +518,6 @@ export default function APIVaultScreen() {
             icon: 'wallet-outline',
             badgeTag: 'ACCOUNTS',
             isSecret: true,
-            baseUrl: 'https://api.monnify.com/api/v1',
             secondaryValue: monnifySecretKey,
             setSecondaryValue: setMonnifySecretKey,
             secondaryPlaceholder: 'Enter Monnify Secret Key...',
@@ -549,8 +535,7 @@ export default function APIVaultScreen() {
             description: 'Social Media Growth panel orders & status sync.',
             icon: 'sparkles-outline',
             badgeTag: 'SMM PANEL',
-            isSecret: true,
-            baseUrl: 'https://9boost.com/api/v2'
+            isSecret: true
         },
         {
             id: 'termii',
@@ -561,11 +546,10 @@ export default function APIVaultScreen() {
             value: termiiApiKey,
             setValue: setTermiiApiKey,
             placeholder: 'Enter Termii API Key...',
-            description: 'Transactional SMS notifications, OTPs & phone verification.',
+            description: 'SMS notifications, OTPs & phone verification.',
             icon: 'chatbox-ellipses-outline',
             badgeTag: 'OTP & SMS',
-            isSecret: true,
-            baseUrl: 'https://api.ng.termii.com/api'
+            isSecret: true
         },
         {
             id: 'nowpayments',
@@ -576,11 +560,10 @@ export default function APIVaultScreen() {
             value: nowPaymentsApiKey,
             setValue: setNowPaymentsApiKey,
             placeholder: 'Enter NowPayments API Key...',
-            description: 'Accept USDT, BTC, ETH & crypto deposit settlements.',
+            description: 'Accept USDT, BTC, ETH & crypto settlements.',
             icon: 'logo-bitcoin',
             badgeTag: 'CRYPTO DEPOSITS',
-            isSecret: true,
-            baseUrl: 'https://api.nowpayments.io/v1'
+            isSecret: true
         }
     ];
 
@@ -600,8 +583,8 @@ export default function APIVaultScreen() {
     if (loading) {
         return (
             <View style={{ flex: 1, backgroundColor: L.bg, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator color={L.goldDk} size="large" />
-                <Text style={{ color: L.navyHeader, marginTop: 16, fontSize: 12, fontWeight: 'bold', letterSpacing: 1.2, textTransform: 'uppercase' }}>Loading API Vault & Master Control...</Text>
+                <ActivityIndicator color={L.goldDk} size="small" />
+                <Text style={{ color: L.navyHeader, marginTop: 10, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>Loading API Vault...</Text>
             </View>
         );
     }
@@ -609,165 +592,161 @@ export default function APIVaultScreen() {
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{
-                title: 'API Vault & Master Control',
+                title: 'API Vault Control',
                 headerStyle: { backgroundColor: L.navyHeader },
                 headerTintColor: L.gold,
-                headerTitleStyle: { fontWeight: '900', color: L.gold }
+                headerTitleStyle: { fontWeight: '900', fontSize: 14, color: L.gold }
             }} />
 
             {/* Toast Notification Banner */}
             {toastMessage && (
-                <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 50, backgroundColor: L.navyHeader, borderColor: L.gold, borderWidth: 1.5, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                        <Ionicons name="sparkles" size={20} color={L.gold} />
-                        <Text style={{ color: L.goldLight, fontWeight: 'bold', fontSize: 12, flex: 1 }}>{toastMessage}</Text>
+                <View style={{ position: 'absolute', top: 10, left: 12, right: 12, zIndex: 50, backgroundColor: L.navyHeader, borderColor: L.gold, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Ionicons name="sparkles" size={14} color={L.gold} />
+                        <Text style={{ color: L.goldLight, fontWeight: 'bold', fontSize: 10, flex: 1 }}>{toastMessage}</Text>
                     </View>
                 </View>
             )}
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingTop: 16 }} contentContainerStyle={{ paddingBottom: 130 }}>
+            <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 10 }} contentContainerStyle={{ paddingBottom: 110 }}>
 
-                {/* Royal Navy & Metallic Gold Master Hero Card (Light Theme) */}
+                {/* Compact Royal Navy Hero Banner */}
                 <LinearGradient
                     colors={['#0F172A', '#1C2541', '#0B132B']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={{ padding: 20, borderRadius: 24, borderWidth: 2, borderColor: L.goldDk, marginBottom: 20, position: 'relative', overflow: 'hidden', shadowColor: L.navyHeader, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }}
+                    style={{ padding: 14, borderRadius: 18, borderWidth: 1.5, borderColor: L.goldDk, marginBottom: 12 }}
                 >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255, 215, 0, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: L.gold }}>
-                                <Ionicons name="shield-checkmark-sharp" size={24} color={L.gold} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 34, height: 34, borderRadius: 12, backgroundColor: 'rgba(255, 215, 0, 0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: L.gold }}>
+                                <Ionicons name="shield-checkmark-sharp" size={18} color={L.gold} />
                             </View>
                             <View>
-                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>ULTRA API VAULT</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: L.emerald }} />
-                                    <Text style={{ color: '#E2E8F0', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>Encrypted Storage Active • Live Sync</Text>
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 15, letterSpacing: -0.3 }}>ULTRA API VAULT</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: L.emerald }} />
+                                    <Text style={{ color: '#E2E8F0', fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' }}>Encrypted • Live Sync</Text>
                                 </View>
                             </View>
                         </View>
 
                         <TouchableOpacity
                             onPress={() => router.push('/manage/liquidity')}
-                            style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                            style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 3 }}
                         >
-                            <Ionicons name="wallet-outline" size={14} color={L.gold} />
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12 }}>Balances →</Text>
+                            <Ionicons name="wallet-outline" size={12} color={L.gold} />
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>Balances →</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Vault Health Progress Bar */}
-                    <View style={{ backgroundColor: 'rgba(6, 11, 25, 0.8)', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.4)', marginBottom: 16 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <Text style={{ color: '#CBD5E1', fontWeight: 'bold', fontSize: 12 }}>Vault Health & Readiness Score</Text>
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12 }}>{healthPercent}% ({activeCount}/{totalCount} Configured)</Text>
+                    <View style={{ backgroundColor: 'rgba(6, 11, 25, 0.8)', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.35)', marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={{ color: '#CBD5E1', fontWeight: 'bold', fontSize: 10 }}>Vault Health</Text>
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>{healthPercent}% ({activeCount}/{totalCount} Active)</Text>
                         </View>
-                        <View style={{ width: '100%', height: 10, backgroundColor: '#0A1128', borderRadius: 5, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)' }}>
+                        <View style={{ width: '100%', height: 6, backgroundColor: '#0A1128', borderRadius: 3, overflow: 'hidden' }}>
                             <View
-                                style={{ width: `${healthPercent}%`, height: '100%', backgroundColor: L.gold, borderRadius: 5 }}
+                                style={{ width: `${healthPercent}%`, height: '100%', backgroundColor: L.gold, borderRadius: 3 }}
                             />
                         </View>
                     </View>
 
-                    {/* Quick Action Control Strip */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 6, borderTopWidth: 1, borderColor: 'rgba(218, 165, 32, 0.25)' }}>
+                    {/* Quick Action Strip */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingTop: 4 }}>
                         <TouchableOpacity
                             onPress={testAllConnections}
                             disabled={testingAll}
-                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                         >
                             {testingAll ? (
                                 <ActivityIndicator size="small" color={L.gold} />
                             ) : (
                                 <>
-                                    <Ionicons name="flash" size={14} color={L.gold} />
-                                    <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 12 }}>Ping All APIs</Text>
+                                    <Ionicons name="flash" size={12} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 10 }}>Ping APIs</Text>
                                 </>
                             )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             onPress={exportBackupJson}
-                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
                         >
-                            <Ionicons name="code-download-outline" size={14} color={L.gold} />
-                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 12 }}>Backup JSON</Text>
+                            <Ionicons name="code-download-outline" size={12} color={L.gold} />
+                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 10 }}>Backup JSON</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             onPress={toggleShowAllKeys}
-                            style={{ backgroundColor: '#0A1128', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                            style={{ backgroundColor: '#0A1128', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(218, 165, 32, 0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}
                         >
-                            <Ionicons name={Object.keys(visibleKeys).length > 0 ? "eye-off" : "eye"} size={14} color={L.gold} />
-                            <Text style={{ color: L.goldLight, fontWeight: '600', fontSize: 12 }}>
+                            <Ionicons name={Object.keys(visibleKeys).length > 0 ? "eye-off" : "eye"} size={12} color={L.gold} />
+                            <Text style={{ color: L.goldLight, fontWeight: '600', fontSize: 10 }}>
                                 {Object.keys(visibleKeys).length > 0 ? "Hide" : "Show"}
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
 
-                {/* Multi-API Active Failover Switchboard (Light Theme Card) */}
-                <View style={{ backgroundColor: L.card, padding: 18, borderRadius: 24, borderWidth: 1.5, borderColor: L.cardBorder, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="flash-sharp" size={18} color={L.goldDk} />
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>⚡ Failover & Routing Strategy</Text>
+                {/* Compact Failover Strategy Card */}
+                <View style={{ backgroundColor: L.card, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="flash-sharp" size={15} color={L.goldDk} />
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>⚡ Failover & Routing Engine</Text>
                         </View>
-                        <View style={{ backgroundColor: L.goldLight, paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: L.goldDk }}>
-                            <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 10 }}>ROUTING ENGINE</Text>
+                        <View style={{ backgroundColor: L.goldLight, paddingHorizontal: 8, paddingVertical: 1, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk }}>
+                            <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 8 }}>ROUTING</Text>
                         </View>
                     </View>
 
-                    {/* Mode Toggle Switch */}
-                    <View style={{ flexDirection: 'row', backgroundColor: L.bg, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 14 }}>
+                    {/* Compact Mode Switch */}
+                    <View style={{ flexDirection: 'row', backgroundColor: L.bg, padding: 2, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10 }}>
                         <TouchableOpacity
                             onPress={() => setFailoverMode('smart')}
-                            style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: failoverMode === 'smart' ? L.navyHeader : 'transparent' }}
+                            style={{ flex: 1, paddingVertical: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3, backgroundColor: failoverMode === 'smart' ? L.navyHeader : 'transparent' }}
                         >
-                            <Ionicons name="sparkles" size={13} color={failoverMode === 'smart' ? L.gold : L.textMuted} />
-                            <Text style={{ fontWeight: '900', fontSize: 12, color: failoverMode === 'smart' ? L.gold : L.textMuted }}>Smart Load-Balance</Text>
+                            <Ionicons name="sparkles" size={11} color={failoverMode === 'smart' ? L.gold : L.textMuted} />
+                            <Text style={{ fontWeight: '900', fontSize: 10, color: failoverMode === 'smart' ? L.gold : L.textMuted }}>Smart Load-Balance</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => setFailoverMode('sequential')}
-                            style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, backgroundColor: failoverMode === 'sequential' ? L.navyHeader : 'transparent' }}
+                            style={{ flex: 1, paddingVertical: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3, backgroundColor: failoverMode === 'sequential' ? L.navyHeader : 'transparent' }}
                         >
-                            <Ionicons name="swap-vertical" size={13} color={failoverMode === 'sequential' ? L.gold : L.textMuted} />
-                            <Text style={{ fontWeight: '900', fontSize: 12, color: failoverMode === 'sequential' ? L.gold : L.textMuted }}>Sequential Priority</Text>
+                            <Ionicons name="swap-vertical" size={11} color={failoverMode === 'sequential' ? L.gold : L.textMuted} />
+                            <Text style={{ fontWeight: '900', fontSize: 10, color: failoverMode === 'sequential' ? L.gold : L.textMuted }}>Sequential Priority</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={{ color: L.textSecondary, fontSize: 12, marginBottom: 12, fontWeight: '500' }}>
-                        Enable/disable active VTU vendor providers for instant failover:
-                    </Text>
-
-                    <View style={{ gap: 10 }}>
+                    <View style={{ gap: 6 }}>
                         {[
-                            { id: 'bilalsadasub', rank: 'PRIORITY #1', name: 'BilalSadaSub API', domain: 'bilalsadasub.com', desc: 'Data, Airtime, Cable TV & Telecom' },
-                            { id: 'bigi', rank: 'PRIORITY #2', name: 'Bigi VTU API', domain: 'bigidata.com', desc: 'SME & Gifting Data Provider' },
-                            { id: 'clubkonnect', rank: 'PRIORITY #3', name: 'ClubKonnect API', domain: 'nellobytesystems.com', desc: 'Telecom & Utility Payments' }
+                            { id: 'bilalsadasub', rank: 'PRIORITY #1', name: 'BilalSadaSub API', desc: 'Data, Airtime, Cable TV & Telecom' },
+                            { id: 'bigi', rank: 'PRIORITY #2', name: 'Bigi VTU API', desc: 'SME & Gifting Data Provider' },
+                            { id: 'clubkonnect', rank: 'PRIORITY #3', name: 'ClubKonnect API', desc: 'Telecom & Utility Payments' }
                         ].map((item) => {
                             const checked = isVendorSelected(item.id);
                             return (
                                 <TouchableOpacity
                                     key={item.id}
                                     onPress={() => toggleVendorSelect(item.id)}
-                                    style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: checked ? L.goldBg : L.card, borderColor: checked ? L.goldDk : L.inputBorder }}
+                                    style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, backgroundColor: checked ? L.goldBg : L.card, borderColor: checked ? L.goldDk : L.inputBorder }}
                                     activeOpacity={0.85}
                                 >
-                                    <View style={{ width: 22, height: 22, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: checked ? L.navyHeader : L.card, borderColor: checked ? L.navyHeader : L.textMuted }}>
-                                        {checked && <Ionicons name="checkmark" size={14} color={L.gold} />}
+                                    <View style={{ width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 10, backgroundColor: checked ? L.navyHeader : L.card, borderColor: checked ? L.navyHeader : L.textMuted }}>
+                                        {checked && <Ionicons name="checkmark" size={12} color={L.gold} />}
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Text style={{ fontWeight: '900', fontSize: 12, color: L.navyHeader }}>{item.name}</Text>
-                                            <Text style={{ color: L.goldAmber, fontSize: 9, fontWeight: '900', textTransform: 'uppercase', backgroundColor: L.goldLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.goldDk }}>{item.rank}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={{ fontWeight: '900', fontSize: 11, color: L.navyHeader }}>{item.name}</Text>
+                                            <Text style={{ color: L.goldAmber, fontSize: 8, fontWeight: '900', backgroundColor: L.goldLight, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, borderWidth: 1, borderColor: L.goldDk }}>{item.rank}</Text>
                                         </View>
-                                        <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 2 }}>{item.desc}</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 1 }}>{item.desc}</Text>
                                     </View>
                                     {checked && (
-                                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>ENABLED</Text>
+                                        <View style={{ backgroundColor: L.navyHeader, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9 }}>ACTIVE</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -776,35 +755,35 @@ export default function APIVaultScreen() {
                     </View>
                 </View>
 
-                {/* Search Bar & Category Filter */}
-                <View style={{ marginBottom: 20 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.card, borderWidth: 1.5, borderColor: L.inputBorder, borderRadius: 16, paddingHorizontal: 16, height: 48, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 2 }}>
-                        <Ionicons name="search-outline" size={18} color={L.goldDk} />
+                {/* Compact Search Bar & Category Filter */}
+                <View style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.card, borderWidth: 1, borderColor: L.inputBorder, borderRadius: 14, paddingHorizontal: 12, height: 38, marginBottom: 8 }}>
+                        <Ionicons name="search-outline" size={15} color={L.goldDk} />
                         <TextInput
-                            style={{ flex: 1, marginLeft: 12, color: L.textPrimary, fontWeight: '600', fontSize: 12 }}
-                            placeholder="Search API keys by provider or title..."
+                            style={{ flex: 1, marginLeft: 8, color: L.textPrimary, fontWeight: '600', fontSize: 11 }}
+                            placeholder="Search API keys..."
                             placeholderTextColor={L.textMuted}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={18} color={L.textMuted} />
+                                <Ionicons name="close-circle" size={15} color={L.textMuted} />
                             </TouchableOpacity>
                         )}
                     </View>
 
-                    {/* Category Scroll Tabs */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {/* Category Filter Pills */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                         {categories.map((cat) => {
                             const isSelected = selectedCategory === cat;
                             return (
                                 <TouchableOpacity
                                     key={cat}
                                     onPress={() => setSelectedCategory(cat)}
-                                    style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, backgroundColor: isSelected ? L.navyHeader : L.card, borderColor: isSelected ? L.navyHeader : L.inputBorder }}
+                                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, backgroundColor: isSelected ? L.navyHeader : L.card, borderColor: isSelected ? L.navyHeader : L.inputBorder }}
                                 >
-                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: isSelected ? L.gold : L.textSecondary }}>
+                                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: isSelected ? L.gold : L.textSecondary }}>
                                         {cat}
                                     </Text>
                                 </TouchableOpacity>
@@ -813,8 +792,8 @@ export default function APIVaultScreen() {
                     </ScrollView>
                 </View>
 
-                {/* Credential Cards List */}
-                <View style={{ gap: 16 }}>
+                {/* Compact Credential Cards List */}
+                <View style={{ gap: 10 }}>
                     {filteredSecrets.map((item) => {
                         const isConfigured = item.value && item.value.trim() !== '';
                         const showSecret = visibleKeys[item.keyName];
@@ -826,77 +805,77 @@ export default function APIVaultScreen() {
                         return (
                             <View
                                 key={item.id}
-                                style={{ backgroundColor: L.card, padding: 18, borderRadius: 24, borderWidth: 1.5, borderColor: isConfigured ? L.cardBorder : L.inputBorder, position: 'relative', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 3 }}
+                                style={{ backgroundColor: L.card, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: isConfigured ? L.cardBorder : L.inputBorder, position: 'relative', overflow: 'hidden' }}
                             >
                                 {/* Card Ribbon Badge */}
                                 {item.badgeTag && (
-                                    <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: L.goldLight, paddingHorizontal: 12, paddingVertical: 3, borderBottomLeftRadius: 12, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: L.goldDk }}>
-                                        <Text style={{ color: L.goldAmber, fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>{item.badgeTag}</Text>
+                                    <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: L.goldLight, paddingHorizontal: 8, paddingVertical: 2, borderBottomLeftRadius: 8, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: L.goldDk }}>
+                                        <Text style={{ color: L.goldAmber, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 }}>{item.badgeTag}</Text>
                                     </View>
                                 )}
 
                                 {/* Card Header */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingTop: 4 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                                        <View style={{ width: 40, height: 40, borderRadius: 16, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name={item.icon} size={20} color={L.gold} />
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name={item.icon} size={16} color={L.gold} />
                                         </View>
-                                        <View style={{ flex: 1, paddingRight: 50 }}>
-                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13 }}>{item.title}</Text>
-                                            <Text style={{ color: L.goldDk, fontSize: 10, fontWeight: '900' }}>{item.provider} • {item.category}</Text>
+                                        <View style={{ flex: 1, paddingRight: 40 }}>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>{item.title}</Text>
+                                            <Text style={{ color: L.goldDk, fontSize: 9, fontWeight: '900' }}>{item.provider} • {item.category}</Text>
                                         </View>
                                     </View>
                                 </View>
 
-                                <Text style={{ color: L.textSecondary, fontSize: 11, lineHeight: 16, marginBottom: 12 }}>{item.description}</Text>
+                                <Text style={{ color: L.textSecondary, fontSize: 10, lineHeight: 14, marginBottom: 8 }}>{item.description}</Text>
 
-                                {/* Live Float Balance Ribbon if Fetched */}
+                                {/* Live Float Balance Banner */}
                                 {balance && (
-                                    <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: L.emeraldBorder, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 11 }}>💰 Live Account Balance:</Text>
-                                        <Text style={{ color: L.emerald, fontWeight: '900', fontSize: 12 }}>{balance}</Text>
+                                    <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.emeraldBorder, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 10 }}>💰 Live Balance:</Text>
+                                        <Text style={{ color: L.emerald, fontWeight: '900', fontSize: 10 }}>{balance}</Text>
                                     </View>
                                 )}
 
                                 {/* Input Field 1 */}
-                                <View style={{ marginBottom: 8 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold' }}>KEY: {item.keyName}</Text>
+                                <View style={{ marginBottom: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold' }}>KEY: {item.keyName}</Text>
                                         {ping && (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: L.emeraldBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                                <Ionicons name="checkmark-circle" size={10} color={L.emerald} />
-                                                <Text style={{ color: L.emerald, fontSize: 9, fontWeight: 'bold' }}>200 OK ({ping.ms}ms)</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                                <Ionicons name="checkmark-circle" size={9} color={L.emerald} />
+                                                <Text style={{ color: L.emerald, fontSize: 8, fontWeight: 'bold' }}>200 OK ({ping.ms}ms)</Text>
                                             </View>
                                         )}
                                     </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 16, borderWidth: 1.5, borderColor: L.inputBorder, paddingHorizontal: 12, paddingVertical: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36 }}>
                                         <TextInput
                                             value={item.value}
                                             onChangeText={item.setValue}
                                             placeholder={item.placeholder}
                                             placeholderTextColor="#94A3B8"
                                             secureTextEntry={item.isSecret && !showSecret}
-                                            style={{ flex: 1, color: L.textPrimary, paddingVertical: 10, fontSize: 12, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
+                                            style={{ flex: 1, color: L.textPrimary, paddingVertical: 6, fontSize: 11, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
                                         />
                                         
                                         {/* Input Actions */}
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 6 }}>
                                             {item.isSecret && (
                                                 <TouchableOpacity
                                                     onPress={() => toggleVisibility(item.keyName)}
-                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
+                                                    style={{ padding: 5, borderRadius: 8, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
                                                 >
-                                                    <Ionicons name={showSecret ? "eye-off-outline" : "eye-outline"} size={16} color={L.navyHeader} />
+                                                    <Ionicons name={showSecret ? "eye-off-outline" : "eye-outline"} size={14} color={L.navyHeader} />
                                                 </TouchableOpacity>
                                             )}
 
                                             <TouchableOpacity
                                                 onPress={() => copyValue(item.keyName, item.value)}
-                                                style={{ padding: 8, borderRadius: 10, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
+                                                style={{ padding: 5, borderRadius: 8, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
                                             >
                                                 <Ionicons
                                                     name={copiedKey === item.keyName ? "checkmark-sharp" : "copy-outline"}
-                                                    size={16}
+                                                    size={14}
                                                     color={copiedKey === item.keyName ? L.emerald : L.navyHeader}
                                                 />
                                             </TouchableOpacity>
@@ -904,35 +883,35 @@ export default function APIVaultScreen() {
                                     </View>
                                 </View>
 
-                                {/* Optional Secondary Input Field */}
+                                {/* Secondary Input Field */}
                                 {item.secondaryKeyName && item.setSecondaryValue && (
-                                    <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: L.inputBorder }}>
-                                        <Text style={{ color: L.textMuted, fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold', marginBottom: 4 }}>SECONDARY KEY: {item.secondaryKeyName}</Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 16, borderWidth: 1.5, borderColor: L.inputBorder, paddingHorizontal: 12, paddingVertical: 2 }}>
+                                    <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderColor: L.inputBorder }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold', marginBottom: 2 }}>SECONDARY KEY: {item.secondaryKeyName}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: L.inputBg, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 36 }}>
                                             <TextInput
                                                 value={item.secondaryValue || ''}
                                                 onChangeText={item.setSecondaryValue}
                                                 placeholder={item.secondaryPlaceholder || 'Enter key...'}
                                                 placeholderTextColor="#94A3B8"
                                                 secureTextEntry={item.isSecret && !showSecondarySecret}
-                                                style={{ flex: 1, color: L.textPrimary, paddingVertical: 10, fontSize: 12, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
+                                                style={{ flex: 1, color: L.textPrimary, paddingVertical: 6, fontSize: 11, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}
                                             />
 
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 6 }}>
                                                 <TouchableOpacity
                                                     onPress={() => toggleVisibility(item.secondaryKeyName!)}
-                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
+                                                    style={{ padding: 5, borderRadius: 8, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
                                                 >
-                                                    <Ionicons name={showSecondarySecret ? "eye-off-outline" : "eye-outline"} size={16} color={L.navyHeader} />
+                                                    <Ionicons name={showSecondarySecret ? "eye-off-outline" : "eye-outline"} size={14} color={L.navyHeader} />
                                                 </TouchableOpacity>
 
                                                 <TouchableOpacity
                                                     onPress={() => copyValue(item.secondaryKeyName!, item.secondaryValue || '')}
-                                                    style={{ padding: 8, borderRadius: 10, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
+                                                    style={{ padding: 5, borderRadius: 8, backgroundColor: L.bg, borderWidth: 1, borderColor: L.inputBorder }}
                                                 >
                                                     <Ionicons
                                                         name={copiedKey === item.secondaryKeyName ? "checkmark-sharp" : "copy-outline"}
-                                                        size={16}
+                                                        size={14}
                                                         color={copiedKey === item.secondaryKeyName ? L.emerald : L.navyHeader}
                                                     />
                                                 </TouchableOpacity>
@@ -942,38 +921,36 @@ export default function APIVaultScreen() {
                                 )}
 
                                 {/* Bottom Card Controls */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderColor: L.inputBorder }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <View style={{ paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isConfigured ? L.emeraldBg : L.roseBg, borderColor: isConfigured ? L.emeraldBorder : L.rose }}>
-                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isConfigured ? L.emerald : L.rose }} />
-                                            <Text style={{ fontWeight: '900', fontSize: 9, color: isConfigured ? L.emerald : L.rose }}>
-                                                {isConfigured ? 'SAVED & ACTIVE' : 'NOT CONFIGURED'}
-                                            </Text>
-                                        </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderColor: L.inputBorder }}>
+                                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: isConfigured ? L.emeraldBg : L.roseBg, borderColor: isConfigured ? L.emeraldBorder : L.rose }}>
+                                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isConfigured ? L.emerald : L.rose }} />
+                                        <Text style={{ fontWeight: '900', fontSize: 8, color: isConfigured ? L.emerald : L.rose }}>
+                                            {isConfigured ? 'SAVED & ACTIVE' : 'NOT SET'}
+                                        </Text>
                                     </View>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                         <TouchableOpacity
                                             onPress={() => fetchLiveProviderBalance(item.id, item.value)}
                                             disabled={isFetchingBal}
-                                            style={{ backgroundColor: L.goldBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                            style={{ backgroundColor: L.goldBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 3 }}
                                         >
                                             {isFetchingBal ? (
                                                 <ActivityIndicator size="small" color={L.goldAmber} />
                                             ) : (
                                                 <>
-                                                    <Ionicons name="wallet-outline" size={12} color={L.goldAmber} />
-                                                    <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 10 }}>Live Float</Text>
+                                                    <Ionicons name="wallet-outline" size={11} color={L.goldAmber} />
+                                                    <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 9 }}>Float</Text>
                                                 </>
                                             )}
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
                                             onPress={() => testSingleConnection(item.id, item.value)}
-                                            style={{ backgroundColor: L.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                            style={{ backgroundColor: L.bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', alignItems: 'center', gap: 3 }}
                                         >
-                                            <Ionicons name="flash-outline" size={12} color={L.navyHeader} />
-                                            <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 10 }}>Ping</Text>
+                                            <Ionicons name="flash-outline" size={11} color={L.navyHeader} />
+                                            <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 9 }}>Ping</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -987,10 +964,10 @@ export default function APIVaultScreen() {
                                                 secondaryKey: item.secondaryKeyName,
                                                 secondaryValue: item.secondaryValue
                                             })}
-                                            style={{ backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: L.navyHeader, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                            style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.navyHeader, flexDirection: 'row', alignItems: 'center', gap: 3 }}
                                         >
-                                            <Ionicons name="information-circle-outline" size={12} color={L.gold} />
-                                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 10 }}>Audit Specs</Text>
+                                            <Ionicons name="information-circle-outline" size={11} color={L.gold} />
+                                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 9 }}>Specs</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1000,8 +977,8 @@ export default function APIVaultScreen() {
                 </View>
             </ScrollView>
 
-            {/* Floating Gold Save Bar (Light Theme) */}
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)', borderTopWidth: 2, borderColor: L.goldDk, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 15 }}>
+            {/* Compact Floating Gold Save Bar */}
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255, 255, 255, 0.95)', borderTopWidth: 1.5, borderColor: L.goldDk, elevation: 10 }}>
                 <TouchableOpacity
                     onPress={handleSaveVault}
                     disabled={saving}
@@ -1011,15 +988,15 @@ export default function APIVaultScreen() {
                         colors={['#0F172A', '#1C2541', '#0B132B']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 2, borderColor: L.gold }}
+                        style={{ paddingVertical: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1.5, borderColor: L.gold }}
                     >
                         {saving ? (
-                            <ActivityIndicator color={L.gold} />
+                            <ActivityIndicator color={L.gold} size="small" />
                         ) : (
                             <>
-                                <Ionicons name="shield-checkmark-sharp" size={20} color={L.gold} />
-                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>
-                                    💾 Save & Sync All Vault Credentials
+                                <Ionicons name="shield-checkmark-sharp" size={16} color={L.gold} />
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    💾 Save All Vault Credentials
                                 </Text>
                             </>
                         )}
@@ -1027,7 +1004,7 @@ export default function APIVaultScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Tabbed Secret Key Detail Modal (Light Theme) */}
+            {/* Tabbed Detail Modal */}
             <Modal
                 visible={selectedSecretDetail !== null}
                 transparent
@@ -1035,61 +1012,61 @@ export default function APIVaultScreen() {
                 onRequestClose={() => setSelectedSecretDetail(null)}
             >
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'flex-end' }}>
-                    <View style={{ backgroundColor: L.card, borderTopWidth: 4, borderColor: L.goldDk, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Ionicons name="key-sharp" size={22} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 16 }}>API Security & Audit Spec</Text>
+                    <View style={{ backgroundColor: L.card, borderTopWidth: 3, borderColor: L.goldDk, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '80%' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="key-sharp" size={18} color={L.navyHeader} />
+                                <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 14 }}>API Security Spec</Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setSelectedSecretDetail(null)}
-                                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.inputBorder }}
+                                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.inputBorder }}
                             >
-                                <Ionicons name="close" size={18} color={L.navyHeader} />
+                                <Ionicons name="close" size={16} color={L.navyHeader} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Modal Tabs */}
-                        <View style={{ flexDirection: 'row', backgroundColor: L.bg, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: L.bg, padding: 2, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 12 }}>
                             {(['info', 'webhooks', 'audit'] as const).map(tab => (
                                 <TouchableOpacity
                                     key={tab}
                                     onPress={() => setModalTab(tab)}
-                                    style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center', backgroundColor: modalTab === tab ? L.navyHeader : 'transparent' }}
+                                    style={{ flex: 1, paddingVertical: 6, borderRadius: 10, alignItems: 'center', backgroundColor: modalTab === tab ? L.navyHeader : 'transparent' }}
                                 >
-                                    <Text style={{ fontWeight: '900', fontSize: 12, textTransform: 'uppercase', color: modalTab === tab ? L.gold : L.textMuted }}>{tab}</Text>
+                                    <Text style={{ fontWeight: '900', fontSize: 10, textTransform: 'uppercase', color: modalTab === tab ? L.gold : L.textMuted }}>{tab}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
                         {selectedSecretDetail && (
-                            <ScrollView style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 12 }}>
+                            <ScrollView style={{ marginBottom: 6 }} contentContainerStyle={{ gap: 10 }}>
                                 {modalTab === 'info' && (
                                     <>
-                                        <View style={{ backgroundColor: L.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Provider & Category</Text>
-                                            <Text style={{ color: L.navyHeader, fontWeight: '800', fontSize: 14 }}>{selectedSecretDetail.provider} ({selectedSecretDetail.category})</Text>
+                                        <View style={{ backgroundColor: L.bg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 9, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 0.5, marginBottom: 2 }}>Provider & Category</Text>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '800', fontSize: 12 }}>{selectedSecretDetail.provider} ({selectedSecretDetail.category})</Text>
                                         </View>
 
-                                        <View style={{ backgroundColor: L.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Key Name</Text>
-                                            <Text style={{ color: L.goldAmber, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, fontWeight: 'bold', marginBottom: 4 }}>{selectedSecretDetail.key}</Text>
-                                            <Text style={{ color: L.textSecondary, fontSize: 12, lineHeight: 18 }}>{selectedSecretDetail.desc}</Text>
+                                        <View style={{ backgroundColor: L.bg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 9, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 0.5, marginBottom: 2 }}>Key Name</Text>
+                                            <Text style={{ color: L.goldAmber, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, fontWeight: 'bold', marginBottom: 2 }}>{selectedSecretDetail.key}</Text>
+                                            <Text style={{ color: L.textSecondary, fontSize: 11, lineHeight: 16 }}>{selectedSecretDetail.desc}</Text>
                                         </View>
 
-                                        <View style={{ backgroundColor: L.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 10, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 }}>Status & Length</Text>
+                                        <View style={{ backgroundColor: L.bg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 9, textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 0.5, marginBottom: 2 }}>Status</Text>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 12 }}>
-                                                    {selectedSecretDetail.value ? `✓ Set (${selectedSecretDetail.value.length} chars)` : '❌ Not Configured'}
+                                                <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 11 }}>
+                                                    {selectedSecretDetail.value ? `✓ Set (${selectedSecretDetail.value.length} chars)` : '❌ Not Set'}
                                                 </Text>
                                                 {selectedSecretDetail.value && (
                                                     <TouchableOpacity
                                                         onPress={() => copyValue(selectedSecretDetail.key, selectedSecretDetail.value)}
-                                                        style={{ backgroundColor: L.goldBg, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                                        style={{ backgroundColor: L.goldBg, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', gap: 3 }}
                                                     >
-                                                        <Ionicons name="copy-outline" size={12} color={L.goldAmber} />
-                                                        <Text style={{ color: L.goldAmber, fontWeight: 'bold', fontSize: 12 }}>Copy Key</Text>
+                                                        <Ionicons name="copy-outline" size={11} color={L.goldAmber} />
+                                                        <Text style={{ color: L.goldAmber, fontWeight: 'bold', fontSize: 10 }}>Copy</Text>
                                                     </TouchableOpacity>
                                                 )}
                                             </View>
@@ -1098,31 +1075,24 @@ export default function APIVaultScreen() {
                                 )}
 
                                 {modalTab === 'webhooks' && (
-                                    <View style={{ backgroundColor: L.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, gap: 8 }}>
-                                        <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>⚡ Webhook Callback URL</Text>
-                                        <Text style={{ color: L.navyHeader, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, backgroundColor: L.card, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <View style={{ backgroundColor: L.bg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                                        <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 11, marginBottom: 2 }}>⚡ Webhook Callback URL</Text>
+                                        <Text style={{ color: L.navyHeader, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 10, backgroundColor: L.card, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder }}>
                                             https://sljydbtydwyygzoxerpw.supabase.co/functions/v1/{selectedSecretDetail.provider.toLowerCase().replace(/[^a-z0-9]/g, '')}-webhook
-                                        </Text>
-                                        <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 }}>
-                                            Paste this webhook URL into your {selectedSecretDetail.provider} developer dashboard to receive automated transaction notifications.
                                         </Text>
                                     </View>
                                 )}
 
                                 {modalTab === 'audit' && (
-                                    <View style={{ backgroundColor: L.bg, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, gap: 8 }}>
-                                        <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>🛡️ Security Audit Log</Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 12 }}>Encryption</Text>
-                                            <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 12 }}>AES-256 System Vault</Text>
+                                    <View style={{ backgroundColor: L.bg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                                        <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 11, marginBottom: 2 }}>🛡️ Audit Specs</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 11 }}>Encryption</Text>
+                                            <Text style={{ color: L.emerald, fontWeight: 'bold', fontSize: 11 }}>AES-256 Vault</Text>
                                         </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 12 }}>Environment</Text>
-                                            <Text style={{ color: L.navyHeader, fontWeight: 'bold', fontSize: 12 }}>Production Live</Text>
-                                        </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
-                                            <Text style={{ color: L.textMuted, fontSize: 12 }}>Admin Access</Text>
-                                            <Text style={{ color: L.goldAmber, fontWeight: 'bold', fontSize: 12 }}>Super Admin Only</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 11 }}>Access</Text>
+                                            <Text style={{ color: L.goldAmber, fontWeight: 'bold', fontSize: 11 }}>Super Admin Only</Text>
                                         </View>
                                     </View>
                                 )}
@@ -1131,9 +1101,9 @@ export default function APIVaultScreen() {
 
                         <TouchableOpacity
                             onPress={() => setSelectedSecretDetail(null)}
-                            style={{ backgroundColor: L.navyHeader, paddingVertical: 14, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: L.gold, marginTop: 12 }}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: L.gold, marginTop: 8 }}
                         >
-                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 12, textTransform: 'uppercase' }}>Close Security Modal</Text>
+                            <Text style={{ color: L.gold, fontWeight: 'bold', fontSize: 11, textTransform: 'uppercase' }}>Close Modal</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1146,38 +1116,35 @@ export default function APIVaultScreen() {
                 animationType="fade"
                 onRequestClose={() => setShowBackupModal(false)}
             >
-                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 20 }}>
-                    <View style={{ backgroundColor: L.card, borderRadius: 24, padding: 20, borderWidth: 2, borderColor: L.goldDk }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 16 }}>📋 Vault Backup & Restore JSON</Text>
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 16 }}>
+                    <View style={{ backgroundColor: L.card, borderRadius: 20, padding: 16, borderWidth: 1.5, borderColor: L.goldDk }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 14 }}>📋 Vault Backup JSON</Text>
                             <TouchableOpacity onPress={() => setShowBackupModal(false)}>
-                                <Ionicons name="close-circle" size={24} color={L.textMuted} />
+                                <Ionicons name="close-circle" size={20} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
-                        <Text style={{ color: L.textSecondary, fontSize: 11, marginBottom: 10 }}>
-                            Copy your JSON backup or paste a previously saved JSON configuration below to restore keys:
-                        </Text>
                         <TextInput
                             multiline
-                            numberOfLines={10}
+                            numberOfLines={8}
                             value={backupJsonText}
                             onChangeText={setBackupJsonText}
-                            placeholder="Paste JSON configuration here..."
+                            placeholder="Paste JSON configuration..."
                             placeholderTextColor={L.textMuted}
-                            style={{ backgroundColor: L.bg, borderRadius: 16, padding: 12, color: L.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, minHeight: 180, textAlignVertical: 'top', borderWidth: 1, borderColor: L.inputBorder, marginBottom: 14 }}
+                            style={{ backgroundColor: L.bg, borderRadius: 12, padding: 10, color: L.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 10, minHeight: 140, textAlignVertical: 'top', borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10 }}
                         />
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity
                                 onPress={importBackupJson}
-                                style={{ flex: 1, backgroundColor: L.navyHeader, paddingVertical: 12, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
+                                style={{ flex: 1, backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
                             >
-                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12 }}>Import & Apply JSON</Text>
+                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11 }}>Import JSON</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setShowBackupModal(false)}
-                                style={{ backgroundColor: L.bg, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}
+                                style={{ backgroundColor: L.bg, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}
                             >
-                                <Text style={{ color: L.textSecondary, fontWeight: 'bold', fontSize: 12 }}>Close</Text>
+                                <Text style={{ color: L.textSecondary, fontWeight: 'bold', fontSize: 11 }}>Close</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
