@@ -382,8 +382,6 @@ export default function SocialBoostScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Dynamic Banners */}
-          <DynamicBanners placement="social_boost" />
           
           {/* VIP Platform Filter Carousel */}
           <Text style={s.sectionLabel}>Select Platform</Text>
