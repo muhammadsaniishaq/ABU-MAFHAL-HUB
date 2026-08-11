@@ -52,33 +52,33 @@ const extractStringValue = (val: any): string => {
 };
 
 const REQUIRED_SECRETS = [
-    { key: 'AGENTHUB_API_KEY', desc: 'AgentHub API Key (agenthub.ng for NIN/BVN & Slips)', provider: 'AgentHub' },
-    { key: 'BILALSADASUB_TOKEN', desc: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)', provider: 'Bilalsadasub' },
-    { key: 'PAYSTACK_SECRET_KEY', desc: 'Paystack Secret Key', provider: 'Paystack' },
-    { key: 'PAYSTACK_PUBLIC_KEY', desc: 'Paystack Public Key', provider: 'Paystack' },
-    { key: 'FLUTTERWAVE_SECRET_KEY', desc: 'Flutterwave Secret Key', provider: 'Flutterwave' },
-    { key: 'TERMII_API_KEY', desc: 'Termii API Key for SMS/OTP', provider: 'Termii' },
-    { key: 'AIJALON_API_KEY', desc: 'Aijalon Telecommunications', provider: 'Aijalon' },
-    { key: 'CLUBKONNECT_API_KEY', desc: 'ClubKonnect API Key', provider: 'ClubKonnect' },
-    { key: 'CLUBKONNECT_USER_ID', desc: 'ClubKonnect User ID', provider: 'ClubKonnect' },
-    { key: 'IDPRO_API_KEY', desc: 'IDPRO Verification API', provider: 'IDPRO' },
-    { key: 'PAYVESSEL_API_SECRET', desc: 'PayVessel Secret Key', provider: 'PayVessel' },
-    { key: 'PAYVESSEL_API_KEY', desc: 'PayVessel API Key', provider: 'PayVessel' },
-    { key: 'OPENAI_API_KEY', desc: 'OpenAI Secret Key for Cortex AI', provider: 'AI & Misc' },
-    { key: 'CRYPTO_EXCHANGE_KEY', desc: 'CoinGecko API Key', provider: 'Crypto' },
-    { key: 'DERIV_API_TOKEN', desc: 'Deriv Trading API Token', provider: 'Trading' },
-    { key: 'APIFY_API_TOKEN', desc: 'Apify API Token', provider: 'Automation' },
-    { key: 'ALCHEMY_API_KEY', desc: 'Alchemy Node RPC API Key', provider: 'Crypto' },
-    { key: 'NINE_BOOST_API_KEY', desc: '9Boost API Key for Social Media Panel', provider: '9Boost' },
-    { key: 'NOWPAYMENTS_API_KEY', desc: 'NowPayments API Key for Crypto Receive', provider: 'NowPayments' },
-    { key: 'NOWPAYMENTS_IPN_SECRET', desc: 'NowPayments IPN Secret for Webhook', provider: 'NowPayments' },
-    { key: 'BIGI_API_TOKEN', desc: 'Bigi API Token for VTU Services', provider: 'Bigi' },
-    { key: 'BIGI_API_PIN', desc: 'Bigi 4-digit Transaction PIN', provider: 'Bigi' },
-    { key: 'RESEND_API_KEY', desc: 'Resend.com API Key for Automatic Email Receipts', provider: 'Email & Notifications' },
-    { key: 'ZOHO_EMAIL', desc: 'Zoho / SMTP Email Address (e.g. support@abumafhal.com)', provider: 'Email & Notifications' },
-    { key: 'ZOHO_PASSWORD', desc: 'Zoho / SMTP Password or App Password', provider: 'Email & Notifications' },
-    { key: 'SMTP_HOST', desc: 'SMTP Host Server (Default: smtp.zoho.com)', provider: 'Email & Notifications' },
-    { key: 'SMTP_PORT', desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' }
+    { key: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], desc: 'AgentHub API Key (agenthub.ng for NIN/BVN & Slips)', provider: 'AgentHub' },
+    { key: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], desc: 'Bilalsadasub API Token (bilalsadasub.com for Telecom)', provider: 'Bilalsadasub' },
+    { key: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], desc: 'Paystack Secret Key', provider: 'Paystack' },
+    { key: 'PAYSTACK_PUBLIC_KEY', aliases: ['PAYSTACK_PUB'], desc: 'Paystack Public Key', provider: 'Paystack' },
+    { key: 'FLUTTERWAVE_SECRET_KEY', aliases: ['FLUTTERWAVE_KEY'], desc: 'Flutterwave Secret Key', provider: 'Flutterwave' },
+    { key: 'TERMII_API_KEY', aliases: ['TERMII_KEY'], desc: 'Termii API Key for SMS/OTP', provider: 'Termii' },
+    { key: 'AIJALON_API_KEY', aliases: ['AIJALON_KEY'], desc: 'Aijalon Telecommunications', provider: 'Aijalon' },
+    { key: 'CLUBKONNECT_API_KEY', aliases: ['CLUBKONNECT_KEY'], desc: 'ClubKonnect API Key', provider: 'ClubKonnect' },
+    { key: 'CLUBKONNECT_USER_ID', aliases: ['CLUBKONNECT_USER'], desc: 'ClubKonnect User ID', provider: 'ClubKonnect' },
+    { key: 'IDPRO_API_KEY', aliases: ['IDPRO_KEY'], desc: 'IDPRO Verification API', provider: 'IDPRO' },
+    { key: 'PAYVESSEL_API_SECRET', aliases: ['PAYVESSEL_SECRET_KEY', 'PAYVESSEL_SECRET'], desc: 'PayVessel Secret Key', provider: 'PayVessel' },
+    { key: 'PAYVESSEL_API_KEY', aliases: ['PAYVESSEL_KEY', 'PAYBESSEL_API_KEY'], desc: 'PayVessel API Key', provider: 'PayVessel' },
+    { key: 'OPENAI_API_KEY', aliases: ['OPENAI_KEY'], desc: 'OpenAI Secret Key for Cortex AI', provider: 'AI & Misc' },
+    { key: 'CRYPTO_EXCHANGE_KEY', aliases: ['COINGECKO_KEY'], desc: 'CoinGecko API Key', provider: 'Crypto' },
+    { key: 'DERIV_API_TOKEN', aliases: ['DERIV_TOKEN'], desc: 'Deriv Trading API Token', provider: 'Trading' },
+    { key: 'APIFY_API_TOKEN', aliases: ['APIFY_TOKEN'], desc: 'Apify API Token', provider: 'Automation' },
+    { key: 'ALCHEMY_API_KEY', aliases: ['ALCHEMY_KEY'], desc: 'Alchemy Node RPC API Key', provider: 'Crypto' },
+    { key: 'NINE_BOOST_API_KEY', aliases: ['NINEBOOST_API_KEY', 'NINEBOOST_KEY'], desc: '9Boost API Key for Social Media Panel', provider: '9Boost' },
+    { key: 'NOWPAYMENTS_API_KEY', aliases: ['NOWPAYMENTS_KEY'], desc: 'NowPayments API Key for Crypto Receive', provider: 'NowPayments' },
+    { key: 'NOWPAYMENTS_IPN_SECRET', aliases: ['NOWPAYMENTS_SECRET'], desc: 'NowPayments IPN Secret for Webhook', provider: 'NowPayments' },
+    { key: 'BIGI_API_TOKEN', aliases: ['BIGI_TOKEN'], desc: 'Bigi API Token for VTU Services', provider: 'Bigi' },
+    { key: 'BIGI_API_PIN', aliases: ['BIGI_PIN'], desc: 'Bigi 4-digit Transaction PIN', provider: 'Bigi' },
+    { key: 'RESEND_API_KEY', aliases: ['RESEND_KEY'], desc: 'Resend.com API Key for Automatic Email Receipts', provider: 'Email & Notifications' },
+    { key: 'ZOHO_EMAIL', aliases: ['SMTP_USER'], desc: 'Zoho / SMTP Email Address (e.g. support@abumafhal.com)', provider: 'Email & Notifications' },
+    { key: 'ZOHO_PASSWORD', aliases: ['SMTP_PASS'], desc: 'Zoho / SMTP Password or App Password', provider: 'Email & Notifications' },
+    { key: 'SMTP_HOST', aliases: ['ZOHO_HOST'], desc: 'SMTP Host Server (Default: smtp.zoho.com)', provider: 'Email & Notifications' },
+    { key: 'SMTP_PORT', aliases: ['ZOHO_PORT'], desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' }
 ];
 
 export default function SecretsManager() {
@@ -99,31 +99,56 @@ export default function SecretsManager() {
 
     const fetchSecrets = async () => {
         try {
-            const secretsMap: Record<string, string> = {};
+            const masterMap: Record<string, string> = {};
 
+            // 1. Check AsyncStorage Cache
             for (const s of REQUIRED_SECRETS) {
-                const cached = await AsyncStorage.getItem(`@vault_${s.key}`);
-                if (cached) secretsMap[s.key] = cached;
+                const keysToCheck = [s.key, ...(s.aliases || [])];
+                for (const k of keysToCheck) {
+                    const cached = await AsyncStorage.getItem(`@vault_${k}`);
+                    if (cached && cached.trim() !== '') {
+                        masterMap[k.toUpperCase()] = cached.trim();
+                    }
+                }
             }
 
+            // 2. Fetch from Supabase system_secrets
             const { data } = await supabase.from('system_secrets').select('*');
             if (data) {
                 data.forEach(s => {
                     const parsed = extractStringValue(s.value);
-                    if (parsed) secretsMap[s.key.toUpperCase()] = parsed;
+                    if (parsed && parsed.trim() !== '') {
+                        masterMap[s.key.toUpperCase()] = parsed.trim();
+                    }
                 });
             }
 
+            // 3. Fetch from Supabase app_settings
             const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
                 settings.forEach(s => {
                     const parsed = extractStringValue(s.value);
-                    if (parsed) secretsMap[s.key.toUpperCase()] = parsed;
+                    if (parsed && parsed.trim() !== '') {
+                        masterMap[s.key.toUpperCase()] = parsed.trim();
+                    }
                 });
             }
 
-            setSecrets(secretsMap);
-            setOriginalSecrets(secretsMap);
+            // Match values using aliases
+            const resolvedSecrets: Record<string, string> = {};
+            REQUIRED_SECRETS.forEach(s => {
+                const keysToCheck = [s.key, ...(s.aliases || [])];
+                for (const k of keysToCheck) {
+                    const found = masterMap[k.toUpperCase()];
+                    if (found && found.trim() !== '') {
+                        resolvedSecrets[s.key] = found.trim();
+                        break;
+                    }
+                }
+            });
+
+            setSecrets(resolvedSecrets);
+            setOriginalSecrets(resolvedSecrets);
         } catch (error: any) {
             console.error('Error fetching secrets:', error);
         } finally {
@@ -131,34 +156,39 @@ export default function SecretsManager() {
         }
     };
 
-    const handleSave = async (key: string, value: string, description: string) => {
+    const handleSave = async (keyItem: typeof REQUIRED_SECRETS[0], value: string) => {
         if (!value.trim()) {
             Alert.alert('Error', 'Value cannot be empty');
             return;
         }
 
-        setSaving(key);
+        const primaryKey = keyItem.key;
+        setSaving(primaryKey);
         try {
             const cleanVal = value.trim();
-            await AsyncStorage.setItem(`@vault_${key}`, cleanVal);
+            const keysToSync = [primaryKey, ...(keyItem.aliases || [])];
 
-            await supabase.from('system_secrets').upsert({
-                key,
-                value: cleanVal,
-                description,
-                updated_at: new Date().toISOString()
-            });
+            for (const k of keysToSync) {
+                await AsyncStorage.setItem(`@vault_${k}`, cleanVal);
 
-            await supabase.from('app_settings').upsert({
-                key,
-                value: cleanVal,
-                updated_at: new Date().toISOString()
-            });
+                await supabase.from('system_secrets').upsert({
+                    key: k,
+                    value: cleanVal,
+                    description: keyItem.desc,
+                    updated_at: new Date().toISOString()
+                });
 
-            setOriginalSecrets(prev => ({ ...prev, [key]: cleanVal }));
-            Alert.alert('Success 🎉', `${key} saved securely!`);
+                await supabase.from('app_settings').upsert({
+                    key: k,
+                    value: cleanVal,
+                    updated_at: new Date().toISOString()
+                });
+            }
+
+            setOriginalSecrets(prev => ({ ...prev, [primaryKey]: cleanVal }));
+            Alert.alert('Success 🎉', `${primaryKey} saved securely!`);
         } catch (error: any) {
-            Alert.alert('Saved Locally 💾', 'Saved key to local storage.');
+            Alert.alert('Saved Locally 💾', 'Saved key to local cache.');
         } finally {
             setSaving(null);
         }
@@ -347,7 +377,7 @@ export default function SecretsManager() {
                                     </View>
 
                                     <TouchableOpacity 
-                                        onPress={() => handleSave(item.key, secrets[item.key] || '', item.desc)}
+                                        onPress={() => handleSave(item, secrets[item.key] || '')}
                                         disabled={saving === item.key || (!modified && isSaved)}
                                         style={{ height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: saving === item.key ? L.bg : (!modified && isSaved ? L.emeraldBg : L.navyHeader), borderWidth: !modified && isSaved ? 1 : 0, borderColor: L.emeraldBorder }}
                                     >

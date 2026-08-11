@@ -56,6 +56,17 @@ const extractStringValue = (val: any): string => {
     return String(val);
 };
 
+// Helper to look up first valid key across legacy aliases
+const getFirstValid = (map: Record<string, string>, ...keys: string[]) => {
+    for (const k of keys) {
+        const val = map[k] || map[k.toUpperCase()] || map[k.toLowerCase()];
+        if (val && typeof val === 'string' && val.trim() !== '') {
+            return val.trim();
+        }
+    }
+    return '';
+};
+
 interface SecretItem {
     id: string;
     keyName: string;
@@ -128,39 +139,55 @@ export default function APIVaultScreen() {
 
     const fetchApiVaultData = async () => {
         try {
-            const keysToLoad = [
-                'VTU_VENDOR', 'FAILOVER_MODE', 'AGENTHUB_API_KEY', 'BILALSADASUB_TOKEN',
-                'PAYSTACK_SECRET_KEY', 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_USER_ID',
-                'IDPRO_API_KEY', 'PAYVESSEL_API_KEY', 'PAYVESSEL_SECRET_KEY',
-                'NINEBOOST_API_KEY', 'NOWPAYMENTS_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN',
-                'TERMII_API_KEY', 'MONNIFY_API_KEY', 'MONNIFY_SECRET_KEY'
+            const masterMap: Record<string, string> = {};
+
+            // 1. Fetch from AsyncStorage (Local Device/Browser Cache)
+            const allKeysToRead = [
+                'VTU_VENDOR', 'FAILOVER_MODE', 
+                'AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY',
+                'BILALSADASUB_TOKEN', 'BILAL_TOKEN', 'BILALSADASUB_API_KEY', 'BILAL_API_KEY',
+                'PAYSTACK_SECRET_KEY', 'PAYSTACK_KEY', 'PAYSTACK_SECRET', 'PAYSTACK_API_KEY',
+                'CLUBKONNECT_API_KEY', 'CLUBKONNECT_KEY', 'CLUBKONNECT_USER_ID', 'CLUBKONNECT_USER',
+                'IDPRO_API_KEY', 'IDPRO_KEY',
+                'PAYVESSEL_API_KEY', 'PAYVESSEL_KEY', 'PAYVESSEL_SECRET_KEY', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET',
+                'NINEBOOST_API_KEY', 'NINE_BOOST_API_KEY', 'NINEBOOST_KEY', 'NINE_BOOST_KEY',
+                'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY',
+                'BIGI_API_TOKEN', 'BIGI_TOKEN', 'BIGI_API_PIN', 'BIGI_PIN',
+                'TERMII_API_KEY', 'TERMII_KEY',
+                'MONNIFY_API_KEY', 'MONNIFY_KEY', 'MONNIFY_SECRET_KEY', 'MONNIFY_SECRET'
             ];
 
-            const cacheMap: Record<string, string> = {};
-            for (const key of keysToLoad) {
-                const cached = await AsyncStorage.getItem(`@vault_${key}`);
-                if (cached) cacheMap[key] = cached;
+            for (const k of allKeysToRead) {
+                const cached = await AsyncStorage.getItem(`@vault_${k}`);
+                if (cached && cached.trim() !== '') {
+                    masterMap[k.toUpperCase()] = cached.trim();
+                }
             }
 
-            applyKeysFromObject(cacheMap);
-
+            // 2. Fetch from Supabase app_settings
             const { data: settings } = await supabase.from('app_settings').select('*');
             if (settings) {
-                const settingsMap: Record<string, string> = {};
                 settings.forEach((s) => {
-                    settingsMap[s.key.toUpperCase()] = extractStringValue(s.value);
+                    const parsed = extractStringValue(s.value);
+                    if (parsed && parsed.trim() !== '') {
+                        masterMap[s.key.toUpperCase()] = parsed.trim();
+                    }
                 });
-                applyKeysFromObject(settingsMap);
             }
 
+            // 3. Fetch from Supabase system_secrets
             const { data: secrets } = await supabase.from('system_secrets').select('*');
             if (secrets) {
-                const secretsMap: Record<string, string> = {};
                 secrets.forEach((s) => {
-                    secretsMap[s.key.toUpperCase()] = extractStringValue(s.value);
+                    const parsed = extractStringValue(s.value);
+                    if (parsed && parsed.trim() !== '') {
+                        masterMap[s.key.toUpperCase()] = parsed.trim();
+                    }
                 });
-                applyKeysFromObject(secretsMap);
             }
+
+            // Apply all found keys with comprehensive alias fallbacks
+            applyKeysFromMasterMap(masterMap);
         } catch (e: any) {
             console.error("API Vault Load Error:", e);
         } finally {
@@ -168,25 +195,57 @@ export default function APIVaultScreen() {
         }
     };
 
-    const applyKeysFromObject = (map: Record<string, string>) => {
-        if (map['VTU_VENDOR']) setVtuVendor(map['VTU_VENDOR']);
-        if (map['FAILOVER_MODE']) setFailoverMode(map['FAILOVER_MODE'] === 'sequential' ? 'sequential' : 'smart');
-        
-        if (map['AGENTHUB_API_KEY'] || map['AGENTHUB_KEY']) setAgentHubApiKey(map['AGENTHUB_API_KEY'] || map['AGENTHUB_KEY']);
-        if (map['BILALSADASUB_TOKEN'] || map['BILAL_TOKEN']) setBilalToken(map['BILALSADASUB_TOKEN'] || map['BILAL_TOKEN']);
-        if (map['PAYSTACK_SECRET_KEY'] || map['PAYSTACK_KEY']) setPaystackSecret(map['PAYSTACK_SECRET_KEY'] || map['PAYSTACK_KEY']);
-        if (map['CLUBKONNECT_API_KEY'] || map['CLUBKONNECT_KEY']) setClubkonnectApiKey(map['CLUBKONNECT_API_KEY'] || map['CLUBKONNECT_KEY']);
-        if (map['CLUBKONNECT_USER_ID'] || map['CLUBKONNECT_USER']) setClubkonnectUserId(map['CLUBKONNECT_USER_ID'] || map['CLUBKONNECT_USER']);
-        if (map['IDPRO_API_KEY'] || map['IDPRO_KEY']) setIdProApiKey(map['IDPRO_API_KEY'] || map['IDPRO_KEY']);
-        if (map['PAYVESSEL_API_KEY'] || map['PAYVESSEL_KEY']) setPayVesselApiKey(map['PAYVESSEL_API_KEY'] || map['PAYVESSEL_KEY']);
-        if (map['PAYVESSEL_SECRET_KEY'] || map['PAYVESSEL_SECRET']) setPayVesselSecretKey(map['PAYVESSEL_SECRET_KEY'] || map['PAYVESSEL_SECRET']);
-        if (map['NINEBOOST_API_KEY'] || map['NINEBOOST_KEY']) setNineBoostApiKey(map['NINEBOOST_API_KEY'] || map['NINEBOOST_KEY']);
-        if (map['NOWPAYMENTS_API_KEY'] || map['NOWPAYMENTS_KEY']) setNowPaymentsApiKey(map['NOWPAYMENTS_API_KEY'] || map['NOWPAYMENTS_KEY']);
-        if (map['BIGI_API_TOKEN'] || map['BIGI_TOKEN']) setBigiToken(map['BIGI_API_TOKEN'] || map['BIGI_TOKEN']);
-        if (map['BIGI_API_PIN'] || map['BIGI_PIN']) setBigiPin(map['BIGI_API_PIN'] || map['BIGI_PIN']);
-        if (map['TERMII_API_KEY'] || map['TERMII_KEY']) setTermiiApiKey(map['TERMII_API_KEY'] || map['TERMII_KEY']);
-        if (map['MONNIFY_API_KEY'] || map['MONNIFY_KEY']) setMonnifyApiKey(map['MONNIFY_API_KEY'] || map['MONNIFY_KEY']);
-        if (map['MONNIFY_SECRET_KEY'] || map['MONNIFY_SECRET']) setMonnifySecretKey(map['MONNIFY_SECRET_KEY'] || map['MONNIFY_SECRET']);
+    const applyKeysFromMasterMap = (map: Record<string, string>) => {
+        const vendor = getFirstValid(map, 'VTU_VENDOR', 'vtu_vendor');
+        if (vendor) setVtuVendor(vendor);
+
+        const mode = getFirstValid(map, 'FAILOVER_MODE', 'failover_mode');
+        if (mode) setFailoverMode(mode === 'sequential' ? 'sequential' : 'smart');
+
+        const ahKey = getFirstValid(map, 'AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY');
+        if (ahKey) setAgentHubApiKey(ahKey);
+
+        const bilal = getFirstValid(map, 'BILALSADASUB_TOKEN', 'BILAL_TOKEN', 'BILALSADASUB_API_KEY', 'BILAL_API_KEY', 'BILALSADASUB_KEY');
+        if (bilal) setBilalToken(bilal);
+
+        const paystack = getFirstValid(map, 'PAYSTACK_SECRET_KEY', 'PAYSTACK_KEY', 'PAYSTACK_SECRET', 'PAYSTACK_API_KEY');
+        if (paystack) setPaystackSecret(paystack);
+
+        const ckKey = getFirstValid(map, 'CLUBKONNECT_API_KEY', 'CLUBKONNECT_KEY');
+        if (ckKey) setClubkonnectApiKey(ckKey);
+
+        const ckUser = getFirstValid(map, 'CLUBKONNECT_USER_ID', 'CLUBKONNECT_USER');
+        if (ckUser) setClubkonnectUserId(ckUser);
+
+        const idpKey = getFirstValid(map, 'IDPRO_API_KEY', 'IDPRO_KEY');
+        if (idpKey) setIdProApiKey(idpKey);
+
+        const pvKey = getFirstValid(map, 'PAYVESSEL_API_KEY', 'PAYVESSEL_KEY', 'PAYBESSEL_API_KEY', 'PAYBESSEL_KEY');
+        if (pvKey) setPayVesselApiKey(pvKey);
+
+        const pvSecret = getFirstValid(map, 'PAYVESSEL_SECRET_KEY', 'PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET');
+        if (pvSecret) setPayVesselSecretKey(pvSecret);
+
+        const nbKey = getFirstValid(map, 'NINEBOOST_API_KEY', 'NINE_BOOST_API_KEY', 'NINEBOOST_KEY', 'NINE_BOOST_KEY', 'NINEBOOST_TOKEN');
+        if (nbKey) setNineBoostApiKey(nbKey);
+
+        const npKey = getFirstValid(map, 'NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_KEY', 'NOWPAYMENTS_TOKEN');
+        if (npKey) setNowPaymentsApiKey(npKey);
+
+        const bigiTkn = getFirstValid(map, 'BIGI_API_TOKEN', 'BIGI_TOKEN', 'BIGI_API_KEY');
+        if (bigiTkn) setBigiToken(bigiTkn);
+
+        const bigiP = getFirstValid(map, 'BIGI_API_PIN', 'BIGI_PIN');
+        if (bigiP) setBigiPin(bigiP);
+
+        const termii = getFirstValid(map, 'TERMII_API_KEY', 'TERMII_KEY');
+        if (termii) setTermiiApiKey(termii);
+
+        const monnifyKey = getFirstValid(map, 'MONNIFY_API_KEY', 'MONNIFY_KEY');
+        if (monnifyKey) setMonnifyApiKey(monnifyKey);
+
+        const monnifySecret = getFirstValid(map, 'MONNIFY_SECRET_KEY', 'MONNIFY_SECRET');
+        if (monnifySecret) setMonnifySecretKey(monnifySecret);
     };
 
     const isVendorSelected = (vendorKey: string) => {
@@ -323,7 +382,7 @@ export default function APIVaultScreen() {
             if (!backupJsonText.trim()) return;
             const parsed = JSON.parse(backupJsonText);
             if (parsed.keys) {
-                applyKeysFromObject(parsed.keys);
+                applyKeysFromMasterMap(parsed.keys);
                 if (parsed.vtu_vendor) setVtuVendor(parsed.vtu_vendor);
                 if (parsed.failover_mode) setFailoverMode(parsed.failover_mode);
                 setShowBackupModal(false);
@@ -340,53 +399,58 @@ export default function APIVaultScreen() {
     const handleSaveVault = async () => {
         setSaving(true);
         try {
-            const secretsToSave = [
-                { key: 'VTU_VENDOR', value: vtuVendor, description: 'Active VTU Provider List' },
-                { key: 'FAILOVER_MODE', value: failoverMode, description: 'Failover Routing Engine Mode' },
-                { key: 'AGENTHUB_API_KEY', value: agentHubApiKey, description: 'AgentHub API Key (NIN/BVN)' },
-                { key: 'BILALSADASUB_TOKEN', value: bilalToken, description: 'Bilalsadasub API Token (Telecom)' },
-                { key: 'PAYSTACK_SECRET_KEY', value: paystackSecret, description: 'Paystack Secret Key' },
-                { key: 'CLUBKONNECT_API_KEY', value: clubkonnectApiKey, description: 'ClubKonnect API Key' },
-                { key: 'CLUBKONNECT_USER_ID', value: clubkonnectUserId, description: 'ClubKonnect Registered User ID' },
-                { key: 'IDPRO_API_KEY', value: idProApiKey, description: 'IDPro API Key' },
-                { key: 'PAYVESSEL_API_KEY', value: payVesselApiKey, description: 'PayVessel API Key' },
-                { key: 'PAYVESSEL_SECRET_KEY', value: payVesselSecretKey, description: 'PayVessel Secret Key' },
-                { key: 'NINEBOOST_API_KEY', value: nineBoostApiKey, description: 'NineBoost API Key (SMM)' },
-                { key: 'NOWPAYMENTS_API_KEY', value: nowPaymentsApiKey, description: 'NowPayments API Key (Crypto)' },
-                { key: 'BIGI_API_TOKEN', value: bigiToken, description: 'Bigi API Token' },
-                { key: 'BIGI_API_PIN', value: bigiPin, description: 'Bigi 4-digit Transaction PIN' },
-                { key: 'TERMII_API_KEY', value: termiiApiKey, description: 'Termii API Key (SMS)' },
-                { key: 'MONNIFY_API_KEY', value: monnifyApiKey, description: 'Monnify API Key' },
-                { key: 'MONNIFY_SECRET_KEY', value: monnifySecretKey, description: 'Monnify Secret Key' }
+            const keyPairsToSave: { canonical: string; aliases: string[]; value: string; desc: string }[] = [
+                { canonical: 'VTU_VENDOR', aliases: ['vtu_vendor'], value: vtuVendor, desc: 'Active VTU Provider List' },
+                { canonical: 'FAILOVER_MODE', aliases: ['failover_mode'], value: failoverMode, desc: 'Failover Routing Strategy' },
+                { canonical: 'AGENTHUB_API_KEY', aliases: ['AGENTHUB_KEY', 'AGENTS_HUB_KEY'], value: agentHubApiKey, desc: 'AgentHub API Key (NIN/BVN)' },
+                { canonical: 'BILALSADASUB_TOKEN', aliases: ['BILAL_TOKEN', 'BILALSADASUB_API_KEY'], value: bilalToken, desc: 'Bilalsadasub API Token' },
+                { canonical: 'PAYSTACK_SECRET_KEY', aliases: ['PAYSTACK_KEY', 'PAYSTACK_SECRET'], value: paystackSecret, desc: 'Paystack Secret Key' },
+                { canonical: 'CLUBKONNECT_API_KEY', aliases: ['CLUBKONNECT_KEY'], value: clubkonnectApiKey, desc: 'ClubKonnect API Key' },
+                { canonical: 'CLUBKONNECT_USER_ID', aliases: ['CLUBKONNECT_USER'], value: clubkonnectUserId, desc: 'ClubKonnect User ID' },
+                { canonical: 'IDPRO_API_KEY', aliases: ['IDPRO_KEY'], value: idProApiKey, desc: 'IDPro API Key' },
+                { canonical: 'PAYVESSEL_API_KEY', aliases: ['PAYVESSEL_KEY', 'PAYBESSEL_API_KEY'], value: payVesselApiKey, desc: 'PayVessel API Key' },
+                { canonical: 'PAYVESSEL_SECRET_KEY', aliases: ['PAYVESSEL_API_SECRET', 'PAYVESSEL_SECRET'], value: payVesselSecretKey, desc: 'PayVessel Secret Key' },
+                { canonical: 'NINEBOOST_API_KEY', aliases: ['NINE_BOOST_API_KEY', 'NINEBOOST_KEY'], value: nineBoostApiKey, desc: 'NineBoost API Key' },
+                { canonical: 'NOWPAYMENTS_API_KEY', aliases: ['NOWPAYMENTS_KEY'], value: nowPaymentsApiKey, desc: 'NowPayments API Key' },
+                { canonical: 'BIGI_API_TOKEN', aliases: ['BIGI_TOKEN'], value: bigiToken, desc: 'Bigi API Token' },
+                { canonical: 'BIGI_API_PIN', aliases: ['BIGI_PIN'], value: bigiPin, desc: 'Bigi PIN' },
+                { canonical: 'TERMII_API_KEY', aliases: ['TERMII_KEY'], value: termiiApiKey, desc: 'Termii API Key' },
+                { canonical: 'MONNIFY_API_KEY', aliases: ['MONNIFY_KEY'], value: monnifyApiKey, desc: 'Monnify API Key' },
+                { canonical: 'MONNIFY_SECRET_KEY', aliases: ['MONNIFY_SECRET'], value: monnifySecretKey, desc: 'Monnify Secret Key' }
             ];
 
-            for (const sec of secretsToSave) {
-                if (sec.value !== undefined && sec.value !== null) {
-                    await AsyncStorage.setItem(`@vault_${sec.key}`, sec.value.trim());
+            for (const item of keyPairsToSave) {
+                const val = item.value ? item.value.trim() : '';
+                if (val !== '') {
+                    // Save to AsyncStorage for canonical + aliases
+                    await AsyncStorage.setItem(`@vault_${item.canonical}`, val);
+                    for (const alias of item.aliases) {
+                        await AsyncStorage.setItem(`@vault_${alias}`, val);
+                    }
+
+                    // Upsert canonical + aliases to system_secrets & app_settings
+                    const upsertList = [item.canonical, ...item.aliases];
+                    for (const keyToSave of upsertList) {
+                        await supabase.from('system_secrets').upsert({
+                            key: keyToSave,
+                            value: val,
+                            description: item.desc,
+                            updated_at: new Date().toISOString()
+                        });
+
+                        await supabase.from('app_settings').upsert({
+                            key: keyToSave,
+                            value: val,
+                            updated_at: new Date().toISOString()
+                        });
+                    }
                 }
             }
 
-            for (const sec of secretsToSave) {
-                if (sec.value && sec.value.trim() !== '') {
-                    await supabase.from('system_secrets').upsert({
-                        key: sec.key,
-                        value: sec.value.trim(),
-                        description: sec.description,
-                        updated_at: new Date().toISOString()
-                    });
-
-                    await supabase.from('app_settings').upsert({
-                        key: sec.key,
-                        value: sec.value.trim(),
-                        updated_at: new Date().toISOString()
-                    });
-                }
-            }
-
-            Alert.alert("Success 🎉", "All Vault credentials saved and synced!");
-            showToast("Saved securely! 🔐");
+            Alert.alert("Success 🎉", "All Vault credentials saved and synced across database keys!");
+            showToast("Saved & synced to all database keys! 🔐");
         } catch (e: any) {
-            Alert.alert("Saved Locally 💾", "Saved to local storage.");
+            Alert.alert("Saved Locally 💾", "Vault saved to local storage.");
         } finally {
             setSaving(false);
         }
@@ -996,7 +1060,7 @@ export default function APIVaultScreen() {
                             <>
                                 <Ionicons name="shield-checkmark-sharp" size={16} color={L.gold} />
                                 <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                    💾 Save All Vault Credentials
+                                    💾 Save & Sync All Vault Credentials
                                 </Text>
                             </>
                         )}
