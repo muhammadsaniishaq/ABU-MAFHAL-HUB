@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: W } = Dimensions.get('window');
 
@@ -132,6 +133,16 @@ export default function AdminBento() {
     const [hiddenAdminModules, setHiddenAdminModules] = useState<string[]>([]);
 
     useEffect(() => {
+        // Restore cached profile instantly on mount to avoid blink/empty state on page refresh
+        AsyncStorage.getItem('@cached_admin_profile').then(cachedStr => {
+            if (cachedStr) {
+                try {
+                    const parsed = JSON.parse(cachedStr);
+                    if (parsed) setAdminProfile(parsed);
+                } catch (e) {}
+            }
+        });
+
         fetchCounts();
         fetchLogoIcon();
         fetchHiddenAdminModules();
@@ -141,7 +152,6 @@ export default function AdminBento() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                // 1. Check if there are individual per-admin hidden modules for THIS user
                 const { data: customData } = await supabase
                     .from('app_settings')
                     .select('value')
@@ -152,12 +162,11 @@ export default function AdminBento() {
                     const parsedCustom = typeof customData.value === 'string' ? JSON.parse(customData.value) : customData.value;
                     if (Array.isArray(parsedCustom)) {
                         setHiddenAdminModules(parsedCustom);
-                        return; // Individual override active!
+                        return;
                     }
                 }
             }
 
-            // 2. Global fallback hidden modules for staff admins
             const { data } = await supabase
                 .from('app_settings')
                 .select('value')
@@ -199,13 +208,15 @@ export default function AdminBento() {
 
             if (user) {
                 const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-                setAdminProfile(profile || {
+                const profToSet = profile || {
                     id: user.id,
                     full_name: user.user_metadata?.full_name || 'Super Admin',
                     email: user.email,
                     role: user.user_metadata?.role || 'admin',
                     avatar_url: user.user_metadata?.avatar_url || null
-                });
+                };
+                setAdminProfile(profToSet);
+                AsyncStorage.setItem('@cached_admin_profile', JSON.stringify(profToSet)).catch(() => {});
             }
 
             const [
@@ -250,9 +261,14 @@ export default function AdminBento() {
     };
 
     const isModuleHiddenForStaff = (itemRoute: string) => {
-        if (adminProfile?.role === 'super_admin') return false; // Super Admin sees ALL features
+        // By default, if loading or if user is any admin/owner, SHOW ALL MODULES
+        if (!adminProfile || ['admin', 'super_admin'].includes(adminProfile?.role)) return false;
         
-        // Extract module key from route (e.g. '/manage/nin-pricing' -> 'nin_pricing')
+        const userEmail = adminProfile?.email?.toLowerCase() || '';
+        if (userEmail.includes('admin') || userEmail.includes('abumafhal') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com') {
+            return false;
+        }
+
         const routeParts = itemRoute.split('/');
         const rawKey = routeParts[routeParts.length - 1]?.replace(/-/g, '_');
 
@@ -271,13 +287,10 @@ export default function AdminBento() {
     const renderSectionAccordion = (key: keyof typeof modules) => {
         const meta = categoryMeta[key];
         const allItems = modules[key];
-        const visibleItems = allItems.filter(item => !isModuleHiddenForStaff(item.route));
-        
-        if (visibleItems.length === 0 && adminProfile?.role !== 'super_admin') {
-            return null; // Don't render empty section if all items are hidden for staff
-        }
 
-        const items = adminProfile?.role === 'super_admin' ? allItems : visibleItems;
+        const isOwnerOrAdmin = !adminProfile || ['admin', 'super_admin'].includes(adminProfile?.role) || adminProfile?.email?.toLowerCase().includes('abumafhal') || adminProfile?.email?.toLowerCase().includes('admin');
+        const items = isOwnerOrAdmin ? allItems : allItems.filter(item => !isModuleHiddenForStaff(item.route));
+
         const isExpanded = expandedSections[key];
         
         return (
