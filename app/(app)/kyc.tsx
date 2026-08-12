@@ -38,6 +38,8 @@ export default function KYC() {
     const [showSumsub, setShowSumsub] = useState(false);
     const [sumsubToken, setSumsubToken] = useState<string | null>(null);
 
+    const [virtualAcc, setVirtualAcc] = useState<any>(null);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -54,6 +56,17 @@ export default function KYC() {
             }
             setUserData({ ...profile, id: user.id });
             
+            // Fetch User Virtual Bank Account if exists
+            const { data: vAcc } = await supabase
+                .from('virtual_accounts')
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (vAcc) {
+                setVirtualAcc(vAcc);
+            }
+
             const { data: pending } = await supabase
                 .from('kyc_requests')
                 .select('*')
@@ -409,6 +422,47 @@ export default function KYC() {
                                     </View>
                                 </View>
                             )}
+                            </View>
+                        )}
+
+                        {/* Virtual Bank Account Display Card */}
+                        {virtualAcc && (
+                            <View style={[s.glassCard, { marginBottom: 20, borderColor: GOLD }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Ionicons name="card" size={20} color={GOLD} />
+                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>Reserved Virtual Bank Account</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#10b981' }}>
+                                        <Text style={{ color: '#10b981', fontSize: 9, fontWeight: '900' }}>Active</Text>
+                                    </View>
+                                </View>
+
+                                <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: GOLD, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
+                                    
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                                        <View>
+                                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>Account Number</Text>
+                                            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                                {virtualAcc.account_number}
+                                            </Text>
+                                        </View>
+
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                if (virtualAcc.account_number) {
+                                                    Alert.alert("Copied!", `Account Number ${virtualAcc.account_number} copied to clipboard`);
+                                                }
+                                            }}
+                                            style={{ backgroundColor: GOLD, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+                                        >
+                                            <Text style={{ color: NAVY, fontWeight: '900', fontSize: 10 }}>COPY</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, marginTop: 6 }}>Account Name: <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>{virtualAcc.account_name || userData?.full_name}</Text></Text>
+                                </View>
                             </View>
                         )}
 
