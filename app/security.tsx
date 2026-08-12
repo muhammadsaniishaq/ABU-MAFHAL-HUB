@@ -1,14 +1,41 @@
-import { View, Text, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, Alert, Platform, ScrollView } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Executive Light Navy & Gold Design Tokens
+const L = {
+    bg: '#F4F6FB',
+    card: '#FFFFFF',
+    cardBorder: 'rgba(245, 166, 35, 0.35)',
+    navyHeader: '#0F172A',
+    navyMid: '#1C2541',
+    navyDark: '#0B132B',
+    gold: '#F5A623',
+    goldDk: '#D97706',
+    goldAmber: '#B45309',
+    goldBg: 'rgba(254, 243, 199, 0.75)',
+    textPrimary: '#0F172A',
+    textSecondary: '#334155',
+    textMuted: '#64748B',
+    inputBg: '#FFFFFF',
+    inputBorder: '#CBD5E1',
+    emerald: '#10B981',
+    emeraldBg: '#ECFDF5',
+    emeraldBorder: '#A7F3D0',
+    rose: '#E11D48',
+    roseBg: '#FFF1F2'
+};
 
 export default function SecurityScreen() {
-    const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const insets = useSafeAreaInsets();
     const router = useRouter();
+    const [biometricEnabled, setBiometricEnabled] = useState(false);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -24,7 +51,6 @@ export default function SecurityScreen() {
 
     const handleBiometricToggle = async (value: boolean) => {
         if (value) {
-            // Trigger biometrics challenge to verify setup
             try {
                 const hasHardware = await LocalAuthentication.hasHardwareAsync();
                 const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -32,20 +58,20 @@ export default function SecurityScreen() {
                 if (!hasHardware || !isEnrolled) {
                     Alert.alert(
                         "Not Supported", 
-                        "Biometric authentication is not supported or set up on this device."
+                        "Biometric authentication (FaceID/Fingerprint) is not supported or set up on this device."
                     );
                     return;
                 }
 
                 const result = await LocalAuthentication.authenticateAsync({
-                    promptMessage: 'Confirm Biometric Setup',
-                    fallbackLabel: 'Use passcode',
+                    promptMessage: 'Confirm Biometric Login Setup',
+                    fallbackLabel: 'Use Passcode',
                 });
 
                 if (result.success) {
                     await AsyncStorage.setItem('biometrics_setup_completed', 'true');
                     setBiometricEnabled(true);
-                    Alert.alert("Success", "Biometric login enabled.");
+                    Alert.alert("Biometrics Active 🎉", "Biometric FaceID / TouchID login has been enabled.");
                 } else {
                     setBiometricEnabled(false);
                 }
@@ -61,70 +87,96 @@ export default function SecurityScreen() {
     };
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={{ flex: 1, backgroundColor: L.bg, alignItems: 'center' }}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* HEADER */}
-            <View className="bg-[#0d1b3e] pt-12 pb-5 px-6 border-b border-[#0d1b3e] shadow-sm flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => router.back()} className="p-2 bg-white/10 rounded-full border border-white/20">
-                    <Ionicons name="arrow-back" size={20} color="#ffffff" />
-                </TouchableOpacity>
-                <Text className="text-lg font-black text-white tracking-wide">Security</Text>
-                <View className="w-10" />
-            </View>
+            {/* Mobile-First Container Wrapper (Max 600px for Desktop Web, 100% for Mobile) */}
+            <View style={{ flex: 1, width: '100%', maxWidth: 600, backgroundColor: L.bg }}>
+                
+                {/* Royal Navy Header */}
+                <LinearGradient
+                    colors={['#0F172A', '#1C2541', '#0B132B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 14, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, borderBottomWidth: 1.5, borderColor: L.goldDk }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <TouchableOpacity onPress={() => router.back()} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="arrow-back" size={16} color={L.gold} />
+                        </TouchableOpacity>
 
-            <View className="px-6 pt-6">
-                <Text className="text-[#0d1b3e] font-black tracking-widest text-[10px] uppercase mb-3 ml-1">Access Credentials</Text>
-                <View className="bg-white rounded-2xl shadow-sm shadow-[#0d1b3e]/10 border border-[#0d1b3e]/10 overflow-hidden">
-                    <TouchableOpacity
-                        className="flex-row items-center justify-between p-4 border-b border-[#0d1b3e]/5"
-                        onPress={() => router.push('/(auth)/pin-setup')}
-                    >
-                        <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-md bg-[#0d1b3e]/5 items-center justify-center mr-3">
-                                <Ionicons name="keypad" size={16} color="#f5a623" />
-                            </View>
-                            <Text className="text-[#0d1b3e] font-bold text-xs">Change PIN</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color="#0d1b3e" style={{opacity: 0.3}} />
-                    </TouchableOpacity>
+                        <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>SECURITY & CREDENTIALS</Text>
 
-                    <TouchableOpacity
-                        className="flex-row items-center justify-between p-4"
-                        onPress={() => router.push('/(auth)/pin-setup')} // Should link to password change
-                    >
-                        <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-md bg-[#0d1b3e]/5 items-center justify-center mr-3">
-                                <Ionicons name="lock-closed" size={16} color="#f5a623" />
-                            </View>
-                            <Text className="text-[#0d1b3e] font-bold text-xs">Change Password</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color="#0d1b3e" style={{opacity: 0.3}} />
-                    </TouchableOpacity>
-                </View>
-
-                <Text className="text-[#0d1b3e] font-black tracking-widest text-[10px] uppercase mt-8 mb-3 ml-1">Device Security</Text>
-                <View className="bg-white rounded-2xl shadow-sm shadow-[#0d1b3e]/10 border border-[#0d1b3e]/10 overflow-hidden">
-                    <View className="flex-row items-center justify-between p-4">
-                        <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-md bg-[#0d1b3e]/5 items-center justify-center mr-3">
-                                <Ionicons name="finger-print" size={16} color="#f5a623" />
-                            </View>
-                            <View>
-                                <Text className="text-[#0d1b3e] font-bold text-xs">Biometric Login</Text>
-                                <Text className="text-[10px] text-slate-400 font-medium mt-0.5">FaceID / TouchID</Text>
-                            </View>
-                        </View>
-                        <Switch
-                            trackColor={{ false: '#e2e8f0', true: '#0d1b3e' }}
-                            thumbColor={biometricEnabled ? '#f5a623' : '#ffffff'}
-                            onValueChange={handleBiometricToggle}
-                            value={biometricEnabled}
-                            style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
-                        />
+                        <View style={{ width: 32 }} />
                     </View>
-                </View>
+                </LinearGradient>
+
+                <ScrollView style={{ flex: 1, paddingHorizontal: 14, paddingTop: 14 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                    
+                    {/* Credentials Section */}
+                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Access Credentials & Security</Text>
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, elevation: 1, overflow: 'hidden', marginBottom: 14 }}>
+                        
+                        {/* Transaction PIN Option */}
+                        <TouchableOpacity
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderColor: L.inputBorder }}
+                            onPress={() => router.push('/(auth)/pin-setup')}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="keypad" size={14} color={L.goldAmber} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Change 4-Digit Transaction PIN</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Used for approving airtime, data & transfer transactions</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
+                        </TouchableOpacity>
+
+                        {/* Account Password Option */}
+                        <TouchableOpacity
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 }}
+                            onPress={() => router.push('/change-password')}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="lock-closed" size={14} color={L.navyHeader} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Change Login Password</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Update your main account login password</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Biometrics Device Security Section */}
+                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Device Hardware Security</Text>
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, borderWidth: 1, borderColor: L.inputBorder, elevation: 1, padding: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="finger-print" size={16} color={L.emerald} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Biometric Login (FaceID / TouchID)</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 9 }}>Instant hardware authentication on app launch</Text>
+                                </View>
+                            </View>
+                            <Switch
+                                trackColor={{ false: '#CBD5E1', true: L.navyHeader }}
+                                thumbColor={biometricEnabled ? L.gold : '#FFFFFF'}
+                                onValueChange={handleBiometricToggle}
+                                value={biometricEnabled}
+                                style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
+                            />
+                        </View>
+                    </View>
+
+                </ScrollView>
             </View>
         </View>
     );

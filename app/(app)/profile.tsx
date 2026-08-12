@@ -489,6 +489,19 @@ export default function UserProfileScreen() {
                                 <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                             </TouchableOpacity>
 
+                            <TouchableOpacity onPress={() => router.push('/security')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="shield-checkmark" size={14} color={L.emerald} />
+                                    </View>
+                                    <View>
+                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>PIN Code & Biometrics Security</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>4-digit transaction PIN & FaceID/TouchID setup</Text>
+                                    </View>
+                                </View>
+                                <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
+                            </TouchableOpacity>
+
                             <TouchableOpacity onPress={() => router.push('/change-password')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: L.inputBorder }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                     <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -505,7 +518,7 @@ export default function UserProfileScreen() {
                             <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                     <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="key" size={14} color={L.emerald} />
+                                        <Ionicons name="key" size={14} color={L.blue} />
                                     </View>
                                     <View>
                                         <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Two-Factor Security (2FA)</Text>
