@@ -1,23 +1,26 @@
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
-import { useState, useEffect, useRef } from 'react';
+import { 
+    View, Text, TouchableOpacity, TextInput, ActivityIndicator, 
+    Alert, Image, ScrollView, KeyboardAvoidingView, Platform, StyleSheet 
+} from 'react-native';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
-import { BlurView } from 'expo-blur';
 import { useAppSettings } from '../../hooks/useAppSettings';
-import { WebView } from 'react-native-webview';
 
-const NAVY = '#0d1b3e';
-const GOLD = '#f5a623';
+const NAVY = '#0F172A';
+const NAVY_MID = '#1C2541';
+const GOLD = '#FFD700';
+const GOLD_DK = '#DAA520';
 
-export default function KYC() {
+export default function UserKYCScreen() {
     const router = useRouter();
     const { settings } = useAppSettings();
 
@@ -26,19 +29,14 @@ export default function KYC() {
     const [userData, setUserData] = useState<any>(null);
     const [pendingRequest, setPendingRequest] = useState<any>(null);
     const [verifying, setVerifying] = useState(false);
-
-    const [permission, requestPermission] = useCameraPermissions();
-    const cameraRef = useRef<CameraView>(null);
-    const [showCamera, setShowCamera] = useState(false);
-
-    const [bvn, setBvn] = useState('');
-    const [nin, setNin] = useState('');
-
-    // Sumsub Integration State
-    const [showSumsub, setShowSumsub] = useState(false);
-    const [sumsubToken, setSumsubToken] = useState<string | null>(null);
-
     const [virtualAcc, setVirtualAcc] = useState<any>(null);
+
+    // Active Verification Mode: 'bvn' | 'nin' | 'drivers_license' | 'voters_card' | 'utility_bill' | 'liveness'
+    const [selectedDocType, setSelectedDocType] = useState<string>('bvn');
+
+    // Input States
+    const [idNumberInput, setIdNumberInput] = useState('');
+    const [docImageUri, setDocImageUri] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -50,35 +48,38 @@ export default function KYC() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not logged in");
 
-            const { data: profile, error: profErr } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-            if (profErr) {
-                console.error(profErr);
-            }
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
             setUserData({ ...profile, id: user.id });
-            
-            // Fetch User Virtual Bank Account if exists
+
+            // Fetch User Virtual Account if generated
             const { data: vAcc } = await supabase
                 .from('virtual_accounts')
                 .select('*')
                 .eq('user_id', user.id)
                 .maybeSingle();
 
-            if (vAcc) {
-                setVirtualAcc(vAcc);
-            }
+            if (vAcc) setVirtualAcc(vAcc);
 
             const { data: pending } = await supabase
                 .from('kyc_requests')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('status', 'pending')
+                .order('created_at', { ascending: false })
+                .limit(1)
                 .maybeSingle();
 
             if (pending) {
                 setPendingRequest(pending);
             }
 
-            setTier(profile?.kyc_tier || 0);
+            const currentTier = profile?.kyc_tier || 0;
+            setTier(currentTier);
+
+            // Default initial mode selection
+            if (currentTier === 0) setSelectedDocType('bvn');
+            else if (currentTier === 1) setSelectedDocType('drivers_license');
+            else if (currentTier === 2) setSelectedDocType('utility_bill');
 
         } catch (error: any) {
             console.error("KYC Load Error:", error);
@@ -87,9 +88,63 @@ export default function KYC() {
         }
     };
 
+    const pickDocumentPhoto = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert("Permission Required", "Please allow access to your photo library to attach your document photo.");
+                return;
+            }
 
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.7,
+                allowsEditing: true,
+            });
 
-    const handleSubmit = async (docType: string, payload: any) => {
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setDocImageUri(result.assets[0].uri);
+            }
+        } catch (e: any) {
+            Alert.alert("Image Error", e.message || "Failed to select document photo.");
+        }
+    };
+
+    const takeDocumentPhoto = async () => {
+        try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert("Permission Required", "Please allow camera access to take a photo of your document.");
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                quality: 0.7,
+                allowsEditing: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setDocImageUri(result.assets[0].uri);
+            }
+        } catch (e: any) {
+            Alert.alert("Camera Error", e.message || "Failed to take document photo.");
+        }
+    };
+
+    const handleSubmitKYC = async () => {
+        if (selectedDocType === 'bvn' && (!idNumberInput || idNumberInput.trim().length !== 11)) {
+            return Alert.alert("BVN Required", "Please enter your valid 11-digit BVN.");
+        }
+        if (selectedDocType === 'nin' && (!idNumberInput || idNumberInput.trim().length !== 11)) {
+            return Alert.alert("NIN Required", "Please enter your valid 11-digit NIN.");
+        }
+        if (selectedDocType === 'drivers_license' && !idNumberInput.trim() && !docImageUri) {
+            return Alert.alert("License Required", "Please enter your Driver's License Number or upload a photo of your License.");
+        }
+        if (selectedDocType === 'voters_card' && !idNumberInput.trim() && !docImageUri) {
+            return Alert.alert("Voter's Card Required", "Please enter your Voter's Card VIN Number or upload a photo.");
+        }
+
         setVerifying(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -97,13 +152,13 @@ export default function KYC() {
 
             let fileUrl = null;
 
-            if (payload.fileUri) {
-                const base64 = await FileSystem.readAsStringAsync(payload.fileUri, {
+            if (docImageUri) {
+                const base64 = await FileSystem.readAsStringAsync(docImageUri, {
                     encoding: 'base64',
                 });
                 
-                const fileExt = payload.fileUri.split('.').pop() || 'jpg';
-                const fileName = `${user.id}_${docType}_${Date.now()}.${fileExt}`;
+                const fileExt = docImageUri.split('.').pop() || 'jpg';
+                const fileName = `${user.id}_${selectedDocType}_${Date.now()}.${fileExt}`;
                 
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('kyc-documents')
@@ -113,446 +168,288 @@ export default function KYC() {
                 
                 if (uploadError) {
                     console.error("Upload Error:", uploadError);
-                    throw new Error("Failed to upload image. " + uploadError.message);
+                } else {
+                    const { data: publicUrlData } = supabase.storage
+                        .from('kyc-documents')
+                        .getPublicUrl(fileName);
+                    fileUrl = publicUrlData?.publicUrl || fileName;
                 }
-                
-                const { data: publicUrlData } = supabase.storage
-                    .from('kyc-documents')
-                    .getPublicUrl(fileName);
-                    
-                fileUrl = publicUrlData.publicUrl;
             }
 
-            const isAutoApproveSetting = settings?.auto_approve_kyc !== false;
-            const isAutoApprove = isAutoApproveSetting && (docType === 'bvn' || docType === 'nin' || docType === 'liveness');
+            // Check Auto Approve Setting
+            const isAutoApproveSetting = 
+                settings?.auto_kyc_verification_enabled === true || 
+                settings?.auto_approve_kyc === true;
+
+            const isAutoApprove = isAutoApproveSetting;
             const status = isAutoApprove ? 'approved' : 'pending';
 
             const { error: dbError } = await supabase.from('kyc_requests').insert({
                 user_id: user.id,
-                document_type: docType,
-                document_number: payload.idNumber || null,
+                document_type: selectedDocType,
+                document_number: idNumberInput.trim() || null,
                 document_url: fileUrl,
                 status: status
             });
 
-            if (dbError) {
-                console.error("DB Insert Error:", dbError);
-                throw new Error("Failed to save KYC request. " + dbError.message);
-            }
+            if (dbError) throw dbError;
 
             if (isAutoApprove) {
-                let newTier = tier;
-                if (docType === 'bvn') newTier = 1;
-                if (docType === 'nin') newTier = 2;
-                if (docType === 'liveness') newTier = 3;
-
-                const updatePayload: any = { kyc_tier: newTier };
-                if (docType === 'bvn') updatePayload.bvn = payload.idNumber;
-                if (docType === 'nin') updatePayload.nin = payload.idNumber;
-
-                if (!userData?.email) updatePayload.email = `${user.id.substring(0,8)}@abumafhal.com.ng`;
-                let safePhone = userData?.phone ? userData.phone.replace(/\D/g, '') : '';
-                if (!safePhone || safePhone.length < 10) safePhone = '08000000000';
-                if (!userData?.phone || userData.phone !== safePhone) updatePayload.phone = safePhone;
-                if (!userData?.full_name) updatePayload.full_name = 'Abu Mafhal User';
-
-                const { error: profileError } = await supabase
-                    .from('profiles')
-                    .update(updatePayload)
-                    .eq('id', user.id);
-
-                if (profileError) {
-                    console.error("Profile Update Error:", profileError);
-                    throw new Error("Failed to update profile tier. " + profileError.message);
+                let targetTier = tier;
+                if (selectedDocType === 'bvn' || selectedDocType === 'nin' || selectedDocType === 'drivers_license' || selectedDocType === 'voters_card') {
+                    if (targetTier < 2) targetTier = 2;
+                } else if (selectedDocType === 'utility_bill' || selectedDocType === 'bank_statement') {
+                    if (targetTier < 3) targetTier = 3;
+                } else if (selectedDocType === 'liveness') {
+                    if (targetTier < 4) targetTier = 4;
                 }
 
-                if (docType === 'bvn') {
-                    const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error("Timeout: The server took too long to create the virtual account.")), 15000)
-                    );
-                    
+                const updatePayload: any = { kyc_tier: targetTier };
+                if (selectedDocType === 'bvn') updatePayload.bvn = idNumberInput.trim();
+                if (selectedDocType === 'nin') updatePayload.nin = idNumberInput.trim();
+
+                await supabase.from('profiles').update(updatePayload).eq('id', user.id);
+
+                // Auto Virtual Account Creation on Approval
+                if (selectedDocType === 'bvn' || selectedDocType === 'nin' || selectedDocType === 'drivers_license') {
                     try {
-                        const response: any = await Promise.race([
-                            supabase.functions.invoke('create-virtual-account', {
-                                body: { userId: user.id, bvn: payload.idNumber }
-                            }),
-                            timeoutPromise
-                        ]);
-                        
-                        const vAccountData = response?.data;
-                        const vAccountErr = response?.error;
-                        
-                        if (vAccountErr) {
-                            Alert.alert('Virtual Account Creation Error', JSON.stringify(vAccountErr));
-                        } else if (vAccountData?.error) {
-                            Alert.alert('Virtual Account Backend Failed', JSON.stringify(vAccountData));
-                        } else {
-                            Alert.alert("Success!", `Virtual Account created successfully!`);
-                        }
-                    } catch (e: any) {
-                        Alert.alert('Virtual Account Server Error', e.message || JSON.stringify(e));
+                        await supabase.functions.invoke('create-virtual-account', {
+                            body: { userId: user.id, bvn: idNumberInput.trim() }
+                        });
+                    } catch (e) {
+                        console.warn("DVA generation trigger:", e);
                     }
                 }
 
-                if (docType === 'liveness') {
-                     Alert.alert("Success", "Face Verification Saved!");
-                }
-
-                setTier(newTier);
+                setTier(targetTier);
+                Alert.alert("Verification Success! 🎉", `Your ${selectedDocType.toUpperCase().replace(/_/g, ' ')} has been verified automatically. Account is now Tier ${targetTier}!`);
+                loadData();
             } else {
-                setPendingRequest({ document_type: docType, status: 'pending' });
-                Alert.alert("Submitted", "Document saved successfully and is pending review.");
+                setPendingRequest({ document_type: selectedDocType, status: 'pending' });
+                Alert.alert("Submitted Successfully", "Your verification request has been submitted for instant admin review.");
             }
+
+            setIdNumberInput('');
+            setDocImageUri(null);
 
         } catch (error: any) {
-            console.error("HandleSubmit Fatal Error:", error);
-            Alert.alert("Submission Failed", error.message || "An unexpected error occurred.");
+            console.error("KYC Submit Error:", error);
+            Alert.alert("Submission Failed", error.message || "Failed to submit verification request");
         } finally {
             setVerifying(false);
         }
     };
 
-    const submitBVN = () => {
-        if (!bvn) return Alert.alert("Required", "Please enter your 11-digit BVN");
-        if (bvn.length !== 11) return Alert.alert("Required", "BVN must be exactly 11 digits");
-        handleSubmit('bvn', { idNumber: bvn });
-    };
+    const docTypes = [
+        { id: 'bvn', name: 'BVN (Tier 2)', icon: 'card' },
+        { id: 'nin', name: 'NIN (Tier 2)', icon: 'id-card' },
+        { id: 'drivers_license', name: "Driver's License (Tier 2)", icon: 'car-sport' },
+        { id: 'voters_card', name: "Voter's Card (Tier 2)", icon: 'checkbox' },
+        { id: 'utility_bill', name: 'Utility / Address (Tier 3)', icon: 'home' },
+        { id: 'liveness', name: 'AI Face Scan (Tier 4)', icon: 'scan' },
+    ];
 
-    const submitNIN = () => {
-        if (!nin) return Alert.alert("Required", "Please enter your 11-digit NIN");
-        if (nin.length !== 11) return Alert.alert("Required", "NIN must be exactly 11 digits");
-        handleSubmit('nin', { idNumber: nin });
-    };
-
-    const startSumsubVerification = async () => {
-        try {
-            setVerifying(true);
-            const { data, error } = await supabase.functions.invoke('sumsub-token');
-            if (error || !data?.token) {
-                throw new Error(error?.message || 'Failed to initialize Sumsub verification');
-            }
-            setSumsubToken(data.token);
-            setShowSumsub(true);
-        } catch (e: any) {
-            Alert.alert("Verification Error", e.message);
-        } finally {
-            setVerifying(false);
-        }
-    };
-
-    const handleSumsubMessage = (event: any) => {
-        try {
-            const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === 'onStepCompleted') {
-                console.log('Step completed', data.payload);
-            } else if (data.type === 'onApplicantSubmitted') {
-                // Verification complete!
-                setShowSumsub(false);
-                handleSubmit('liveness', { status: 'submitted_to_sumsub' });
-                Alert.alert("Success", "Your identity verification has been submitted successfully!");
-                // Optionally update tier locally
-                setTier(3);
-                loadData();
-            } else if (data.type === 'onError') {
-                console.error("Sumsub Error:", data.error);
-                Alert.alert("Verification Error", "There was an issue processing your verification. Please try again.");
-                setShowSumsub(false);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
-    if (loading) return (
-        <SafeAreaView style={s.centerContainer}>
-            <ActivityIndicator size="large" color={GOLD} />
-        </SafeAreaView>
-    );
+    if (loading) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={GOLD} />
+            </SafeAreaView>
+        );
+    }
 
     return (
-        <View style={s.container}>
+        <View style={{ flex: 1, backgroundColor: NAVY }}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            <View style={StyleSheet.absoluteFillObject} className="pointer-events-none">
-                <LinearGradient colors={[NAVY, '#101c3d']} style={{flex: 1}} />
-                <LinearGradient colors={['rgba(245, 166, 35, 0.1)', 'rgba(245, 166, 35, 0)']} style={s.topGlow} />
-            </View>
-
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
                 
-                <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={s.backBtn} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                {/* Header Row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10 }}>
+                    <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GOLD }}>
+                        <Ionicons name="arrow-back" size={14} color={GOLD} />
                     </TouchableOpacity>
-                    <Text style={s.headerTitle}>KYC Verification</Text>
-                    <View style={{ width: 40 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 }}>Identity Verification Hub</Text>
+                    <View style={{ width: 30 }} />
                 </View>
 
                 <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                    <ScrollView 
-                        style={{ flex: 1 }}
-                        contentContainerStyle={s.scrollContent}
-                        showsVerticalScrollIndicator={false} 
-                    >
+                    <ScrollView style={{ flex: 1, paddingHorizontal: 14 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                         
-                        <View style={s.introBlock}>
-                            <Text style={s.introTitle}>Verify Your Identity</Text>
-                            <Text style={s.introDesc}>Unlock premium features, higher limits, and advanced security.</Text>
+                        {/* Compact Intro */}
+                        <View style={{ marginTop: 2, marginBottom: 12, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 16, fontWeight: '900', color: '#FFFFFF', marginBottom: 2 }}>Verify Identity & Unlock Limits</Text>
+                            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>Tier {tier} Account Active • Higher Limits & Dedicated Bank Account</Text>
                         </View>
 
-                        <View style={s.stepperRow}>
-                            <View style={[s.stepTab, tier >= 0 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier >= 0 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    {tier > 0 ? <Ionicons name="checkmark" size={16} color={NAVY} /> : <Text style={[s.stepNum, s.stepNumActive]}>1</Text>}
-                                </View>
-                                <Text style={[s.stepText, tier >= 0 ? s.stepTextActive : s.stepTextInactive]}>BVN</Text>
-                            </View>
-                            
-                            <View style={[s.stepLine, tier >= 1 ? {backgroundColor: GOLD} : {}]} />
-
-                            <View style={[s.stepTab, tier >= 1 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier >= 1 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    {tier > 1 ? <Ionicons name="checkmark" size={16} color={NAVY} /> : <Text style={[s.stepNum, tier === 1 ? s.stepNumActive : s.stepNumInactive]}>2</Text>}
-                                </View>
-                                <Text style={[s.stepText, tier >= 1 ? s.stepTextActive : s.stepTextInactive]}>NIN</Text>
-                            </View>
-
-                            <View style={[s.stepLine, tier >= 2 ? {backgroundColor: GOLD} : {}]} />
-
-                            <View style={[s.stepTab, tier >= 2 ? s.stepTabActive : s.stepTabInactive]}>
-                                <View style={[s.stepCircle, tier >= 2 ? s.stepCircleActive : s.stepCircleInactive]}>
-                                    {tier > 2 ? <Ionicons name="checkmark" size={16} color={NAVY} /> : <Text style={[s.stepNum, tier === 2 ? s.stepNumActive : s.stepNumInactive]}>3</Text>}
-                                </View>
-                                <Text style={[s.stepText, tier >= 2 ? s.stepTextActive : s.stepTextInactive]}>FACE</Text>
-                            </View>
-                        </View>
-
-                        {pendingRequest && pendingRequest.document_type !== 'liveness' ? (
-                            <View style={s.glassCard}>
-                                <View style={s.iconWrapper}>
-                                    <Ionicons name="time" size={32} color={GOLD} />
-                                </View>
-                                <Text style={s.cardTitle}>Under Review</Text>
-                                <Text style={s.cardDesc}>Your document has been submitted and is currently under review by our team.</Text>
-                                <TouchableOpacity onPress={() => router.replace('/')} style={[s.actionBtn, {marginTop: 10}]} activeOpacity={0.8}>
-                                    <Text style={s.actionBtnText}>Return to Dashboard</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View>
-                            {tier === 0 && (
-                                <View style={s.glassCard}>
-                                    <View style={s.iconWrapper}>
-                                        <Ionicons name="card" size={26} color={NAVY} />
-                                    </View>
-                                    <Text style={s.cardTitle}>Bank Verification Number</Text>
-                                    <Text style={s.cardDesc}>Enter your 11-digit BVN to instantly generate your Virtual Account.</Text>
-                                    
-                                    <View style={s.inputContainer}>
-                                        <TextInput 
-                                            value={bvn} 
-                                            onChangeText={setBvn} 
-                                            placeholder="Enter 11-digit BVN" 
-                                            placeholderTextColor="rgba(255,255,255,0.4)"
-                                            style={s.textInput} 
-                                            keyboardType="numeric"
-                                            maxLength={11}
-                                        />
-                                    </View>
-
-                                    <TouchableOpacity onPress={submitBVN} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
-                                        {verifying ? <ActivityIndicator color={NAVY} /> : (
-                                            <Text style={s.actionBtnText}>Verify & Continue</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-
-                            {tier === 1 && (
-                                <View style={s.glassCard}>
-                                    <View style={s.iconWrapper}>
-                                        <Ionicons name="id-card" size={26} color={NAVY} />
-                                    </View>
-                                    <Text style={s.cardTitle}>National Identity Number</Text>
-                                    <Text style={s.cardDesc}>Provide your 11-digit NIN for advanced security profiling.</Text>
-                                    
-                                    <View style={s.inputContainer}>
-                                        <TextInput 
-                                            value={nin} 
-                                            onChangeText={setNin} 
-                                            placeholder="Enter 11-digit NIN" 
-                                            placeholderTextColor="rgba(255,255,255,0.4)"
-                                            style={s.textInput} 
-                                            keyboardType="numeric"
-                                            maxLength={11}
-                                        />
-                                    </View>
-
-                                    <TouchableOpacity onPress={submitNIN} disabled={verifying} activeOpacity={0.8} style={s.actionBtn}>
-                                        {verifying ? <ActivityIndicator color={NAVY} /> : (
-                                            <Text style={s.actionBtnText}>Verify NIN</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-
-                            {tier === 2 && (
-                                <View style={s.glassCard}>
-                                    <View style={s.iconWrapper}>
-                                        <Ionicons name="scan" size={26} color={NAVY} />
-                                    </View>
-                                    <Text style={s.cardTitle}>Auto Face Verification</Text>
-                                    <Text style={s.cardDesc}>We use advanced AI to verify your face automatically. Ensure you are in a well-lit room.</Text>
-                                    
-
-
-                                    {/* Action Buttons Container */}
-                                    <View style={{flexDirection: 'row', gap: 10, marginTop: 16}}>
-                                        <TouchableOpacity onPress={startSumsubVerification} disabled={verifying} style={[s.actionBtn, {flex: 1}]} activeOpacity={0.8}>
-                                            {verifying ? (
-                                                <ActivityIndicator color={NAVY} size="small" />
-                                            ) : (
-                                                <>
-                                                    <Ionicons name="scan-outline" size={20} color="#ffffff" style={{marginRight: 6}} />
-                                                    <Text style={[s.actionBtnText, {color: '#ffffff'}]}>Start Sumsub Scan</Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            )}
-                            </View>
-                        )}
-
-                        {/* Virtual Bank Account Display Card */}
-                        {virtualAcc && (
-                            <View style={[s.glassCard, { marginBottom: 20, borderColor: GOLD }]}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Ionicons name="card" size={20} color={GOLD} />
-                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>Reserved Virtual Bank Account</Text>
-                                    </View>
-                                    <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#10b981' }}>
-                                        <Text style={{ color: '#10b981', fontSize: 9, fontWeight: '900' }}>Active</Text>
-                                    </View>
-                                </View>
-
-                                <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: GOLD, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
-                                    
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                                        <View>
-                                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>Account Number</Text>
-                                            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                                                {virtualAcc.account_number}
-                                            </Text>
+                        {/* Stepper Level Indicators */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                            {[
+                                { t: 1, label: 'Tier 1' },
+                                { t: 2, label: 'Tier 2 (ID/License)' },
+                                { t: 3, label: 'Tier 3 (Address)' },
+                                { t: 4, label: 'Tier 4 (Face)' },
+                            ].map((st) => {
+                                const isPassed = tier >= st.t;
+                                return (
+                                    <View key={st.t} style={{ alignItems: 'center', flex: 1 }}>
+                                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isPassed ? GOLD : 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isPassed ? GOLD : 'rgba(255,255,255,0.3)', marginBottom: 2 }}>
+                                            {isPassed ? <Ionicons name="checkmark" size={12} color={NAVY} /> : <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>{st.t}</Text>}
                                         </View>
+                                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: isPassed ? GOLD : 'rgba(255,255,255,0.6)', textAlign: 'center' }}>{st.label}</Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
 
-                                        <TouchableOpacity 
-                                            onPress={() => {
-                                                if (virtualAcc.account_number) {
-                                                    Alert.alert("Copied!", `Account Number ${virtualAcc.account_number} copied to clipboard`);
-                                                }
-                                            }}
-                                            style={{ backgroundColor: GOLD, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
-                                        >
-                                            <Text style={{ color: NAVY, fontWeight: '900', fontSize: 10 }}>COPY</Text>
+                        {/* Virtual Dedicated Bank Account Display Card */}
+                        {virtualAcc && (
+                            <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: GOLD, marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        <Ionicons name="card" size={14} color={GOLD} />
+                                        <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 11 }}>Reserved Virtual Bank Account</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#10b981' }}>
+                                        <Text style={{ color: '#10b981', fontSize: 8, fontWeight: '900' }}>Active</Text>
+                                    </View>
+                                </View>
+                                <View style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 10 }}>
+                                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9 }}>Bank: <Text style={{ color: GOLD, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                        <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                            {virtualAcc.account_number}
+                                        </Text>
+                                        <TouchableOpacity onPress={() => Alert.alert("Copied", `Account ${virtualAcc.account_number} copied!`)} style={{ backgroundColor: GOLD, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                            <Text style={{ color: NAVY, fontWeight: '900', fontSize: 9 }}>COPY</Text>
                                         </TouchableOpacity>
                                     </View>
-
-                                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, marginTop: 6 }}>Account Name: <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>{virtualAcc.account_name || userData?.full_name}</Text></Text>
                                 </View>
                             </View>
                         )}
 
-                        {tier >= 3 && (
-                            <View style={[s.glassCard, {alignItems: 'center', paddingTop: 40, paddingBottom: 40}]}>
-                                <View style={s.successIconBox}>
-                                    <Ionicons name="shield-checkmark" size={44} color="#10b981" />
+                        {/* Document Type Selector Carousel */}
+                        <Text style={{ color: GOLD, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Select Verification Document</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 6 }}>
+                            {docTypes.map((dt) => {
+                                const isSel = selectedDocType === dt.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={dt.id}
+                                        onPress={() => { setSelectedDocType(dt.id); setIdNumberInput(''); setDocImageUri(null); }}
+                                        style={{
+                                            backgroundColor: isSel ? GOLD : 'rgba(255,255,255,0.08)',
+                                            paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                                            borderWidth: 1, borderColor: isSel ? GOLD : 'rgba(255,255,255,0.15)',
+                                            flexDirection: 'row', alignItems: 'center', gap: 4
+                                        }}
+                                    >
+                                        <Ionicons name={dt.icon as any} size={12} color={isSel ? NAVY : '#FFFFFF'} />
+                                        <Text style={{ fontSize: 9, fontWeight: '900', color: isSel ? NAVY : '#FFFFFF' }}>{dt.name}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        {/* Submission Form Card */}
+                        <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                <Ionicons name="shield-checkmark" size={16} color={GOLD} />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13, textTransform: 'uppercase' }}>
+                                    {selectedDocType.replace(/_/g, ' ')} Submission
+                                </Text>
+                            </View>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginBottom: 10 }}>
+                                Provide your document details or snap/upload a clear photo of your identification.
+                            </Text>
+
+                            {/* Text / ID Number Input */}
+                            <View style={{ marginBottom: 10 }}>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, fontWeight: 'bold', marginBottom: 4 }}>
+                                    {selectedDocType === 'drivers_license' ? "Driver's License Number:" : selectedDocType === 'voters_card' ? "Voter's Card VIN Number:" : selectedDocType === 'bvn' ? "11-Digit BVN:" : selectedDocType === 'nin' ? "11-Digit NIN:" : "Document ID / Number:"}
+                                </Text>
+                                <View style={{ height: 40, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, justifyContent: 'center' }}>
+                                    <TextInput
+                                        value={idNumberInput}
+                                        onChangeText={setIdNumberInput}
+                                        placeholder={`Enter ${selectedDocType.replace(/_/g, ' ')} ID Number...`}
+                                        placeholderTextColor="rgba(255,255,255,0.4)"
+                                        style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600' }}
+                                        keyboardType={selectedDocType === 'bvn' || selectedDocType === 'nin' ? 'numeric' : 'default'}
+                                        maxLength={selectedDocType === 'bvn' || selectedDocType === 'nin' ? 11 : 30}
+                                    />
                                 </View>
-                                <Text style={[s.cardTitle, {textAlign: 'center'}]}>Fully Verified</Text>
-                                <Text style={[s.cardDesc, {textAlign: 'center'}]}>Congratulations! Your account is fully verified. You now have unrestricted access to all premium features.</Text>
-                                
-                                <TouchableOpacity onPress={() => router.replace('/')} style={[s.actionBtn, {width: '100%', marginTop: 10}]} activeOpacity={0.8}>
-                                    <Text style={s.actionBtnText}>Go to Dashboard</Text>
-                                </TouchableOpacity>
+                            </View>
+
+                            {/* Document Photo Attachment Box */}
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, fontWeight: 'bold', marginBottom: 4 }}>
+                                Attachment (Optional / Photo Card):
+                            </Text>
+                            
+                            {docImageUri ? (
+                                <View style={{ height: 140, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: GOLD, marginBottom: 10, position: 'relative' }}>
+                                    <Image source={{ uri: docImageUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                    <TouchableOpacity 
+                                        onPress={() => setDocImageUri(null)}
+                                        style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 12, padding: 4 }}
+                                    >
+                                        <Ionicons name="close" size={14} color="#FFFFFF" />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                                    <TouchableOpacity 
+                                        onPress={takeDocumentPhoto}
+                                        style={{ flex: 1, height: 38, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}
+                                    >
+                                        <Ionicons name="camera-outline" size={14} color={GOLD} />
+                                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: 'bold' }}>Snap Photo</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        onPress={pickDocumentPhoto}
+                                        style={{ flex: 1, height: 38, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}
+                                    >
+                                        <Ionicons name="image-outline" size={14} color={GOLD} />
+                                        <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: 'bold' }}>Upload Gallery</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* Submit Verification Action Button */}
+                            <TouchableOpacity 
+                                onPress={handleSubmitKYC}
+                                disabled={verifying}
+                                style={{ height: 40, backgroundColor: GOLD, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                            >
+                                {verifying ? (
+                                    <ActivityIndicator size="small" color={NAVY} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="checkmark-circle-sharp" size={14} color={NAVY} />
+                                        <Text style={{ color: NAVY, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Submit Verification Request</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                        </View>
+
+                        {/* Recent Pending Status Alert if exists */}
+                        {pendingRequest && (
+                            <View style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#D97706', marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="time-outline" size={18} color={GOLD} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: GOLD, fontWeight: '900', fontSize: 10 }}>Verification Under Review</Text>
+                                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 8 }}>
+                                        Your submitted {pendingRequest.document_type?.toUpperCase().replace(/_/g, ' ')} request is pending review by compliance.
+                                    </Text>
+                                </View>
                             </View>
                         )}
 
                     </ScrollView>
                 </KeyboardAvoidingView>
-
-
             </SafeAreaView>
         </View>
     );
 }
-
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: NAVY },
-    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: NAVY },
-    
-    topGlow: { position: 'absolute', top: -100, right: -100, width: 400, height: 400, borderRadius: 200 },
-    
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 10 : 14, paddingBottom: 12 },
-    backBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-    headerTitle: { fontSize: 14, fontWeight: '700', color: '#ffffff', letterSpacing: 0.3 },
-    
-    scrollContent: { paddingHorizontal: 14, paddingBottom: 30 },
-    
-    introBlock: { marginTop: 4, marginBottom: 16, alignItems: 'center' },
-    introTitle: { fontSize: 18, fontWeight: '900', color: '#ffffff', marginBottom: 4, letterSpacing: 0.3 },
-    introDesc: { fontSize: 11, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 16, paddingHorizontal: 8 },
-    
-    stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16, paddingHorizontal: 6 },
-    stepTab: { alignItems: 'center' },
-    stepTabActive: { opacity: 1 },
-    stepTabInactive: { opacity: 0.4 },
-    stepCircle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 4, borderWidth: 1.5 },
-    stepCircleActive: { backgroundColor: GOLD, borderColor: GOLD, shadowColor: GOLD, shadowOffset: {width:0, height:2}, shadowOpacity:0.3, shadowRadius: 4, elevation: 3 },
-    stepCircleInactive: { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.5)' },
-    stepNum: { fontSize: 10, fontWeight: '800' },
-    stepNumActive: { color: NAVY },
-    stepNumInactive: { color: '#ffffff' },
-    stepText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-    stepTextActive: { color: GOLD },
-    stepTextInactive: { color: 'rgba(255,255,255,0.8)' },
-    stepLine: { flex: 1, height: 1.5, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 8, alignSelf: 'flex-start', marginTop: 12 },
-    
-    glassCard: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 6 },
-    iconWrapper: { width: 40, height: 40, borderRadius: 12, backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center', marginBottom: 12, shadowColor: GOLD, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-    cardTitle: { fontSize: 15, fontWeight: '800', color: '#ffffff', marginBottom: 4 },
-    cardDesc: { fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 16, marginBottom: 14 },
-    
-    inputContainer: { marginBottom: 14 },
-    textInput: { height: 42, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 14, fontSize: 13, fontWeight: '600', color: '#ffffff', letterSpacing: 1.5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    
-    actionBtn: { flexDirection: 'row', height: 42, backgroundColor: GOLD, justifyContent: 'center', alignItems: 'center', borderRadius: 12, shadowColor: GOLD, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 },
-    actionBtnText: { color: NAVY, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-    
-    selfieBox: { width: '100%', height: 220, backgroundColor: 'rgba(0,0,0,0.2)', marginBottom: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-    selfieImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    selfieEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-    selfieEmptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '600', marginTop: 10, letterSpacing: 0.5 },
-    
-    successIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(16, 185, 129, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' },
-
-    cameraModalContainer: { flex: 1, backgroundColor: '#000' },
-    cameraOverlayWrapper: { flex: 1, justifyContent: 'space-between', zIndex: 10, ...StyleSheet.absoluteFillObject },
-    cameraTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 50 : 30 },
-    cameraBackBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    cameraHelpBadge: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: GOLD },
-    cameraHelpText: { color: GOLD, fontSize: 13, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-    
-    faceFrameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    faceFrame: { width: 280, height: 380, borderRadius: 140, borderWidth: 4, backgroundColor: 'transparent', shadowColor: GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 20 },
-    
-    cameraBottomBar: { paddingBottom: 50, alignItems: 'center', paddingHorizontal: 20 },
-    livenessCard: { width: '100%', backgroundColor: 'rgba(13, 27, 62, 0.95)', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.4)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10 },
-    livenessIconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(245, 166, 35, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(245, 166, 35, 0.2)' },
-    livenessTitle: { color: '#ffffff', fontSize: 22, fontWeight: '900', letterSpacing: 0.5, marginBottom: 8, textAlign: 'center' },
-    livenessMsgText: { color: 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: '500', textAlign: 'center', lineHeight: 22, paddingHorizontal: 10 },
-    livenessBtn: { backgroundColor: GOLD, paddingHorizontal: 36, paddingVertical: 14, borderRadius: 20, marginTop: 20, shadowColor: GOLD, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-    livenessBtnText: { color: NAVY, fontWeight: '900', fontSize: 16, letterSpacing: 1, textTransform: 'uppercase' }
-});
