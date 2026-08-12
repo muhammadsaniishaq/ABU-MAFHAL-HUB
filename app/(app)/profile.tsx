@@ -15,7 +15,7 @@ import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CACHE_KEY = '@profile_data_v6';
+const CACHE_KEY = '@profile_data_v7';
 
 // Executive Light Navy & Gold Design Tokens
 const L = {
@@ -63,8 +63,8 @@ export default function UserProfileScreen() {
         created_at?: string;
         role?: string;
     }>({
-        full_name: 'User',
-        email: 'Loading...',
+        full_name: 'User Profile',
+        email: 'Loading details...',
         kyc_tier: 0,
         balance: 0
     });
@@ -83,7 +83,6 @@ export default function UserProfileScreen() {
     const [totpCodeInput, setTotpCodeInput] = useState<string>('');
 
     useEffect(() => {
-        // Fast instant cache load + silent background sync
         loadCachedData();
         loadAllData();
     }, []);
@@ -124,7 +123,6 @@ export default function UserProfileScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Fetch background data asynchronously without blocking UI render
             fetchProfileData(user.id);
             fetchVirtualAccount(user.id);
             fetchTransactionCount(user.id);
@@ -308,7 +306,7 @@ export default function UserProfileScreen() {
                 <ScrollView 
                     style={{ flex: 1 }} 
                     showsVerticalScrollIndicator={false} 
-                    contentContainerStyle={{ paddingBottom: 110 }}
+                    contentContainerStyle={{ paddingBottom: 90 }}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={L.navyHeader} />
                     }
@@ -326,7 +324,7 @@ export default function UserProfileScreen() {
                                 <Ionicons name="arrow-back" size={16} color={L.gold} />
                             </TouchableOpacity>
 
-                            <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>USER PROFILE</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>USER PROFILE HUB</Text>
 
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
@@ -400,42 +398,42 @@ export default function UserProfileScreen() {
                         {/* Balance & Metrics Strip */}
                         <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 2 }}>
                             <View style={{ alignItems: 'center', flex: 1 }}>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Wallet Balance</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Wallet Balance</Text>
                                 <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>₦{(profile?.balance || 0).toLocaleString()}</Text>
                             </View>
                             <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
                             <View style={{ alignItems: 'center', flex: 1 }}>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Transactions</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Transactions</Text>
                                 <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{txCount}</Text>
                             </View>
                             <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
                             <View style={{ alignItems: 'center', flex: 1 }}>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Account Status</Text>
+                                <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Account Status</Text>
                                 <Text style={{ color: L.emerald, fontSize: 12, fontWeight: '900', marginTop: 2 }}>Verified</Text>
                             </View>
                         </View>
 
-                        {/* Mobile First Chips Navigation Bar (4 Horizontal Touch Chips) */}
-                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginTop: 2 }}>Quick Navigation Actions</Text>
+                        {/* Mobile-First Quick Chips Navigation (4 Balanced Touch Chips) */}
+                        <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 2 }}>Quick Navigation Actions</Text>
                         <View style={{ flexDirection: 'row', gap: 6 }}>
-                            <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
+                            <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
                                 <Ionicons name="person-outline" size={14} color={L.navyHeader} />
-                                <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900' }}>Edit</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900' }}>Edit Profile</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
+                            <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
                                 <Ionicons name="shield-checkmark-outline" size={14} color={L.goldAmber} />
-                                <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900' }}>KYC</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900' }}>KYC Hub</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => router.push('/referrals')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
+                            <TouchableOpacity onPress={() => router.push('/referrals')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
                                 <Ionicons name="gift-outline" size={14} color={L.emerald} />
-                                <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900' }}>Earn ₦500</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900' }}>Earn ₦500</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => router.push('/support')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
+                            <TouchableOpacity onPress={() => router.push('/support')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
                                 <Ionicons name="headset-outline" size={14} color={L.blue} />
-                                <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900' }}>Support</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900' }}>Support</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -443,103 +441,103 @@ export default function UserProfileScreen() {
                         <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.cardBorder, elevation: 2 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Ionicons name="card" size={14} color={L.goldAmber} />
-                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Reserved Virtual Dedicated Account</Text>
+                                    <Ionicons name="card" size={15} color={L.goldAmber} />
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Reserved Virtual Dedicated Account</Text>
                                 </View>
-                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                    <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>Active</Text>
+                                <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                    <Text style={{ color: L.emerald, fontSize: 8.5, fontWeight: '900' }}>Active</Text>
                                 </View>
                             </View>
 
                             {virtualAcc ? (
-                                <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
-                                    <Text style={{ color: L.textMuted, fontSize: 8.5, fontWeight: 'bold' }}>Bank: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                                        <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <Text style={{ color: L.textMuted, fontSize: 9, fontWeight: 'bold' }}>Bank: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                        <Text style={{ color: L.navyHeader, fontSize: 15, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
                                             {virtualAcc.account_number}
                                         </Text>
-                                        <TouchableOpacity onPress={() => copyToClipboard(virtualAcc.account_number, 'Account Number')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}>
-                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8 }}>COPY</Text>
+                                        <TouchableOpacity onPress={() => copyToClipboard(virtualAcc.account_number, 'Account Number')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}>
+                                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9 }}>COPY</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
                             ) : (
-                                <TouchableOpacity onPress={() => router.push('/kyc')} style={{ backgroundColor: L.goldBg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <TouchableOpacity onPress={() => router.push('/kyc')} style={{ backgroundColor: L.goldBg, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <View>
-                                        <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 10 }}>Activate Reserved Virtual Account</Text>
-                                        <Text style={{ color: L.textSecondary, fontSize: 8, marginTop: 1 }}>Submit BVN or NIN to receive automatic account</Text>
+                                        <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 11 }}>Activate Reserved Virtual Account</Text>
+                                        <Text style={{ color: L.textSecondary, fontSize: 9, marginTop: 1 }}>Submit BVN or NIN to receive automatic account</Text>
                                     </View>
-                                    <Ionicons name="arrow-forward" size={14} color={L.goldAmber} />
+                                    <Ionicons name="arrow-forward" size={15} color={L.goldAmber} />
                                 </TouchableOpacity>
                             )}
                         </View>
 
-                        {/* Account Security Menu */}
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
-                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Account Security & Login Settings</Text>
+                        {/* Account Security Menu Card */}
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Account Security & Login Settings</Text>
 
-                            <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="person" size={12} color={L.navyHeader} />
+                            <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="person" size={14} color={L.navyHeader} />
                                     </View>
                                     <View>
-                                        <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Personal Details</Text>
-                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Update full name, phone number & email</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Personal Details</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>Update full name, phone number & email</Text>
                                     </View>
                                 </View>
-                                <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
+                                <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => router.push('/change-password')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="lock-closed" size={12} color={L.goldAmber} />
+                            <TouchableOpacity onPress={() => router.push('/change-password')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="lock-closed" size={14} color={L.goldAmber} />
                                     </View>
                                     <View>
-                                        <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Password & Transaction PIN</Text>
-                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Change login password & PIN security</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Password & Transaction PIN</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>Change login password & PIN security</Text>
                                     </View>
                                 </View>
-                                <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
+                                <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Ionicons name="key" size={12} color={L.emerald} />
+                            <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Ionicons name="key" size={14} color={L.emerald} />
                                     </View>
                                     <View>
-                                        <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Two-Factor Security (2FA)</Text>
-                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>{twoFactorEnabled ? 'Active (Google Authenticator)' : 'Disabled'}</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Two-Factor Security (2FA)</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>{twoFactorEnabled ? 'Active (Google Authenticator)' : 'Disabled'}</Text>
                                     </View>
                                 </View>
-                                <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
+                                <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
 
-                        {/* Referral Bonus Card */}
-                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
-                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Referral Rewards Program</Text>
+                        {/* Referral Rewards Program Card */}
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Referral Rewards Program</Text>
 
-                            <View style={{ backgroundColor: L.goldBg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk }}>
-                                <Text style={{ color: L.goldAmber, fontSize: 10, fontWeight: '900' }}>Earn ₦500 Cash Bonus Per Referral!</Text>
-                                <Text style={{ color: L.textSecondary, fontSize: 8, marginTop: 1 }}>Share your unique referral link to claim automatic bonus payments.</Text>
+                            <View style={{ backgroundColor: L.goldBg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: L.goldDk }}>
+                                <Text style={{ color: L.goldAmber, fontSize: 11, fontWeight: '900' }}>Earn ₦500 Cash Bonus Per Referral!</Text>
+                                <Text style={{ color: L.textSecondary, fontSize: 9, marginTop: 2 }}>Share your unique referral link to claim automatic bonus payments.</Text>
 
-                                <TouchableOpacity onPress={() => copyToClipboard(refLink, 'Referral Link')} style={{ marginTop: 6, backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: L.gold }}>
-                                    <Text style={{ color: L.gold, fontSize: 8, fontWeight: 'bold' }} numberOfLines={1}>{refLink}</Text>
-                                    <Ionicons name="copy" size={10} color={L.gold} />
+                                <TouchableOpacity onPress={() => copyToClipboard(refLink, 'Referral Link')} style={{ marginTop: 8, backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: L.gold }}>
+                                    <Text style={{ color: L.gold, fontSize: 9, fontWeight: 'bold' }} numberOfLines={1}>{refLink}</Text>
+                                    <Ionicons name="copy" size={12} color={L.gold} />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        {/* Log Out Button */}
+                        {/* Log Out Action Button */}
                         <TouchableOpacity 
                             onPress={handleLogout}
-                            style={{ backgroundColor: L.roseBg, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.roseBorder, marginTop: 2 }}
+                            style={{ backgroundColor: L.roseBg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.roseBorder, marginTop: 2 }}
                         >
-                            <Ionicons name="log-out-outline" size={14} color={L.rose} />
-                            <Text style={{ color: L.rose, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Log Out Account</Text>
+                            <Ionicons name="log-out-outline" size={16} color={L.rose} />
+                            <Text style={{ color: L.rose, fontWeight: '900', fontSize: 11, textTransform: 'uppercase' }}>Log Out Account</Text>
                         </TouchableOpacity>
 
                     </View>
@@ -551,18 +549,18 @@ export default function UserProfileScreen() {
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 14 }}>
                     <View style={{ backgroundColor: L.card, borderRadius: 16, padding: 14, borderWidth: 1.5, borderColor: L.goldDk, maxWidth: 500, alignSelf: 'center', width: '100%' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>Two-Factor Security (2FA)</Text>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 13 }}>Two-Factor Security (2FA)</Text>
                             <TouchableOpacity onPress={() => setTwoFactorModalVisible(false)}>
-                                <Ionicons name="close-circle" size={18} color={L.textMuted} />
+                                <Ionicons name="close-circle" size={20} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 8 }}>
+                        <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 8 }}>
                             Scan or copy this secret key into Google Authenticator or Authy app:
                         </Text>
 
                         <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', marginBottom: 10 }}>
-                            <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '900', letterSpacing: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', letterSpacing: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
                                 {totpSecret}
                             </Text>
                             <TouchableOpacity onPress={() => copyToClipboard(totpSecret, '2FA Secret')} style={{ marginTop: 4, backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
@@ -570,8 +568,8 @@ export default function UserProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: L.textSecondary, fontSize: 8, fontWeight: 'bold', marginBottom: 2 }}>Enter 6-digit Authenticator Code:</Text>
-                        <View style={{ backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, height: 36, marginBottom: 10 }}>
+                        <Text style={{ color: L.textSecondary, fontSize: 9, fontWeight: 'bold', marginBottom: 3 }}>Enter 6-digit Authenticator Code:</Text>
+                        <View style={{ backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, height: 38, marginBottom: 10 }}>
                             <TextInput
                                 value={totpCodeInput}
                                 onChangeText={setTotpCodeInput}
@@ -579,7 +577,7 @@ export default function UserProfileScreen() {
                                 placeholderTextColor="#94A3B8"
                                 keyboardType="numeric"
                                 maxLength={6}
-                                style={{ flex: 1, color: L.textPrimary, fontWeight: '600', fontSize: 10 }}
+                                style={{ flex: 1, color: L.textPrimary, fontWeight: '600', fontSize: 11 }}
                             />
                         </View>
 
@@ -593,9 +591,9 @@ export default function UserProfileScreen() {
                                     Alert.alert("Code Error", "Please enter a valid 6-digit code.");
                                 }
                             }}
-                            style={{ backgroundColor: L.navyHeader, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
                         >
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Activate 2FA Security</Text>
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Activate 2FA Security</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
