@@ -495,8 +495,8 @@ export default function UserProfileScreen() {
                                         <Ionicons name="lock-closed" size={14} color={L.goldAmber} />
                                     </View>
                                     <View>
-                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Password & Transaction PIN</Text>
-                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>Change login password & PIN security</Text>
+                                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '800' }}>Change Account Password</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 9 }}>Update your login password securely</Text>
                                     </View>
                                 </View>
                                 <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
