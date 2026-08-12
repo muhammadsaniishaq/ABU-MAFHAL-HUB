@@ -497,68 +497,68 @@ export default function KYCManagerScreen() {
                         </View>
                     </View>
 
-                    <Text style={{ color: L.gold, fontSize: 16, fontWeight: '900', letterSpacing: -0.3, marginBottom: 1 }}>COMPLIANCE & KYC VERIFICATION QUEUE</Text>
-                    <Text style={{ color: '#CBD5E1', fontSize: 10, marginBottom: 8 }}>Review user identities, BVN, NIN, utility bills & tier upgrades.</Text>
+                    <Text style={{ color: L.gold, fontSize: 13, fontWeight: '900', letterSpacing: -0.2, marginBottom: 1 }}>COMPLIANCE & KYC QUEUE</Text>
+                    <Text style={{ color: '#CBD5E1', fontSize: 9, marginBottom: 6 }}>Review user identities, BVN, NIN, utility bills & tier upgrades.</Text>
 
                     {/* Search Input Bar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', paddingHorizontal: 10, height: 36 }}>
-                        <Ionicons name="search-outline" size={14} color={L.gold} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', paddingHorizontal: 8, height: 32 }}>
+                        <Ionicons name="search-outline" size={12} color={L.gold} />
                         <TextInput
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                             placeholder="Search user name, email, BVN or NIN..."
                             placeholderTextColor="#94A3B8"
-                            style={{ flex: 1, marginLeft: 6, color: '#FFFFFF', fontWeight: '600', fontSize: 11 }}
+                            style={{ flex: 1, marginLeft: 6, color: '#FFFFFF', fontWeight: '600', fontSize: 10 }}
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={14} color="#94A3B8" />
+                                <Ionicons name="close-circle" size={12} color="#94A3B8" />
                             </TouchableOpacity>
                         )}
                     </View>
                 </LinearGradient>
 
                 {/* Master Automation & Virtual Account Control Bar */}
-                <View style={{ backgroundColor: '#0F172A', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: L.goldDk }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="hardware-chip-outline" size={14} color={L.gold} />
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>KYC & Virtual Account Automation Engine</Text>
+                <View style={{ backgroundColor: '#0F172A', paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: L.goldDk }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="hardware-chip-outline" size={12} color={L.gold} />
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>KYC Automation Engine</Text>
                         </View>
 
                         <TouchableOpacity 
                             onPress={handleBulkAutoApprove}
                             disabled={isBulkProcessing}
-                            style={{ backgroundColor: L.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                            style={{ backgroundColor: L.gold, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 2 }}
                         >
                             {isBulkProcessing ? (
                                 <ActivityIndicator size="small" color="#0F172A" />
                             ) : (
                                 <>
-                                    <Ionicons name="flash-sharp" size={10} color="#0F172A" />
-                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 8, textTransform: 'uppercase' }}>Bulk Approve & Issue Accounts</Text>
+                                    <Ionicons name="flash-sharp" size={9} color="#0F172A" />
+                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 8, textTransform: 'uppercase' }}>Bulk Approve & Issue</Text>
                                 </>
                             )}
                         </TouchableOpacity>
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
                         {/* Auto-KYC Verification Toggle */}
                         <TouchableOpacity 
                             onPress={() => toggleAutoKycSetting(!autoKycEnabled)}
                             style={{
                                 flex: 1, backgroundColor: autoKycEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.05)',
-                                padding: 6, borderRadius: 8, borderWidth: 1,
+                                padding: 5, borderRadius: 6, borderWidth: 1,
                                 borderColor: autoKycEnabled ? L.emerald : 'rgba(255,255,255,0.15)',
                                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
                             }}
                         >
                             <View style={{ flex: 1, marginRight: 4 }}>
-                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 9 }}>Auto-Verify Submissions</Text>
-                                <Text style={{ color: autoKycEnabled ? L.emerald : '#94A3B8', fontSize: 8 }}>{autoKycEnabled ? '⚡ Active (Instant Approve)' : 'Manual Admin Approval'}</Text>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 8 }}>Auto-Verify KYC</Text>
+                                <Text style={{ color: autoKycEnabled ? L.emerald : '#94A3B8', fontSize: 7 }}>{autoKycEnabled ? '⚡ Instant Approve' : 'Manual Mode'}</Text>
                             </View>
-                            <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: autoKycEnabled ? L.emerald : '#475569', padding: 2, alignItems: autoKycEnabled ? 'flex-end' : 'flex-start' }}>
-                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#FFFFFF' }} />
+                            <View style={{ width: 24, height: 14, borderRadius: 7, backgroundColor: autoKycEnabled ? L.emerald : '#475569', padding: 1.5, alignItems: autoKycEnabled ? 'flex-end' : 'flex-start' }}>
+                                <View style={{ width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#FFFFFF' }} />
                             </View>
                         </TouchableOpacity>
 
@@ -567,42 +567,42 @@ export default function KYCManagerScreen() {
                             onPress={() => toggleAutoVirtualAccSetting(!autoVirtualAccEnabled)}
                             style={{
                                 flex: 1, backgroundColor: autoVirtualAccEnabled ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.05)',
-                                padding: 6, borderRadius: 8, borderWidth: 1,
+                                padding: 5, borderRadius: 6, borderWidth: 1,
                                 borderColor: autoVirtualAccEnabled ? L.gold : 'rgba(255,255,255,0.15)',
                                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
                             }}
                         >
                             <View style={{ flex: 1, marginRight: 4 }}>
-                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 9 }}>Auto Virtual Bank Acc</Text>
-                                <Text style={{ color: autoVirtualAccEnabled ? L.gold : '#94A3B8', fontSize: 8 }}>{autoVirtualAccEnabled ? '🏦 Auto Payvessel / Wema' : 'Off'}</Text>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 8 }}>Auto Virtual Acc</Text>
+                                <Text style={{ color: autoVirtualAccEnabled ? L.gold : '#94A3B8', fontSize: 7 }}>{autoVirtualAccEnabled ? '🏦 Wema / Payvessel' : 'Off'}</Text>
                             </View>
-                            <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: autoVirtualAccEnabled ? L.gold : '#475569', padding: 2, alignItems: autoVirtualAccEnabled ? 'flex-end' : 'flex-start' }}>
-                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#0F172A' }} />
+                            <View style={{ width: 24, height: 14, borderRadius: 7, backgroundColor: autoVirtualAccEnabled ? L.gold : '#475569', padding: 1.5, alignItems: autoVirtualAccEnabled ? 'flex-end' : 'flex-start' }}>
+                                <View style={{ width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#0F172A' }} />
                             </View>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 {/* Metrics Summary Strip */}
-                <View style={{ backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+                <View style={{ backgroundColor: L.card, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Pending Review</Text>
-                        <Text style={{ color: pendingCount > 0 ? L.rose : L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 1 }}>{pendingCount}</Text>
+                        <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Pending</Text>
+                        <Text style={{ color: pendingCount > 0 ? L.rose : L.navyHeader, fontSize: 11, fontWeight: '900' }}>{pendingCount}</Text>
                     </View>
-                    <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
+                    <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Approved Today</Text>
-                        <Text style={{ color: L.emerald, fontSize: 13, fontWeight: '900', marginTop: 1 }}>{approvedToday}</Text>
+                        <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Approved Today</Text>
+                        <Text style={{ color: L.emerald, fontSize: 11, fontWeight: '900' }}>{approvedToday}</Text>
                     </View>
-                    <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
+                    <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Total Approved</Text>
-                        <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', marginTop: 1 }}>{totalApprovedCount}</Text>
+                        <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Total Approved</Text>
+                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900' }}>{totalApprovedCount}</Text>
                     </View>
-                    <View style={{ width: 1, height: 22, backgroundColor: L.inputBorder }} />
+                    <View style={{ width: 1, height: 18, backgroundColor: L.inputBorder }} />
                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: '900', textTransform: 'uppercase' }}>Total Rejected</Text>
-                        <Text style={{ color: L.rose, fontSize: 13, fontWeight: '900', marginTop: 1 }}>{totalRejectedCount}</Text>
+                        <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Total Rejected</Text>
+                        <Text style={{ color: L.rose, fontSize: 11, fontWeight: '900' }}>{totalRejectedCount}</Text>
                     </View>
                 </View>
 
