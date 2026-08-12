@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, ActivityIndicator } from 'react-native';
+import { 
+    View, Text, TextInput, TouchableOpacity, ScrollView, Alert, 
+    Image, ActivityIndicator, Platform, KeyboardAvoidingView 
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,13 +10,43 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Executive Light Navy & Gold Design Tokens
+const L = {
+    bg: '#F4F6FB',
+    card: '#FFFFFF',
+    cardBorder: 'rgba(218, 165, 32, 0.35)',
+    navyHeader: '#0F172A',
+    navyMid: '#1C2541',
+    navyDark: '#0B132B',
+    gold: '#FFD700',
+    goldDk: '#DAA520',
+    goldAmber: '#D97706',
+    goldBg: 'rgba(254, 243, 199, 0.65)',
+    textPrimary: '#0F172A',
+    textSecondary: '#334155',
+    textMuted: '#64748B',
+    inputBg: '#FFFFFF',
+    inputBorder: '#CBD5E1',
+    emerald: '#10B981',
+    emeraldBg: '#ECFDF5',
+    emeraldBorder: '#A7F3D0',
+    rose: '#E11D48',
+    roseBg: '#FFF1F2',
+    roseBorder: '#FECDD3',
+    blue: '#3B82F6',
+    blueBg: '#EFF6FF',
+    blueBorder: '#BFDBFE'
+};
 
 export default function EditProfileScreen() {
+    const insets = useSafeAreaInsets();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     
-    // Profile Data
+    // Profile Data States
     const [fullName, setFullName] = useState('');
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -21,13 +54,11 @@ export default function EditProfileScreen() {
     const [customId, setCustomId] = useState(''); 
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-    // Logic States
+    // Logic & Contact States
     const [isPhoneLocked, setIsPhoneLocked] = useState(false);
-    
-    // New Fields
     const [address, setAddress] = useState('');
     const [gender, setGender] = useState('');
-    const [dob, setDob] = useState(''); // YYYY-MM-DD
+    const [dob, setDob] = useState('');
     const [state, setState] = useState('');
     const [nextOfKinName, setNextOfKinName] = useState('');
     const [nextOfKinPhone, setNextOfKinPhone] = useState('');
@@ -40,7 +71,7 @@ export default function EditProfileScreen() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data, error } = await supabase
+                const { data } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', user.id)
@@ -51,17 +82,11 @@ export default function EditProfileScreen() {
                     setUsername(data.username || '');
                     setEmail(data.email || user.email || '');
                     setPhone(data.phone || '');
-                     // Lock phone if it exists
                     if (data.phone && data.phone.length > 5) {
                         setIsPhoneLocked(true);
-                    } else {
-                        setIsPhoneLocked(false);
                     }
-
                     setCustomId(data.custom_id || 'ID-PENDING');
                     setAvatarUrl(data.avatar_url || null);
-                    
-                    // Load new fields if they exist
                     setAddress(data.address || '');
                     setGender(data.gender || '');
                     setDob(data.dob || '');
@@ -71,7 +96,7 @@ export default function EditProfileScreen() {
                 }
             }
         } catch (error) {
-            console.log('Error fetching', error);
+            console.log('Error fetching profile', error);
         } finally {
             setLoading(false);
         }
@@ -86,7 +111,7 @@ export default function EditProfileScreen() {
             base64: true,
         });
 
-        if (!result.canceled) {
+        if (!result.canceled && result.assets[0].base64) {
             uploadImage(result.assets[0]);
         }
     };
@@ -100,7 +125,7 @@ export default function EditProfileScreen() {
             if (!image.base64) throw new Error('No image data');
 
             const fileName = `${user.id}/${Date.now()}.jpg`;
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .storage
                 .from('avatars')
                 .upload(fileName, decode(image.base64), {
@@ -115,16 +140,13 @@ export default function EditProfileScreen() {
                 .from('avatars')
                 .getPublicUrl(fileName);
 
-            // Update profile with new avatar URL
-            const { error: updateError } = await supabase
+            await supabase
                 .from('profiles')
                 .update({ avatar_url: publicUrl })
                 .eq('id', user.id);
 
-            if (updateError) throw updateError;
-            
             setAvatarUrl(publicUrl);
-            Alert.alert("Success", "Profile photo updated!");
+            Alert.alert("Success", "Profile photo updated successfully!");
 
         } catch (error: any) {
             Alert.alert("Upload Failed", error.message);
@@ -133,25 +155,23 @@ export default function EditProfileScreen() {
         }
     };
 
-
     const handleSave = async () => {
         setSaving(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No user');
+            if (!user) throw new Error('No user session');
 
-            // Note: Ensure these columns exist in your Supabase 'profiles' table
             const updates = {
                 full_name: fullName,
                 username: username,
-                phone: phone, // Save phone (if it was editable)
+                phone: phone,
                 address: address,
                 gender: gender,
                 dob: dob,
                 state: state,
                 next_of_kin_name: nextOfKinName,
                 next_of_kin_phone: nextOfKinPhone,
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
             };
 
             const { error } = await supabase
@@ -161,26 +181,15 @@ export default function EditProfileScreen() {
 
             if (error) throw error;
 
-            Alert.alert("Success", "Profile details updated!");
-            
-            // If phone was empty and now set, lock it
-            if (!isPhoneLocked && phone.length > 5) {
-                setIsPhoneLocked(true);
-            }
+            Alert.alert("Profile Updated 🎉", "Your profile information has been saved successfully.");
+            router.back();
 
-            // router.back(); // Optional: Stay on page to see changes
         } catch (error: any) {
-            let errorMessage = error.message;
-
-            // Handle duplicate unique constraints (Postgres error 23505)
-            if (error.message.includes('profiles_username_key') || error.message.includes('username')) {
-                errorMessage = "This Username is already taken. Please choose another one.";
-            } else if (error.message.includes('profiles_phone_key') || error.message.includes('phone')) {
-                errorMessage = "This Phone Number is already linked to another account.";
-            } else if (error.message.includes('profiles_email_key') || error.message.includes('email')) {
-                errorMessage = "This Email is already in use.";
+            console.error('Update error:', error);
+            let errorMessage = "Failed to update profile details.";
+            if (error.message?.includes('profiles_username_key')) {
+                errorMessage = "This Username is already taken.";
             }
-
             Alert.alert("Update Failed", errorMessage);
         } finally {
             setSaving(false);
@@ -189,257 +198,248 @@ export default function EditProfileScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-slate-50">
-                <ActivityIndicator size="large" color="#4f46e5" />
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: L.bg }}>
+                <ActivityIndicator size="small" color={L.goldDk} />
             </View>
         );
     }
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={{ flex: 1, backgroundColor: L.bg, alignItems: 'center' }}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="dark" />
+            <StatusBar style="light" />
 
-            {/* HEADER */}
-            <View className="bg-[#0d1b3e] pt-12 pb-5 px-6 border-b border-[#0d1b3e] shadow-sm flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => router.back()} className="p-2 bg-white/10 rounded-full border border-white/20">
-                    <Ionicons name="arrow-back" size={20} color="#ffffff" />
-                </TouchableOpacity>
-                <Text className="text-lg font-black text-white tracking-wide">Edit Profile</Text>
-                <View className="w-10" />
-            </View>
-
-            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 50 }}>
+            {/* Container Wrapper (Max Width 600px for Web, 100% for Mobile) */}
+            <View style={{ flex: 1, width: '100%', maxWidth: 600, backgroundColor: L.bg }}>
                 
-                {/* AVATAR SECTION */}
-                <View className="items-center mb-8">
-                    <View className="relative">
-                        {avatarUrl ? (
-                            <Image 
-                                source={{ uri: avatarUrl }} 
-                                className="w-24 h-24 rounded-full border-2 border-[#f5a623]"
-                            />
-                        ) : (
-                            <LinearGradient
-                                colors={['#f5a623', '#d97706']}
-                                className="w-24 h-24 rounded-full items-center justify-center"
-                            >
-                                <Text className="text-3xl font-black text-[#0d1b3e]">{fullName.charAt(0) || 'U'}</Text>
-                            </LinearGradient>
-                        )}
-                        
-                        <TouchableOpacity 
-                            onPress={pickImage}
-                            className="absolute bottom-0 right-0 bg-[#f5a623] p-1.5 rounded-full border-2 border-white shadow-sm"
-                        >
-                            <Ionicons name="camera" size={16} color="#ffffff" />
+                {/* Royal Navy Header */}
+                <LinearGradient
+                    colors={['#0F172A', '#1C2541', '#0B132B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 14, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, borderBottomWidth: 1.5, borderColor: L.goldDk }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <TouchableOpacity onPress={() => router.back()} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="arrow-back" size={16} color={L.gold} />
                         </TouchableOpacity>
-                    </View>
-                    <Text className="mt-3 text-slate-400 font-semibold text-[9px] uppercase tracking-widest bg-[#0d1b3e]/5 px-3 py-1 rounded-full border border-[#0d1b3e]/10">ID: {customId}</Text>
-                </View>
 
-                {/* FORM FIELDS */}
-                <View className="gap-y-4">
-                    
-                    {/* Basic Info */}
-                    <View>
-                        <Text className="text-[#0d1b3e] font-black tracking-widest text-[9px] uppercase mb-3 ml-1">Basic Information</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>EDIT PROFILE DETAILS</Text>
+
+                        <View style={{ width: 32 }} />
+                    </View>
+                </LinearGradient>
+
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                    <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 12 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
                         
-                        <View className="gap-y-2.5">
-                            <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Username</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="at" size={14} color="#0d1b3e" /></View>
+                        {/* Avatar Section */}
+                        <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ position: 'relative' }}>
+                                <View style={{ width: 64, height: 64, borderRadius: 32, padding: 2, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                                    <View style={{ width: 60, height: 60, borderRadius: 30, overflow: 'hidden', backgroundColor: L.navyHeader }}>
+                                        {avatarUrl ? (
+                                            <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%' }} />
+                                        ) : (
+                                            <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
+                                                <Text style={{ fontSize: 20, fontWeight: '900', color: L.gold }}>{fullName?.charAt(0).toUpperCase() || 'U'}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity onPress={pickImage} style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: L.gold, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: L.navyHeader }}>
+                                    <Ionicons name="camera" size={11} color={L.navyHeader} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: L.goldDk, marginTop: 6 }}>
+                                <Text style={{ color: L.goldAmber, fontSize: 8.5, fontWeight: '900' }}>ID: {customId}</Text>
+                            </View>
+                        </View>
+
+                        {/* Form Card 1: Basic Information */}
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10, elevation: 1 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Basic Profile Information</Text>
+
+                            {/* Username Input */}
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Username:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="at" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                         value={username}
                                         onChangeText={setUsername}
-                                        placeholder="Set a username"
+                                        placeholder="Enter username..."
+                                        placeholderTextColor="#94A3B8"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
                                 </View>
                             </View>
 
-                            <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Full Name</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="person-outline" size={14} color="#0d1b3e" /></View>
+                            {/* Full Name Input */}
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Full Name:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="person-outline" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                         value={fullName}
                                         onChangeText={setFullName}
-                                        placeholder="Your Name"
+                                        placeholder="Enter full name..."
+                                        placeholderTextColor="#94A3B8"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
                                 </View>
                             </View>
 
-                             <View className="flex-row gap-x-4">
-                                <View className="flex-1">
-                                    <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Gender</Text>
-                                    <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                        <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="male-female-outline" size={14} color="#0d1b3e" /></View>
+                            {/* Gender & DOB Dual Inputs */}
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Gender:</Text>
+                                    <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        <Ionicons name="male-female-outline" size={13} color={L.navyHeader} />
                                         <TextInput
-                                            className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                             value={gender}
                                             onChangeText={setGender}
-                                            placeholder="M/F"
+                                            placeholder="Male / Female"
+                                            placeholderTextColor="#94A3B8"
+                                            style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                         />
                                     </View>
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Date of Birth</Text>
-                                    <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                        <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="calendar-outline" size={14} color="#0d1b3e" /></View>
+
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Date of Birth:</Text>
+                                    <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        <Ionicons name="calendar-outline" size={13} color={L.navyHeader} />
                                         <TextInput
-                                            className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                             value={dob}
                                             onChangeText={setDob}
                                             placeholder="DD/MM/YYYY"
+                                            placeholderTextColor="#94A3B8"
+                                            style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                         />
                                     </View>
                                 </View>
                             </View>
                         </View>
-                    </View>
 
-                    {/* Contact Info */}
-                    <View>
-                        <Text className="text-[#0d1b3e] font-black tracking-widest text-[9px] uppercase mb-3 ml-1 mt-4">Contact Details</Text>
-                        
-                        <View className="gap-y-2.5">
-                             <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Home Address</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="location-outline" size={14} color="#0d1b3e" /></View>
+                        {/* Form Card 2: Contact Details */}
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 10, elevation: 1 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Contact & Address Details</Text>
+
+                            {/* Home Address Input */}
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Home Address:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="location-outline" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                         value={address}
                                         onChangeText={setAddress}
-                                        placeholder="Enter your address"
+                                        placeholder="Enter residential address..."
+                                        placeholderTextColor="#94A3B8"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
                                 </View>
                             </View>
 
-                             <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">State / LGA</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="map-outline" size={14} color="#0d1b3e" /></View>
+                            {/* State / LGA Input */}
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>State / LGA:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="map-outline" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                         value={state}
                                         onChangeText={setState}
-                                        placeholder="e.g. Gshua, Yobe State"
+                                        placeholder="e.g. Kano, Kano State"
+                                        placeholderTextColor="#94A3B8"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
                                 </View>
                             </View>
-                            
-                            {/* SMART PHONE INPUT */}
-                            <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Phone Number</Text>
-                                <View className={`flex-row items-center border rounded-xl px-3 h-11 ${isPhoneLocked ? 'bg-slate-100 border-slate-200 opacity-80' : 'bg-white border-slate-200 shadow-sm'}`}>
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="call-outline" size={14} color="#0d1b3e" /></View>
+
+                            {/* Phone Input */}
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Phone Number:</Text>
+                                <View style={{ height: 38, backgroundColor: isPhoneLocked ? L.bg : L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="call-outline" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className={`flex-1 ml-3 font-medium text-xs ${isPhoneLocked ? 'text-slate-500' : 'text-slate-800'}`}
                                         value={phone}
                                         onChangeText={setPhone}
                                         editable={!isPhoneLocked}
-                                        placeholder="Enter Phone Number"
+                                        placeholder="Enter phone number..."
+                                        placeholderTextColor="#94A3B8"
                                         keyboardType="phone-pad"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
-                                    {isPhoneLocked ? (
-                                        <Ionicons name="lock-closed" size={16} color="#cbd5e1" />
-                                    ) : (
-                                        <Ionicons name="pencil" size={16} color="#64748b" />
-                                    )}
+                                    {isPhoneLocked && <Ionicons name="lock-closed" size={14} color={L.textMuted} />}
                                 </View>
-                                {!isPhoneLocked && (
-                                    <Text className="text-xs text-indigo-500 mt-1 ml-1">Enter your phone number to lock it to your account.</Text>
-                                )}
+                            </View>
+
+                            {/* Email Address (Locked) */}
+                            <View>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Email Address (Verified):</Text>
+                                <View style={{ height: 38, backgroundColor: L.bg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="mail-outline" size={14} color={L.textMuted} />
+                                    <Text style={{ flex: 1, color: L.textMuted, fontSize: 10, fontWeight: '600' }}>{email}</Text>
+                                    <Ionicons name="checkmark-circle" size={14} color={L.emerald} />
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Form Card 3: Next of Kin */}
+                        <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: L.inputBorder, marginBottom: 12, elevation: 1 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>Next of Kin Information</Text>
+
+                            <View style={{ marginBottom: 8 }}>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Next of Kin Full Name:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="people-outline" size={14} color={L.navyHeader} />
+                                    <TextInput
+                                        value={nextOfKinName}
+                                        onChangeText={setNextOfKinName}
+                                        placeholder="Enter next of kin name..."
+                                        placeholderTextColor="#94A3B8"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
+                                    />
+                                </View>
                             </View>
 
                             <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Email (Linked)</Text>
-                                <View className="flex-row items-center bg-slate-100 border border-[#0d1b3e]/10 rounded-xl px-3 h-11 opacity-70">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="mail-outline" size={14} color="#0d1b3e" /></View>
+                                <Text style={{ color: L.textSecondary, fontSize: 8.5, fontWeight: 'bold', marginBottom: 3 }}>Next of Kin Phone Number:</Text>
+                                <View style={{ height: 38, backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Ionicons name="call-outline" size={14} color={L.navyHeader} />
                                     <TextInput
-                                        className="flex-1 ml-3 text-slate-500 font-medium text-xs"
-                                        value={email}
-                                        editable={false}
-                                    />
-                                    <Ionicons name="lock-closed" size={16} color="#cbd5e1" />
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Next of Kin */}
-                    <View>
-                        <Text className="text-[#0d1b3e] font-black tracking-widest text-[9px] uppercase mb-3 ml-1 mt-4">Next of Kin</Text>
-                        
-                        <View className="gap-y-2.5">
-                             <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Full Name</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="people-outline" size={14} color="#0d1b3e" /></View>
-                                    <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
-                                        value={nextOfKinName}
-                                        onChangeText={setNextOfKinName}
-                                        placeholder="Next of Kin Name"
-                                    />
-                                </View>
-                            </View>
-
-                             <View>
-                                <Text className="text-[#0d1b3e] font-bold text-[9px] uppercase mb-1 tracking-wider ml-2">Phone Number</Text>
-                                <View className="flex-row items-center bg-white border border-[#0d1b3e]/10 rounded-xl px-3 h-11 shadow-sm">
-                                    <View className="w-7 h-7 rounded-md bg-[#0d1b3e]/5 items-center justify-center"><Ionicons name="call-outline" size={14} color="#0d1b3e" /></View>
-                                    <TextInput
-                                        className="flex-1 ml-3 text-[#0d1b3e] font-bold text-xs"
                                         value={nextOfKinPhone}
                                         onChangeText={setNextOfKinPhone}
-                                        placeholder="Next of Kin Phone"
+                                        placeholder="Enter next of kin phone..."
+                                        placeholderTextColor="#94A3B8"
                                         keyboardType="phone-pad"
+                                        style={{ flex: 1, color: L.textPrimary, fontSize: 10, fontWeight: '600' }}
                                     />
                                 </View>
                             </View>
                         </View>
-                    </View>
 
-                </View>
-
-                {/* SAVE BUTTON */}
-                <View className="items-center mt-6 mb-8">
-                    <TouchableOpacity
-                        onPress={handleSave}
-                        disabled={saving}
-                        className="w-[90%]"
-                        activeOpacity={0.8}
-                    >
-                        <LinearGradient
-                            colors={['#0d1b3e', '#1a2951']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            className="h-12 rounded-xl flex-row items-center justify-center shadow-lg shadow-[#0d1b3e]/30"
+                        {/* Save Changes Button */}
+                        <TouchableOpacity 
+                            onPress={handleSave}
+                            disabled={saving}
+                            style={{ height: 40, backgroundColor: L.navyHeader, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.gold }}
                         >
-                             {saving ? (
-                                <ActivityIndicator color="#f5a623" size="small" />
+                            {saving ? (
+                                <ActivityIndicator size="small" color={L.gold} />
                             ) : (
                                 <>
-                                    <View className="w-6 h-6 rounded-full bg-[#f5a623]/15 items-center justify-center mr-2">
-                                        <Ionicons name="save-outline" size={14} color="#f5a623" />
-                                    </View>
-                                    <Text className="text-[#f5a623] font-black text-xs tracking-widest uppercase">Save Updates</Text>
+                                    <Ionicons name="checkmark-circle" size={16} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Save Profile Changes</Text>
                                 </>
                             )}
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </View>
+                        </TouchableOpacity>
 
-            </ScrollView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </View>
         </View>
     );
 }
-
-
-
-
