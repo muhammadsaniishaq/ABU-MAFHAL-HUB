@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
@@ -363,11 +364,27 @@ export default function UserKYCScreen() {
                                 Provide your document details or snap/upload a clear photo of your identification.
                             </Text>
 
-                            {/* Text / ID Number Input */}
+                            {/* Text / ID Number Input with 1-Tap Clipboard Paste */}
                             <View style={{ marginBottom: 10 }}>
-                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, fontWeight: 'bold', marginBottom: 4 }}>
-                                    {selectedDocType === 'drivers_license' ? "Driver's License Number:" : selectedDocType === 'voters_card' ? "Voter's Card VIN Number:" : selectedDocType === 'bvn' ? "11-Digit BVN:" : selectedDocType === 'nin' ? "11-Digit NIN:" : "Document ID / Number:"}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9, fontWeight: 'bold' }}>
+                                        {selectedDocType === 'drivers_license' ? "Driver's License Number:" : selectedDocType === 'voters_card' ? "Voter's Card VIN Number:" : selectedDocType === 'bvn' ? "11-Digit BVN:" : selectedDocType === 'nin' ? "11-Digit NIN:" : "Document ID / Number:"}
+                                    </Text>
+                                    <TouchableOpacity 
+                                        onPress={async () => {
+                                            const text = await Clipboard.getStringAsync();
+                                            if (text) {
+                                                setIdNumberInput(text.trim());
+                                                Alert.alert("Pasted!", "ID number pasted from clipboard");
+                                            }
+                                        }}
+                                        style={{ backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: GOLD, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                                    >
+                                        <Ionicons name="clipboard-outline" size={10} color={GOLD} />
+                                        <Text style={{ color: GOLD, fontSize: 8, fontWeight: '900' }}>PASTE</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                
                                 <View style={{ height: 40, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, justifyContent: 'center' }}>
                                     <TextInput
                                         value={idNumberInput}

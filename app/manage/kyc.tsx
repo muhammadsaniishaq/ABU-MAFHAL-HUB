@@ -845,6 +845,35 @@ export default function KYCManagerScreen() {
                                         <Ionicons name="copy-outline" size={10} color={L.goldDk} />
                                     </TouchableOpacity>
                                 )}
+
+                                {/* Direct WhatsApp / Call / SMS Action Row */}
+                                {inspectorItem?.profiles?.phone && (
+                                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                const phone = inspectorItem.profiles.phone.replace(/\D/g, '');
+                                                const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone;
+                                                const url = `https://wa.me/${formattedPhone}?text=Hello%20${encodeURIComponent(inspectorItem.profiles.full_name || 'User')},%20regarding%20your%20KYC%20verification%20on%20Abu%20Mafhal%20Hub:`;
+                                                if (Platform.OS === 'web') window.open(url, '_blank');
+                                                else router.push(url as any);
+                                            }}
+                                            style={{ backgroundColor: '#25D366', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                                        >
+                                            <Ionicons name="logo-whatsapp" size={11} color="#FFFFFF" />
+                                            <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '900' }}>WhatsApp</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            onPress={() => {
+                                                copyToClipboard(inspectorItem.profiles.phone, 'Phone Number');
+                                            }}
+                                            style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                                        >
+                                            <Ionicons name="call" size={11} color={L.gold} />
+                                            <Text style={{ color: L.gold, fontSize: 8, fontWeight: '900' }}>Copy Phone</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Document Photo Image Preview */}
