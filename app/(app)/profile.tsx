@@ -15,9 +15,9 @@ import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CACHE_KEY = '@profile_data_v3';
+const CACHE_KEY = '@profile_data_v4';
 
-// Executive Light Navy & Gold Design Tokens
+// Compact Light Platinum, Royal Navy & Gold Design Tokens
 const L = {
     bg: '#F4F6FB',
     card: '#FFFFFF',
@@ -63,13 +63,16 @@ export default function UserProfileScreen() {
         role?: string;
     } | null>(null);
 
-    const [kycStatus, setKycStatus] = useState<'pending' | 'approved' | 'none'>('none');
+    const [virtualAcc, setVirtualAcc] = useState<any>(null);
     const [txCount, setTxCount] = useState<number>(0);
     const [unreadCount, setUnreadCount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // Active Category Tab: 'personal' | 'banking' | 'rewards' | 'settings'
+    const [activeTab, setActiveTab] = useState<'personal' | 'banking' | 'rewards' | 'settings'>('personal');
 
     // 2FA Security Modal States
     const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
@@ -121,8 +124,8 @@ export default function UserProfileScreen() {
 
             await Promise.all([
                 fetchProfileData(user.id),
+                fetchVirtualAccount(user.id),
                 fetchTransactionCount(user.id),
-                fetchKycStatus(user.id),
                 fetchUnreadNotifications(user.id)
             ]);
         } catch (e) {
@@ -139,12 +142,17 @@ export default function UserProfileScreen() {
     }, []);
 
     const fetchProfileData = async (userId: string) => {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (data) {
             setProfile(data);
             setTwoFactorEnabled(!!data.two_factor_enabled);
             saveCache({ profile: data });
         }
+    };
+
+    const fetchVirtualAccount = async (userId: string) => {
+        const { data } = await supabase.from('virtual_accounts').select('*').eq('user_id', userId).maybeSingle();
+        if (data) setVirtualAcc(data);
     };
 
     const fetchTransactionCount = async (userId: string) => {
@@ -153,20 +161,6 @@ export default function UserProfileScreen() {
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId);
         setTxCount(count || 0);
-    };
-
-    const fetchKycStatus = async (userId: string) => {
-        const { data } = await supabase
-            .from('kyc_requests')
-            .select('status')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        if (data?.status) {
-            setKycStatus(data.status);
-        }
     };
 
     const fetchUnreadNotifications = async (userId: string) => {
@@ -182,7 +176,7 @@ export default function UserProfileScreen() {
         try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert("Permission Denied", "Camera roll permissions are required to select an avatar.");
+                Alert.alert("Permission Denied", "Camera roll permissions are required.");
                 return;
             }
 
@@ -232,7 +226,7 @@ export default function UserProfileScreen() {
                 .eq('id', user.id);
 
             setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
-            showToast("Profile photo updated successfully! ✨");
+            showToast("Profile photo updated! ✨");
         } catch (error: any) {
             Alert.alert("Upload Failed", error.message);
         } finally {
@@ -247,17 +241,16 @@ export default function UserProfileScreen() {
         } else {
             Clipboard.setString(text);
         }
-        showToast(`Copied ${label || 'text'} to clipboard! ✨`);
+        showToast(`Copied ${label || 'text'}! ✨`);
     };
 
     const handleLogout = () => {
         if (Platform.OS === 'web') {
-            const confirmed = window.confirm("Are you sure you want to log out?");
-            if (confirmed) performLogout();
+            if (window.confirm("Are you sure you want to log out?")) performLogout();
         } else {
             Alert.alert(
                 "Logout",
-                "Are you sure you want to log out of your account?",
+                "Are you sure you want to log out?",
                 [
                     { text: "Cancel", style: "cancel" },
                     { text: "Logout", style: "destructive", onPress: performLogout }
@@ -275,13 +268,13 @@ export default function UserProfileScreen() {
         }
     };
 
-    const tierLabel = (tier?: number) => {
+    const tierLimitText = (tier?: number) => {
         switch (tier) {
-            case 1: return 'Tier 1 (BVN)';
-            case 2: return 'Tier 2 (Identity)';
-            case 3: return 'Tier 3 (Address)';
-            case 4: return 'Tier 4 (Face VIP)';
-            default: return 'Tier 0 (Unverified)';
+            case 1: return '₦100,000 / day';
+            case 2: return '₦500,000 / day';
+            case 3: return '₦5,000,000 / day';
+            case 4: return 'Unlimited';
+            default: return '₦10,000 / day';
         }
     };
 
@@ -293,6 +286,8 @@ export default function UserProfileScreen() {
         );
     }
 
+    const refLink = `https://abumafhal.com.ng/register?ref=${profile?.username || profile?.custom_id || ''}`;
+
     return (
         <View style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -300,259 +295,311 @@ export default function UserProfileScreen() {
 
             {/* Toast Bar */}
             {toastMsg && (
-                <View style={{ position: 'absolute', top: insets.top + 6, left: 12, right: 12, zIndex: 60, backgroundColor: L.navyHeader, borderColor: L.gold, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 8 }}>
-                    <Ionicons name="sparkles" size={12} color={L.gold} />
-                    <Text style={{ color: L.goldBg, fontWeight: 'bold', fontSize: 9, flex: 1 }}>{toastMsg}</Text>
+                <View style={{ position: 'absolute', top: insets.top + 4, left: 10, right: 10, zIndex: 60, backgroundColor: L.navyHeader, borderColor: L.gold, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5, elevation: 8 }}>
+                    <Ionicons name="sparkles" size={10} color={L.gold} />
+                    <Text style={{ color: L.goldBg, fontWeight: 'bold', fontSize: 8, flex: 1 }}>{toastMsg}</Text>
                 </View>
             )}
 
-            <ScrollView 
-                style={{ flex: 1 }} 
-                showsVerticalScrollIndicator={false} 
-                contentContainerStyle={{ paddingBottom: 110 }}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={L.navyHeader} />
-                }
+            {/* Compact Header */}
+            <LinearGradient
+                colors={['#0F172A', '#1C2541', '#0B132B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ paddingTop: insets.top + 4, paddingBottom: 10, paddingHorizontal: 10, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, borderBottomWidth: 1, borderColor: L.goldDk }}
             >
-                {/* Executive Royal Navy Header */}
-                <LinearGradient
-                    colors={['#0F172A', '#1C2541', '#0B132B']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 14, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, borderBottomWidth: 1.5, borderColor: L.goldDk }}
-                >
-                    {/* Header Top Toolbar */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <TouchableOpacity onPress={() => router.back()} style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                            <Ionicons name="arrow-back" size={14} color={L.gold} />
-                        </TouchableOpacity>
-
-                        <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>USER PROFILE & SETTINGS</Text>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-                                <Ionicons name="notifications" size={14} color="#FFFFFF" />
-                                {unreadCount > 0 && (
-                                    <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: L.gold, width: 12, height: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Text style={{ color: L.navyHeader, fontSize: 7, fontWeight: '900' }}>{unreadCount}</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-                                <Ionicons name="settings" size={14} color={L.gold} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Executive User Profile Details Box */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        {/* Avatar Picker with Double Gold Ring */}
-                        <View style={{ position: 'relative' }}>
-                            <View style={{ width: 56, height: 56, borderRadius: 28, padding: 2, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
-                                <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: L.navyHeader }}>
-                                    {profile?.avatar_url ? (
-                                        <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
-                                    ) : (
-                                        <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
-                                            <Text style={{ fontSize: 18, fontWeight: '900', color: L.gold }}>{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                            <TouchableOpacity onPress={pickImage} style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: L.gold, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.navyHeader }}>
-                                {uploading ? <ActivityIndicator size="small" color={L.navyHeader} /> : <Ionicons name="camera" size={10} color={L.navyHeader} />}
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Name & Account Details */}
-                        <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900' }} numberOfLines={1}>
-                                    {profile?.full_name || 'System User'}
-                                </Text>
-                                {profile?.role === 'admin' && (
-                                    <View style={{ backgroundColor: L.gold, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                                        <Text style={{ color: L.navyHeader, fontSize: 7, fontWeight: '900' }}>ADMIN</Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            <Text style={{ color: '#94A3B8', fontSize: 9, fontWeight: 'bold', marginTop: 1 }} numberOfLines={1}>
-                                {profile?.email || 'No Email Set'} {profile?.phone ? `• ${profile.phone}` : ''}
-                            </Text>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                <TouchableOpacity onPress={() => copyToClipboard(profile?.custom_id || profile?.username, 'User ID')} style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                    <Ionicons name="copy-outline" size={9} color={L.gold} />
-                                    <Text style={{ color: L.gold, fontSize: 8, fontWeight: 'bold' }}>ID: {profile?.custom_id || profile?.username || 'AM-USER'}</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity onPress={() => router.push('/kyc')} style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
-                                    <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>{tierLabel(profile?.kyc_tier)}</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </LinearGradient>
-
-                {/* Main Content Body */}
-                <View style={{ paddingHorizontal: 12, paddingTop: 10, gap: 10 }}>
-
-                    {/* Quick Stats & Metrics Grid */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', elevation: 2 }}>
-                        <View style={{ alignItems: 'center', flex: 1 }}>
-                            <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Wallet Balance</Text>
-                            <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '900', marginTop: 1 }}>₦{(profile?.balance || 0).toLocaleString()}</Text>
-                        </View>
-                        <View style={{ width: 1, height: 20, backgroundColor: L.inputBorder }} />
-                        <View style={{ alignItems: 'center', flex: 1 }}>
-                            <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Transactions</Text>
-                            <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '900', marginTop: 1 }}>{txCount}</Text>
-                        </View>
-                        <View style={{ width: 1, height: 20, backgroundColor: L.inputBorder }} />
-                        <View style={{ alignItems: 'center', flex: 1 }}>
-                            <Text style={{ color: L.textMuted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>Account Status</Text>
-                            <Text style={{ color: L.emerald, fontSize: 11, fontWeight: '900', marginTop: 1 }}>Verified</Text>
-                        </View>
-                    </View>
-
-                    {/* Quick Action Navigation Grid */}
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flex: 1, backgroundColor: L.card, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center' }}>
-                            <Ionicons name="person-outline" size={14} color={L.navyHeader} />
-                            <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900', marginTop: 2 }}>Edit Profile</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flex: 1, backgroundColor: L.card, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center' }}>
-                            <Ionicons name="shield-checkmark-outline" size={14} color={L.goldAmber} />
-                            <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900', marginTop: 2 }}>KYC Center</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => router.push('/referrals')} style={{ flex: 1, backgroundColor: L.card, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center' }}>
-                            <Ionicons name="gift-outline" size={14} color={L.emerald} />
-                            <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900', marginTop: 2 }}>Referrals</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => router.push('/support')} style={{ flex: 1, backgroundColor: L.card, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center' }}>
-                            <Ionicons name="headset-outline" size={14} color={L.blue} />
-                            <Text style={{ color: L.navyHeader, fontSize: 8, fontWeight: '900', marginTop: 2 }}>Support</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Section 1: Account Settings Menu */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
-                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Account Settings & Security</Text>
-                        
-                        <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="person" size={12} color={L.navyHeader} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Personal Information</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>Update full name, phone number & email</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => router.push('/change-password')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="lock-closed" size={12} color={L.goldAmber} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Security & Password</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>Change password & PIN authentication</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="key" size={12} color={L.emerald} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Two-Factor Authentication (2FA)</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>{twoFactorEnabled ? 'Active (Authenticator App)' : 'Disabled'}</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Section 2: Banking & Compliance */}
-                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: L.inputBorder, elevation: 1 }}>
-                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>Banking & Identity Verification</Text>
-
-                        <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: L.inputBorder }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="card" size={12} color={L.goldAmber} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>Reserved Virtual Dedicated Account</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>View Wema / Payvessel account details</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Ionicons name="shield-checkmark" size={12} color={L.blue} />
-                                </View>
-                                <View>
-                                    <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '800' }}>KYC Level & Limits</Text>
-                                    <Text style={{ color: L.textMuted, fontSize: 8 }}>Upgrade to Tier 1, Tier 2, or Tier 3</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={12} color={L.textMuted} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Section 3: Logout Action Button */}
-                    <TouchableOpacity 
-                        onPress={handleLogout}
-                        style={{ backgroundColor: L.roseBg, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: L.roseBorder, marginTop: 4 }}
-                    >
-                        <Ionicons name="log-out-outline" size={14} color={L.rose} />
-                        <Text style={{ color: L.rose, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Log Out Account</Text>
+                {/* Header Top Bar */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <TouchableOpacity onPress={() => router.back()} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="arrow-back" size={12} color={L.gold} />
                     </TouchableOpacity>
 
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: L.gold, letterSpacing: -0.2 }}>EXECUTIVE PROFILE</Text>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                            <Ionicons name="notifications" size={12} color="#FFFFFF" />
+                            {unreadCount > 0 && (
+                                <View style={{ position: 'absolute', top: -1, right: -1, backgroundColor: L.gold, width: 10, height: 10, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 6, fontWeight: '900' }}>{unreadCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                            <Ionicons name="settings" size={12} color={L.gold} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
+
+                {/* Profile Hero Row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ position: 'relative' }}>
+                        <View style={{ width: 44, height: 44, borderRadius: 22, padding: 1.5, backgroundColor: L.gold, alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 41, height: 41, borderRadius: 20.5, overflow: 'hidden', backgroundColor: L.navyHeader }}>
+                                {profile?.avatar_url ? (
+                                    <Image source={{ uri: profile.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                                ) : (
+                                    <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: L.navyMid }}>
+                                        <Text style={{ fontSize: 14, fontWeight: '900', color: L.gold }}>{profile?.full_name?.charAt(0).toUpperCase() || 'U'}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                        <TouchableOpacity onPress={pickImage} style={{ position: 'absolute', bottom: -1, right: -1, backgroundColor: L.gold, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.navyHeader }}>
+                            {uploading ? <ActivityIndicator size="small" color={L.navyHeader} /> : <Ionicons name="camera" size={8} color={L.navyHeader} />}
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900' }} numberOfLines={1}>
+                                {profile?.full_name || 'System User'}
+                            </Text>
+                            {profile?.role === 'admin' && (
+                                <View style={{ backgroundColor: L.gold, paddingHorizontal: 4, paddingVertical: 0.5, borderRadius: 3 }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 6.5, fontWeight: '900' }}>ADMIN</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <Text style={{ color: '#94A3B8', fontSize: 8, fontWeight: 'bold', marginTop: 0.5 }} numberOfLines={1}>
+                            {profile?.email || 'No Email'} {profile?.phone ? `• ${profile.phone}` : ''}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                            <TouchableOpacity onPress={() => copyToClipboard(profile?.custom_id || profile?.username, 'User ID')} style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                <Ionicons name="copy-outline" size={8} color={L.gold} />
+                                <Text style={{ color: L.gold, fontSize: 7.5, fontWeight: 'bold' }}>ID: {profile?.custom_id || profile?.username || 'AM-USER'}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push('/kyc')} style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                <Text style={{ color: L.emerald, fontSize: 7.5, fontWeight: '900' }}>Tier {profile?.kyc_tier || 0} ({tierLimitText(profile?.kyc_tier)})</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </LinearGradient>
+
+            {/* Quick Balance & Metrics Strip */}
+            <View style={{ backgroundColor: L.card, paddingVertical: 5, paddingHorizontal: 10, borderBottomWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                    <Text style={{ color: L.textMuted, fontSize: 6.5, fontWeight: '900', textTransform: 'uppercase' }}>Wallet Balance</Text>
+                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900' }}>₦{(profile?.balance || 0).toLocaleString()}</Text>
+                </View>
+                <View style={{ width: 1, height: 16, backgroundColor: L.inputBorder }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                    <Text style={{ color: L.textMuted, fontSize: 6.5, fontWeight: '900', textTransform: 'uppercase' }}>Transactions</Text>
+                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900' }}>{txCount}</Text>
+                </View>
+                <View style={{ width: 1, height: 16, backgroundColor: L.inputBorder }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                    <Text style={{ color: L.textMuted, fontSize: 6.5, fontWeight: '900', textTransform: 'uppercase' }}>Status</Text>
+                    <Text style={{ color: L.emerald, fontSize: 10, fontWeight: '900' }}>Verified</Text>
+                </View>
+            </View>
+
+            {/* Category Segment Tabs */}
+            <View style={{ paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 }}>
+                <View style={{ flexDirection: 'row', backgroundColor: L.card, borderRadius: 8, padding: 2, borderWidth: 1, borderColor: L.inputBorder }}>
+                    {[
+                        { id: 'personal', label: '👤 Account', icon: 'person' },
+                        { id: 'banking', label: '💳 Banking', icon: 'card' },
+                        { id: 'rewards', label: '🎁 Referral', icon: 'gift' },
+                        { id: 'settings', label: '⚙️ Preferences', icon: 'options' },
+                    ].map((tab) => {
+                        const isSel = activeTab === tab.id;
+                        return (
+                            <TouchableOpacity
+                                key={tab.id}
+                                onPress={() => setActiveTab(tab.id as any)}
+                                style={{
+                                    flex: 1, paddingVertical: 4, borderRadius: 6,
+                                    backgroundColor: isSel ? L.navyHeader : 'transparent',
+                                    alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >
+                                <Text style={{ fontSize: 8, fontWeight: '900', color: isSel ? L.gold : L.textSecondary }}>{tab.label}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* Main Single-Screen Tab Content Body */}
+            <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 6 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={L.navyHeader} />}>
+                
+                {/* TAB 1: PERSONAL & SECURITY */}
+                {activeTab === 'personal' && (
+                    <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Account Profile & Security</Text>
+
+                        <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="person" size={11} color={L.navyHeader} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Edit Personal Details</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>Full name, email, phone & username</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => router.push('/change-password')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="lock-closed" size={11} color={L.goldAmber} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Security & PIN Code</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>Change login password & transaction PIN</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="key" size={11} color={L.emerald} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Two-Factor Security (2FA)</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>{twoFactorEnabled ? 'Active (Authenticator)' : 'Disabled'}</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* TAB 2: BANKING & KYC */}
+                {activeTab === 'banking' && (
+                    <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Virtual Dedicated Account & KYC</Text>
+
+                        {virtualAcc ? (
+                            <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.cardBorder }}>
+                                <Text style={{ color: L.textMuted, fontSize: 7.5, fontWeight: 'bold' }}>Bank: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900', letterSpacing: 1, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                        {virtualAcc.account_number}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => copyToClipboard(virtualAcc.account_number, 'Account Number')} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: L.gold }}>
+                                        <Text style={{ color: L.gold, fontWeight: '900', fontSize: 7.5 }}>COPY</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ) : (
+                            <TouchableOpacity onPress={() => router.push('/kyc')} style={{ backgroundColor: L.goldBg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <View>
+                                    <Text style={{ color: L.goldAmber, fontWeight: '900', fontSize: 9 }}>Activate Virtual Dedicated Bank Account</Text>
+                                    <Text style={{ color: L.textSecondary, fontSize: 7.5 }}>Submit BVN or NIN to receive automatic account</Text>
+                                </View>
+                                <Ionicons name="arrow-forward" size={12} color={L.goldAmber} />
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity onPress={() => router.push('/kyc')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, marginTop: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="shield-checkmark" size={11} color={L.blue} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>KYC Verification & Daily Limits</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>Upgrade Tier 1 (BVN), Tier 2 (NIN/License), Tier 3 (Address)</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* TAB 3: REFERRAL REWARDS */}
+                {activeTab === 'rewards' && (
+                    <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>Referral Rewards & Bonus</Text>
+                        
+                        <View style={{ backgroundColor: L.goldBg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.goldDk }}>
+                            <Text style={{ color: L.goldAmber, fontSize: 9, fontWeight: '900' }}>Earn ₦500 Per Referral!</Text>
+                            <Text style={{ color: L.textSecondary, fontSize: 7.5, marginTop: 1 }}>Share your invite link with friends and receive automatic cash bonus.</Text>
+
+                            <TouchableOpacity onPress={() => copyToClipboard(refLink, 'Referral Link')} style={{ marginTop: 6, backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: L.gold }}>
+                                <Text style={{ color: L.gold, fontSize: 8, fontWeight: 'bold' }} numberOfLines={1}>{refLink}</Text>
+                                <Ionicons name="copy" size={10} color={L.gold} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity onPress={() => router.push('/referrals')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="people" size={11} color={L.emerald} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>My Referral Network</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>View list of referred users & earnings history</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* TAB 4: PREFERENCES & LOGOUT */}
+                {activeTab === 'settings' && (
+                    <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.inputBorder, gap: 6 }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>App Preferences & Support</Text>
+
+                        <TouchableOpacity onPress={() => router.push('/support')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderColor: L.inputBorder }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="headset" size={11} color={L.blue} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontSize: 9.5, fontWeight: '800' }}>Customer Support Center</Text>
+                                    <Text style={{ color: L.textMuted, fontSize: 7.5 }}>Chat on WhatsApp, Email or Phone</Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color={L.textMuted} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: L.roseBg, borderRadius: 8, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: L.roseBorder, marginTop: 4 }}>
+                            <Ionicons name="log-out-outline" size={12} color={L.rose} />
+                            <Text style={{ color: L.rose, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Log Out Account</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
             </ScrollView>
 
             {/* 2FA SETUP MODAL */}
             <Modal visible={twoFactorModalVisible} transparent animationType="fade" onRequestClose={() => setTwoFactorModalVisible(false)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)', justifyContent: 'center', padding: 14 }}>
-                    <View style={{ backgroundColor: L.card, borderRadius: 16, padding: 14, borderWidth: 1.5, borderColor: L.goldDk }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 12 }}>Two-Factor Security (2FA)</Text>
+                    <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 12, borderWidth: 1.5, borderColor: L.goldDk }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>Two-Factor Security (2FA)</Text>
                             <TouchableOpacity onPress={() => setTwoFactorModalVisible(false)}>
-                                <Ionicons name="close-circle" size={18} color={L.textMuted} />
+                                <Ionicons name="close-circle" size={16} color={L.textMuted} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: L.textMuted, fontSize: 9, marginBottom: 8 }}>
-                            Scan this secret key in your Google Authenticator or Authy app:
+                        <Text style={{ color: L.textMuted, fontSize: 8.5, marginBottom: 6 }}>
+                            Scan or copy this secret key into Google Authenticator or Authy:
                         </Text>
 
-                        <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', marginBottom: 10 }}>
-                            <Text style={{ color: L.navyHeader, fontSize: 12, fontWeight: '900', letterSpacing: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                        <View style={{ backgroundColor: L.bg, padding: 6, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', marginBottom: 8 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
                                 {totpSecret}
                             </Text>
-                            <TouchableOpacity onPress={() => copyToClipboard(totpSecret, '2FA Secret')} style={{ marginTop: 4, backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}>
-                                <Text style={{ color: L.gold, fontSize: 8, fontWeight: '900' }}>COPY SECRET</Text>
+                            <TouchableOpacity onPress={() => copyToClipboard(totpSecret, '2FA Secret')} style={{ marginTop: 3, backgroundColor: L.navyHeader, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                <Text style={{ color: L.gold, fontSize: 7.5, fontWeight: '900' }}>COPY SECRET</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={{ color: L.textSecondary, fontSize: 8, fontWeight: 'bold', marginBottom: 2 }}>Enter 6-digit Authenticator Code:</Text>
-                        <View style={{ backgroundColor: L.inputBg, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, height: 38, marginBottom: 10 }}>
+                        <Text style={{ color: L.textSecondary, fontSize: 7.5, fontWeight: 'bold', marginBottom: 2 }}>Enter 6-digit Authenticator Code:</Text>
+                        <View style={{ backgroundColor: L.inputBg, borderRadius: 6, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 8, height: 34, marginBottom: 8 }}>
                             <TextInput
                                 value={totpCodeInput}
                                 onChangeText={setTotpCodeInput}
@@ -560,7 +607,7 @@ export default function UserProfileScreen() {
                                 placeholderTextColor="#94A3B8"
                                 keyboardType="numeric"
                                 maxLength={6}
-                                style={{ flex: 1, color: L.textPrimary, fontWeight: '600', fontSize: 10 }}
+                                style={{ flex: 1, color: L.textPrimary, fontWeight: '600', fontSize: 9.5 }}
                             />
                         </View>
 
@@ -574,9 +621,9 @@ export default function UserProfileScreen() {
                                     Alert.alert("Code Error", "Please enter a valid 6-digit code.");
                                 }
                             }}
-                            style={{ backgroundColor: L.navyHeader, paddingVertical: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 7, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: L.gold }}
                         >
-                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 9, textTransform: 'uppercase' }}>Activate 2FA Security</Text>
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8.5, textTransform: 'uppercase' }}>Activate 2FA Security</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
