@@ -96,18 +96,48 @@ export default function DynamicBanners({ placement = 'dashboard' }: { placement?
           <TouchableOpacity 
             onPress={() => handleBannerClick(item)}
             activeOpacity={0.9}
-            className={`rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-200 justify-center`}
-            style={{ width: W - 32, height: 60, marginRight: 12 }}
+            style={{ 
+              width: Math.min(W - 32, 450), 
+              height: 76, 
+              marginRight: 12, 
+              borderRadius: 16, 
+              overflow: 'hidden', 
+              backgroundColor: '#0F172A', 
+              borderWidth: 1, 
+              borderColor: 'rgba(218, 165, 32, 0.4)',
+              elevation: 4
+            }}
           >
             {item.image_url ? (
-              <Image source={{ uri: item.image_url }} className="w-full h-full" resizeMode="cover" />
+              <Image 
+                source={{ uri: item.image_url }} 
+                style={{ width: '100%', height: '100%' }} 
+                resizeMode="cover" 
+              />
             ) : (
-              <LinearGradient colors={['#0f172a', '#1e293b']} start={{x:0,y:0}} end={{x:1,y:1}} className="w-full h-full flex-row items-center justify-between px-4 relative overflow-hidden">
-                <View className="absolute -right-6 -top-6 w-16 h-16 bg-[#f5a623] rounded-full opacity-10" />
-                <View className="flex-row items-center z-10">
-                   <Text className="text-white font-bold text-sm tracking-tight" numberOfLines={1}>{item.title}</Text>
+              <LinearGradient 
+                colors={['#0F172A', '#1E293B', '#0B132B']} 
+                start={{ x: 0, y: 0 }} 
+                end={{ x: 1, y: 1 }} 
+                style={{ width: '100%', height: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 }}
+              >
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <View style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#FFD700' }}>
+                      <Text style={{ color: '#FFD700', fontSize: 7, fontWeight: '900', textTransform: 'uppercase' }}>PROMO</Text>
+                    </View>
+                    <Text style={{ color: '#CBD5E1', fontSize: 9, fontWeight: 'bold' }}>Abu Mafhal Hub</Text>
+                  </View>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }} numberOfLines={1}>
+                    {item.title || 'Special Promotion & Offers'}
+                  </Text>
+                  <Text style={{ color: '#94A3B8', fontSize: 9, marginTop: 1 }} numberOfLines={1}>
+                    {item.subtitle || item.description || 'Tap to view details and claim offer'}
+                  </Text>
                 </View>
-                <Text className="text-[#94a3b8] font-medium text-[10px] z-10">Tap for details ➔</Text>
+                <View style={{ backgroundColor: '#FFD700', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                  <Text style={{ color: '#0F172A', fontSize: 9, fontWeight: '900' }}>VIEW →</Text>
+                </View>
               </LinearGradient>
             )}
           </TouchableOpacity>
