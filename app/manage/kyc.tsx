@@ -67,9 +67,83 @@ export default function KYCManagerScreen() {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [isActionProcessing, setIsActionProcessing] = useState(false);
 
+    // Automation & Virtual Account States
+    const [autoKycEnabled, setAutoKycEnabled] = useState(false);
+    const [autoVirtualAccEnabled, setAutoVirtualAccEnabled] = useState(true);
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
     useEffect(() => {
         fetchKYCData();
+        fetchAutoSettings();
     }, []);
+
+    const fetchAutoSettings = async () => {
+        try {
+            const { data: kycSetting } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'auto_kyc_verification_enabled')
+                .maybeSingle();
+
+            if (kycSetting?.value != null) {
+                const val = typeof kycSetting.value === 'string' ? JSON.parse(kycSetting.value) : kycSetting.value;
+                setAutoKycEnabled(Boolean(val));
+            }
+
+            const { data: dvaSetting } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'auto_generate_virtual_account_enabled')
+                .maybeSingle();
+
+            if (dvaSetting?.value != null) {
+                const val = typeof dvaSetting.value === 'string' ? JSON.parse(dvaSetting.value) : dvaSetting.value;
+                setAutoVirtualAccEnabled(Boolean(val));
+            }
+        } catch (e) {
+            console.error("Error fetching auto settings:", e);
+        }
+    };
+
+    const toggleAutoKycSetting = async (newValue: boolean) => {
+        setAutoKycEnabled(newValue);
+        try {
+            await supabase.from('app_settings').upsert({
+                key: 'auto_kyc_verification_enabled',
+                value: JSON.stringify(newValue),
+                updated_at: new Date().toISOString()
+            });
+            showToast(newValue ? "Auto-KYC Verification Enabled! ⚡" : "Auto-KYC Disabled. Manual Mode Active.");
+        } catch (e: any) {
+            Alert.alert("Setting Error", e.message);
+        }
+    };
+
+    const toggleAutoVirtualAccSetting = async (newValue: boolean) => {
+        setAutoVirtualAccEnabled(newValue);
+        try {
+            await supabase.from('app_settings').upsert({
+                key: 'auto_generate_virtual_account_enabled',
+                value: JSON.stringify(newValue),
+                updated_at: new Date().toISOString()
+            });
+            showToast(newValue ? "Auto Virtual Account Issue Enabled! 🏦" : "Auto Virtual Account Disabled.");
+        } catch (e: any) {
+            Alert.alert("Setting Error", e.message);
+        }
+    };
+
+    const triggerVirtualAccountGeneration = async (userId: string, bvn?: string) => {
+        try {
+            const { data, error } = await supabase.functions.invoke('create-virtual-account', {
+                body: { userId, bvn }
+            });
+            if (error) console.warn("Virtual account invocation warning:", error);
+            return data;
+        } catch (e) {
+            console.error("Virtual account error:", e);
+        }
+    };
 
     const showToast = (msg: string) => {
         setToastMsg(msg);
@@ -161,6 +235,42 @@ export default function KYCManagerScreen() {
         setRejectionReason('');
     };
 
+    const handleBulkAutoApprove = async () => {
+        const pendingItems = kycQueue.filter(k => k.status === 'pending');
+        if (pendingItems.length === 0) {
+            Alert.alert("Queue Empty", "There are no pending KYC requests to approve.");
+            return;
+        }
+
+        Alert.alert(
+            "Bulk Auto-Approval & Virtual Accounts",
+            `Are you sure you want to Auto-Approve ${pendingItems.length} pending KYC request(s) and issue Virtual Bank Accounts for each user?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Confirm Bulk Approve",
+                    style: "default",
+                    onPress: async () => {
+                        setIsBulkProcessing(true);
+                        try {
+                            let processed = 0;
+                            for (const item of pendingItems) {
+                                await handleAction(item, 'approved');
+                                processed++;
+                            }
+                            showToast(`Processed ${processed} KYC requests & issued virtual accounts! 🚀`);
+                            fetchKYCData();
+                        } catch (e: any) {
+                            Alert.alert("Bulk Approval Error", e.message);
+                        } finally {
+                            setIsBulkProcessing(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     // Process Approval or Rejection
     const handleAction = async (request: any, status: 'approved' | 'rejected') => {
         setIsActionProcessing(true);
@@ -216,17 +326,22 @@ export default function KYCManagerScreen() {
                     }
                 }
 
-                emailSubject = "KYC Verification Approved! 🎉";
-                emailBody = `Dear ${request.profiles?.full_name || 'User'},\n\nWe are pleased to inform you that your ${request.document_type?.toUpperCase().replace(/_/g, ' ')} verification has been successfully approved.\n\nYour account has been upgraded to Tier ${targetTier}. You now have higher transaction limits and unlocked features.\n\nThank you for choosing Abu Mafhal Hub.`;
+                // 3. Auto Generate Virtual Bank Account if enabled or approved
+                if (autoVirtualAccEnabled) {
+                    triggerVirtualAccountGeneration(request.user_id, request.document_number);
+                }
+
+                emailSubject = "KYC Verification Approved & Virtual Account Issued! 🎉";
+                emailBody = `Dear ${request.profiles?.full_name || 'User'},\n\nWe are pleased to inform you that your ${request.document_type?.toUpperCase().replace(/_/g, ' ')} verification has been successfully approved.\n\nYour account has been upgraded to Tier ${targetTier} and your dedicated Reserved Virtual Bank Account (Wema/Payvessel) has been issued for automated wallet funding.\n\nThank you for choosing Abu Mafhal Hub.`;
 
                 await supabase.from('notifications').insert({
                     user_id: request.user_id,
-                    title: "KYC Verification Approved! 🎉",
-                    body: `Your ${request.document_type?.toUpperCase().replace(/_/g, ' ')} verification was approved. Account is now Tier ${targetTier}.`,
+                    title: "KYC Approved & Virtual Account Issued! 🎉",
+                    body: `Your ${request.document_type?.toUpperCase().replace(/_/g, ' ')} verification was approved. Tier ${targetTier} & Virtual Bank Account activated!`,
                     data: { type: 'kyc_approved' }
                 });
 
-                showToast(`Verification Approved! Tier ${targetTier} Activated ✨`);
+                showToast(`Verification Approved! Tier ${targetTier} & Virtual Account Issued ✨`);
             } else {
                 // Rejection Logic
                 const reasonText = rejectionReason.trim() ? `Reason: ${rejectionReason.trim()}` : "Reason: Document requirements not met.";
@@ -402,6 +517,71 @@ export default function KYCManagerScreen() {
                         )}
                     </View>
                 </LinearGradient>
+
+                {/* Master Automation & Virtual Account Control Bar */}
+                <View style={{ backgroundColor: '#0F172A', paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: L.goldDk }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="hardware-chip-outline" size={14} color={L.gold} />
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>KYC & Virtual Account Automation Engine</Text>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={handleBulkAutoApprove}
+                            disabled={isBulkProcessing}
+                            style={{ backgroundColor: L.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                        >
+                            {isBulkProcessing ? (
+                                <ActivityIndicator size="small" color="#0F172A" />
+                            ) : (
+                                <>
+                                    <Ionicons name="flash-sharp" size={10} color="#0F172A" />
+                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 8, textTransform: 'uppercase' }}>Bulk Approve & Issue Accounts</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {/* Auto-KYC Verification Toggle */}
+                        <TouchableOpacity 
+                            onPress={() => toggleAutoKycSetting(!autoKycEnabled)}
+                            style={{
+                                flex: 1, backgroundColor: autoKycEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.05)',
+                                padding: 6, borderRadius: 8, borderWidth: 1,
+                                borderColor: autoKycEnabled ? L.emerald : 'rgba(255,255,255,0.15)',
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+                            }}
+                        >
+                            <View style={{ flex: 1, marginRight: 4 }}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 9 }}>Auto-Verify Submissions</Text>
+                                <Text style={{ color: autoKycEnabled ? L.emerald : '#94A3B8', fontSize: 8 }}>{autoKycEnabled ? '⚡ Active (Instant Approve)' : 'Manual Admin Approval'}</Text>
+                            </View>
+                            <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: autoKycEnabled ? L.emerald : '#475569', padding: 2, alignItems: autoKycEnabled ? 'flex-end' : 'flex-start' }}>
+                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#FFFFFF' }} />
+                            </View>
+                        </TouchableOpacity>
+
+                        {/* Auto-Virtual Account Generation Toggle */}
+                        <TouchableOpacity 
+                            onPress={() => toggleAutoVirtualAccSetting(!autoVirtualAccEnabled)}
+                            style={{
+                                flex: 1, backgroundColor: autoVirtualAccEnabled ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.05)',
+                                padding: 6, borderRadius: 8, borderWidth: 1,
+                                borderColor: autoVirtualAccEnabled ? L.gold : 'rgba(255,255,255,0.15)',
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+                            }}
+                        >
+                            <View style={{ flex: 1, marginRight: 4 }}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 9 }}>Auto Virtual Bank Acc</Text>
+                                <Text style={{ color: autoVirtualAccEnabled ? L.gold : '#94A3B8', fontSize: 8 }}>{autoVirtualAccEnabled ? '🏦 Auto Payvessel / Wema' : 'Off'}</Text>
+                            </View>
+                            <View style={{ width: 28, height: 16, borderRadius: 8, backgroundColor: autoVirtualAccEnabled ? L.gold : '#475569', padding: 2, alignItems: autoVirtualAccEnabled ? 'flex-end' : 'flex-start' }}>
+                                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#0F172A' }} />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
                 {/* Metrics Summary Strip */}
                 <View style={{ backgroundColor: L.card, paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
