@@ -109,10 +109,7 @@ export default function AdminLayout() {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#060B19', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#FFD700" />
-                <Text style={{ color: '#FFD700', marginTop: 16, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }}>AUTHENTICATING ADMIN SESSION...</Text>
-            </View>
+            <View style={{ flex: 1, backgroundColor: '#060B19' }} />
         );
     }
 

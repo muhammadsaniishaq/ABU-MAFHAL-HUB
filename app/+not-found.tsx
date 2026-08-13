@@ -1,62 +1,82 @@
 import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../services/supabase';
 import { StatusBar } from 'expo-status-bar';
-
-// Executive Light Navy & Gold Tokens
-const L = {
-    bg: '#0F172A',
-    gold: '#F5A623',
-    goldBg: 'rgba(254, 243, 199, 0.15)',
-    textLight: '#F8FAFC',
-    textMuted: '#94A3B8'
-};
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NotFoundScreen() {
     const router = useRouter();
 
     useEffect(() => {
+        let isMounted = true;
+
         const resolveRoute = async () => {
             try {
+                // 1. Instant check via cached active session marker & cached role
+                const activeMarker = await AsyncStorage.getItem('has_active_session');
+                
+                if (activeMarker === 'true') {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                        const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                        if (cachedRole === 'admin' || cachedRole === 'super_admin') {
+                            if (isMounted) router.replace('/manage/dashboard' as any);
+                        } else {
+                            if (isMounted) router.replace('/(app)/dashboard');
+                        }
+                    } else {
+                        if (isMounted) router.replace('/(app)/dashboard');
+                    }
+                    return;
+                }
+
+                // 2. Fetch session from Supabase if no cache marker
                 const { data: { session } } = await supabase.auth.getSession();
                 
                 if (session && session.user) {
-                    // Check user role for admin vs regular user
-                    const { data: profile } = await supabase
+                    await AsyncStorage.setItem('has_active_session', 'true');
+                    const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
+                    
+                    if (cachedRole === 'admin' || cachedRole === 'super_admin') {
+                        if (isMounted) router.replace('/manage/dashboard' as any);
+                    } else {
+                        if (isMounted) router.replace('/(app)/dashboard');
+                    }
+
+                    // Async background role check (non-blocking)
+                    supabase
                         .from('profiles')
                         .select('role')
                         .eq('id', session.user.id)
-                        .maybeSingle();
-
-                    if (profile?.role === 'admin' || profile?.role === 'super_admin') {
-                        router.replace('/manage/dashboard' as any);
-                    } else {
-                        router.replace('/(app)/dashboard');
-                    }
+                        .maybeSingle()
+                        .then(({ data: profile }) => {
+                            if (profile?.role) {
+                                AsyncStorage.setItem(`user_role_${session.user.id}`, profile.role);
+                            }
+                        })
+                        .catch(() => {});
                 } else {
-                    router.replace('/(auth)/login');
+                    if (isMounted) router.replace('/(auth)/login');
                 }
             } catch (e) {
-                console.error("Not found route handler error:", e);
-                router.replace('/(auth)/login');
+                console.error("Instant route resolve error:", e);
+                if (isMounted) router.replace('/(auth)/login');
             }
         };
 
-        const timer = setTimeout(resolveRoute, 300);
-        return () => clearTimeout(timer);
+        resolveRoute();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
+    // Flexible, instant transition without any stuck loading text or spinners
     return (
-        <View style={{ flex: 1, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
             <StatusBar style="light" />
-            <ActivityIndicator size="large" color={L.gold} />
-            <Text style={{ color: L.gold, fontSize: 13, fontWeight: '900', marginTop: 14, letterSpacing: -0.2 }}>
-                Redirecting To Your Dashboard...
-            </Text>
-            <Text style={{ color: L.textMuted, fontSize: 10, marginTop: 4, textAlign: 'center' }}>
-                Securing your session and loading workspace...
-            </Text>
         </View>
     );
 }
+

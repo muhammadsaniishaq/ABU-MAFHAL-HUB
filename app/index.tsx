@@ -105,19 +105,28 @@ export default function Splash() {
 
         if (session && session.user) {
           await AsyncStorage.setItem('has_active_session', 'true');
+          const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
           const pinSaved = await AsyncStorage.getItem(`user_pin_${session.user.id}`);
-          if (pinSaved) {
+
+          if (cachedRole === 'admin' || cachedRole === 'super_admin') {
+            router.replace('/manage/dashboard' as any);
+          } else if (pinSaved) {
             router.replace('/(auth)/pin');
           } else {
             router.replace('/(app)/dashboard');
           }
           return;
         } else if (activeMarker === 'true') {
-          // If session marker exists, do not kick to landing page immediately
-          setIsReady(true);
+          // Active session marker found - immediately route to dashboard
+          router.replace('/(app)/dashboard');
           return;
         }
       } catch (e) {}
+
+      if (ref) {
+        router.replace(`/(auth)/login?ref=${ref}`);
+        return;
+      }
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         if (window.location.pathname === '/' && !ref) {
@@ -126,11 +135,7 @@ export default function Splash() {
         }
       }
 
-      if (ref) {
-        router.replace(`/(auth)/login?ref=${ref}`);
-      } else {
-        setIsReady(true);
-      }
+      setIsReady(true);
     };
 
     checkSession();

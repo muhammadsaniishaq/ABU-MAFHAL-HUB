@@ -231,10 +231,15 @@ export default function RootLayout() {
         const isPublicScreen = publicScreens.includes(currentScreen);
 
         if (session) {
+            const isAdmin = userRole === 'admin' || userRole === 'super_admin';
             if (isAuthGroup) {
                 const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
-                if (userRole && !allowedAuthScreens.includes(currentScreen)) {
-                    router.replace('/(app)/dashboard');
+                if (!allowedAuthScreens.includes(currentScreen)) {
+                    if (isAdmin) {
+                        router.replace('/manage/dashboard' as any);
+                    } else {
+                        router.replace('/(app)/dashboard');
+                    }
                 }
             } else if (isManagementGroup) {
                 const userEmail = session.user.email?.toLowerCase() || '';
@@ -243,15 +248,19 @@ export default function RootLayout() {
                     router.replace('/(app)/dashboard');
                 }
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                AsyncStorage.getItem(`user_pin_${session.user.id}`).then((savedPin) => {
-                    if (savedPin) {
-                        router.replace('/(auth)/pin');
-                    } else {
+                if (isAdmin) {
+                    router.replace('/manage/dashboard' as any);
+                } else {
+                    AsyncStorage.getItem(`user_pin_${session.user.id}`).then((savedPin) => {
+                        if (savedPin) {
+                            router.replace('/(auth)/pin');
+                        } else {
+                            router.replace('/(app)/dashboard');
+                        }
+                    }).catch(() => {
                         router.replace('/(app)/dashboard');
-                    }
-                }).catch(() => {
-                    router.replace('/(app)/dashboard');
-                });
+                    });
+                }
             }
         } else {
             // Check if active session marker exists before forcing redirect to landing page on refresh

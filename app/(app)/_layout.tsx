@@ -77,9 +77,7 @@ export default function AppLayout() {
 
     if (loadingVerification) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#0d1b3e', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#ffffff" />
-            </View>
+            <View style={{ flex: 1, backgroundColor: '#0d1b3e' }} />
         );
     }
 
