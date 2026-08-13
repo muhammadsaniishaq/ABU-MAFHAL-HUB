@@ -3,6 +3,26 @@
   "installCommand": "npm install --legacy-peer-deps",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*).html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!_expo/|assets/|favicon.ico|manifest.json|sw.js).*)",
