@@ -141,6 +141,7 @@ export default function PinSetupScreen() {
 
                     if (dbError) throw dbError;
 
+                    await AsyncStorage.setItem('app_unlocked', 'true');
                     Vibration.vibrate(50);
                     setStoredPin(pin);
                     setMode('verify');

@@ -200,6 +200,8 @@ export default function LoginScreen() {
                 }).eq('id', data.user.id);
 
                 await AsyncStorage.setItem(`user_role_${data.user.id}`, resolvedRole || 'user');
+                await AsyncStorage.setItem('has_active_session', 'true');
+                await AsyncStorage.setItem('app_unlocked', 'true');
                 await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
                 const validRedirect = redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/') && !redirectTo.includes('://') && !redirectTo.includes('/auth/login') ? redirectTo : null;

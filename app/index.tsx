@@ -100,31 +100,28 @@ export default function Splash() {
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
       setIsReady(true);
-    }, 800);
+    }, 400);
 
     const checkSession = async () => {
       try {
-        const activeMarker = await AsyncStorage.getItem('has_active_session');
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session && session.user) {
           clearTimeout(safetyTimer);
           await AsyncStorage.setItem('has_active_session', 'true');
+          const unlocked = await AsyncStorage.getItem('app_unlocked');
           const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
-          const pinSaved = await AsyncStorage.getItem(`user_pin_${session.user.id}`);
+          const isAdmin = cachedRole === 'admin' || cachedRole === 'super_admin';
 
-          if (cachedRole === 'admin' || cachedRole === 'super_admin') {
-            router.replace('/manage/dashboard' as any);
-          } else if (pinSaved) {
-            router.replace('/(auth)/pin');
+          if (unlocked === 'true') {
+            if (isAdmin) {
+              router.replace('/manage/dashboard' as any);
+            } else {
+              router.replace('/(app)/dashboard');
+            }
           } else {
-            router.replace('/(app)/dashboard');
+            router.replace('/(auth)/pin');
           }
-          return;
-        } else if (activeMarker === 'true') {
-          clearTimeout(safetyTimer);
-          // Active session marker found - immediately route to dashboard
-          router.replace('/(app)/dashboard');
           return;
         }
       } catch (e) {}
@@ -277,15 +274,23 @@ export default function Splash() {
               </Animated.View>
             )}
 
-            {/* Get Started Button */}
-            <Animated.View style={r4}>
+            {/* Action Buttons: Get Started & Sign In */}
+            <Animated.View style={[r4, { width: '100%', gap: 12 }]}>
               <TouchableOpacity 
                 style={s.btn}
-                onPress={() => router.push('/onboarding')}
+                onPress={() => router.push('/(auth)/signup')}
                 activeOpacity={0.9}
               >
-                <Text style={s.btnText}>Get Started</Text>
-                <Ionicons name="arrow-forward" size={15} color={T.navy} />
+                <Text style={s.btnText}>Get Started (Register)</Text>
+                <Ionicons name="arrow-forward" size={16} color={T.navy} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={s.btnLogin}
+                onPress={() => router.push('/(auth)/login')}
+                activeOpacity={0.8}
+              >
+                <Text style={s.btnLoginText}>Already have an account? Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>
@@ -397,9 +402,16 @@ const s = StyleSheet.create({
   footerText: { textAlign: 'center', color: T.white, fontSize: 13, fontWeight: '700', marginBottom: 25 },
 
   btn: { 
-    backgroundColor: T.gold, flexDirection: 'row', alignItems: 'center', gap: 8, 
-    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 18, 
+    backgroundColor: T.gold, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, 
+    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 18, width: '100%',
     elevation: 8, shadowColor: T.gold, shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: { width: 0, height: 6 } 
   },
   btnText: { color: T.navy, fontSize: 14, fontWeight: '900' },
+  btnLogin: {
+    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(247, 201, 72, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center', justifyContent: 'center', width: '100%',
+  },
+  btnLoginText: { color: T.gold, fontSize: 13, fontWeight: '700' },
 });

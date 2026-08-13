@@ -223,54 +223,55 @@ export default function RootLayout() {
         const currentScreen = segments[segments.length - 1] || 'index';
         const isAuthGroup = segments.includes('(auth)');
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
-        const isAppGroup = segments.includes('(app)') || segments.some(s => ['dashboard', 'profile', 'wallet', 'history'].includes(s));
 
         const publicScreens = ['index', 'onboarding', 'privacy', 'terms'];
         const isPublicScreen = publicScreens.includes(currentScreen);
 
         if (session) {
-            const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-            if (isAuthGroup) {
-                const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
-                if (!allowedAuthScreens.includes(currentScreen)) {
-                    if (isAdmin) {
-                        router.replace('/manage/dashboard' as any);
-                    } else {
-                        router.replace('/(app)/dashboard');
+            AsyncStorage.getItem('app_unlocked').then((unlocked) => {
+                const isUnlocked = unlocked === 'true';
+                const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+                if (!isUnlocked) {
+                    // Show PIN screen on launch if logged in
+                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
+                        router.replace('/(auth)/pin');
                     }
-                }
-            } else if (isManagementGroup) {
-                const userEmail = session.user.email?.toLowerCase() || '';
-                const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
-                if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
-                    router.replace('/(app)/dashboard');
-                }
-            } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                if (isAdmin) {
-                    router.replace('/manage/dashboard' as any);
                 } else {
-                    AsyncStorage.getItem(`user_pin_${session.user.id}`).then((savedPin) => {
-                        if (savedPin) {
-                            router.replace('/(auth)/pin');
+                    // Session is unlocked
+                    if (isAuthGroup) {
+                        const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
+                        if (!allowedAuthScreens.includes(currentScreen)) {
+                            if (isAdmin) {
+                                router.replace('/manage/dashboard' as any);
+                            } else {
+                                router.replace('/(app)/dashboard');
+                            }
+                        }
+                    } else if (isManagementGroup) {
+                        const userEmail = session.user.email?.toLowerCase() || '';
+                        const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
+                        if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
+                            router.replace('/(app)/dashboard');
+                        }
+                    } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
+                        if (isAdmin) {
+                            router.replace('/manage/dashboard' as any);
                         } else {
                             router.replace('/(app)/dashboard');
                         }
-                    }).catch(() => {
-                        router.replace('/(app)/dashboard');
-                    });
-                }
-            }
-        } else {
-            // Check if active session marker exists before forcing redirect to landing page on refresh
-            AsyncStorage.getItem('has_active_session').then((activeMarker) => {
-                if (!activeMarker && !isPublicScreen && !isAuthGroup) {
-                    router.replace('/');
+                    }
                 }
             }).catch(() => {
-                if (!isPublicScreen && !isAuthGroup) {
-                    router.replace('/');
+                if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
+                    router.replace('/(auth)/pin');
                 }
             });
+        } else {
+            AsyncStorage.removeItem('app_unlocked');
+            if (!isPublicScreen && !isAuthGroup) {
+                router.replace('/');
+            }
         }
     }, [session, userRole, initialized, segments, loaded, authChecked]);
 
