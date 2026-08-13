@@ -97,7 +97,7 @@ export default function InstallAppButton() {
                 borderColor: L.gold,
                 flexDirection: 'row',
                 alignItems: 'center',
-                justify: 'center',
+                justifyContent: 'center',
                 gap: 5,
                 elevation: 2
             }}
