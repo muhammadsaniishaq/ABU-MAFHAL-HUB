@@ -109,18 +109,16 @@ export default function Splash() {
         if (session && session.user) {
           clearTimeout(safetyTimer);
           await AsyncStorage.setItem('has_active_session', 'true');
-          const unlocked = await AsyncStorage.getItem('app_unlocked');
           const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
           const isAdmin = cachedRole === 'admin' || cachedRole === 'super_admin';
+          const pinSaved = await AsyncStorage.getItem('user_transaction_pin');
 
-          if (unlocked === 'true') {
-            if (isAdmin) {
-              router.replace('/manage/dashboard' as any);
-            } else {
-              router.replace('/(app)/dashboard');
-            }
-          } else {
+          if (isAdmin) {
+            router.replace('/manage/dashboard' as any);
+          } else if (pinSaved) {
             router.replace('/(auth)/pin');
+          } else {
+            router.replace('/(app)/dashboard');
           }
           return;
         }

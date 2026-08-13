@@ -228,47 +228,31 @@ export default function RootLayout() {
         const isPublicScreen = publicScreens.includes(currentScreen);
 
         if (session) {
-            AsyncStorage.getItem('app_unlocked').then((unlocked) => {
-                const isUnlocked = unlocked === 'true';
-                const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+            const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-                if (!isUnlocked) {
-                    // Show PIN screen on launch if logged in
-                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
-                        router.replace('/(auth)/pin');
+            if (isAuthGroup) {
+                const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
+                if (!allowedAuthScreens.includes(currentScreen)) {
+                    if (isAdmin) {
+                        router.replace('/manage/dashboard' as any);
+                    } else {
+                        router.replace('/(app)/dashboard');
                     }
+                }
+            } else if (isManagementGroup) {
+                const userEmail = session.user.email?.toLowerCase() || '';
+                const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
+                if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
+                    router.replace('/(app)/dashboard');
+                }
+            } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
+                if (isAdmin) {
+                    router.replace('/manage/dashboard' as any);
                 } else {
-                    // Session is unlocked
-                    if (isAuthGroup) {
-                        const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
-                        if (!allowedAuthScreens.includes(currentScreen)) {
-                            if (isAdmin) {
-                                router.replace('/manage/dashboard' as any);
-                            } else {
-                                router.replace('/(app)/dashboard');
-                            }
-                        }
-                    } else if (isManagementGroup) {
-                        const userEmail = session.user.email?.toLowerCase() || '';
-                        const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
-                        if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
-                            router.replace('/(app)/dashboard');
-                        }
-                    } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                        if (isAdmin) {
-                            router.replace('/manage/dashboard' as any);
-                        } else {
-                            router.replace('/(app)/dashboard');
-                        }
-                    }
+                    router.replace('/(app)/dashboard');
                 }
-            }).catch(() => {
-                if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
-                    router.replace('/(auth)/pin');
-                }
-            });
+            }
         } else {
-            AsyncStorage.removeItem('app_unlocked');
             if (!isPublicScreen && !isAuthGroup) {
                 router.replace('/');
             }
