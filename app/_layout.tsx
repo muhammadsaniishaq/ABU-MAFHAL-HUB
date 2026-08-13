@@ -78,6 +78,16 @@ if (typeof document !== 'undefined') {
       metaApple.name = 'apple-mobile-web-app-capable';
       metaApple.content = 'yes';
       document.head.appendChild(metaApple);
+
+      // Register PWA Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(
+            (reg) => console.log('PWA ServiceWorker active:', reg.scope),
+            (err) => console.warn('PWA ServiceWorker error:', err)
+          );
+        });
+      }
     }
   } catch (e) {}
 }
