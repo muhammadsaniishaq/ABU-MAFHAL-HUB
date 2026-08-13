@@ -98,12 +98,17 @@ export default function Splash() {
   }, []);
 
   useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      setIsReady(true);
+    }, 800);
+
     const checkSession = async () => {
       try {
         const activeMarker = await AsyncStorage.getItem('has_active_session');
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session && session.user) {
+          clearTimeout(safetyTimer);
           await AsyncStorage.setItem('has_active_session', 'true');
           const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
           const pinSaved = await AsyncStorage.getItem(`user_pin_${session.user.id}`);
@@ -117,6 +122,7 @@ export default function Splash() {
           }
           return;
         } else if (activeMarker === 'true') {
+          clearTimeout(safetyTimer);
           // Active session marker found - immediately route to dashboard
           router.replace('/(app)/dashboard');
           return;
@@ -124,21 +130,16 @@ export default function Splash() {
       } catch (e) {}
 
       if (ref) {
+        clearTimeout(safetyTimer);
         router.replace(`/(auth)/login?ref=${ref}`);
         return;
-      }
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (window.location.pathname === '/' && !ref) {
-          window.location.replace('/landing.html');
-          return;
-        }
       }
 
       setIsReady(true);
     };
 
     checkSession();
+    return () => clearTimeout(safetyTimer);
   }, [ref]);
 
   const r1 = useReveal(200);
