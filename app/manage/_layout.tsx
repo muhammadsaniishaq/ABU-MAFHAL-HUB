@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function AdminLayout() {
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(true);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         let isMounted = true;

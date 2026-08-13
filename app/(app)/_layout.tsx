@@ -15,8 +15,6 @@ const LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 export default function AppLayout() {
     const router = useRouter();
     const { settings } = useAppSettings();
-    const [isVerified, setIsVerified] = useState(false);
-    const [loadingVerification, setLoadingVerification] = useState(true);
     const [isFabOpen, setIsFabOpen] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     usePushNotifications(); // Register for push notifications
@@ -38,59 +36,9 @@ export default function AppLayout() {
             ])
         ).start();
 
-        const checkInactivityLock = async () => {
-            try {
-                const lastVerificationStr = await AsyncStorage.getItem('last_security_verification_time');
-                if (lastVerificationStr) {
-                    const lastVerificationTime = parseInt(lastVerificationStr, 10);
-                    const now = Date.now();
-                    if (now - lastVerificationTime < LOCK_TIMEOUT) {
-                        setIsVerified(true);
-                        // Refresh timestamp to extend active session
-                        await AsyncStorage.setItem('last_security_verification_time', String(now));
-                        setLoadingVerification(false);
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error("Error checking verification timeout:", e);
-            }
-            setLoadingVerification(false);
-        };
-        checkInactivityLock();
+        // Refresh timestamp to extend active session
+        AsyncStorage.setItem('last_security_verification_time', String(Date.now())).catch(err => console.log(err));
     }, []);
-
-    useEffect(() => {
-        if (isVerified) {
-            AsyncStorage.setItem('last_security_verification_time', String(Date.now())).catch(err => console.log(err));
-        }
-    }, [isVerified]);
-
-    const handleVerificationSuccess = async () => {
-        try {
-            await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-        } catch (e) {
-            console.error("Failed to save verification time:", e);
-        }
-        setIsVerified(true);
-    };
-
-    if (loadingVerification) {
-        return (
-            <View style={{ flex: 1, backgroundColor: '#0d1b3e' }} />
-        );
-    }
-
-    if (!isVerified) {
-        return (
-            <SecurityModal
-                visible={true}
-                onClose={() => router.replace('/')}
-                onSuccess={handleVerificationSuccess}
-                title="Welcome Back"
-            />
-        );
-    }
 
     return (
         <View style={{ flex: 1 }}>

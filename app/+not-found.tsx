@@ -45,17 +45,18 @@ export default function NotFoundScreen() {
                     }
 
                     // Async background role check (non-blocking)
-                    supabase
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', session.user.id)
-                        .maybeSingle()
-                        .then(({ data: profile }) => {
+                    (async () => {
+                        try {
+                            const { data: profile } = await supabase
+                                .from('profiles')
+                                .select('role')
+                                .eq('id', session.user.id)
+                                .maybeSingle();
                             if (profile?.role) {
-                                AsyncStorage.setItem(`user_role_${session.user.id}`, profile.role);
+                                await AsyncStorage.setItem(`user_role_${session.user.id}`, profile.role);
                             }
-                        })
-                        .catch(() => {});
+                        } catch (err) {}
+                    })();
                 } else {
                     if (isMounted) router.replace('/(auth)/login');
                 }

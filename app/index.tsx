@@ -80,7 +80,7 @@ export default function Splash() {
   const router = useRouter();
   const { ref } = useLocalSearchParams<{ ref?: string }>();
   
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(true);
   const [partners, setPartners] = useState<any[]>([]);
 
   useEffect(() => {
