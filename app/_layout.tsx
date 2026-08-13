@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
-import { View, ActivityIndicator, LogBox, Text, TextInput } from 'react-native';
+import { View, ActivityIndicator, LogBox, Text, TextInput, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -251,7 +251,15 @@ export default function RootLayout() {
                 if (isAdmin) {
                     router.replace('/manage/dashboard' as any);
                 } else {
-                    router.replace('/(app)/dashboard');
+                    AsyncStorage.getItem('user_transaction_pin').then((pin) => {
+                        if (pin) {
+                            router.replace('/(auth)/pin');
+                        } else {
+                            router.replace('/(app)/dashboard');
+                        }
+                    }).catch(() => {
+                        router.replace('/(app)/dashboard');
+                    });
                 }
             }
         } else {

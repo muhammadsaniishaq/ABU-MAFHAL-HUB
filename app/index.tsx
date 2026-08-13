@@ -98,43 +98,11 @@ export default function Splash() {
   }, []);
 
   useEffect(() => {
-    const safetyTimer = setTimeout(() => {
-      setIsReady(true);
-    }, 400);
-
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (session && session.user) {
-          clearTimeout(safetyTimer);
-          await AsyncStorage.setItem('has_active_session', 'true');
-          const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
-          const isAdmin = cachedRole === 'admin' || cachedRole === 'super_admin';
-          const pinSaved = await AsyncStorage.getItem('user_transaction_pin');
-
-          if (isAdmin) {
-            router.replace('/manage/dashboard' as any);
-          } else if (pinSaved) {
-            router.replace('/(auth)/pin');
-          } else {
-            router.replace('/(app)/dashboard');
-          }
-          return;
-        }
-      } catch (e) {}
-
-      if (ref) {
-        clearTimeout(safetyTimer);
-        router.replace(`/(auth)/login?ref=${ref}`);
-        return;
-      }
-
-      setIsReady(true);
-    };
-
-    checkSession();
-    return () => clearTimeout(safetyTimer);
+    if (ref) {
+      router.replace(`/(auth)/login?ref=${ref}`);
+      return;
+    }
+    setIsReady(true);
   }, [ref]);
 
   const r1 = useReveal(200);
