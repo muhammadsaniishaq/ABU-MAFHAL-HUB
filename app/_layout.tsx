@@ -92,8 +92,10 @@ if (typeof document !== 'undefined') {
   } catch (e) {}
 }
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
+// Prevent the splash screen from auto-hiding before asset loading is complete (Mobile only)
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync().catch((e) => console.warn("SplashScreen preventAutoHideAsync failed:", e));
+}
 
 import { useAppSettings } from '../hooks/useAppSettings';
 import MaintenanceScreen from '../components/MaintenanceScreen';
@@ -260,7 +262,11 @@ export default function RootLayout() {
     }, [session, userRole, initialized, segments, loaded, authChecked]);
 
     if (!loaded || !initialized) {
-        return null;
+        return (
+            <View style={{ flex: 1, backgroundColor: '#030C22', alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color="#f5a623" />
+            </View>
+        );
     }
 
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';
