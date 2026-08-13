@@ -7,6 +7,7 @@ export default function AuthLayout() {
             <Stack.Screen name="signup" options={{ headerShown: false }} />
             <Stack.Screen name="otp" options={{ headerShown: false }} />
             <Stack.Screen name="pin-setup" options={{ headerShown: false }} />
+            <Stack.Screen name="pin" options={{ headerShown: false }} />
         </Stack>
     );
 }
