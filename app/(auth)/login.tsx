@@ -135,7 +135,7 @@ export default function LoginScreen() {
             if (error) {
                 if (error.message.includes('Email not confirmed') || error.message.includes('Email not verified')) {
                     router.push({
-                        pathname: '/(auth)/otp',
+                        pathname: '/otp' as any,
                         params: { email: isEmailInput ? cleanIdent : '', type: 'signup' }
                     });
                     return;
@@ -151,7 +151,7 @@ export default function LoginScreen() {
 
                 if (settings?.require_email_verif && !data.user.email_confirmed_at && isEmailInput) {
                     router.push({
-                        pathname: '/(auth)/otp',
+                        pathname: '/otp' as any,
                         params: { email: cleanIdent, type: 'signup' }
                     });
                     return;
@@ -211,7 +211,7 @@ export default function LoginScreen() {
                 } else if (resolvedRole === 'admin' || resolvedRole === 'super_admin') {
                     router.replace('/manage/dashboard' as any);
                 } else {
-                    router.replace('/(app)/dashboard');
+                    router.replace('/dashboard' as any);
                 }
             }
         } catch (error: any) {
@@ -233,7 +233,7 @@ export default function LoginScreen() {
                 });
                 if (error) throw error;
             } else {
-                const redirectToUrl = Linking.createURL('/(auth)/login');
+                const redirectToUrl = Linking.createURL('/login');
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
                     options: {
@@ -526,7 +526,7 @@ export default function LoginScreen() {
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Don't have an account?</Text>
-                                    <TouchableOpacity onPress={() => router.push('/(auth)/signup')} activeOpacity={0.8}>
+                                    <TouchableOpacity onPress={() => router.push('/signup' as any)} activeOpacity={0.8}>
                                         <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Create Account</Text>
                                     </TouchableOpacity>
                                 </View>

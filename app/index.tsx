@@ -244,7 +244,7 @@ export default function Splash() {
             <Animated.View style={[r4, { width: '100%', gap: 12 }]}>
               <TouchableOpacity 
                 style={s.btn}
-                onPress={() => router.push('/(auth)/signup')}
+                onPress={() => router.push('/signup' as any)}
                 activeOpacity={0.9}
               >
                 <Text style={s.btnText}>Get Started (Register)</Text>
@@ -253,7 +253,7 @@ export default function Splash() {
 
               <TouchableOpacity 
                 style={s.btnLogin}
-                onPress={() => router.push('/(auth)/login')}
+                onPress={() => router.push('/login' as any)}
                 activeOpacity={0.8}
               >
                 <Text style={s.btnLoginText}>Already have an account? Sign In</Text>

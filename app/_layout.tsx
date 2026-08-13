@@ -238,14 +238,14 @@ export default function RootLayout() {
                     if (isAdmin) {
                         router.replace('/manage/dashboard' as any);
                     } else {
-                        router.replace('/(app)/dashboard');
+                        router.replace('/dashboard' as any);
                     }
                 }
             } else if (isManagementGroup) {
                 const userEmail = session.user.email?.toLowerCase() || '';
                 const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
                 if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
-                    router.replace('/(app)/dashboard');
+                    router.replace('/dashboard' as any);
                 }
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
                 if (isAdmin) {
@@ -253,12 +253,12 @@ export default function RootLayout() {
                 } else {
                     AsyncStorage.getItem('user_transaction_pin').then((pin) => {
                         if (pin) {
-                            router.replace('/(auth)/pin');
+                            router.replace('/pin' as any);
                         } else {
-                            router.replace('/(app)/dashboard');
+                            router.replace('/dashboard' as any);
                         }
                     }).catch(() => {
-                        router.replace('/(app)/dashboard');
+                        router.replace('/dashboard' as any);
                     });
                 }
             }

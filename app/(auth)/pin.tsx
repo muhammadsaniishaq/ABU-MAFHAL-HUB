@@ -89,7 +89,7 @@ export default function PinUnlockScreen() {
                 if (role === 'admin' || role === 'super_admin') {
                     router.replace('/manage/dashboard' as any);
                 } else {
-                    router.replace('/(app)/dashboard');
+                    router.replace('/dashboard' as any);
                 }
                 return;
             }
@@ -144,7 +144,7 @@ export default function PinUnlockScreen() {
                 return;
             }
         }
-        router.replace('/(app)/dashboard');
+        router.replace('/dashboard' as any);
     };
 
     const handlePress = (digit: string) => {

@@ -24,10 +24,10 @@ export default function NotFoundScreen() {
                         if (cachedRole === 'admin' || cachedRole === 'super_admin') {
                             if (isMounted) router.replace('/manage/dashboard' as any);
                         } else {
-                            if (isMounted) router.replace('/(app)/dashboard');
+                            if (isMounted) router.replace('/dashboard' as any);
                         }
                     } else {
-                        if (isMounted) router.replace('/(auth)/pin');
+                        if (isMounted) router.replace('/pin' as any);
                     }
                 } else {
                     if (isMounted) router.replace('/');

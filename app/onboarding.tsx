@@ -375,12 +375,12 @@ export default function OnboardingScreen() {
     if (activeSlide < SLIDES.length - 1) {
       animateToSlide(activeSlide + 1);
     } else {
-      router.push('/(auth)/signup');
+      router.push('/signup' as any);
     }
   };
 
   const handleSkip = () => {
-    router.push('/(auth)/signup');
+    router.push('/signup' as any);
   };
 
   const handleDotPress = (index: number) => {
@@ -539,7 +539,7 @@ export default function OnboardingScreen() {
         {/* Log In prompt */}
         <View style={s.loginLinkRow}>
           <Text style={s.loginLabel}>{content.loginLabel}</Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+          <TouchableOpacity onPress={() => router.push('/login' as any)}>
             <Text style={s.loginAction}>{content.loginAction}</Text>
           </TouchableOpacity>
         </View>

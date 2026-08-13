@@ -195,11 +195,11 @@ export default function SignupScreen() {
                     setShowSuccessModal(false);
                     if (settings?.require_email_verif && !data.user?.email_confirmed_at) {
                         router.push({
-                            pathname: '/(auth)/otp',
+                            pathname: '/otp' as any,
                             params: { email: email.trim(), type: 'signup' }
                         });
                     } else {
-                        router.replace('/(auth)/pin-setup');
+                        router.replace('/pin-setup' as any);
                     }
                 }, 1600);
             }
@@ -223,7 +223,7 @@ export default function SignupScreen() {
                 });
                 if (error) throw error;
             } else {
-                const redirectToUrl = Linking.createURL('/(auth)/login');
+                const redirectToUrl = Linking.createURL('/login');
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
                     options: {
@@ -556,7 +556,7 @@ export default function SignupScreen() {
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Already have an account?</Text>
-                                    <TouchableOpacity onPress={() => router.push('/(auth)/login')} activeOpacity={0.8}>
+                                    <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8}>
                                         <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Sign In</Text>
                                     </TouchableOpacity>
                                 </View>
