@@ -14,6 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import InstallAppButton from '../../components/InstallAppButton';
 
 const CACHE_KEY = '@profile_data_v7';
 
@@ -414,7 +415,10 @@ export default function UserProfileScreen() {
                         </View>
 
                         {/* Mobile-First Quick Chips Navigation (4 Balanced Touch Chips) */}
-                        <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginTop: 2 }}>Quick Navigation Actions</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase' }}>Quick Navigation Actions</Text>
+                            <InstallAppButton />
+                        </View>
                         <View style={{ flexDirection: 'row', gap: 6 }}>
                             <TouchableOpacity onPress={() => router.push('/edit-profile')} style={{ flex: 1, backgroundColor: L.card, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, elevation: 1 }}>
                                 <Ionicons name="person-outline" size={14} color={L.navyHeader} />

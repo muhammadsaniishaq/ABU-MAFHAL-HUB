@@ -35,7 +35,7 @@ import { Session } from '@supabase/supabase-js';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import '../global.css';
 
-// Suppress browser focus outlines globally across web app
+// Suppress browser focus outlines & set up PWA manifest globally across web app
 if (typeof document !== 'undefined') {
   try {
     const styleId = 'global-outline-suppress';
@@ -53,6 +53,31 @@ if (typeof document !== 'undefined') {
         }
       `;
       document.head.appendChild(style);
+    }
+
+    // PWA Manifest and Mobile App Meta Tags Setup
+    const manifestId = 'pwa-manifest-link';
+    if (!document.getElementById(manifestId)) {
+      const manifestLink = document.createElement('link');
+      manifestLink.id = manifestId;
+      manifestLink.rel = 'manifest';
+      manifestLink.href = '/manifest.json';
+      document.head.appendChild(manifestLink);
+
+      const metaTheme = document.createElement('meta');
+      metaTheme.name = 'theme-color';
+      metaTheme.content = '#0F172A';
+      document.head.appendChild(metaTheme);
+
+      const metaMobile = document.createElement('meta');
+      metaMobile.name = 'mobile-web-app-capable';
+      metaMobile.content = 'yes';
+      document.head.appendChild(metaMobile);
+
+      const metaApple = document.createElement('meta');
+      metaApple.name = 'apple-mobile-web-app-capable';
+      metaApple.content = 'yes';
+      document.head.appendChild(metaApple);
     }
   } catch (e) {}
 }
