@@ -101,9 +101,7 @@ import UpdateScreen from '../components/UpdateScreen';
 
 export default function RootLayout() {
     const colorScheme = useColorScheme();
-    const [loaded] = useFonts({
-        // SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    });
+    const loaded = true;
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [initialized, setInitialized] = useState(false);
@@ -157,7 +155,7 @@ export default function RootLayout() {
         const bootTimer = setTimeout(() => {
             setAuthChecked(true);
             setInitialized(true);
-        }, 1500);
+        }, 300);
 
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
             clearTimeout(bootTimer);
