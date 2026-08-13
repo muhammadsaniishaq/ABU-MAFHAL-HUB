@@ -202,8 +202,10 @@ export default function LoginScreen() {
                 await AsyncStorage.setItem(`user_role_${data.user.id}`, resolvedRole || 'user');
                 await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
-                if (redirectTo) {
-                    router.replace(redirectTo as any);
+                const validRedirect = redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/') && !redirectTo.includes('://') && !redirectTo.includes('/auth/login') ? redirectTo : null;
+
+                if (validRedirect) {
+                    router.replace(validRedirect as any);
                 } else if (resolvedRole === 'admin' || resolvedRole === 'super_admin') {
                     router.replace('/manage/dashboard' as any);
                 } else {

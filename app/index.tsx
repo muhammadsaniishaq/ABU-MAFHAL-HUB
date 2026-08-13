@@ -127,7 +127,7 @@ export default function Splash() {
       }
 
       if (ref) {
-        router.replace(`/auth/login?ref=${ref}`);
+        router.replace(`/(auth)/login?ref=${ref}`);
       } else {
         setIsReady(true);
       }
