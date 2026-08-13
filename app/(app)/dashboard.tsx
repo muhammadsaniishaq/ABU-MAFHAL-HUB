@@ -58,7 +58,7 @@ export default function Dashboard() {
         Animated.timing(partnerAnim, {
           toValue: -totalWidth,
           duration: Math.max(10000, activePartners.length * 5000),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
           easing: Easing.linear,
         })
       ).start();
