@@ -229,7 +229,8 @@ export default function RootLayout() {
         if (!initialized || !loaded || !authChecked) return;
 
         const currentScreen = segments[segments.length - 1] || 'index';
-        const isAuthGroup = segments.includes('(auth)');
+        const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp'];
+        const isAuthGroup = segments.includes('(auth)') || authScreens.includes(currentScreen);
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
 
         const publicScreens = ['index', 'onboarding', 'privacy', 'terms'];
@@ -298,6 +299,11 @@ export default function RootLayout() {
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="login" options={{ headerShown: false }} />
+                    <Stack.Screen name="signup" options={{ headerShown: false }} />
+                    <Stack.Screen name="pin" options={{ headerShown: false }} />
+                    <Stack.Screen name="pin-setup" options={{ headerShown: false }} />
+                    <Stack.Screen name="dashboard" options={{ headerShown: false }} />
                     <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                     <Stack.Screen name="privacy" options={{ headerShown: false }} />
                     <Stack.Screen name="terms" options={{ headerShown: false }} />
