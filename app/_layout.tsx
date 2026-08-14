@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
-import { View, ActivityIndicator, LogBox, Text, TextInput, Platform } from 'react-native';
+import { View, ActivityIndicator, LogBox, Text, TextInput, Platform, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -233,6 +233,15 @@ export default function RootLayout() {
     }, [loaded, initialized, authChecked]);
 
     useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            if (nextAppState === 'background' || nextAppState === 'inactive') {
+                AsyncStorage.removeItem('app_unlocked').catch(() => {});
+            }
+        });
+        return () => subscription.remove();
+    }, []);
+
+    useEffect(() => {
         if (!initialized || !loaded || !authChecked) return;
 
         const currentScreen = segments[segments.length - 1] || 'index';
@@ -245,19 +254,18 @@ export default function RootLayout() {
 
         if (session) {
             const isAdmin = isUserAdmin(userRole, session.user?.email);
-            const targetDashboard = isAdmin ? '/manage/dashboard' : '/dashboard';
 
             if (isAuthGroup) {
                 const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
                 if (!allowedAuthScreens.includes(currentScreen)) {
-                    router.replace(targetDashboard as any);
+                    router.replace('/dashboard' as any);
                 }
             } else if (isManagementGroup && !isAdmin) {
                 router.replace('/dashboard' as any);
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
                 AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
                     if (unlocked === 'true') {
-                        router.replace(targetDashboard as any);
+                        router.replace('/dashboard' as any);
                     } else {
                         let localPin = Platform.OS === 'web'
                             ? await AsyncStorage.getItem('user_transaction_pin')
@@ -276,11 +284,11 @@ export default function RootLayout() {
                             router.replace('/pin' as any);
                         } else {
                             await AsyncStorage.setItem('app_unlocked', 'true');
-                            router.replace(targetDashboard as any);
+                            router.replace('/dashboard' as any);
                         }
                     }
                 }).catch(() => {
-                    router.replace(targetDashboard as any);
+                    router.replace('/dashboard' as any);
                 });
             }
         } else {
