@@ -146,9 +146,14 @@ export default function PinSetupScreen() {
                     setStoredPin(pin);
                     setMode('verify');
                     
-                    Alert.alert("Success", "PIN created successfully!", [
-                        { text: "Continue", onPress: () => router.replace('/dashboard' as any) }
-                    ]);
+                    if (Platform.OS === 'web') {
+                        alert("Success! PIN created successfully!");
+                        router.replace('/dashboard' as any);
+                    } else {
+                        Alert.alert("Success", "PIN created successfully!", [
+                            { text: "Continue", onPress: () => router.replace('/dashboard' as any) }
+                        ]);
+                    }
                 } catch (error: any) {
                     Alert.alert("Error", error.message || "Failed to set PIN");
                     setConfirmPin('');

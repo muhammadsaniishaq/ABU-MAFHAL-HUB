@@ -172,15 +172,21 @@ export default function PinUnlockScreen() {
             if (Platform.OS !== 'web') {
                 Vibration.vibrate([50, 50, 50]);
             }
-            Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.', [
-                {
-                    text: 'OK',
-                    onPress: () => {
-                        setPin('');
-                        setVerifying(false);
+            if (Platform.OS === 'web') {
+                alert('Incorrect PIN. The PIN you entered is incorrect. Please try again.');
+                setPin('');
+                setVerifying(false);
+            } else {
+                Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.', [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            setPin('');
+                            setVerifying(false);
+                        },
                     },
-                },
-            ]);
+                ]);
+            }
         }
     };
 
