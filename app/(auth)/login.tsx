@@ -206,9 +206,11 @@ export default function LoginScreen() {
 
                 const validRedirect = redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/') && !redirectTo.includes('://') && !redirectTo.includes('/auth/login') ? redirectTo : null;
 
+                const isFinalAdmin = resolvedRole === 'admin' || resolvedRole === 'super_admin' || isAdminEmail;
+
                 if (validRedirect) {
                     router.replace(validRedirect as any);
-                } else if (resolvedRole === 'admin' || resolvedRole === 'super_admin') {
+                } else if (isFinalAdmin) {
                     router.replace('/manage/dashboard' as any);
                 } else {
                     router.replace('/dashboard' as any);

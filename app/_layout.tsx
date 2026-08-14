@@ -9,6 +9,7 @@ import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-rean
 import { View, ActivityIndicator, LogBox, Text, TextInput, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 
 
@@ -106,6 +107,20 @@ if (Platform.OS !== 'web') {
 import { useAppSettings } from '../hooks/useAppSettings';
 import MaintenanceScreen from '../components/MaintenanceScreen';
 import UpdateScreen from '../components/UpdateScreen';
+
+const isUserAdmin = (role?: string | null, email?: string | null) => {
+    if (role === 'admin' || role === 'super_admin') return true;
+    const lowerEmail = email ? email.toLowerCase().trim() : '';
+    if (!lowerEmail) return false;
+    return (
+        lowerEmail === 'sale.abumafhal@gmail.com' ||
+        lowerEmail === 'admin@abumafhal.com' ||
+        lowerEmail === 'abumafhal@gmail.com' ||
+        lowerEmail.endsWith('@abumafhal.com') ||
+        lowerEmail.endsWith('@abumafhal.com.ng') ||
+        lowerEmail.includes('admin')
+    );
+};
 
 export default function RootLayout() {
     const colorScheme = useColorScheme();
@@ -212,14 +227,6 @@ export default function RootLayout() {
             }
             setAuthChecked(true);
         });
-
-        return () => {
-            clearTimeout(bootTimer);
-            subscription.unsubscribe();
-        };
-    }, []);
-
-    useEffect(() => {
         if (loaded && initialized && authChecked) {
             SplashScreen.hideAsync().catch(() => {});
         }
@@ -237,37 +244,44 @@ export default function RootLayout() {
         const isPublicScreen = publicScreens.includes(currentScreen);
 
         if (session) {
-            const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+            const isAdmin = isUserAdmin(userRole, session.user?.email);
+            const targetDashboard = isAdmin ? '/manage/dashboard' : '/dashboard';
 
             if (isAuthGroup) {
                 const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
                 if (!allowedAuthScreens.includes(currentScreen)) {
-                    if (isAdmin) {
-                        router.replace('/manage/dashboard' as any);
-                    } else {
-                        router.replace('/dashboard' as any);
-                    }
+                    router.replace(targetDashboard as any);
                 }
-            } else if (isManagementGroup) {
-                const userEmail = session.user.email?.toLowerCase() || '';
-                const isAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
-                if (userRole && !['admin', 'super_admin'].includes(userRole) && !isAdminEmail) {
-                    router.replace('/dashboard' as any);
-                }
+            } else if (isManagementGroup && !isAdmin) {
+                router.replace('/dashboard' as any);
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                if (isAdmin) {
-                    router.replace('/manage/dashboard' as any);
-                } else {
-                    AsyncStorage.getItem('user_transaction_pin').then((pin) => {
-                        if (pin) {
+                AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
+                    if (unlocked === 'true') {
+                        router.replace(targetDashboard as any);
+                    } else {
+                        let localPin = Platform.OS === 'web'
+                            ? await AsyncStorage.getItem('user_transaction_pin')
+                            : await SecureStore.getItemAsync('user_transaction_pin');
+
+                        if (!localPin) {
+                            const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', session.user.id).maybeSingle();
+                            if (data?.transaction_pin) {
+                                localPin = data.transaction_pin;
+                                if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                                else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
+                            }
+                        }
+
+                        if (localPin) {
                             router.replace('/pin' as any);
                         } else {
-                            router.replace('/dashboard' as any);
+                            await AsyncStorage.setItem('app_unlocked', 'true');
+                            router.replace(targetDashboard as any);
                         }
-                    }).catch(() => {
-                        router.replace('/dashboard' as any);
-                    });
-                }
+                    }
+                }).catch(() => {
+                    router.replace(targetDashboard as any);
+                });
             }
         } else {
             if (!isPublicScreen && !isAuthGroup) {
