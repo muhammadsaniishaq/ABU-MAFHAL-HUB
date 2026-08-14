@@ -5,16 +5,7 @@
   "cleanUrls": true,
   "headers": [
     {
-      "source": "/(.*).html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -24,20 +15,9 @@
     }
   ],
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/auth/login", "destination": "/login.html" },
-    { "source": "/(auth)/login", "destination": "/login.html" },
-    { "source": "/signup", "destination": "/signup.html" },
-    { "source": "/auth/signup", "destination": "/signup.html" },
-    { "source": "/(auth)/signup", "destination": "/signup.html" },
-    { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/(app)/dashboard", "destination": "/dashboard.html" },
-    { "source": "/pin", "destination": "/pin.html" },
-    { "source": "/(auth)/pin", "destination": "/pin.html" },
-    { "source": "/otp", "destination": "/otp.html" },
-    { "source": "/(auth)/otp", "destination": "/otp.html" },
-    { "source": "/pin-setup", "destination": "/pin-setup.html" },
-    { "source": "/(auth)/pin-setup", "destination": "/pin-setup.html" },
-    { "source": "/((?!_expo/|assets/|favicon.ico|manifest.json|sw.js).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!_expo/|assets/|favicon.ico|manifest.json).*)",
+      "destination": "/index.html"
+    }
   ]
 }
