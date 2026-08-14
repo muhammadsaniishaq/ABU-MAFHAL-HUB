@@ -42,27 +42,7 @@ export default function PinUnlockScreen() {
     const initPinScreen = async () => {
         setLoading(true);
         try {
-            // Get user session & details
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
-                router.replace('/');
-                return;
-            }
-
-            setUserEmail(session.user.email || '');
-
-            // Get cached role & user name
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('full_name, transaction_pin, role')
-                .eq('id', session.user.id)
-                .maybeSingle();
-
-            if (profile?.full_name) {
-                setUserName(profile.full_name);
-            }
-
-            // Check for saved PIN in local storage or profile
+            // Check for saved PIN in local storage first for instant rendering
             let localPin: string | null = null;
             if (Platform.OS === 'web') {
                 localPin = await AsyncStorage.getItem(PIN_KEY);
@@ -70,40 +50,57 @@ export default function PinUnlockScreen() {
                 localPin = await SecureStore.getItemAsync(PIN_KEY);
             }
 
-            let effectivePin = localPin || profile?.transaction_pin || null;
+            // Get user session & details safely
+            let { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    session = { user } as any;
+                }
+            }
 
-            if (effectivePin) {
-                setSavedPin(effectivePin);
-                // Sync back to local storage if needed
-                if (!localPin) {
+            if (session?.user) {
+                setUserEmail(session.user.email || '');
+
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name, transaction_pin, role')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+
+                if (profile?.full_name) {
+                    setUserName(profile.full_name);
+                }
+
+                if (!localPin && profile?.transaction_pin) {
+                    const fetchedPin = profile.transaction_pin;
+                    localPin = fetchedPin;
                     if (Platform.OS === 'web') {
-                        await AsyncStorage.setItem(PIN_KEY, effectivePin);
+                        await AsyncStorage.setItem(PIN_KEY, fetchedPin);
                     } else {
-                        await SecureStore.setItemAsync(PIN_KEY, effectivePin);
+                        await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
                     }
                 }
+            }
+
+            if (localPin) {
+                setSavedPin(localPin);
             } else {
                 // If user has no PIN configured at all, mark as unlocked & let them go to dashboard
                 await AsyncStorage.setItem('app_unlocked', 'true');
-                const role = profile?.role || (await AsyncStorage.getItem(`user_role_${session.user.id}`));
-                if (role === 'admin' || role === 'super_admin') {
-                    router.replace('/manage/dashboard' as any);
-                } else {
-                    router.replace('/dashboard' as any);
-                }
+                router.replace('/dashboard' as any);
                 return;
             }
 
-            // Check biometric availability
+            // Check biometric availability on native mobile
             if (Platform.OS !== 'web') {
                 const hasHardware = await LocalAuthentication.hasHardwareAsync();
                 const isEnrolled = await LocalAuthentication.isEnrolledAsync();
                 const bioEnabled = await AsyncStorage.getItem('biometrics_enabled');
                 if (hasHardware && isEnrolled && bioEnabled === 'true') {
                     setBiometricAvailable(true);
-                    // Prompt biometrics automatically on open
                     setTimeout(() => {
-                        triggerBiometricAuth(effectivePin);
+                        triggerBiometricAuth(localPin);
                     }, 300);
                 }
             }
