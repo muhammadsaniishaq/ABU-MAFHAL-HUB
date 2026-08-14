@@ -79,14 +79,20 @@ if (typeof document !== 'undefined') {
       metaApple.content = 'yes';
       document.head.appendChild(metaApple);
 
-      // Register PWA Service Worker
+      // Unregister old service workers & clear stale caches to ensure immediate live updates
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(
-            (reg) => console.log('PWA ServiceWorker active:', reg.scope),
-            (err) => console.warn('PWA ServiceWorker error:', err)
-          );
-        });
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (let reg of registrations) {
+            reg.unregister();
+          }
+        }).catch(() => {});
+        if (typeof caches !== 'undefined') {
+          caches.keys().then((keys) => {
+            for (let key of keys) {
+              caches.delete(key);
+            }
+          }).catch(() => {});
+        }
       }
     }
   } catch (e) {}
@@ -291,9 +297,13 @@ export default function RootLayout() {
         <SafeAreaProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="manage" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                    <Stack.Screen name="privacy" options={{ headerShown: false }} />
+                    <Stack.Screen name="terms" options={{ headerShown: false }} />
+                    <Stack.Screen name="manage" options={{ headerShown: false }} />
+                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                    <Stack.Screen name="(app)" options={{ headerShown: false }} />
                 </Stack>
                 <StatusBar style="auto" />
             </ThemeProvider>

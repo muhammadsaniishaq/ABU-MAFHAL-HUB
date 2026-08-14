@@ -37,6 +37,7 @@
     { "source": "/otp", "destination": "/otp.html" },
     { "source": "/(auth)/otp", "destination": "/otp.html" },
     { "source": "/pin-setup", "destination": "/pin-setup.html" },
-    { "source": "/(auth)/pin-setup", "destination": "/pin-setup.html" }
+    { "source": "/(auth)/pin-setup", "destination": "/pin-setup.html" },
+    { "source": "/((?!_expo/|assets/|favicon.ico|manifest.json|sw.js).*)", "destination": "/index.html" }
   ]
 }
