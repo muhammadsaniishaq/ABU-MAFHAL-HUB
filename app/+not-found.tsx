@@ -20,12 +20,7 @@ export default function NotFoundScreen() {
                     const unlocked = await AsyncStorage.getItem('app_unlocked');
 
                     if (unlocked === 'true') {
-                        const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
-                        if (cachedRole === 'admin' || cachedRole === 'super_admin') {
-                            if (isMounted) router.replace('/manage/dashboard' as any);
-                        } else {
-                            if (isMounted) router.replace('/dashboard' as any);
-                        }
+                        if (isMounted) router.replace('/dashboard' as any);
                     } else {
                         if (isMounted) router.replace('/pin' as any);
                     }

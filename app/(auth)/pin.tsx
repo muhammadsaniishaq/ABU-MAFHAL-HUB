@@ -132,15 +132,6 @@ export default function PinUnlockScreen() {
         }
         await AsyncStorage.setItem('app_unlocked', 'true');
         await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            const cachedRole = await AsyncStorage.getItem(`user_role_${session.user.id}`);
-            if (cachedRole === 'admin' || cachedRole === 'super_admin') {
-                router.replace('/manage/dashboard' as any);
-                return;
-            }
-        }
         router.replace('/dashboard' as any);
     };
 
