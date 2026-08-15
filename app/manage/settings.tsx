@@ -84,6 +84,9 @@ export default function AdminSettings() {
     const [welcomeBonus, setWelcomeBonus] = useState('0');
     const [fundingFeeValue, setFundingFeeValue] = useState('0');
     const [fundingFeeType, setFundingFeeType] = useState('percentage');
+    const [fundingFeeFixedThreshold, setFundingFeeFixedThreshold] = useState('5000');
+    const [fundingFeeUnderThreshold, setFundingFeeUnderThreshold] = useState('50');
+    const [fundingFeeAboveThreshold, setFundingFeeAboveThreshold] = useState('1');
     const [userBulkSmsPrice, setUserBulkSmsPrice] = useState('10.00');
 
     // Comms
@@ -189,6 +192,9 @@ export default function AdminSettings() {
                     if (s.key === 'funding_fee_percentage') setFundingFeeValue(s.value); // Legacy migration
                     if (s.key === 'funding_fee_value') setFundingFeeValue(s.value);
                     if (s.key === 'funding_fee_type') setFundingFeeType(s.value);
+                    if (s.key === 'funding_fee_fixed_threshold') setFundingFeeFixedThreshold(s.value);
+                    if (s.key === 'funding_fee_under_threshold') setFundingFeeUnderThreshold(s.value);
+                    if (s.key === 'funding_fee_above_threshold') setFundingFeeAboveThreshold(s.value);
                     if (s.key === 'user_bulk_sms_price') setUserBulkSmsPrice(s.value);
                     
                     if (s.key === 'support_whatsapp') setSupportWhatsapp(s.value);
@@ -309,6 +315,9 @@ export default function AdminSettings() {
                 { key: 'welcome_bonus', value: welcomeBonus },
                 { key: 'funding_fee_value', value: fundingFeeValue },
                 { key: 'funding_fee_type', value: fundingFeeType },
+                { key: 'funding_fee_fixed_threshold', value: fundingFeeFixedThreshold },
+                { key: 'funding_fee_under_threshold', value: fundingFeeUnderThreshold },
+                { key: 'funding_fee_above_threshold', value: fundingFeeAboveThreshold },
                 { key: 'user_bulk_sms_price', value: userBulkSmsPrice },
                 { key: 'support_whatsapp', value: supportWhatsapp },
                 { key: 'support_email', value: supportEmail },
@@ -651,18 +660,23 @@ export default function AdminSettings() {
                             <InputRow label="USD/NGN Exchange Rate" value={usdNgnRate} onChangeText={setUsdNgnRate} prefix="₦" keyboardType="numeric" />
                             <InputRow label="Agent Commission Rate" value={agentCommission} onChangeText={setAgentCommission} prefix="%" keyboardType="numeric" />
                             
-                            <View style={s.inputGroup}>
-                                <Text style={s.label}>Funding Fee Type</Text>
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity onPress={() => setFundingFeeType('percentage')} style={[s.typeBtn, fundingFeeType === 'percentage' && s.typeBtnActive]}>
-                                        <Text style={[s.typeText, fundingFeeType === 'percentage' && { color: '#fff' }]}>Percentage (%)</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => setFundingFeeType('fixed')} style={[s.typeBtn, fundingFeeType === 'fixed' && s.typeBtnActive]}>
-                                        <Text style={[s.typeText, fundingFeeType === 'fixed' && { color: '#fff' }]}>Fixed Amount (₦)</Text>
-                                    </TouchableOpacity>
+                        <Text style={s.groupLabel}>Automated Deposit & Wallet Funding Fees</Text>
+                        <View style={s.card}>
+                            <InputRow label="Deposit Amount Tier Threshold" value={fundingFeeFixedThreshold} onChangeText={setFundingFeeFixedThreshold} prefix="₦" keyboardType="numeric" placeholder="5000" />
+                            <InputRow label="Fixed Fee (For Deposits UNDER Threshold)" value={fundingFeeUnderThreshold} onChangeText={setFundingFeeUnderThreshold} prefix="₦" keyboardType="numeric" placeholder="50" />
+                            <InputRow label="Percentage Fee (For Deposits AT OR ABOVE Threshold)" value={fundingFeeAboveThreshold} onChangeText={setFundingFeeAboveThreshold} prefix="%" keyboardType="numeric" placeholder="1" />
+
+                            <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', marginTop: 4 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <Ionicons name="information-circle" size={16} color="#B45309" />
+                                    <Text style={{ color: '#B45309', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>Active Deposit Fee Rule Preview</Text>
                                 </View>
+                                <Text style={{ color: '#78350F', fontSize: 11, lineHeight: 16 }}>
+                                    • Deposits under <Text style={{ fontWeight: 'bold' }}>₦{parseFloat(fundingFeeFixedThreshold || '0').toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{fundingFeeUnderThreshold || '0'} Fixed Fee</Text>{'\n'}
+                                    • Deposits <Text style={{ fontWeight: 'bold' }}>₦{parseFloat(fundingFeeFixedThreshold || '0').toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>{fundingFeeAboveThreshold || '0'}% Percentage Fee</Text>
+                                </Text>
                             </View>
-                            <InputRow label={`Funding Fee Deduction`} value={fundingFeeValue} onChangeText={setFundingFeeValue} prefix={fundingFeeType === 'fixed' ? '₦' : '%'} keyboardType="numeric" />
+                        </View>
                         </View>
                         
                         <Text style={s.groupLabel}>Wallet & Withdrawals</Text>

@@ -386,22 +386,41 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     
     console.log(`[FundWallet] User Match via ${method}: ${profile.id}`);
 
-    // 2.5 Dynamic Tiered Funding Fee Calculation:
-    // User Directive: Amount < ₦5,000 -> ₦50 fixed fee | Amount >= ₦5,000 -> 1% percentage fee
+    // 2.5 Dynamic Tiered Funding Fee Calculation (Admin Configurable):
+    let threshold = 5000;
+    let underFee = 50;
+    let aboveFeePercent = 1;
+
+    const { data: feeSettings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold']);
+
+    if (feeSettings) {
+        const tSetting = feeSettings.find(s => s.key === 'funding_fee_fixed_threshold');
+        if (tSetting && !isNaN(parseFloat(tSetting.value))) threshold = parseFloat(tSetting.value);
+
+        const uSetting = feeSettings.find(s => s.key === 'funding_fee_under_threshold');
+        if (uSetting && !isNaN(parseFloat(uSetting.value))) underFee = parseFloat(uSetting.value);
+
+        const aSetting = feeSettings.find(s => s.key === 'funding_fee_above_threshold');
+        if (aSetting && !isNaN(parseFloat(aSetting.value))) aboveFeePercent = parseFloat(aSetting.value);
+    }
+
     let feeAmount = 0;
     let feeType = 'fixed';
-    let feeValue = 50;
+    let feeValue = underFee;
 
-    if (amount < 5000) {
-        feeAmount = 50;
+    if (amount < threshold) {
+        feeAmount = underFee;
         feeType = 'fixed';
-        feeValue = 50;
-        console.log(`[FundWallet] Amount < 5000: Applying fixed ₦50 fee to deposit of ₦${amount}`);
+        feeValue = underFee;
+        console.log(`[FundWallet] Amount < ${threshold}: Applying fixed ₦${underFee} fee to deposit of ₦${amount}`);
     } else {
-        feeAmount = amount * 0.01;
+        feeAmount = amount * (aboveFeePercent / 100);
         feeType = 'percentage';
-        feeValue = 1;
-        console.log(`[FundWallet] Amount >= 5000: Applying 1% fee (₦${feeAmount}) to deposit of ₦${amount}`);
+        feeValue = aboveFeePercent;
+        console.log(`[FundWallet] Amount >= ${threshold}: Applying ${aboveFeePercent}% fee (₦${feeAmount}) to deposit of ₦${amount}`);
     }
     
     const creditedAmount = Math.max(0, amount - feeAmount);

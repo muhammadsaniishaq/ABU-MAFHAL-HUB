@@ -29,8 +29,9 @@ export default function WalletScreen() {
   const [totalIn, setTotalIn] = useState(0);
   const [totalOut, setTotalOut] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [fundingFeeType, setFundingFeeType] = useState('percentage');
-  const [fundingFeeValue, setFundingFeeValue] = useState('0');
+  const [feeThreshold, setFeeThreshold] = useState(5000);
+  const [feeUnder, setFeeUnder] = useState(50);
+  const [feeAbove, setFeeAbove] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { settings, loading: settingsLoading } = useAppSettings();
@@ -72,7 +73,7 @@ export default function WalletScreen() {
         supabase.from('virtual_accounts').select('bank_name, account_number, account_name').eq('user_id', user.id).maybeSingle(),
         supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success'),
         supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
-        supabase.from('app_settings').select('key, value').in('key', ['funding_fee_type', 'funding_fee_value', 'funding_fee_percentage'])
+        supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
       ]);
 
       setUserEmail(user.email || '');
@@ -127,14 +128,16 @@ export default function WalletScreen() {
       // 4. Recent Transactions
       setRecentTransactions(recentRes.data || []);
 
-      // 5. Settings
+      // 5. Dynamic Deposit Fee Settings
       if (settingsRes.data) {
-        const typeSetting = settingsRes.data.find(s => s.key === 'funding_fee_type');
-        if (typeSetting) setFundingFeeType(typeSetting.value);
+        const tSet = settingsRes.data.find(s => s.key === 'funding_fee_fixed_threshold');
+        if (tSet && !isNaN(parseFloat(tSet.value))) setFeeThreshold(parseFloat(tSet.value));
 
-        let valSetting = settingsRes.data.find(s => s.key === 'funding_fee_value');
-        if (!valSetting) valSetting = settingsRes.data.find(s => s.key === 'funding_fee_percentage');
-        if (valSetting) setFundingFeeValue(valSetting.value);
+        const uSet = settingsRes.data.find(s => s.key === 'funding_fee_under_threshold');
+        if (uSet && !isNaN(parseFloat(uSet.value))) setFeeUnder(parseFloat(uSet.value));
+
+        const aSet = settingsRes.data.find(s => s.key === 'funding_fee_above_threshold');
+        if (aSet && !isNaN(parseFloat(aSet.value))) setFeeAbove(parseFloat(aSet.value));
       }
 
       hasLoadedOnce.current = true;
@@ -388,14 +391,20 @@ export default function WalletScreen() {
             </View>
           )}
 
-          {parseFloat(fundingFeeValue) > 0 && (
-            <View style={[s.feeWarningBox, { marginTop: 16 }]}>
-              <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginTop: 2 }} />
-              <Text style={s.feeWarningText}>
-                A standard banking fee of <Text style={{ fontWeight: 'bold' }}>{fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`}</Text> applies to all deposits via this method. This fee is charged directly by the payment processor.
+          <View style={[s.feeWarningBox, { marginTop: 16 }]}>
+            <Ionicons name="information-circle" size={18} color="#d97706" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: 'bold', color: '#b45309', fontSize: 11, marginBottom: 2 }}>
+                Automated Deposit Fee Structure:
+              </Text>
+              <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16 }}>
+                • Deposits under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>₦{feeUnder} fixed fee</Text>
+              </Text>
+              <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16, marginTop: 2 }}>
+                • Deposits <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>{feeAbove}% fee</Text>
               </Text>
             </View>
-          )}
+          </View>
         </View>
         {/* 4. Stats Row */}
         <View style={s.statsRow}>
@@ -579,10 +588,10 @@ export default function WalletScreen() {
                       Automated Deposit Fee Structure:
                     </Text>
                     <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16 }}>
-                      • Deposits under <Text style={{ fontWeight: 'bold' }}>₦5,000</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>₦50 fixed fee</Text>
+                      • Deposits under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>₦{feeUnder} fixed fee</Text>
                     </Text>
                     <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16, marginTop: 2 }}>
-                      • Deposits <Text style={{ fontWeight: 'bold' }}>₦5,000 and above</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>1% fee</Text>
+                      • Deposits <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>{feeAbove}% fee</Text>
                     </Text>
                   </View>
                 </View>
@@ -618,10 +627,10 @@ export default function WalletScreen() {
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                       <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '600' }}>
-                        Deposit Fee ({parseFloat(fundAmount) < 5000 ? 'Fixed ₦50' : '1%'}):
+                        Deposit Fee ({parseFloat(fundAmount) < feeThreshold ? `Fixed ₦${feeUnder}` : `${feeAbove}%`}):
                       </Text>
                       <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
-                        -₦{(parseFloat(fundAmount) < 5000 ? 50 : parseFloat(fundAmount) * 0.01).toLocaleString()}
+                        -₦{(parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100)).toLocaleString()}
                       </Text>
                     </View>
 
@@ -630,7 +639,7 @@ export default function WalletScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
                       <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '800' }}>Net Wallet Credit:</Text>
                       <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900' }}>
-                        ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < 5000 ? 50 : parseFloat(fundAmount) * 0.01)).toLocaleString()}
+                        ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100))).toLocaleString()}
                       </Text>
                     </View>
                   </View>
