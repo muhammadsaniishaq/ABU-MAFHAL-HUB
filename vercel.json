@@ -33,9 +33,11 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
-    }
+    { "source": "/ref/(.*)", "destination": "/index.html" },
+    { "source": "/r/(.*)", "destination": "/index.html" },
+    { "source": "/join/(.*)", "destination": "/index.html" },
+    { "source": "/register(.*)", "destination": "/index.html" },
+    { "source": "/signup(.*)", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

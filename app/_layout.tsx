@@ -241,8 +241,9 @@ export default function RootLayout() {
         const isAuthGroup = segments.includes('(auth)') || authScreens.includes(currentScreen);
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
 
-        const publicScreens = ['index', 'onboarding', 'privacy', 'terms'];
-        const isPublicScreen = publicScreens.includes(currentScreen);
+        const referralScreens = ['ref', 'r', 'join', 'register', 'ref/[code]', 'r/[code]', 'join/[code]'];
+        const publicScreens = ['index', 'onboarding', 'privacy', 'terms', ...referralScreens];
+        const isPublicScreen = publicScreens.includes(currentScreen) || segments.some(s => referralScreens.includes(s));
 
         if (session) {
             const isAdmin = isUserAdmin(userRole, session.user?.email);
@@ -316,6 +317,10 @@ export default function RootLayout() {
                     <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                     <Stack.Screen name="privacy" options={{ headerShown: false }} />
                     <Stack.Screen name="terms" options={{ headerShown: false }} />
+                    <Stack.Screen name="ref/[code]" options={{ headerShown: false }} />
+                    <Stack.Screen name="r/[code]" options={{ headerShown: false }} />
+                    <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
+                    <Stack.Screen name="register" options={{ headerShown: false }} />
                     <Stack.Screen name="manage" options={{ headerShown: false }} />
                     <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                     <Stack.Screen name="(app)" options={{ headerShown: false }} />
