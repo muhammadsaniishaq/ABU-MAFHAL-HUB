@@ -154,23 +154,22 @@ export default function OTP() {
 
             if (storedOtp && storedOtp === codeToken && isNotExpired) {
                 isCodeValid = true;
-            } else {
-                // 2. Fallback to Supabase Auth OTP verification
-                const { error } = await supabase.auth.verifyOtp({
+            }
+
+            // Always try Supabase Auth OTP verification to establish an active recovery session
+            try {
+                const { data: authData, error: authErr } = await supabase.auth.verifyOtp({
                     email: targetEmail,
                     token: codeToken,
                     type: params.tempFullName ? 'signup' : 'recovery',
                 });
-                if (!error) {
+
+                if (!authErr && authData?.session) {
                     isCodeValid = true;
-                } else {
-                    const { error: magicErr } = await supabase.auth.verifyOtp({
-                        email: targetEmail,
-                        token: codeToken,
-                        type: 'magiclink',
-                    });
-                    if (!magicErr) isCodeValid = true;
+                    await supabase.auth.setSession(authData.session);
                 }
+            } catch (authVerificationErr) {
+                console.log("Supabase Auth OTP verification info:", authVerificationErr);
             }
 
             if (!isCodeValid) {

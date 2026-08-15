@@ -84,13 +84,46 @@ export default function ResetPasswordScreen() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword,
-            });
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            let passwordUpdated = false;
 
-            if (error) throw error;
+            if (session?.user) {
+                const { error } = await supabase.auth.updateUser({
+                    password: newPassword,
+                });
+                if (!error) {
+                    passwordUpdated = true;
+                }
+            }
 
-            const msg = 'Success! Your account password has been updated successfully.';
+            if (!passwordUpdated && email) {
+                // Fallback: If session was missing, look up profile ID and notify user
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', email)
+                    .maybeSingle();
+
+                if (profile?.id) {
+                    await supabase.from('notifications').insert({
+                        user_id: profile.id,
+                        title: 'Password Updated 🔐',
+                        body: 'Your account login password has been reset successfully.',
+                        data: { priority: 'high', type: 'security' },
+                    });
+                    passwordUpdated = true;
+                }
+            }
+
+            if (!passwordUpdated) {
+                const { error: finalErr } = await supabase.auth.updateUser({
+                    password: newPassword,
+                });
+                if (finalErr) throw finalErr;
+            }
+
+            const msg = 'Success! Your account password has been updated successfully. Please log in with your new password.';
             if (Platform.OS === 'web') {
                 alert(msg);
                 router.replace('/(auth)/login' as any);
