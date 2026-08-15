@@ -58,6 +58,7 @@ export default function UserProfileScreen() {
         phone?: string; 
         username?: string; 
         custom_id?: string; 
+        referral_code?: string;
         avatar_url?: string; 
         kyc_tier?: number; 
         balance?: number; 
