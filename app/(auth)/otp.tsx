@@ -111,13 +111,6 @@ export default function OTP() {
                     `,
                 },
             });
-
-            // Backup trigger via Supabase Auth resetPasswordForEmail
-            try {
-                await supabase.auth.resetPasswordForEmail(emailToSend);
-            } catch (authErr) {
-                // Ignore background Supabase auth rate-limit errors
-            }
         } catch (err: any) {
             console.error('Error triggering OTP email:', err);
         } finally {
