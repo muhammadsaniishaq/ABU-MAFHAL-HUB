@@ -6,7 +6,6 @@ import {
     ScrollView,
     RefreshControl,
     Alert,
-    ActivityIndicator,
     Image,
     StyleSheet,
     TextInput,
@@ -37,7 +36,6 @@ export default function WalletScreen() {
     const [feeUnder, setFeeUnder] = useState(50);
     const [feeAbove, setFeeAbove] = useState(1);
 
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { settings, loading: settingsLoading } = useAppSettings();
     const [showBalance, setShowBalance] = useState(!settings?.hide_user_balances);
@@ -49,8 +47,6 @@ export default function WalletScreen() {
     const [paystackVisible, setPaystackVisible] = useState(false);
     const [paystackKey, setPaystackKey] = useState('');
     const [userEmail, setUserEmail] = useState('');
-
-    const hasLoadedOnce = useRef(false);
 
     useEffect(() => {
         if (!settingsLoading) {
@@ -65,9 +61,6 @@ export default function WalletScreen() {
     );
 
     const fetchWalletData = async () => {
-        if (!hasLoadedOnce.current) {
-            setLoading(true);
-        }
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -134,12 +127,9 @@ export default function WalletScreen() {
                 const aSet = settingsRes.data.find(s => s.key === 'funding_fee_above_threshold');
                 if (aSet && !isNaN(parseFloat(aSet.value))) setFeeAbove(parseFloat(aSet.value));
             }
-
-            hasLoadedOnce.current = true;
         } catch (error) {
             console.error("Error fetching wallet data:", error);
         } finally {
-            setLoading(false);
             setRefreshing(false);
         }
     };
@@ -212,21 +202,15 @@ export default function WalletScreen() {
 
     const [balanceWhole, balanceDecimal] = formatCurrency(balance);
 
-    if (loading && !refreshing) {
-        return (
-            <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={s.centerContainer}>
-                <ActivityIndicator size="small" color="#F59E0B" />
-                <Text style={s.loadingText}>Loading Wallet...</Text>
-            </LinearGradient>
-        );
-    }
-
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Compact Header Banner */}
+            {/* Decorative Gold Top Accent Line */}
+            <View style={s.topGoldLine} />
+
+            {/* Header Banner */}
             <LinearGradient colors={['#020617', '#0F172A', '#1E293B']} style={s.headerContainer}>
                 <View style={s.headerNavRow}>
                     <View style={s.brandCol}>
@@ -256,7 +240,7 @@ export default function WalletScreen() {
                 <Text style={s.screenTitle}>My Wallet</Text>
             </LinearGradient>
 
-            {/* Compact Floating Balance Card */}
+            {/* Decorated Floating Balance Card */}
             <View style={s.balanceCardWrapper}>
                 <LinearGradient
                     colors={['#0B132B', '#1C2541', '#0F172A']}
@@ -264,8 +248,14 @@ export default function WalletScreen() {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 >
+                    {/* Decorative Ambient Radial Glow Circle */}
+                    <View style={s.ambientGlowCircle} />
+
                     <View style={s.cardTopRow}>
                         <View style={s.balanceTitleRow}>
+                            <View style={s.goldCoinBadge}>
+                                <Text style={s.goldCoinBadgeText}>₦</Text>
+                            </View>
                             <Text style={s.balanceTitleText}>AVAILABLE BALANCE</Text>
                             <TouchableOpacity onPress={() => setShowBalance(!showBalance)} activeOpacity={0.7} style={s.eyeBtn}>
                                 <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={14} color="#F59E0B" />
@@ -326,7 +316,7 @@ export default function WalletScreen() {
                 {/* Dynamic Banners */}
                 <DynamicBanners placement="wallet" />
 
-                {/* Ultra-Compact Virtual Bank Account Card */}
+                {/* Ultra-Compact Decorated Virtual Bank Account Card */}
                 <View style={s.sectionBox}>
                     <Text style={s.sectionHeaderTitle}>Automated Dedicated Bank Account</Text>
 
@@ -338,9 +328,10 @@ export default function WalletScreen() {
                                     <Text style={s.bankNameText}>{virtualAccount.bank_name}</Text>
                                 </View>
 
-                                <Text style={s.acctHolderName} numberOfLines={1}>
-                                    {virtualAccount.account_name}
-                                </Text>
+                                <View style={s.instantDepositTag}>
+                                    <View style={s.greenLiveDot} />
+                                    <Text style={s.instantDepositText}>Instant Auto-Credit</Text>
+                                </View>
                             </View>
 
                             <View style={s.acctNumRowCompact}>
@@ -348,6 +339,9 @@ export default function WalletScreen() {
                                     <Text style={s.acctNumLabel}>ACCOUNT NUMBER</Text>
                                     <Text style={s.acctNumTextCompact}>
                                         {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
+                                    </Text>
+                                    <Text style={s.acctHolderNameSub} numberOfLines={1}>
+                                        Holder: {virtualAccount.account_name}
                                     </Text>
                                 </View>
 
@@ -663,23 +657,16 @@ const s = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
-    centerContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingText: {
-        color: '#F59E0B',
-        fontSize: 12,
-        fontWeight: '700',
-        marginTop: 10,
+    topGoldLine: {
+        height: 2.5,
+        backgroundColor: '#F59E0B',
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'android' ? 36 : 46,
-        paddingBottom: 26,
+        paddingTop: Platform.OS === 'android' ? 32 : 42,
+        paddingBottom: 24,
         paddingHorizontal: 16,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderBottomLeftRadius: 22,
+        borderBottomRightRadius: 22,
         borderBottomWidth: 1,
         borderColor: 'rgba(245, 158, 11, 0.3)',
     },
@@ -743,7 +730,7 @@ const s = StyleSheet.create({
     },
     balanceCardWrapper: {
         paddingHorizontal: 16,
-        marginTop: -20,
+        marginTop: -18,
         marginBottom: 12,
         shadowColor: '#020617',
         shadowOffset: { width: 0, height: 6 },
@@ -755,10 +742,19 @@ const s = StyleSheet.create({
     balanceCard: {
         borderRadius: 18,
         padding: 14,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: 'rgba(245, 158, 11, 0.35)',
         borderWidth: 1.2,
         position: 'relative',
         overflow: 'hidden',
+    },
+    ambientGlowCircle: {
+        position: 'absolute',
+        top: -40,
+        right: -40,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: 'rgba(245, 158, 11, 0.08)',
     },
     cardTopRow: {
         flexDirection: 'row',
@@ -769,10 +765,25 @@ const s = StyleSheet.create({
     balanceTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        gap: 6,
+    },
+    goldCoinBadge: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+        borderColor: '#F59E0B',
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    goldCoinBadgeText: {
+        color: '#F59E0B',
+        fontSize: 9,
+        fontWeight: '900',
     },
     balanceTitleText: {
-        color: 'rgba(255, 255, 255, 0.65)',
+        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 9,
         fontWeight: '800',
         letterSpacing: 0.6,
@@ -887,8 +898,6 @@ const s = StyleSheet.create({
         marginBottom: 8,
         letterSpacing: -0.2,
     },
-    
-    // ULTRA-COMPACT VIRTUAL BANK CARD
     virtualBankCard: {
         backgroundColor: '#0F172A',
         borderRadius: 14,
@@ -905,7 +914,7 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     bankNamePill: {
         flexDirection: 'row',
@@ -924,17 +933,31 @@ const s = StyleSheet.create({
         letterSpacing: 0.5,
         textTransform: 'uppercase',
     },
-    acctHolderName: {
-        color: '#FFFFFF',
-        fontSize: 11,
+    instantDepositTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    greenLiveDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#10B981',
+    },
+    instantDepositText: {
+        color: '#10B981',
+        fontSize: 8.5,
         fontWeight: '800',
-        maxWidth: 180,
     },
     acctNumRowCompact: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
         padding: 8,
         borderRadius: 10,
         borderWidth: 1,
@@ -954,6 +977,12 @@ const s = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.8,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    acctHolderNameSub: {
+        color: '#94A3B8',
+        fontSize: 9.5,
+        fontWeight: '700',
+        marginTop: 2,
     },
     copyPillBtn: {
         flexDirection: 'row',
