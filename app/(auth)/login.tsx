@@ -269,27 +269,20 @@ export default function LoginScreen() {
     };
 
     const handleForgotPasswordSubmit = async () => {
-        if (!resetEmail.trim() || !resetEmail.includes('@')) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+        const cleanEmail = resetEmail.trim();
+        if (!cleanEmail || !cleanEmail.includes('@')) {
+            const msg = 'Please enter a valid email address.';
+            if (Platform.OS === 'web') alert(msg);
+            else Alert.alert('Invalid Email', msg);
             return;
         }
 
-        setResetLoading(true);
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-                redirectTo: Platform.OS === 'web' ? `${window.location.origin}/auth/reset-password` : Linking.createURL('/auth/reset-password')
-            });
-
-            if (error) throw error;
-
-            Alert.alert('Reset Email Sent 📧', 'Please check your inbox for instructions to reset your password.');
-            setShowForgotModal(false);
-            setResetEmail('');
-        } catch (e: any) {
-            Alert.alert('Error', e.message || 'Failed to send password reset email.');
-        } finally {
-            setResetLoading(false);
-        }
+        setShowForgotModal(false);
+        setResetEmail('');
+        router.push({
+            pathname: '/(auth)/otp' as any,
+            params: { email: cleanEmail, mode: 'reset-password' },
+        });
     };
 
     return (

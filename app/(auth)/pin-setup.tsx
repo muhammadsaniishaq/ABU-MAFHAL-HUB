@@ -27,7 +27,7 @@ import { useAppSettings } from '../../hooks/useAppSettings';
 export default function PinSetupScreen() {
     const { settings } = useAppSettings();
     const router = useRouter();
-    const { action } = useLocalSearchParams();
+    const { action, reset, email } = useLocalSearchParams<{ action?: string; reset?: string; email?: string }>();
 
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
@@ -86,7 +86,9 @@ export default function PinSetupScreen() {
                 }
             }
 
-            if (savedPin) {
+            const isResetFlow = action === 'reset' || action === 'setup' || reset === 'true' || !!email;
+
+            if (savedPin && !isResetFlow) {
                 setStoredPin(savedPin);
                 setMode('verify');
             } else {

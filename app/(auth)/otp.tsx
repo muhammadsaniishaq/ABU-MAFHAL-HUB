@@ -24,6 +24,7 @@ export default function OTP() {
     const { settings } = useAppSettings();
     const params = useLocalSearchParams<{
         email?: string;
+        mode?: string;
         tempFullName?: string;
         tempUsername?: string;
         tempPhone?: string;
@@ -201,12 +202,21 @@ export default function OTP() {
                 });
             }
 
+            const isResetPassword = params.mode === 'reset-password' || params.mode === 'account-password';
+            const targetPath = isResetPassword ? '/(auth)/reset-password' : '/(auth)/pin-setup';
+            const successMsg = isResetPassword 
+                ? 'Success! 6-digit code verified successfully. Now set your new account password.'
+                : 'Success! 6-digit code verified successfully.';
+
             if (Platform.OS === 'web') {
-                alert('Success! 6-digit code verified successfully.');
-                router.replace('/(auth)/pin-setup' as any);
+                alert(successMsg);
+                router.replace({ pathname: targetPath as any, params: { email: targetEmail } });
             } else {
-                Alert.alert('Success', '6-digit code verified successfully!', [
-                    { text: 'Set New PIN', onPress: () => router.replace('/(auth)/pin-setup' as any) },
+                Alert.alert('Success', successMsg, [
+                    { 
+                        text: isResetPassword ? 'Set New Password' : 'Set New PIN', 
+                        onPress: () => router.replace({ pathname: targetPath as any, params: { email: targetEmail } }) 
+                    },
                 ]);
             }
         } catch (error: any) {
