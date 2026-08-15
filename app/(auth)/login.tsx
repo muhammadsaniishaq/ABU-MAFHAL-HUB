@@ -54,6 +54,22 @@ export default function LoginScreen() {
     useEffect(() => {
         checkBiometrics();
         loadSavedCredentials();
+
+        // Listen for Google OAuth error responses in web URL query/hash params
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            try {
+                const searchParams = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
+                const errCode = searchParams.get('error') || hashParams.get('error');
+
+                if (errorDesc || errCode) {
+                    const cleanError = (errorDesc || errCode || '').replace(/\+/g, ' ');
+                    Alert.alert('Google Authentication Notice', cleanError);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } catch (e) {}
+        }
     }, []);
 
     const loadSavedCredentials = async () => {

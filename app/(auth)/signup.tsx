@@ -47,13 +47,24 @@ export default function SignupScreen() {
     const [referralCode, setReferralCode] = useState('');
     const [acceptTerms, setAcceptTerms] = useState(false);
 
-    // Auto-capture referral code from URL
+    // Auto-capture referral code from URL & listen for OAuth error responses
     useEffect(() => {
         let codeFromUrl = params.ref || params.referral || params.code || '';
-        if (!codeFromUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
             try {
-                const urlParams = new URLSearchParams(window.location.search);
-                codeFromUrl = urlParams.get('ref') || urlParams.get('referral') || urlParams.get('code') || '';
+                const searchParams = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                if (!codeFromUrl) {
+                    codeFromUrl = searchParams.get('ref') || searchParams.get('referral') || searchParams.get('code') || hashParams.get('ref') || '';
+                }
+
+                const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
+                const errCode = searchParams.get('error') || hashParams.get('error');
+                if (errorDesc || errCode) {
+                    const cleanError = (errorDesc || errCode || '').replace(/\+/g, ' ');
+                    Alert.alert('Google Registration Notice', cleanError);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
             } catch (e) {}
         }
         if (codeFromUrl) {
