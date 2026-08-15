@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,9 @@ import {
     Alert,
     Vibration,
     ActivityIndicator,
+    Animated,
+    Modal,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
@@ -34,10 +37,58 @@ export default function PinUnlockScreen() {
     const [biometricAvailable, setBiometricAvailable] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
     const [userName, setUserName] = useState<string>('');
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
+    const [greeting, setGreeting] = useState<string>('Welcome Back');
+
+    // Security & Lockout States
+    const [failedAttempts, setFailedAttempts] = useState<number>(0);
+    const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
+    const [showPin, setShowPin] = useState<boolean>(false);
+    const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
+
+    // Animations
+    const shakeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        calculateGreeting();
         initPinScreen();
     }, []);
+
+    useEffect(() => {
+        let timer: any = null;
+        if (lockoutSeconds > 0) {
+            timer = setInterval(() => {
+                setLockoutSeconds((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timer);
+                        setFailedAttempts(0);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [lockoutSeconds]);
+
+    const calculateGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) setGreeting('Good Morning ☀️');
+        else if (hour < 17) setGreeting('Good Afternoon ☀️');
+        else setGreeting('Good Evening 🌙');
+    };
+
+    const triggerShakeAnimation = () => {
+        Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: 12, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: -12, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+        ]).start();
+    };
 
     const initPinScreen = async () => {
         setLoading(true);
@@ -50,13 +101,11 @@ export default function PinUnlockScreen() {
                 localPin = await SecureStore.getItemAsync(PIN_KEY);
             }
 
-            // Get user session & details safely
+            // Get active session
             let { data: { session } } = await supabase.auth.getSession();
             if (!session?.user) {
                 const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    session = { user } as any;
-                }
+                if (user) session = { user } as any;
             }
 
             if (session?.user) {
@@ -64,12 +113,15 @@ export default function PinUnlockScreen() {
 
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('full_name, transaction_pin, role')
+                    .select('full_name, avatar_url, transaction_pin, role')
                     .eq('id', session.user.id)
                     .maybeSingle();
 
                 if (profile?.full_name) {
                     setUserName(profile.full_name);
+                }
+                if (profile?.avatar_url) {
+                    setUserAvatar(profile.avatar_url);
                 }
 
                 if (!localPin && profile?.transaction_pin) {
@@ -86,7 +138,7 @@ export default function PinUnlockScreen() {
             if (localPin) {
                 setSavedPin(localPin);
             } else {
-                // If user has no PIN configured at all, mark as unlocked & let them go to dashboard
+                // If user has no PIN configured, unlock session and go to dashboard
                 await AsyncStorage.setItem('app_unlocked', 'true');
                 router.replace('/dashboard' as any);
                 return;
@@ -136,10 +188,10 @@ export default function PinUnlockScreen() {
     };
 
     const handlePress = (digit: string) => {
-        if (verifying || loading) return;
+        if (verifying || loading || lockoutSeconds > 0) return;
 
         if (digit === 'back') {
-            setPin(prev => prev.slice(0, -1));
+            setPin((prev) => prev.slice(0, -1));
             return;
         }
 
@@ -157,17 +209,35 @@ export default function PinUnlockScreen() {
         if (enteredPin === savedPin) {
             unlockSuccess();
         } else {
+            triggerShakeAnimation();
+            const newAttempts = failedAttempts + 1;
+            setFailedAttempts(newAttempts);
+
             if (Platform.OS !== 'web') {
-                Vibration.vibrate([50, 50, 50]);
+                Vibration.vibrate([60, 60, 60]);
             }
+
+            if (newAttempts >= 5) {
+                setLockoutSeconds(30);
+                const errMsg = 'Too many failed attempts. Security lock active for 30 seconds.';
+                if (Platform.OS === 'web') alert(errMsg);
+                else Alert.alert('Security Lock', errMsg);
+                setPin('');
+                setVerifying(false);
+                return;
+            }
+
+            const attemptsLeft = 5 - newAttempts;
+            const msg = `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining before security lock.`;
+
             if (Platform.OS === 'web') {
-                alert('Incorrect PIN. The PIN you entered is incorrect. Please try again.');
+                alert(msg);
                 setPin('');
                 setVerifying(false);
             } else {
-                Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.', [
+                Alert.alert('Incorrect PIN', msg, [
                     {
-                        text: 'OK',
+                        text: 'Try Again',
                         onPress: () => {
                             setPin('');
                             setVerifying(false);
@@ -179,40 +249,62 @@ export default function PinUnlockScreen() {
     };
 
     const handleSignOut = () => {
-        Alert.alert('Sign Out', 'Are you sure you want to sign out of your account?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Sign Out',
-                style: 'destructive',
-                onPress: async () => {
-                    await forceSignOut();
-                    await AsyncStorage.removeItem('app_unlocked');
-                    await AsyncStorage.removeItem('has_active_session');
-                    router.replace('/');
+        const executeSignOut = async () => {
+            try {
+                await forceSignOut();
+                await AsyncStorage.removeItem('app_unlocked');
+                await AsyncStorage.removeItem('has_active_session');
+                await AsyncStorage.removeItem(PIN_KEY);
+                router.replace('/');
+            } catch (e) {
+                router.replace('/');
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (confirm('Sign Out: Are you sure you want to sign out of your account?')) {
+                executeSignOut();
+            }
+        } else {
+            Alert.alert('Sign Out', 'Are you sure you want to sign out of your account?', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: executeSignOut,
                 },
-            },
-        ]);
+            ]);
+        }
     };
 
     const handleForgotPin = () => {
-        Alert.alert(
-            'Forgot PIN?',
-            'Please contact ABU MAFHAL SUB support or log in again to reset your PIN securely.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Sign Out & Reset',
-                    onPress: handleSignOut,
-                },
-            ]
-        );
+        setShowForgotModal(true);
+    };
+
+    const handleContactSupport = () => {
+        setShowForgotModal(false);
+        const supportPhone = settings?.support_phone || '2348000000000';
+        const url = `https://wa.me/${supportPhone.replace(/\+/g, '')}?text=Hello%20Support,%20I%20need%20help%20resetting%20my%20ABU%20MAFHAL%20SUB%20PIN.`;
+        Linking.openURL(url).catch(() => {
+            router.push('/support' as any);
+        });
+    };
+
+    const getUserInitial = () => {
+        if (userName && userName.trim()) {
+            return userName.trim().charAt(0).toUpperCase();
+        }
+        if (userEmail && userEmail.trim()) {
+            return userEmail.trim().charAt(0).toUpperCase();
+        }
+        return 'U';
     };
 
     if (loading) {
         return (
             <View style={s.centerContainer}>
                 <StatusBar style="light" />
-                <ActivityIndicator size="large" color="#f5a623" />
+                <ActivityIndicator size="large" color="#F59E0B" />
                 <Text style={s.loadingText}>Securing Session...</Text>
             </View>
         );
@@ -223,49 +315,82 @@ export default function PinUnlockScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Premium Dark Mesh Gradients */}
-            <LinearGradient colors={['#030C22', '#0A1E4A', '#030C22']} style={StyleSheet.absoluteFillObject} />
+            {/* Deep Royal Mesh Gradient */}
+            <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={StyleSheet.absoluteFillObject} />
 
-            {/* Glowing Orbs */}
+            {/* Glowing Ambient Lights */}
             <View style={s.topGlow} />
             <View style={s.bottomGlow} />
 
             <SafeAreaView style={s.safeArea}>
+                {/* Security Top Bar */}
+                <View style={s.topSecurityBar}>
+                    <View style={s.securityBadge}>
+                        <Ionicons name="shield-checkmark" size={13} color="#F59E0B" />
+                        <Text style={s.securityBadgeText}>256-BIT SECURE</Text>
+                    </View>
+                    <Text style={s.brandBadgeText}>ABU MAFHAL SUB</Text>
+                </View>
+
+                {/* Main Card */}
                 <View style={s.card}>
-                    {/* Brand Header */}
-                    <View style={s.headerContainer}>
-                        <View style={s.logoCircle}>
-                            <Image
-                                source={
-                                    settings?.app_logo
-                                        ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url }
-                                        : require('../../assets/images/logo.png')
-                                }
-                                style={s.logo}
-                                resizeMode="contain"
-                            />
+                    {/* User Profile Avatar Ring */}
+                    <View style={s.avatarWrapper}>
+                        <LinearGradient colors={['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
+                            {userAvatar ? (
+                                <Image source={{ uri: userAvatar }} style={s.avatarImage} />
+                            ) : (
+                                <View style={s.avatarFallback}>
+                                    <Text style={s.avatarInitialText}>{getUserInitial()}</Text>
+                                </View>
+                            )}
+                        </LinearGradient>
+                        <View style={s.activeBadge}>
+                            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                         </View>
-
-                        <Text style={s.welcomeText}>
-                            {userName ? `Welcome back, ${userName.split(' ')[0]}` : 'Welcome Back'}
-                        </Text>
-                        <Text style={s.emailSub}>{userEmail || 'Enter your PIN to unlock'}</Text>
                     </View>
 
-                    {/* 4 PIN Dots */}
-                    <View style={s.dotsContainer}>
-                        {[0, 1, 2, 3].map((idx) => {
-                            const filled = idx < pin.length;
-                            return (
-                                <View
-                                    key={idx}
-                                    style={[s.dot, filled ? s.dotFilled : s.dotEmpty]}
-                                />
-                            );
-                        })}
+                    {/* Greeting & Name */}
+                    <View style={s.headerTextContainer}>
+                        <Text style={s.greetingText}>{greeting}</Text>
+                        <Text style={s.welcomeNameText}>{userName || 'Valued Partner'}</Text>
+                        <Text style={s.emailSubText}>{userEmail || 'Enter your 4-digit PIN to unlock'}</Text>
                     </View>
 
-                    {/* Keypad */}
+                    {/* Lockout Warning */}
+                    {lockoutSeconds > 0 ? (
+                        <View style={s.lockoutBadge}>
+                            <Ionicons name="timer-outline" size={16} color="#EF4444" />
+                            <Text style={s.lockoutText}>Try again in {lockoutSeconds}s</Text>
+                        </View>
+                    ) : (
+                        /* PIN Mask Toggle & Dot Input Indicator */
+                        <View style={s.pinSection}>
+                            <Animated.View style={[s.dotsContainer, { transform: [{ translateX: shakeAnim }] }]}>
+                                {[0, 1, 2, 3].map((idx) => {
+                                    const filled = idx < pin.length;
+                                    const currentDigit = pin[idx];
+                                    return (
+                                        <View key={idx} style={[s.dot, filled ? s.dotFilled : s.dotEmpty]}>
+                                            {filled && showPin && (
+                                                <Text style={s.dotNumberText}>{currentDigit}</Text>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </Animated.View>
+
+                            <TouchableOpacity
+                                onPress={() => setShowPin(!showPin)}
+                                style={s.eyeToggleBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name={showPin ? 'eye-off-outline' : 'eye-outline'} size={18} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Keypad Grid */}
                     <View style={s.keypadGrid}>
                         {[
                             [1, 2, 3],
@@ -278,7 +403,8 @@ export default function PinUnlockScreen() {
                                         key={num}
                                         onPress={() => handlePress(num.toString())}
                                         style={s.keypadButton}
-                                        activeOpacity={0.7}
+                                        activeOpacity={0.75}
+                                        disabled={lockoutSeconds > 0}
                                     >
                                         <Text style={s.keypadButtonText}>{num}</Text>
                                     </TouchableOpacity>
@@ -293,11 +419,12 @@ export default function PinUnlockScreen() {
                                     onPress={() => triggerBiometricAuth(savedPin)}
                                     style={[s.keypadButton, s.actionKeypadButton]}
                                     activeOpacity={0.7}
+                                    disabled={lockoutSeconds > 0}
                                 >
                                     <MaterialCommunityIcons
                                         name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
                                         size={26}
-                                        color="#f5a623"
+                                        color="#F59E0B"
                                     />
                                 </TouchableOpacity>
                             ) : (
@@ -308,7 +435,8 @@ export default function PinUnlockScreen() {
                             <TouchableOpacity
                                 onPress={() => handlePress('0')}
                                 style={s.keypadButton}
-                                activeOpacity={0.7}
+                                activeOpacity={0.75}
+                                disabled={lockoutSeconds > 0}
                             >
                                 <Text style={s.keypadButtonText}>0</Text>
                             </TouchableOpacity>
@@ -318,26 +446,97 @@ export default function PinUnlockScreen() {
                                 onPress={() => handlePress('back')}
                                 style={[s.keypadButton, s.actionKeypadButton]}
                                 activeOpacity={0.7}
+                                disabled={lockoutSeconds > 0}
                             >
-                                <Ionicons name="backspace-outline" size={24} color="#f5a623" />
+                                <Ionicons name="backspace-outline" size={24} color="#F59E0B" />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Bottom Actions */}
+                    {/* Bottom Action Footer Buttons */}
                     <View style={s.bottomActions}>
-                        <TouchableOpacity style={s.actionBtn} onPress={handleForgotPin}>
-                            <Text style={s.actionBtnText}>Forgot PIN?</Text>
+                        <TouchableOpacity style={s.forgotBtn} onPress={handleForgotPin} activeOpacity={0.7}>
+                            <Ionicons name="key-outline" size={15} color="#F59E0B" />
+                            <Text style={s.forgotBtnText}>Forgot PIN?</Text>
                         </TouchableOpacity>
 
                         <Text style={s.dotDivider}>•</Text>
 
-                        <TouchableOpacity style={s.actionBtn} onPress={handleSignOut}>
-                            <Text style={[s.actionBtnText, { color: '#ef4444' }]}>Sign Out</Text>
+                        <TouchableOpacity style={s.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
+                            <Ionicons name="log-out-outline" size={15} color="#EF4444" />
+                            <Text style={s.signOutBtnText}>Sign Out</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </SafeAreaView>
+
+            {/* Forgot PIN Action Modal */}
+            <Modal
+                visible={showForgotModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowForgotModal(false)}
+            >
+                <View style={s.modalOverlay}>
+                    <View style={s.modalCard}>
+                        <View style={s.modalHeader}>
+                            <View style={s.modalIconCircle}>
+                                <Ionicons name="shield-half-outline" size={26} color="#F59E0B" />
+                            </View>
+                            <Text style={s.modalTitle}>PIN Recovery & Help</Text>
+                            <Text style={s.modalSub}>
+                                Choose an option to reset your PIN or log in with fresh credentials.
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={s.modalOptionBtn}
+                            onPress={() => {
+                                setShowForgotModal(false);
+                                router.push('/otp' as any);
+                            }}
+                        >
+                            <Ionicons name="mail-unread-outline" size={20} color="#F59E0B" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={s.modalOptionTitle}>Reset via Email OTP</Text>
+                                <Text style={s.modalOptionSub}>Send a 6-digit verification code to your email</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={s.modalOptionBtn} onPress={handleContactSupport}>
+                            <Ionicons name="chatbubbles-outline" size={20} color="#10B981" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={s.modalOptionTitle}>Contact Live Support</Text>
+                                <Text style={s.modalOptionSub}>Get instant PIN reset help via Support Desk</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[s.modalOptionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+                            onPress={() => {
+                                setShowForgotModal(false);
+                                handleSignOut();
+                            }}
+                        >
+                            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={[s.modalOptionTitle, { color: '#EF4444' }]}>Sign Out & Reset</Text>
+                                <Text style={s.modalOptionSub}>Log out of your account to set a new PIN</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={s.modalCloseBtn}
+                            onPress={() => setShowForgotModal(false)}
+                        >
+                            <Text style={s.modalCloseBtnText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -345,16 +544,16 @@ export default function PinUnlockScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#030C22',
+        backgroundColor: '#020617',
     },
     centerContainer: {
         flex: 1,
-        backgroundColor: '#030C22',
+        backgroundColor: '#020617',
         alignItems: 'center',
         justifyContent: 'center',
     },
     loadingText: {
-        color: '#ffffff',
+        color: '#94A3B8',
         fontSize: 14,
         marginTop: 12,
         fontWeight: '600',
@@ -362,155 +561,341 @@ const s = StyleSheet.create({
     topGlow: {
         position: 'absolute',
         top: -100,
-        right: -100,
-        width: 350,
-        height: 350,
-        borderRadius: 175,
-        backgroundColor: 'rgba(245, 166, 35, 0.12)',
+        alignSelf: 'center',
+        width: 320,
+        height: 320,
+        borderRadius: 160,
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
     },
     bottomGlow: {
         position: 'absolute',
         bottom: -100,
-        left: -100,
-        width: 350,
-        height: 350,
-        borderRadius: 175,
-        backgroundColor: 'rgba(10, 30, 74, 0.6)',
+        alignSelf: 'center',
+        width: 340,
+        height: 340,
+        borderRadius: 170,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
     },
     safeArea: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
+        paddingBottom: 16,
+    },
+    topSecurityBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 10,
+        paddingHorizontal: 6,
+    },
+    securityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    securityBadgeText: {
+        color: '#F59E0B',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    brandBadgeText: {
+        color: '#94A3B8',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1,
     },
     card: {
-        width: '100%',
-        maxWidth: 340,
-        backgroundColor: 'rgba(15, 23, 42, 0.85)',
-        borderRadius: 28,
-        paddingHorizontal: 24,
-        paddingTop: 32,
-        paddingBottom: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(247, 201, 72, 0.25)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    headerContainer: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    logoCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#ffffff',
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: '#f5a623',
-        shadowColor: '#f5a623',
-        shadowOpacity: 0.4,
+        paddingVertical: 10,
+    },
+    avatarWrapper: {
+        position: 'relative',
+        marginBottom: 14,
+    },
+    avatarBorderRing: {
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        padding: 3,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
         shadowRadius: 10,
-        elevation: 5,
+        elevation: 8,
     },
-    logo: {
-        width: 38,
-        height: 38,
+    avatarImage: {
+        width: 78,
+        height: 78,
+        borderRadius: 39,
+        backgroundColor: '#0F172A',
     },
-    welcomeText: {
-        fontSize: 20,
+    avatarFallback: {
+        width: 78,
+        height: 78,
+        borderRadius: 39,
+        backgroundColor: '#0F172A',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    avatarInitialText: {
+        color: '#F59E0B',
+        fontSize: 32,
         fontWeight: '900',
-        color: '#ffffff',
-        letterSpacing: -0.3,
-        textAlign: 'center',
     },
-    emailSub: {
+    activeBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        backgroundColor: '#020617',
+        borderRadius: 10,
+    },
+    headerTextContainer: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    greetingText: {
+        color: '#F59E0B',
         fontSize: 12,
-        color: '#94a3b8',
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    welcomeNameText: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '800',
+        letterSpacing: -0.3,
+        marginBottom: 4,
+    },
+    emailSubText: {
+        color: '#94A3B8',
+        fontSize: 13,
         fontWeight: '500',
-        marginTop: 4,
-        textAlign: 'center',
+    },
+    pinSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 24,
     },
     dotsContainer: {
         flexDirection: 'row',
-        gap: 16,
-        marginVertical: 20,
-        justifyContent: 'center',
         alignItems: 'center',
+        gap: 14,
     },
     dot: {
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        borderWidth: 1.5,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     dotEmpty: {
-        backgroundColor: 'transparent',
-        borderColor: '#475569',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1.5,
     },
     dotFilled: {
-        backgroundColor: '#f5a623',
-        borderColor: '#f5a623',
-        shadowColor: '#f5a623',
+        backgroundColor: '#F59E0B',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
-        shadowRadius: 6,
-        elevation: 4,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    dotNumberText: {
+        color: '#020617',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    eyeToggleBtn: {
+        padding: 6,
+    },
+    lockoutBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        borderColor: '#EF4444',
+        borderWidth: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginBottom: 24,
+    },
+    lockoutText: {
+        color: '#EF4444',
+        fontSize: 13,
+        fontWeight: '700',
     },
     keypadGrid: {
-        gap: 12,
         width: '100%',
-        alignItems: 'center',
-        marginVertical: 10,
+        maxWidth: 290,
+        gap: 14,
+        marginBottom: 20,
     },
     keypadRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: 12,
+        alignItems: 'center',
     },
     keypadButton: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-    },
-    actionKeypadButton: {
-        backgroundColor: 'rgba(245, 166, 35, 0.1)',
-        borderColor: 'rgba(245, 166, 35, 0.3)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     keypadButtonText: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#ffffff',
+        color: '#FFFFFF',
+        fontSize: 26,
+        fontWeight: '700',
+    },
+    actionKeypadButton: {
+        backgroundColor: 'rgba(245, 158, 11, 0.08)',
+        borderColor: 'rgba(245, 158, 11, 0.25)',
     },
     bottomActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 20,
-        gap: 12,
+        gap: 16,
+        marginTop: 6,
     },
-    actionBtn: {
+    forgotBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         paddingVertical: 6,
-        paddingHorizontal: 8,
+        paddingHorizontal: 10,
     },
-    actionBtnText: {
-        color: '#f5a623',
+    forgotBtnText: {
+        color: '#F59E0B',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    signOutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+    },
+    signOutBtnText: {
+        color: '#EF4444',
         fontSize: 13,
         fontWeight: '700',
     },
     dotDivider: {
-        color: '#475569',
+        color: '#64748B',
         fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#0F172A',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1,
+        borderRadius: 24,
+        padding: 22,
+        alignItems: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+    modalIconCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    modalTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+    modalSub: {
+        color: '#94A3B8',
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    modalOptionBtn: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+    },
+    modalOptionTextCol: {
+        flex: 1,
+    },
+    modalOptionTitle: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    modalOptionSub: {
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    modalCloseBtn: {
+        width: '100%',
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    modalCloseBtnText: {
+        color: '#94A3B8',
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
