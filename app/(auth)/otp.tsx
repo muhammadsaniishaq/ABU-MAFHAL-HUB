@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
@@ -84,14 +85,37 @@ export default function OTP() {
         if (!emailToSend) return;
         setResending(true);
         try {
-            // Trigger Supabase Auth Password/PIN Reset Recovery Code
-            const { error } = await supabase.auth.resetPasswordForEmail(emailToSend);
-            if (error) {
-                console.log('Supabase resetPasswordForEmail info:', error.message);
-                await supabase.auth.resend({
-                    type: params.tempFullName ? 'signup' : 'recovery',
-                    email: emailToSend,
-                });
+            // Generate a random 6-digit numeric OTP code
+            const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, generatedOtp);
+            await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
+
+            // Dispatch HTML email with the 6-digit code
+            await supabase.functions.invoke('send-communication', {
+                body: {
+                    type: 'email',
+                    recipient_mode: 'single',
+                    recipient: emailToSend,
+                    subject: 'Your 6-Digit PIN Reset Code 🔒 - ABU MAFHAL SUB',
+                    body: `
+                        <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
+                            <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
+                            <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Security Verification & PIN Reset</p>
+                            <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit PIN reset code is:</p>
+                            <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
+                                ${generatedOtp}
+                            </div>
+                            <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
+                        </div>
+                    `,
+                },
+            });
+
+            // Backup trigger via Supabase Auth resetPasswordForEmail
+            try {
+                await supabase.auth.resetPasswordForEmail(emailToSend);
+            } catch (authErr) {
+                // Ignore background Supabase auth rate-limit errors
             }
         } catch (err: any) {
             console.error('Error triggering OTP email:', err);
@@ -126,20 +150,41 @@ export default function OTP() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.auth.verifyOtp({
-                email: targetEmail,
-                token: codeToken,
-                type: params.tempFullName ? 'signup' : 'recovery',
-            });
+            // 1. Check local custom OTP code first
+            const storedOtp = await AsyncStorage.getItem(`recovery_otp_${targetEmail}`);
+            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${targetEmail}`);
+            const storedTime = storedTimeStr ? parseInt(storedTimeStr, 10) : 0;
+            const isNotExpired = Date.now() - storedTime < 10 * 60 * 1000; // 10 mins
 
-            if (error) {
-                const { error: magicErr } = await supabase.auth.verifyOtp({
+            let isCodeValid = false;
+
+            if (storedOtp && storedOtp === codeToken && isNotExpired) {
+                isCodeValid = true;
+            } else {
+                // 2. Fallback to Supabase Auth OTP verification
+                const { error } = await supabase.auth.verifyOtp({
                     email: targetEmail,
                     token: codeToken,
-                    type: 'magiclink',
+                    type: params.tempFullName ? 'signup' : 'recovery',
                 });
-                if (magicErr && error) throw error;
+                if (!error) {
+                    isCodeValid = true;
+                } else {
+                    const { error: magicErr } = await supabase.auth.verifyOtp({
+                        email: targetEmail,
+                        token: codeToken,
+                        type: 'magiclink',
+                    });
+                    if (!magicErr) isCodeValid = true;
+                }
             }
+
+            if (!isCodeValid) {
+                throw new Error('Invalid or expired 6-digit code. Please check your email and try again.');
+            }
+
+            // Clear used OTP
+            await AsyncStorage.removeItem(`recovery_otp_${targetEmail}`);
 
             const { data: { user } } = await supabase.auth.getUser();
             if (user && params.tempFullName) {
@@ -157,10 +202,10 @@ export default function OTP() {
             }
 
             if (Platform.OS === 'web') {
-                alert('Success! Code verified successfully.');
+                alert('Success! 6-digit code verified successfully.');
                 router.replace('/(auth)/pin-setup' as any);
             } else {
-                Alert.alert('Success', 'Code verified successfully!', [
+                Alert.alert('Success', '6-digit code verified successfully!', [
                     { text: 'Set New PIN', onPress: () => router.replace('/(auth)/pin-setup' as any) },
                 ]);
             }
