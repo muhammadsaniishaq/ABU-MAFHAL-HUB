@@ -223,46 +223,70 @@ export default function LoginScreen() {
         if (socialLoading) return;
         setSocialLoading(provider);
         try {
+            const redirectUrl = Platform.OS === 'web'
+                ? (typeof window !== 'undefined' ? window.location.origin : 'https://abumafhal.com.ng')
+                : Linking.createURL('/login');
+
+            const options: any = {
+                redirectTo: redirectUrl,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'select_account',
+                },
+            };
+
             if (Platform.OS === 'web') {
-                const redirectToUrl = window.location.origin;
                 const { error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
-                    options: { redirectTo: redirectToUrl }
+                    options,
                 });
                 if (error) throw error;
             } else {
-                const redirectToUrl = Linking.createURL('/login');
+                options.skipBrowserRedirect = true;
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
-                    options: {
-                        redirectTo: redirectToUrl,
-                        skipBrowserRedirect: true,
-                    }
+                    options,
                 });
                 if (error) throw error;
+
                 if (data?.url) {
-                    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectToUrl);
+                    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
                     if (result.type === 'success' && result.url) {
                         const normalizedUrl = result.url.replace('#', '?');
-                        const parsed = Linking.parse(normalizedUrl);
-                        const { code, access_token, refresh_token } = parsed.queryParams || {};
-                        const codeStr = Array.isArray(code) ? code[0] : code;
-                        const accessTokenStr = Array.isArray(access_token) ? access_token[0] : access_token;
-                        const refreshTokenStr = Array.isArray(refresh_token) ? refresh_token[0] : refresh_token;
+                        let codeStr: string | null = null;
+                        let accessTokenStr: string | null = null;
+                        let refreshTokenStr: string | null = null;
+
+                        try {
+                            const urlObj = new URL(normalizedUrl);
+                            codeStr = urlObj.searchParams.get('code');
+                            accessTokenStr = urlObj.searchParams.get('access_token');
+                            refreshTokenStr = urlObj.searchParams.get('refresh_token');
+                        } catch (e) {
+                            const parsed = Linking.parse(normalizedUrl);
+                            const q = parsed.queryParams || {};
+                            codeStr = Array.isArray(q.code) ? q.code[0] : (q.code as string);
+                            accessTokenStr = Array.isArray(q.access_token) ? q.access_token[0] : (q.access_token as string);
+                            refreshTokenStr = Array.isArray(q.refresh_token) ? q.refresh_token[0] : (q.refresh_token as string);
+                        }
 
                         if (codeStr) {
-                            await supabase.auth.exchangeCodeForSession(codeStr);
+                            const { error: exErr } = await supabase.auth.exchangeCodeForSession(codeStr);
+                            if (exErr) throw exErr;
                         } else if (accessTokenStr && refreshTokenStr) {
-                            await supabase.auth.setSession({
+                            const { error: setErr } = await supabase.auth.setSession({
                                 access_token: accessTokenStr,
                                 refresh_token: refreshTokenStr,
                             });
+                            if (setErr) throw setErr;
                         }
+
+                        router.replace('/dashboard' as any);
                     }
                 }
             }
         } catch (error: any) {
-            Alert.alert(`${provider.toUpperCase()} Auth Error`, error.message || 'Failed to authenticate.');
+            Alert.alert(`${provider.toUpperCase()} Login Error`, error.message || 'Failed to sign in with Google.');
         } finally {
             setSocialLoading(null);
         }
