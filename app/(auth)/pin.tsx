@@ -138,9 +138,8 @@ export default function PinUnlockScreen() {
             if (localPin) {
                 setSavedPin(localPin);
             } else {
-                // If user has no PIN configured, unlock session and go to dashboard
-                await AsyncStorage.setItem('app_unlocked', 'true');
-                router.replace('/dashboard' as any);
+                // If user has no PIN configured yet, show Create PIN screen
+                router.replace('/(auth)/pin-setup?action=create' as any);
                 return;
             }
 

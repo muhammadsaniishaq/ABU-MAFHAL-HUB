@@ -86,12 +86,13 @@ export default function PinSetupScreen() {
                 }
             }
 
-            const isResetFlow = action === 'reset' || action === 'setup' || reset === 'true' || !!email;
+            const isResetFlow = action === 'reset' || action === 'setup' || action === 'create' || reset === 'true' || !!email;
 
             if (savedPin && !isResetFlow) {
                 setStoredPin(savedPin);
                 setMode('verify');
             } else {
+                // If user has no PIN set yet or is in setup/create/reset flow, ALWAYS show Create PIN
                 setMode('create');
             }
 
