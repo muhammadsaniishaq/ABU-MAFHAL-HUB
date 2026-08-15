@@ -24,23 +24,6 @@ import DynamicBanners from '../../components/DynamicBanners';
 import PaystackPayment from '../../components/PaystackPayment';
 import * as Haptics from 'expo-haptics';
 
-const T = {
-    navyDark: '#020617',
-    navyMid: '#0F172A',
-    navyCard: '#1E293B',
-    gold: '#F59E0B',
-    goldDark: '#D97706',
-    goldBg: 'rgba(245, 158, 11, 0.12)',
-    white: '#FFFFFF',
-    bgLight: '#F8FAFC',
-    textDark: '#0F172A',
-    textMuted: '#64748B',
-    emerald: '#10B981',
-    emeraldBg: 'rgba(16, 185, 129, 0.1)',
-    rose: '#EF4444',
-    roseBg: 'rgba(239, 68, 68, 0.1)',
-};
-
 export default function WalletScreen() {
     const router = useRouter();
     const [balance, setBalance] = useState(0);
@@ -93,7 +76,7 @@ export default function WalletScreen() {
                 supabase.from('profiles').select('balance').eq('id', user.id).single(),
                 supabase.from('virtual_accounts').select('bank_name, account_number, account_name').eq('user_id', user.id).maybeSingle(),
                 supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success'),
-                supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+                supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
             ]);
 
@@ -174,7 +157,7 @@ export default function WalletScreen() {
         if (Platform.OS !== 'web') {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        if (Platform.OS === 'web') alert('Account Number Copied to Clipboard!');
+        if (Platform.OS === 'web') alert('Account Number Copied!');
         else Alert.alert("Copied!", "Account number copied to clipboard.");
     };
 
@@ -232,8 +215,8 @@ export default function WalletScreen() {
     if (loading && !refreshing) {
         return (
             <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#F59E0B" />
-                <Text style={s.loadingText}>Securing Wallet Session...</Text>
+                <ActivityIndicator size="small" color="#F59E0B" />
+                <Text style={s.loadingText}>Loading Wallet...</Text>
             </LinearGradient>
         );
     }
@@ -243,7 +226,7 @@ export default function WalletScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Executive Royal Navy Header Banner */}
+            {/* Compact Header Banner */}
             <LinearGradient colors={['#020617', '#0F172A', '#1E293B']} style={s.headerContainer}>
                 <View style={s.headerNavRow}>
                     <View style={s.brandCol}>
@@ -254,26 +237,26 @@ export default function WalletScreen() {
                         />
                         <View>
                             <Text style={s.brandTitle}>ABU MAFHAL</Text>
-                            <Text style={s.brandSub}>FINTECH HUB 👑</Text>
+                            <Text style={s.brandSub}>HUB 👑</Text>
                         </View>
                     </View>
 
                     <View style={s.headerIconsRow}>
                         <TouchableOpacity onPress={() => router.push('/notifications')} style={s.iconBadgeBtn} activeOpacity={0.75}>
-                            <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+                            <Ionicons name="notifications-outline" size={16} color="#FFFFFF" />
                             <View style={s.badgeDot} />
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={() => router.push('/profile')} style={s.iconBadgeBtn} activeOpacity={0.75}>
-                            <Ionicons name="person-outline" size={18} color="#FFFFFF" />
+                            <Ionicons name="person-outline" size={16} color="#FFFFFF" />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <Text style={s.screenTitle}>My Wallet & Funding</Text>
+                <Text style={s.screenTitle}>My Wallet</Text>
             </LinearGradient>
 
-            {/* 3D Floating Executive Balance Card */}
+            {/* Compact Floating Balance Card */}
             <View style={s.balanceCardWrapper}>
                 <LinearGradient
                     colors={['#0B132B', '#1C2541', '#0F172A']}
@@ -281,20 +264,17 @@ export default function WalletScreen() {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 >
-                    {/* Glowing Accent Ring */}
-                    <View style={s.cardGlowRing} />
-
                     <View style={s.cardTopRow}>
                         <View style={s.balanceTitleRow}>
-                            <Text style={s.balanceTitleText}>TOTAL AVAILABLE BALANCE</Text>
+                            <Text style={s.balanceTitleText}>AVAILABLE BALANCE</Text>
                             <TouchableOpacity onPress={() => setShowBalance(!showBalance)} activeOpacity={0.7} style={s.eyeBtn}>
-                                <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={16} color="#F59E0B" />
+                                <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={14} color="#F59E0B" />
                             </TouchableOpacity>
                         </View>
 
                         <View style={s.statusPill}>
                             <View style={s.statusDot} />
-                            <Text style={s.statusPillText}>Active & Secured</Text>
+                            <Text style={s.statusPillText}>Active</Text>
                         </View>
                     </View>
 
@@ -318,7 +298,7 @@ export default function WalletScreen() {
                             style={s.fundWalletBtn}
                             activeOpacity={0.85}
                         >
-                            <Ionicons name="add-circle" size={18} color="#020617" />
+                            <Ionicons name="add-circle" size={16} color="#020617" />
                             <Text style={s.fundWalletBtnText}>Add Funds</Text>
                         </TouchableOpacity>
 
@@ -327,7 +307,7 @@ export default function WalletScreen() {
                             style={s.withdrawBtn}
                             activeOpacity={0.85}
                         >
-                            <Ionicons name="arrow-up-circle" size={18} color="#F59E0B" />
+                            <Ionicons name="arrow-up-circle" size={16} color="#F59E0B" />
                             <Text style={s.withdrawBtnText}>Transfer</Text>
                         </TouchableOpacity>
                     </View>
@@ -343,53 +323,52 @@ export default function WalletScreen() {
                     <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#F59E0B" />
                 }
             >
-                {/* Dynamic Promotional Banners */}
+                {/* Dynamic Banners */}
                 <DynamicBanners placement="wallet" />
 
-                {/* Dedicated Virtual Bank Account Card */}
+                {/* Ultra-Compact Virtual Bank Account Card */}
                 <View style={s.sectionBox}>
                     <Text style={s.sectionHeaderTitle}>Automated Dedicated Bank Account</Text>
 
                     {virtualAccount ? (
                         <View style={s.virtualBankCard}>
-                            <View style={s.vCardHeader}>
+                            <View style={s.vCardTopRow}>
                                 <View style={s.bankNamePill}>
+                                    <Ionicons name="business-outline" size={11} color="#F59E0B" style={{ marginRight: 4 }} />
                                     <Text style={s.bankNameText}>{virtualAccount.bank_name}</Text>
                                 </View>
-                                <Ionicons name="card" size={22} color="#F59E0B" />
-                            </View>
 
-                            <View style={s.acctNumCol}>
-                                <Text style={s.acctNumLabel}>Dedicated Account Number</Text>
-                                <View style={s.acctNumDisplayRow}>
-                                    <Text style={s.acctNumText}>
-                                        {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
-                                    </Text>
-                                    <TouchableOpacity
-                                        onPress={() => copyToClipboard(virtualAccount.account_number)}
-                                        style={s.copyIconBtn}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Ionicons name="copy-outline" size={16} color="#F59E0B" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={s.acctHolderCol}>
-                                <Text style={s.acctHolderLabel}>Account Holder Name</Text>
                                 <Text style={s.acctHolderName} numberOfLines={1}>
                                     {virtualAccount.account_name}
                                 </Text>
+                            </View>
+
+                            <View style={s.acctNumRowCompact}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.acctNumLabel}>ACCOUNT NUMBER</Text>
+                                    <Text style={s.acctNumTextCompact}>
+                                        {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => copyToClipboard(virtualAccount.account_number)}
+                                    style={s.copyPillBtn}
+                                    activeOpacity={0.75}
+                                >
+                                    <Ionicons name="copy-outline" size={12} color="#F59E0B" style={{ marginRight: 3 }} />
+                                    <Text style={s.copyPillBtnText}>Copy</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     ) : (
                         <View style={s.noVirtualAcctCard}>
                             <View style={s.noAcctIconBox}>
-                                <Ionicons name="shield-checkmark" size={26} color="#64748B" />
+                                <Ionicons name="shield-checkmark" size={20} color="#64748B" />
                             </View>
                             <Text style={s.noAcctTitle}>No Dedicated Virtual Account Yet</Text>
                             <Text style={s.noAcctSubtitle}>
-                                Complete your KYC Identity Verification to generate a dedicated automated funding bank account instantly!
+                                Verify your identity to generate a dedicated automated funding bank account.
                             </Text>
                             <TouchableOpacity
                                 onPress={() => router.push('/kyc')}
@@ -401,26 +380,23 @@ export default function WalletScreen() {
                         </View>
                     )}
 
-                    {/* Deposit Fee Structure Information Box */}
+                    {/* Deposit Fee Structure Callout */}
                     <View style={s.depositFeeBox}>
-                        <Ionicons name="information-circle" size={18} color="#D97706" style={{ marginTop: 2 }} />
+                        <Ionicons name="information-circle" size={16} color="#D97706" style={{ marginTop: 1 }} />
                         <View style={{ flex: 1 }}>
-                            <Text style={s.feeBoxHeader}>Automated Deposit Fee Structure:</Text>
+                            <Text style={s.feeBoxHeader}>Automated Deposit Fee Rule:</Text>
                             <Text style={s.feeBoxText}>
-                                • Deposits under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{feeUnder} fixed fee</Text>
-                            </Text>
-                            <Text style={[s.feeBoxText, { marginTop: 3 }]}>
-                                • Deposits <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>{feeAbove}% fee</Text>
+                                • Under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{feeUnder} fee</Text> | <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}+</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>{feeAbove}% fee</Text>
                             </Text>
                         </View>
                     </View>
                 </View>
 
-                {/* Financial KPI Summary Cards */}
+                {/* Compact Financial KPI Summary */}
                 <View style={s.kpiGridRow}>
                     <View style={[s.kpiCard, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
                         <View style={[s.kpiIconCircle, { backgroundColor: '#10B981' }]}>
-                            <Ionicons name="arrow-down" size={16} color="#FFFFFF" />
+                            <Ionicons name="arrow-down" size={14} color="#FFFFFF" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={s.kpiLabel}>Total Deposits</Text>
@@ -432,7 +408,7 @@ export default function WalletScreen() {
 
                     <View style={[s.kpiCard, { backgroundColor: '#FEF2F2', borderColor: '#FECDD3' }]}>
                         <View style={[s.kpiIconCircle, { backgroundColor: '#EF4444' }]}>
-                            <Ionicons name="arrow-up" size={16} color="#FFFFFF" />
+                            <Ionicons name="arrow-up" size={14} color="#FFFFFF" />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={s.kpiLabel}>Total Spent</Text>
@@ -448,7 +424,7 @@ export default function WalletScreen() {
                     <View style={s.recentHeaderRow}>
                         <Text style={s.sectionHeaderTitle}>Recent Transactions</Text>
                         <TouchableOpacity onPress={() => router.push('/history')} activeOpacity={0.7}>
-                            <Text style={s.seeAllLinkText}>See All History ›</Text>
+                            <Text style={s.seeAllLinkText}>See All ›</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -468,7 +444,7 @@ export default function WalletScreen() {
                                     >
                                         <View style={s.txLeftCol}>
                                             <View style={[s.txIconCircle, { backgroundColor: iconConfig.bg }]}>
-                                                <Ionicons name={iconConfig.name as any} size={18} color={iconConfig.color} />
+                                                <Ionicons name={iconConfig.name as any} size={15} color={iconConfig.color} />
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={s.txTitleText} numberOfLines={1}>
@@ -497,9 +473,9 @@ export default function WalletScreen() {
                         </View>
                     ) : (
                         <View style={s.emptyTxBox}>
-                            <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
+                            <Ionicons name="receipt-outline" size={24} color="#94A3B8" />
                             <Text style={s.emptyTxTitle}>No Recent Transactions</Text>
-                            <Text style={s.emptyTxSub}>Your recent deposits and purchases will appear here.</Text>
+                            <Text style={s.emptyTxSub}>Your recent transactions will appear here.</Text>
                         </View>
                     )}
                 </View>
@@ -521,7 +497,7 @@ export default function WalletScreen() {
                         <View style={s.modalHeaderRow}>
                             <Text style={s.modalTitleText}>Fund Wallet</Text>
                             <TouchableOpacity onPress={() => setFundModalVisible(false)} style={s.modalCloseIconBtn}>
-                                <Ionicons name="close" size={20} color="#64748B" />
+                                <Ionicons name="close" size={18} color="#64748B" />
                             </TouchableOpacity>
                         </View>
 
@@ -531,7 +507,7 @@ export default function WalletScreen() {
                                 onPress={() => setFundMethod('transfer')}
                                 style={[s.modalMethodTab, fundMethod === 'transfer' && s.modalMethodTabActive]}
                             >
-                                <Ionicons name="business" size={16} color={fundMethod === 'transfer' ? '#0F172A' : '#64748B'} />
+                                <Ionicons name="business" size={14} color={fundMethod === 'transfer' ? '#0F172A' : '#64748B'} />
                                 <Text style={[s.modalMethodTabText, fundMethod === 'transfer' && s.modalMethodTabTextActive]}>Bank Transfer</Text>
                             </TouchableOpacity>
 
@@ -539,15 +515,15 @@ export default function WalletScreen() {
                                 onPress={() => setFundMethod('card')}
                                 style={[s.modalMethodTab, fundMethod === 'card' && s.modalMethodTabActive]}
                             >
-                                <Ionicons name="card" size={16} color={fundMethod === 'card' ? '#0F172A' : '#64748B'} />
-                                <Text style={[s.modalMethodTabText, fundMethod === 'card' && s.modalMethodTabTextActive]}>Debit Card / Paystack</Text>
+                                <Ionicons name="card" size={14} color={fundMethod === 'card' ? '#0F172A' : '#64748B'} />
+                                <Text style={[s.modalMethodTabText, fundMethod === 'card' && s.modalMethodTabTextActive]}>Card / Paystack</Text>
                             </TouchableOpacity>
                         </View>
 
                         {fundMethod === 'transfer' ? (
                             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
                                 <Text style={s.modalInstructionText}>
-                                    Transfer directly to your dedicated automated account below. Your wallet will be credited instantly upon confirmation!
+                                    Transfer directly to your dedicated automated account below. Wallet credits instantly!
                                 </Text>
 
                                 {virtualAccount ? (
@@ -556,39 +532,36 @@ export default function WalletScreen() {
                                             <Text style={s.mBankPillText}>{virtualAccount.bank_name}</Text>
                                         </View>
 
-                                        <View style={{ marginBottom: 14 }}>
-                                            <Text style={s.mLabelText}>Account Number</Text>
+                                        <View style={{ marginBottom: 10 }}>
+                                            <Text style={s.mLabelText}>ACCOUNT NUMBER</Text>
                                             <View style={s.mNumRow}>
                                                 <Text style={s.mNumText}>
                                                     {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
                                                 </Text>
                                                 <TouchableOpacity onPress={() => copyToClipboard(virtualAccount.account_number)} style={s.mCopyBtn}>
-                                                    <Ionicons name="copy-outline" size={16} color="#F59E0B" />
+                                                    <Ionicons name="copy-outline" size={15} color="#F59E0B" />
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
 
                                         <View>
-                                            <Text style={s.mLabelText}>Account Name</Text>
+                                            <Text style={s.mLabelText}>ACCOUNT NAME</Text>
                                             <Text style={s.mNameText}>{virtualAccount.account_name}</Text>
                                         </View>
                                     </View>
                                 ) : (
                                     <View style={s.modalNoAcctBox}>
-                                        <Text style={s.modalNoAcctTitle}>No Dedicated Virtual Account</Text>
-                                        <Text style={s.modalNoAcctSub}>Please complete your identity verification to generate a dedicated bank account.</Text>
+                                        <Text style={s.modalNoAcctTitle}>No Dedicated Account</Text>
+                                        <Text style={s.modalNoAcctSub}>Complete your identity verification to generate a bank account.</Text>
                                     </View>
                                 )}
 
                                 <View style={s.depositFeeBox}>
-                                    <Ionicons name="information-circle" size={18} color="#D97706" style={{ marginTop: 2 }} />
+                                    <Ionicons name="information-circle" size={16} color="#D97706" style={{ marginTop: 1 }} />
                                     <View style={{ flex: 1 }}>
-                                        <Text style={s.feeBoxHeader}>Automated Deposit Fee Structure:</Text>
+                                        <Text style={s.feeBoxHeader}>Automated Deposit Fee Rule:</Text>
                                         <Text style={s.feeBoxText}>
-                                            • Deposits under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{feeUnder} fixed fee</Text>
-                                        </Text>
-                                        <Text style={[s.feeBoxText, { marginTop: 3 }]}>
-                                            • Deposits <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()} and above</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>{feeAbove}% fee</Text>
+                                            • Under <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>₦{feeUnder} fee</Text> | <Text style={{ fontWeight: 'bold' }}>₦{feeThreshold.toLocaleString()}+</Text>: <Text style={{ fontWeight: 'bold', color: '#B45309' }}>{feeAbove}% fee</Text>
                                         </Text>
                                     </View>
                                 </View>
@@ -596,11 +569,11 @@ export default function WalletScreen() {
                         ) : (
                             <View style={{ flex: 1 }}>
                                 <Text style={s.modalInstructionText}>
-                                    Fund your wallet instantly using your Debit Card or Bank USSD via Paystack.
+                                    Fund your wallet instantly using Debit Card or USSD via Paystack.
                                 </Text>
 
                                 <View style={s.amountInputContainer}>
-                                    <Text style={s.amountInputHeader}>ENTER FUNDING AMOUNT</Text>
+                                    <Text style={s.amountInputHeader}>FUNDING AMOUNT</Text>
                                     <View style={s.amountInputFlexRow}>
                                         <Text style={s.currencyPrefix}>₦</Text>
                                         <TextInput
@@ -614,7 +587,6 @@ export default function WalletScreen() {
                                     </View>
                                 </View>
 
-                                {/* Live Calculator Breakdown */}
                                 {parseFloat(fundAmount) > 0 && (
                                     <View style={s.liveCalcCard}>
                                         <View style={s.liveCalcRow}>
@@ -626,15 +598,15 @@ export default function WalletScreen() {
                                             <Text style={s.liveCalcLabel}>
                                                 Deposit Fee ({parseFloat(fundAmount) < feeThreshold ? `Fixed ₦${feeUnder}` : `${feeAbove}%`}):
                                             </Text>
-                                            <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                                            <Text style={{ color: '#EF4444', fontSize: 10.5, fontWeight: '700' }}>
                                                 -₦{(parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100)).toLocaleString()}
                                             </Text>
                                         </View>
 
                                         <View style={s.liveCalcDivider} />
 
-                                        <View style={[s.liveCalcRow, { marginTop: 4 }]}>
-                                            <Text style={s.liveCalcNetLabel}>Net Wallet Credit:</Text>
+                                        <View style={[s.liveCalcRow, { marginTop: 2 }]}>
+                                            <Text style={s.liveCalcNetLabel}>Net Credit:</Text>
                                             <Text style={s.liveCalcNetVal}>
                                                 ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < feeThreshold ? feeUnder : parseFloat(fundAmount) * (feeAbove / 100))).toLocaleString()}
                                             </Text>
@@ -698,57 +670,57 @@ const s = StyleSheet.create({
     },
     loadingText: {
         color: '#F59E0B',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '700',
-        marginTop: 12,
+        marginTop: 10,
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'android' ? 44 : 54,
-        paddingBottom: 36,
-        paddingHorizontal: 20,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
-        borderBottomWidth: 1.5,
-        borderColor: 'rgba(245, 158, 11, 0.4)',
+        paddingTop: Platform.OS === 'android' ? 36 : 46,
+        paddingBottom: 26,
+        paddingHorizontal: 16,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        borderBottomWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     headerNavRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 8,
     },
     brandCol: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     headerLogo: {
-        width: 28,
-        height: 28,
+        width: 24,
+        height: 24,
     },
     brandTitle: {
         color: '#FFFFFF',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
     brandSub: {
         color: '#F59E0B',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '800',
-        letterSpacing: 1,
+        letterSpacing: 0.8,
     },
     headerIconsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     iconBadgeBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
@@ -756,63 +728,54 @@ const s = StyleSheet.create({
     },
     badgeDot: {
         position: 'absolute',
-        top: 6,
-        right: 6,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        top: 5,
+        right: 5,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: '#F59E0B',
     },
     screenTitle: {
         color: '#FFFFFF',
-        fontSize: 20,
+        fontSize: 17,
         fontWeight: '900',
-        letterSpacing: -0.4,
+        letterSpacing: -0.3,
     },
     balanceCardWrapper: {
-        paddingHorizontal: 20,
-        marginTop: -26,
-        marginBottom: 16,
+        paddingHorizontal: 16,
+        marginTop: -20,
+        marginBottom: 12,
         shadowColor: '#020617',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        elevation: 6,
         zIndex: 30,
     },
     balanceCard: {
-        borderRadius: 24,
-        padding: 20,
-        borderColor: 'rgba(245, 158, 11, 0.35)',
-        borderWidth: 1.5,
+        borderRadius: 18,
+        padding: 14,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1.2,
         position: 'relative',
         overflow: 'hidden',
-    },
-    cardGlowRing: {
-        position: 'absolute',
-        top: -60,
-        right: -60,
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: 'rgba(245, 158, 11, 0.08)',
     },
     cardTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 6,
     },
     balanceTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
     },
     balanceTitleText: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 10,
+        color: 'rgba(255, 255, 255, 0.65)',
+        fontSize: 9,
         fontWeight: '800',
-        letterSpacing: 0.8,
+        letterSpacing: 0.6,
     },
     eyeBtn: {
         padding: 2,
@@ -822,33 +785,33 @@ const s = StyleSheet.create({
         alignItems: 'center',
         gap: 4,
         backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        borderColor: 'rgba(16, 185, 129, 0.4)',
+        borderColor: 'rgba(16, 185, 129, 0.35)',
         borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 12,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
     },
     statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
         backgroundColor: '#10B981',
     },
     statusPillText: {
         color: '#10B981',
-        fontSize: 9,
+        fontSize: 8.5,
         fontWeight: '800',
     },
     balanceAmountRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     currencySymbol: {
         color: '#F59E0B',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
-        marginRight: 4,
+        marginRight: 3,
     },
     balanceValueRow: {
         flexDirection: 'row',
@@ -856,273 +819,283 @@ const s = StyleSheet.create({
     },
     balanceMainText: {
         color: '#FFFFFF',
-        fontSize: 30,
+        fontSize: 24,
         fontWeight: '900',
-        letterSpacing: -0.5,
+        letterSpacing: -0.4,
     },
     balanceDecText: {
         color: 'rgba(255, 255, 255, 0.8)',
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: '800',
     },
     actionButtonsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
     },
     fundWalletBtn: {
         flex: 1,
-        height: 44,
-        borderRadius: 14,
+        height: 38,
+        borderRadius: 11,
         backgroundColor: '#F59E0B',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 5,
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 3,
     },
     fundWalletBtnText: {
         color: '#020617',
-        fontSize: 12.5,
+        fontSize: 11.5,
         fontWeight: '900',
     },
     withdrawBtn: {
         flex: 1,
-        height: 44,
-        borderRadius: 14,
+        height: 38,
+        borderRadius: 11,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(255, 255, 255, 0.18)',
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 5,
     },
     withdrawBtnText: {
         color: '#FFFFFF',
-        fontSize: 12.5,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     scrollBody: {
         flex: 1,
     },
     scrollContentPadding: {
-        paddingHorizontal: 20,
-        paddingBottom: 100,
+        paddingHorizontal: 16,
+        paddingBottom: 90,
     },
     sectionBox: {
-        marginBottom: 16,
+        marginBottom: 12,
     },
     sectionHeaderTitle: {
         color: '#0F172A',
-        fontSize: 14,
+        fontSize: 12.5,
         fontWeight: '900',
-        marginBottom: 10,
+        marginBottom: 8,
         letterSpacing: -0.2,
     },
+    
+    // ULTRA-COMPACT VIRTUAL BANK CARD
     virtualBankCard: {
         backgroundColor: '#0F172A',
-        borderRadius: 20,
-        padding: 16,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderColor: 'rgba(245, 158, 11, 0.35)',
         shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    vCardHeader: {
+    vCardTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 14,
+        marginBottom: 10,
     },
     bankNamePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: 'rgba(245, 158, 11, 0.15)',
-        borderColor: 'rgba(245, 158, 11, 0.4)',
+        borderColor: 'rgba(245, 158, 11, 0.35)',
         borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     bankNameText: {
         color: '#F59E0B',
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    acctNumCol: {
-        marginBottom: 12,
-    },
-    acctNumLabel: {
-        color: '#94A3B8',
         fontSize: 9.5,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: 2,
-    },
-    acctNumDisplayRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    acctNumText: {
-        color: '#FFFFFF',
-        fontSize: 20,
         fontWeight: '900',
-        letterSpacing: 1,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    },
-    copyIconBtn: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        padding: 6,
-        borderRadius: 8,
-    },
-    acctHolderCol: {},
-    acctHolderLabel: {
-        color: '#94A3B8',
-        fontSize: 9,
-        fontWeight: '700',
+        letterSpacing: 0.5,
         textTransform: 'uppercase',
-        marginBottom: 2,
     },
     acctHolderName: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
+        maxWidth: 180,
     },
+    acctNumRowCompact: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        padding: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    acctNumLabel: {
+        color: '#94A3B8',
+        fontSize: 8,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 1,
+    },
+    acctNumTextCompact: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    copyPillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    copyPillBtnText: {
+        color: '#F59E0B',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+
     noVirtualAcctCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 20,
+        borderRadius: 14,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#CBD5E1',
         borderStyle: 'dashed',
         alignItems: 'center',
     },
     noAcctIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     noAcctTitle: {
         color: '#0F172A',
-        fontSize: 14,
+        fontSize: 12.5,
         fontWeight: '800',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     noAcctSubtitle: {
         color: '#64748B',
-        fontSize: 11.5,
+        fontSize: 10.5,
         textAlign: 'center',
-        marginBottom: 14,
-        lineHeight: 16,
+        marginBottom: 10,
+        lineHeight: 15,
     },
     verifyKycBtn: {
         backgroundColor: '#0F172A',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 10,
     },
     verifyKycBtnText: {
         color: '#FFFFFF',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '800',
     },
     depositFeeBox: {
         backgroundColor: '#FEF3C7',
         borderColor: '#FDE68A',
         borderWidth: 1,
-        borderRadius: 14,
-        padding: 12,
-        marginTop: 12,
+        borderRadius: 12,
+        padding: 10,
+        marginTop: 8,
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 8,
+        gap: 6,
     },
     feeBoxHeader: {
         color: '#B45309',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '800',
-        marginBottom: 2,
+        marginBottom: 1,
     },
     feeBoxText: {
         color: '#92400E',
-        fontSize: 11,
-        lineHeight: 16,
+        fontSize: 10.5,
+        lineHeight: 15,
     },
     kpiGridRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 16,
+        gap: 10,
+        marginBottom: 12,
     },
     kpiCard: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        padding: 12,
-        borderRadius: 16,
+        gap: 8,
+        padding: 10,
+        borderRadius: 14,
         borderWidth: 1,
     },
     kpiIconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
     },
     kpiLabel: {
         color: '#64748B',
-        fontSize: 9.5,
+        fontSize: 8.5,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
     kpiValue: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '900',
-        marginTop: 1,
+        marginTop: 0.5,
     },
     recentHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     seeAllLinkText: {
         color: '#F59E0B',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     txListCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 6,
+        borderRadius: 16,
+        padding: 4,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        elevation: 2,
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
     txItemRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 10,
+        padding: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
     },
@@ -1130,23 +1103,23 @@ const s = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        gap: 10,
+        gap: 8,
     },
     txIconCircle: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },
     txTitleText: {
         color: '#0F172A',
-        fontSize: 12.5,
+        fontSize: 11.5,
         fontWeight: '800',
     },
     txDateText: {
         color: '#94A3B8',
-        fontSize: 10,
+        fontSize: 9.5,
         fontWeight: '600',
         marginTop: 1,
     },
@@ -1154,24 +1127,24 @@ const s = StyleSheet.create({
         alignItems: 'flex-end',
     },
     txAmountText: {
-        fontSize: 12.5,
+        fontSize: 11.5,
         fontWeight: '900',
     },
     txStatusPill: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-        marginTop: 2,
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
+        borderRadius: 5,
+        marginTop: 1.5,
     },
     txStatusPillText: {
-        fontSize: 8.5,
+        fontSize: 8,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
     emptyTxBox: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 24,
+        borderRadius: 16,
+        padding: 20,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -1179,14 +1152,14 @@ const s = StyleSheet.create({
     },
     emptyTxTitle: {
         color: '#0F172A',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
-        marginTop: 6,
+        marginTop: 4,
     },
     emptyTxSub: {
         color: '#94A3B8',
-        fontSize: 11,
-        marginTop: 2,
+        fontSize: 10.5,
+        marginTop: 1,
     },
     modalBackdrop: {
         flex: 1,
@@ -1195,36 +1168,36 @@ const s = StyleSheet.create({
     },
     modalSheetContainer: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        padding: 20,
-        borderTopWidth: 3,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 16,
+        borderTopWidth: 2.5,
         borderColor: '#F59E0B',
         maxHeight: '80%',
     },
     modalDragBar: {
-        width: 42,
-        height: 5,
+        width: 36,
+        height: 4,
         backgroundColor: '#CBD5E1',
-        borderRadius: 3,
+        borderRadius: 2,
         alignSelf: 'center',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     modalHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     modalTitleText: {
         color: '#0F172A',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
     },
     modalCloseIconBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1232,31 +1205,31 @@ const s = StyleSheet.create({
     modalMethodTabs: {
         flexDirection: 'row',
         backgroundColor: '#F1F5F9',
-        padding: 4,
-        borderRadius: 14,
-        marginBottom: 16,
-        gap: 6,
+        padding: 3,
+        borderRadius: 12,
+        marginBottom: 12,
+        gap: 4,
     },
     modalMethodTab: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        borderRadius: 10,
+        gap: 5,
+        paddingVertical: 8,
+        borderRadius: 9,
     },
     modalMethodTabActive: {
         backgroundColor: '#FFFFFF',
         shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 1,
     },
     modalMethodTabText: {
         color: '#64748B',
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: '700',
     },
     modalMethodTabTextActive: {
@@ -1265,33 +1238,33 @@ const s = StyleSheet.create({
     },
     modalInstructionText: {
         color: '#64748B',
-        fontSize: 11.5,
-        lineHeight: 16,
-        marginBottom: 14,
+        fontSize: 10.5,
+        lineHeight: 15,
+        marginBottom: 12,
         textAlign: 'center',
     },
     modalBankCard: {
         backgroundColor: '#0F172A',
-        borderRadius: 18,
-        padding: 16,
-        marginBottom: 14,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
     },
     mBankPill: {
         backgroundColor: 'rgba(245, 158, 11, 0.2)',
         alignSelf: 'flex-start',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 8,
-        marginBottom: 12,
+        paddingHorizontal: 7,
+        paddingVertical: 2.5,
+        borderRadius: 6,
+        marginBottom: 8,
     },
     mBankPillText: {
         color: '#F59E0B',
-        fontSize: 9.5,
+        fontSize: 8.5,
         fontWeight: '900',
     },
     mLabelText: {
         color: '#94A3B8',
-        fontSize: 9,
+        fontSize: 8,
         fontWeight: '700',
         textTransform: 'uppercase',
     },
@@ -1302,33 +1275,33 @@ const s = StyleSheet.create({
     },
     mNumText: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '900',
-        letterSpacing: 1,
+        letterSpacing: 0.8,
     },
     mCopyBtn: {
-        padding: 4,
+        padding: 3,
     },
     mNameText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     modalNoAcctBox: {
-        padding: 20,
+        padding: 16,
         backgroundColor: '#F8FAFC',
-        borderRadius: 14,
+        borderRadius: 12,
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     modalNoAcctTitle: {
         color: '#0F172A',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
     },
     modalNoAcctSub: {
         color: '#64748B',
-        fontSize: 11,
+        fontSize: 10,
         textAlign: 'center',
         marginTop: 2,
     },
@@ -1336,16 +1309,16 @@ const s = StyleSheet.create({
         backgroundColor: '#F8FAFC',
         borderColor: '#CBD5E1',
         borderWidth: 1,
-        borderRadius: 16,
-        padding: 14,
-        marginBottom: 14,
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
     },
     amountInputHeader: {
         color: '#64748B',
-        fontSize: 9.5,
+        fontSize: 8.5,
         fontWeight: '800',
-        letterSpacing: 1,
-        marginBottom: 6,
+        letterSpacing: 0.8,
+        marginBottom: 4,
     },
     amountInputFlexRow: {
         flexDirection: 'row',
@@ -1353,67 +1326,67 @@ const s = StyleSheet.create({
     },
     currencyPrefix: {
         color: '#0F172A',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
-        marginRight: 4,
+        marginRight: 3,
     },
     amountInputField: {
         flex: 1,
         color: '#0F172A',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
     },
     liveCalcCard: {
         backgroundColor: '#F8FAFC',
-        borderRadius: 14,
-        padding: 12,
+        borderRadius: 12,
+        padding: 10,
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     liveCalcRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 4,
+        marginBottom: 3,
     },
     liveCalcLabel: {
         color: '#64748B',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '600',
     },
     liveCalcVal: {
         color: '#0F172A',
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '700',
     },
     liveCalcDivider: {
         height: 1,
         backgroundColor: '#E2E8F0',
-        marginVertical: 4,
+        marginVertical: 3,
     },
     liveCalcNetLabel: {
         color: '#0F172A',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     liveCalcNetVal: {
         color: '#10B981',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
     },
     submitPayBtn: {
         backgroundColor: '#0F172A',
         borderColor: '#F59E0B',
-        borderWidth: 1.5,
-        height: 48,
-        borderRadius: 14,
+        borderWidth: 1.2,
+        height: 42,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
     },
     submitPayBtnText: {
         color: '#F59E0B',
-        fontSize: 13,
+        fontSize: 11.5,
         fontWeight: '900',
         textTransform: 'uppercase',
     },
