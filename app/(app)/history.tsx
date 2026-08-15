@@ -1,24 +1,40 @@
-import { View, Text, SectionList, TouchableOpacity, ActivityIndicator, StyleSheet, Platform, Image } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+    View,
+    Text,
+    SectionList,
+    TouchableOpacity,
+    StyleSheet,
+    Platform,
+    TextInput,
+    Modal,
+    ScrollView,
+    Alert,
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
-import { useEffect, useState, useMemo } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
+import * as Linking from 'expo-linking';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 export default function HistoryScreen() {
     const router = useRouter();
     const [history, setHistory] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTx, setSelectedTx] = useState<any | null>(null);
+    const { settings } = useAppSettings();
 
     useEffect(() => {
         fetchHistory();
     }, []);
 
     const fetchHistory = async () => {
-        setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
@@ -31,19 +47,21 @@ export default function HistoryScreen() {
                 if (data) {
                     const mapped = data.map(tx => {
                         const amount = parseFloat(tx.amount.toString());
-                        const isIncome = tx.type === 'deposit' || amount > 0;
-                        let icon = 'wallet-outline';
-                        let color = '#f5a623'; // Gold brand color
+                        const isIncome = tx.type === 'deposit' || (tx.type !== 'withdrawal' && tx.type !== 'transfer' && amount > 0);
+                        let icon = 'receipt-outline';
+                        let color = '#F59E0B';
 
-                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#0d1b3e'; } // Navy brand color
-                        else if (tx.type === 'withdrawal') { icon = 'cash-outline'; color = '#DC2626'; }
-                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#107C10'; }
-                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#0d1b3e'; }
-                        else if (tx.type === 'payment') { icon = 'flash-outline'; color = '#f5a623'; }
+                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#3B82F6'; }
+                        else if (tx.type === 'withdrawal') { icon = 'card-outline'; color = '#EF4444'; }
+                        else if (tx.type === 'deposit') { icon = 'arrow-down-circle-outline'; color = '#10B981'; }
+                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#10B981'; }
+                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#3B82F6'; }
+                        else if (tx.description?.toLowerCase().includes('cable') || tx.description?.toLowerCase().includes('dstv')) { icon = 'tv-outline'; color = '#8B5CF6'; }
 
                         return {
                             ...tx,
-                            displayAmount: `${isIncome ? '+' : '-'}₦${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                            displayAmount: `${isIncome ? '+' : '-'}₦${Math.abs(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+                            rawAmount: Math.abs(amount),
                             isIncome,
                             icon,
                             color,
@@ -53,23 +71,73 @@ export default function HistoryScreen() {
                     setHistory(mapped);
                 }
             }
+        } catch (error) {
+            console.error("Error fetching history:", error);
         } finally {
-            setLoading(false);
+            setRefreshing(false);
         }
     };
 
+    const handleRefresh = () => {
+        setRefreshing(true);
+        if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        fetchHistory();
+    };
+
+    const copyToClipboard = async (text: string, label: string = 'Reference') => {
+        await Clipboard.setStringAsync(text);
+        if (Platform.OS !== 'web') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        if (Platform.OS === 'web') alert(`${label} Copied to Clipboard!`);
+        else Alert.alert("Copied!", `${label} copied to clipboard.`);
+    };
+
+    const contactSupport = (tx: any) => {
+        const supportPhone = settings?.support_whatsapp || '2348000000000';
+        const cleanPhone = supportPhone.replace(/[^0-9]/g, '');
+        const message = `Hello Support, I need assistance regarding my Transaction:\n\n• Type: ${tx.type}\n• Amount: ${tx.displayAmount}\n• Reference: ${tx.reference || tx.id}\n• Status: ${tx.status}\n• Date: ${tx.dateObj.toLocaleString()}`;
+        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        Linking.openURL(url).catch(() => {
+            Alert.alert("Error", "Could not launch WhatsApp. Please try again.");
+        });
+    };
+
+    const filteredHistory = useMemo(() => {
+        return history.filter(tx => {
+            let matchesFilter = true;
+            if (filter === 'Deposits') matchesFilter = tx.isIncome;
+            else if (filter === 'Withdrawals') matchesFilter = tx.type === 'withdrawal' || tx.type === 'transfer';
+            else if (filter === 'Services') matchesFilter = !tx.isIncome && tx.type !== 'withdrawal' && tx.type !== 'transfer';
+            else if (filter === 'Pending/Failed') matchesFilter = tx.status !== 'success';
+
+            let matchesSearch = true;
+            if (searchQuery.trim() !== '') {
+                const query = searchQuery.toLowerCase();
+                const desc = (tx.description || '').toLowerCase();
+                const ref = (tx.reference || tx.id || '').toLowerCase();
+                const amt = tx.rawAmount.toString();
+                matchesSearch = desc.includes(query) || ref.includes(query) || amt.includes(query);
+            }
+
+            return matchesFilter && matchesSearch;
+        });
+    }, [history, filter, searchQuery]);
+
+    const totalVolume = useMemo(() => {
+        return filteredHistory.reduce((acc, tx) => acc + tx.rawAmount, 0);
+    }, [filteredHistory]);
+
     const sections = useMemo(() => {
-        let filtered = history;
-        if (filter === 'In') filtered = history.filter(tx => tx.isIncome);
-        if (filter === 'Out') filtered = history.filter(tx => !tx.isIncome);
-
         const groups: { [key: string]: any[] } = {};
-        const today = new Date().setHours(0,0,0,0);
-        const yesterday = new Date(today - 86400000).setHours(0,0,0,0);
+        const today = new Date().setHours(0, 0, 0, 0);
+        const yesterday = new Date(today - 86400000).setHours(0, 0, 0, 0);
 
-        filtered.forEach(tx => {
-            const txDate = new Date(tx.dateObj).setHours(0,0,0,0);
-            let title = tx.dateObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        filteredHistory.forEach(tx => {
+            const txDate = new Date(tx.dateObj).setHours(0, 0, 0, 0);
+            let title = tx.dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             if (txDate === today) title = 'Today';
             else if (txDate === yesterday) title = 'Yesterday';
 
@@ -81,71 +149,92 @@ export default function HistoryScreen() {
             title,
             data: groups[title]
         }));
-    }, [history, filter]);
-
-    if (loading && history.length === 0) {
-        return (
-            <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#0d1b3e" />
-            </SafeAreaView>
-        );
-    }
+    }, [filteredHistory]);
 
     return (
-        <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            
-            {/* Header */}
-            <View style={s.header}>
-                <TouchableOpacity onPress={() => router.back()} style={s.iconButton}>
-                    <Ionicons name="chevron-back" size={20} color="#0d1b3e" />
-                </TouchableOpacity>
-                <Text style={s.headerTitle}>History</Text>
-                <TouchableOpacity style={s.iconButton}>
-                    <Ionicons name="filter" size={18} color="#0d1b3e" />
-                </TouchableOpacity>
-            </View>
+            <StatusBar style="light" />
 
-            {/* Compact Summary Card with Brand Colors */}
-            <View style={s.summaryContainer}>
-                <LinearGradient 
-                    colors={['#0d1b3e', '#142258']} 
-                    style={s.summaryCard} 
-                    start={{ x: 0, y: 0 }} 
-                    end={{ x: 1, y: 1 }}
-                >
-                    <View style={s.summaryContent}>
-                        <View>
-                            <Text style={s.summaryLabel}>Total Records</Text>
-                            <Text style={s.summaryValue}>{history.length}</Text>
-                        </View>
-                        <View style={s.summaryIconBox}>
-                            <Ionicons name="stats-chart" size={18} color="#f5a623" />
-                        </View>
-                    </View>
-                </LinearGradient>
-            </View>
+            {/* Top Accent Gold Bar */}
+            <View style={s.topAccentLine} />
 
-            {/* Compact Filters */}
-            <View style={s.filterRow}>
-                {['All', 'In', 'Out'].map(f => (
-                    <TouchableOpacity 
-                        key={f} 
-                        style={[s.filterChip, filter === f && s.filterChipActive]}
-                        onPress={() => setFilter(f)}
-                    >
-                        <Text style={[s.filterText, filter === f && s.filterTextActive]}>{f}</Text>
+            {/* Executive Header Banner */}
+            <LinearGradient colors={['#020617', '#0F172A', '#1E293B']} style={s.headerContainer}>
+                <View style={s.headerNavRow}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.8}>
+                        <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
                     </TouchableOpacity>
-                ))}
+
+                    <Text style={s.headerTitleText}>Transaction History</Text>
+
+                    <TouchableOpacity onPress={() => fetchHistory()} style={s.refreshBtn} activeOpacity={0.8}>
+                        <Ionicons name="reload-outline" size={16} color="#F59E0B" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Summary Metrics Pill Bar */}
+                <View style={s.summaryPillRow}>
+                    <View style={s.summaryPill}>
+                        <Ionicons name="receipt" size={13} color="#F59E0B" />
+                        <Text style={s.summaryPillText}>
+                            {filteredHistory.length} {filteredHistory.length === 1 ? 'Record' : 'Records'}
+                        </Text>
+                    </View>
+
+                    <View style={s.summaryPill}>
+                        <Ionicons name="analytics" size={13} color="#10B981" />
+                        <Text style={s.summaryPillText}>
+                            Total: ₦{totalVolume.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </Text>
+                    </View>
+                </View>
+            </LinearGradient>
+
+            {/* Search & Filter Container */}
+            <View style={s.searchFilterBox}>
+                {/* Search Input Bar */}
+                <View style={s.searchBarInputContainer}>
+                    <Ionicons name="search-outline" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search ref, service, amount..."
+                        placeholderTextColor="#94A3B8"
+                        style={s.searchBarInput}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 2 }}>
+                            <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Category Filter Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterChipsScroll}>
+                    {['All', 'Deposits', 'Withdrawals', 'Services', 'Pending/Failed'].map(f => (
+                        <TouchableOpacity
+                            key={f}
+                            style={[s.filterChip, filter === f && s.filterChipActive]}
+                            onPress={() => {
+                                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setFilter(f);
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[s.filterChipText, filter === f && s.filterChipTextActive]}>{f}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             </View>
 
-            {/* Compact Section List */}
+            {/* Transaction Section List */}
             <SectionList
                 sections={sections}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={s.listContent}
-                onRefresh={fetchHistory}
-                refreshing={loading}
+                keyExtractor={(item) => item.id || Math.random().toString()}
+                contentContainerStyle={s.listPadding}
+                onRefresh={handleRefresh}
+                refreshing={refreshing}
                 showsVerticalScrollIndicator={false}
                 stickySectionHeadersEnabled={false}
                 initialNumToRender={15}
@@ -153,44 +242,148 @@ export default function HistoryScreen() {
                 windowSize={7}
                 removeClippedSubviews={Platform.OS !== 'web'}
                 renderSectionHeader={({ section: { title } }) => (
-                    <Text style={s.sectionHeader}>{title}</Text>
+                    <Text style={s.sectionHeaderTitle}>{title}</Text>
                 )}
                 renderItem={({ item }) => (
                     <TouchableOpacity
-                        style={s.transactionCard}
-                        onPress={() => router.push(`/transaction-details/${item.id}`)}
-                        activeOpacity={0.6}
+                        style={s.txItemCard}
+                        onPress={() => {
+                            if (Platform.OS !== 'web') Haptics.selectionAsync();
+                            setSelectedTx(item);
+                        }}
+                        activeOpacity={0.75}
                     >
-                        <View style={s.cardLeft}>
-                            <View style={[s.txIcon, { backgroundColor: item.color + '10' }]}>
-                                <Ionicons name={item.icon as any} size={18} color={item.color} />
+                        <View style={s.txCardLeft}>
+                            <View style={[s.txIconBox, { backgroundColor: item.color + '18' }]}>
+                                <Ionicons name={item.icon as any} size={16} color={item.color} />
                             </View>
-                            <View style={s.txInfo}>
-                                <Text style={s.txTitle} numberOfLines={1}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.txTitleText} numberOfLines={1}>
                                     {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                                 </Text>
-                                <Text style={s.txDesc} numberOfLines={1}>{item.description || item.reference}</Text>
+                                <Text style={s.txSubText} numberOfLines={1}>
+                                    {item.description || item.reference || 'Wallet transaction'}
+                                </Text>
                             </View>
                         </View>
-                        <View style={s.cardRight}>
-                            <Text style={[s.txAmount, item.isIncome ? s.amountPlus : s.amountMinus]}>
+
+                        <View style={s.txCardRight}>
+                            <Text style={[s.txAmountText, { color: item.isIncome ? '#10B981' : '#0F172A' }]}>
                                 {item.displayAmount}
                             </Text>
-                            <Text style={s.txTime}>
-                                {item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </Text>
+
+                            <View style={s.statusRow}>
+                                <View style={[s.statusDotSmall, { backgroundColor: item.status === 'success' ? '#10B981' : item.status === 'failed' ? '#EF4444' : '#F59E0B' }]} />
+                                <Text style={s.txTimeText}>
+                                    {item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                            </View>
                         </View>
                     </TouchableOpacity>
                 )}
                 ListEmptyComponent={() => (
-                    <View style={s.emptyState}>
+                    <View style={s.emptyBox}>
                         <Ionicons name="document-text-outline" size={32} color="#CBD5E1" />
-                        <Text style={s.emptyText}>No records found</Text>
+                        <Text style={s.emptyTitle}>No Transactions Found</Text>
+                        <Text style={s.emptySub}>
+                            {searchQuery ? 'Try matching another keyword or filter.' : 'Your transactions history will appear here.'}
+                        </Text>
                     </View>
                 )}
             />
-            <StatusBar style="dark" />
-        </SafeAreaView>
+
+            {/* INTERACTIVE TRANSACTION DETAILS MODAL SHEET */}
+            <Modal
+                visible={!!selectedTx}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setSelectedTx(null)}
+            >
+                {selectedTx && (
+                    <View style={s.modalBackdrop}>
+                        <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedTx(null)} activeOpacity={1} />
+
+                        <View style={s.modalSheet}>
+                            <View style={s.modalDragBar} />
+
+                            <View style={s.modalHeader}>
+                                <Text style={s.modalHeaderTitle}>Transaction Details</Text>
+                                <TouchableOpacity onPress={() => setSelectedTx(null)} style={s.modalCloseBtn}>
+                                    <Ionicons name="close" size={18} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                                {/* Big Amount Badge */}
+                                <View style={s.detailAmountCard}>
+                                    <Text style={[s.detailAmountText, { color: selectedTx.isIncome ? '#10B981' : '#0F172A' }]}>
+                                        {selectedTx.displayAmount}
+                                    </Text>
+
+                                    <View style={[s.detailStatusPill, { backgroundColor: selectedTx.status === 'success' ? '#ECFDF5' : selectedTx.status === 'failed' ? '#FEF2F2' : '#FEF3C7' }]}>
+                                        <Ionicons
+                                            name={selectedTx.status === 'success' ? 'checkmark-circle' : selectedTx.status === 'failed' ? 'close-circle' : 'time-sharp'}
+                                            size={14}
+                                            color={selectedTx.status === 'success' ? '#047857' : selectedTx.status === 'failed' ? '#B91C1C' : '#B45309'}
+                                        />
+                                        <Text style={[s.detailStatusPillText, { color: selectedTx.status === 'success' ? '#047857' : selectedTx.status === 'failed' ? '#B91C1C' : '#B45309' }]}>
+                                            {selectedTx.status ? selectedTx.status.toUpperCase() : 'SUCCESS'}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Key-Value Details Card */}
+                                <View style={s.detailInfoCard}>
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Transaction Type</Text>
+                                        <Text style={s.infoValue}>{selectedTx.type.toUpperCase()}</Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Description</Text>
+                                        <Text style={s.infoValue} numberOfLines={2}>{selectedTx.description || 'Wallet Transaction'}</Text>
+                                    </View>
+
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Date & Time</Text>
+                                        <Text style={s.infoValue}>{selectedTx.dateObj.toLocaleString()}</Text>
+                                    </View>
+
+                                    <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
+                                        <Text style={s.infoLabel}>Reference ID</Text>
+                                        <TouchableOpacity onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id)} style={s.refCopyRow}>
+                                            <Text style={s.refText} numberOfLines={1}>{selectedTx.reference || selectedTx.id}</Text>
+                                            <Ionicons name="copy-outline" size={13} color="#F59E0B" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Action Buttons */}
+                                <View style={s.modalActionsCol}>
+                                    <TouchableOpacity
+                                        onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id, 'Transaction Reference')}
+                                        style={s.copyRefBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="copy-outline" size={16} color="#0F172A" />
+                                        <Text style={s.copyRefBtnText}>Copy Reference ID</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => contactSupport(selectedTx)}
+                                        style={s.whatsappSupportBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                        <Text style={s.whatsappSupportBtnText}>Need Help? WhatsApp Support</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        </View>
+                    </View>
+                )}
+            </Modal>
+        </View>
     );
 }
 
@@ -199,183 +392,354 @@ const s = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
-    centerContainer: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-        alignItems: 'center',
-        justifyContent: 'center',
+    topAccentLine: {
+        height: 2.5,
+        backgroundColor: '#F59E0B',
     },
-    header: {
+    headerContainer: {
+        paddingTop: Platform.OS === 'android' ? 32 : 42,
+        paddingBottom: 16,
+        paddingHorizontal: 16,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        borderBottomWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    headerNavRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 12,
+        marginBottom: 10,
     },
-    iconButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#f1f5f9',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0F172A',
-    },
-    summaryContainer: {
-        paddingHorizontal: 16,
-        marginBottom: 16,
-    },
-    summaryCard: {
+    backBtn: {
+        width: 32,
+        height: 32,
         borderRadius: 16,
-        padding: 16,
-        shadowColor: '#0d1b3e',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    summaryContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    summaryIconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    summaryLabel: {
-        color: '#e2e8f0',
-        fontSize: 12,
-        fontWeight: '500',
-        marginBottom: 4,
-    },
-    summaryValue: {
+    headerTitleText: {
         color: '#FFFFFF',
-        fontSize: 24,
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: -0.3,
+    },
+    refreshBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryPillRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    summaryPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 10,
+    },
+    summaryPillText: {
+        color: '#FFFFFF',
+        fontSize: 10.5,
         fontWeight: '800',
     },
-    filterRow: {
-        flexDirection: 'row',
+    searchFilterBox: {
         paddingHorizontal: 16,
-        marginBottom: 12,
+        paddingTop: 12,
+        paddingBottom: 4,
+    },
+    searchBarInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        height: 38,
+        marginBottom: 10,
+    },
+    searchBarInput: {
+        flex: 1,
+        fontSize: 12,
+        color: '#0F172A',
+        fontWeight: '600',
+    },
+    filterChipsScroll: {
+        flexDirection: 'row',
+        gap: 6,
+        paddingBottom: 4,
     },
     filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 10,
         backgroundColor: '#FFFFFF',
-        marginRight: 8,
         borderWidth: 1,
         borderColor: '#E2E8F0',
     },
     filterChipActive: {
-        backgroundColor: '#0d1b3e',
-        borderColor: '#0d1b3e',
+        backgroundColor: '#0F172A',
+        borderColor: '#F59E0B',
     },
-    filterText: {
+    filterChipText: {
         color: '#64748B',
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700',
     },
-    filterTextActive: {
-        color: '#FFFFFF',
+    filterChipTextActive: {
+        color: '#F59E0B',
+        fontWeight: '900',
     },
-    listContent: {
+    listPadding: {
         paddingHorizontal: 16,
         paddingBottom: 40,
     },
-    sectionHeader: {
-        fontSize: 12,
-        fontWeight: '700',
+    sectionHeaderTitle: {
+        fontSize: 10.5,
+        fontWeight: '800',
         color: '#94A3B8',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
         marginTop: 12,
-        marginBottom: 8,
-        marginLeft: 4,
+        marginBottom: 6,
+        marginLeft: 2,
     },
-    transactionCard: {
+    txItemCard: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        justifyContent: 'space-between',
         backgroundColor: '#FFFFFF',
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 12,
-        marginBottom: 8,
-        shadowColor: '#000',
+        padding: 10,
+        borderRadius: 14,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.02,
+        shadowOpacity: 0.03,
         shadowRadius: 3,
         elevation: 1,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
     },
-    cardLeft: {
+    txCardLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
+        gap: 8,
     },
-    txIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+    txIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
     },
-    txInfo: {
-        flex: 1,
-        paddingRight: 8,
-    },
-    txTitle: {
-        fontSize: 14,
-        fontWeight: '700',
+    txTitleText: {
         color: '#0F172A',
-        marginBottom: 2,
-    },
-    txDesc: {
         fontSize: 12,
-        color: '#64748B',
-        fontWeight: '400',
+        fontWeight: '800',
     },
-    cardRight: {
+    txSubText: {
+        color: '#64748B',
+        fontSize: 10,
+        fontWeight: '500',
+        marginTop: 1,
+    },
+    txCardRight: {
         alignItems: 'flex-end',
     },
-    txAmount: {
-        fontSize: 14,
-        fontWeight: '800',
+    txAmountText: {
+        fontSize: 12,
+        fontWeight: '900',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-        marginBottom: 2,
     },
-    amountPlus: {
-        color: '#107C10',
+    statusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 2,
     },
-    amountMinus: {
-        color: '#0d1b3e',
+    statusDotSmall: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
     },
-    txTime: {
-        fontSize: 11,
+    txTimeText: {
         color: '#94A3B8',
-        fontWeight: '500',
+        fontSize: 9.5,
+        fontWeight: '600',
     },
-    emptyState: {
+    emptyBox: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: 60,
+        paddingVertical: 40,
     },
-    emptyText: {
-        fontSize: 14,
+    emptyTitle: {
+        color: '#0F172A',
+        fontSize: 13,
+        fontWeight: '800',
+        marginTop: 6,
+    },
+    emptySub: {
         color: '#94A3B8',
-        fontWeight: '600',
-        marginTop: 12,
+        fontSize: 11,
+        marginTop: 2,
+    },
+
+    // MODAL SHEET STYLES
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.65)',
+        justifyContent: 'flex-end',
+    },
+    modalSheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 16,
+        borderTopWidth: 2.5,
+        borderColor: '#F59E0B',
+        maxHeight: '80%',
+    },
+    modalDragBar: {
+        width: 36,
+        height: 4,
+        backgroundColor: '#CBD5E1',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 12,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    modalHeaderTitle: {
+        color: '#0F172A',
+        fontSize: 16,
+        fontWeight: '900',
+    },
+    modalCloseBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    detailAmountCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 14,
+    },
+    detailAmountText: {
+        fontSize: 26,
+        fontWeight: '900',
+        letterSpacing: -0.5,
+        marginBottom: 6,
+    },
+    detailStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 10,
+    },
+    detailStatusPillText: {
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    detailInfoCard: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        marginBottom: 14,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    infoLabel: {
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    infoValue: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '800',
+        maxWidth: 200,
+        textAlign: 'right',
+    },
+    refCopyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    refText: {
+        color: '#0F172A',
+        fontSize: 11,
+        fontWeight: '800',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    modalActionsCol: {
+        gap: 8,
+    },
+    copyRefBtn: {
+        backgroundColor: '#F1F5F9',
+        height: 42,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    copyRefBtnText: {
+        color: '#0F172A',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    whatsappSupportBtn: {
+        backgroundColor: '#0F172A',
+        borderColor: '#25D366',
+        borderWidth: 1.2,
+        height: 42,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    whatsappSupportBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '900',
     },
 });
