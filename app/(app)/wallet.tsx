@@ -572,14 +572,20 @@ export default function WalletScreen() {
                   </View>
                 )}
 
-                {parseFloat(fundingFeeValue) > 0 && (
-                  <View style={s.feeWarningBox}>
-                    <Ionicons name="information-circle" size={16} color="#d97706" style={{ marginTop: 2 }} />
-                    <Text style={s.feeWarningText}>
-                      A standard banking fee of <Text style={{ fontWeight: 'bold' }}>{fundingFeeType === 'fixed' ? `₦${fundingFeeValue}` : `${fundingFeeValue}%`}</Text> applies to all deposits via this method. This fee is charged directly by the payment processor.
+                <View style={s.feeWarningBox}>
+                  <Ionicons name="information-circle" size={18} color="#d97706" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#b45309', fontSize: 11, marginBottom: 2 }}>
+                      Automated Deposit Fee Structure:
+                    </Text>
+                    <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16 }}>
+                      • Deposits under <Text style={{ fontWeight: 'bold' }}>₦5,000</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>₦50 fixed fee</Text>
+                    </Text>
+                    <Text style={{ color: '#92400e', fontSize: 11, lineHeight: 16, marginTop: 2 }}>
+                      • Deposits <Text style={{ fontWeight: 'bold' }}>₦5,000 and above</Text>: <Text style={{ fontWeight: 'bold', color: '#b45309' }}>1% fee</Text>
                     </Text>
                   </View>
-                )}
+                </View>
               </ScrollView>
             ) : (
               <View style={{ flex: 1, paddingHorizontal: 8 }}>
@@ -601,6 +607,34 @@ export default function WalletScreen() {
                     />
                   </View>
                 </View>
+
+                {/* Live Deposit Fee Breakdown */}
+                {parseFloat(fundAmount) > 0 && (
+                  <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '600' }}>Deposit Amount:</Text>
+                      <Text style={{ color: '#0F172A', fontSize: 11, fontWeight: '700' }}>₦{parseFloat(fundAmount).toLocaleString()}</Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '600' }}>
+                        Deposit Fee ({parseFloat(fundAmount) < 5000 ? 'Fixed ₦50' : '1%'}):
+                      </Text>
+                      <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                        -₦{(parseFloat(fundAmount) < 5000 ? 50 : parseFloat(fundAmount) * 0.01).toLocaleString()}
+                      </Text>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 4 }} />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                      <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '800' }}>Net Wallet Credit:</Text>
+                      <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900' }}>
+                        ₦{Math.max(0, parseFloat(fundAmount) - (parseFloat(fundAmount) < 5000 ? 50 : parseFloat(fundAmount) * 0.01)).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 <TouchableOpacity
                   onPress={() => {

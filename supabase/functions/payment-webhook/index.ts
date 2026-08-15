@@ -386,37 +386,25 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
     
     console.log(`[FundWallet] User Match via ${method}: ${profile.id}`);
 
-    // 2.5 Fetch Funding Fee
+    // 2.5 Dynamic Tiered Funding Fee Calculation:
+    // User Directive: Amount < ₦5,000 -> ₦50 fixed fee | Amount >= ₦5,000 -> 1% percentage fee
     let feeAmount = 0;
-    let feeValue = 0;
-    let feeType = 'percentage';
-    const { data: feeSettings } = await supabaseAdmin
-        .from('app_settings')
-        .select('key, value')
-        .in('key', ['funding_fee_value', 'funding_fee_type', 'funding_fee_percentage']);
-        
-    if (feeSettings) {
-        const typeSetting = feeSettings.find(s => s.key === 'funding_fee_type');
-        if (typeSetting) feeType = typeSetting.value;
-        
-        let valSetting = feeSettings.find(s => s.key === 'funding_fee_value');
-        if (!valSetting) valSetting = feeSettings.find(s => s.key === 'funding_fee_percentage');
-        
-        if (valSetting && valSetting.value) {
-            feeValue = parseFloat(valSetting.value);
-            if (!isNaN(feeValue) && feeValue > 0) {
-                if (feeType === 'fixed') {
-                    feeAmount = feeValue;
-                    console.log(`[FundWallet] Applying fixed fee: ${feeAmount} deducted from ${amount}`);
-                } else {
-                    feeAmount = amount * (feeValue / 100);
-                    console.log(`[FundWallet] Applying ${feeValue}% fee: ${feeAmount} deducted from ${amount}`);
-                }
-            }
-        }
+    let feeType = 'fixed';
+    let feeValue = 50;
+
+    if (amount < 5000) {
+        feeAmount = 50;
+        feeType = 'fixed';
+        feeValue = 50;
+        console.log(`[FundWallet] Amount < 5000: Applying fixed ₦50 fee to deposit of ₦${amount}`);
+    } else {
+        feeAmount = amount * 0.01;
+        feeType = 'percentage';
+        feeValue = 1;
+        console.log(`[FundWallet] Amount >= 5000: Applying 1% fee (₦${feeAmount}) to deposit of ₦${amount}`);
     }
     
-    const creditedAmount = amount - feeAmount;
+    const creditedAmount = Math.max(0, amount - feeAmount);
 
     // 3. Fund Wallet (Atomic RPC)
     let finalBalance = 0;
