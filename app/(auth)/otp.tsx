@@ -36,11 +36,17 @@ export default function OTP() {
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     const [counter, setCounter] = useState(60);
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string>('');
     const inputRefs = useRef<Array<TextInput | null>>([]);
+    const initialEmailSentRef = useRef(false);
 
     useEffect(() => {
         if (!targetEmail) {
             fetchActiveUserEmail();
+        } else if (!initialEmailSentRef.current) {
+            initialEmailSentRef.current = true;
+            sendOtpEmail(targetEmail);
         }
     }, [targetEmail]);
 
@@ -56,9 +62,41 @@ export default function OTP() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user?.email) {
                 setTargetEmail(user.email);
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name, avatar_url')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                if (profile?.full_name) setUserName(profile.full_name);
+                if (profile?.avatar_url) setUserAvatar(profile.avatar_url);
+
+                if (!initialEmailSentRef.current) {
+                    initialEmailSentRef.current = true;
+                    sendOtpEmail(user.email);
+                }
             }
         } catch (e) {
             console.log('Error fetching user email in OTP:', e);
+        }
+    };
+
+    const sendOtpEmail = async (emailToSend: string) => {
+        if (!emailToSend) return;
+        setResending(true);
+        try {
+            // Trigger Supabase Auth Password/PIN Reset Recovery Code
+            const { error } = await supabase.auth.resetPasswordForEmail(emailToSend);
+            if (error) {
+                console.log('Supabase resetPasswordForEmail info:', error.message);
+                await supabase.auth.resend({
+                    type: params.tempFullName ? 'signup' : 'recovery',
+                    email: emailToSend,
+                });
+            }
+        } catch (err: any) {
+            console.error('Error triggering OTP email:', err);
+        } finally {
+            setResending(false);
         }
     };
 
@@ -70,6 +108,11 @@ export default function OTP() {
         if (value && index < 5) {
             inputRefs.current[index + 1]?.focus();
         }
+
+        // Auto submit if all 6 digits entered
+        if (newOtp.every((digit) => digit !== '') && newOtp.join('').length === 6) {
+            handleVerifyWithDigits(newOtp.join(''));
+        }
     };
 
     const handleKeyPress = (e: any, index: number) => {
@@ -78,31 +121,24 @@ export default function OTP() {
         }
     };
 
-    const handleVerify = async () => {
-        const token = otp.join('');
-        if (token.length !== 6) {
-            const msg = 'Please enter the complete 6-digit verification code.';
-            if (Platform.OS === 'web') alert(msg);
-            else Alert.alert('Invalid Code', msg);
-            return;
-        }
+    const handleVerifyWithDigits = async (codeToken: string) => {
+        if (codeToken.length !== 6 || loading) return;
 
         setLoading(true);
         try {
             const { error } = await supabase.auth.verifyOtp({
                 email: targetEmail,
-                token,
+                token: codeToken,
                 type: params.tempFullName ? 'signup' : 'recovery',
             });
 
             if (error) {
-                // Fallback attempt with magiclink or recovery token if signup type failed
-                const { error: recoveryErr } = await supabase.auth.verifyOtp({
+                const { error: magicErr } = await supabase.auth.verifyOtp({
                     email: targetEmail,
-                    token,
+                    token: codeToken,
                     type: 'magiclink',
                 });
-                if (recoveryErr && error) throw error;
+                if (magicErr && error) throw error;
             }
 
             const { data: { user } } = await supabase.auth.getUser();
@@ -118,13 +154,6 @@ export default function OTP() {
                     role: 'user',
                     balance: 0,
                 });
-
-                await supabase.from('notifications').insert({
-                    user_id: user.id,
-                    title: 'Welcome to ABU MAFHAL SUB! 🎉',
-                    body: 'Your account is verified. Fund your wallet to start trading.',
-                    data: { priority: 'normal', type: 'welcome' },
-                });
             }
 
             if (Platform.OS === 'web') {
@@ -136,12 +165,16 @@ export default function OTP() {
                 ]);
             }
         } catch (error: any) {
-            const errMsg = error.message || 'Verification failed. Please check the code and try again.';
+            const errMsg = error.message || 'Invalid 6-digit code. Please check your email and try again.';
             if (Platform.OS === 'web') alert(errMsg);
             else Alert.alert('Verification Failed', errMsg);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleVerify = () => {
+        handleVerifyWithDigits(otp.join(''));
     };
 
     const handleResend = async () => {
@@ -152,26 +185,17 @@ export default function OTP() {
             return;
         }
 
-        setResending(true);
-        try {
-            const { error } = await supabase.auth.resend({
-                type: params.tempFullName ? 'signup' : 'recovery',
-                email: targetEmail,
-            });
+        setCounter(60);
+        await sendOtpEmail(targetEmail);
+        const msg = 'A fresh 6-digit code has been sent to your email inbox.';
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Code Sent', msg);
+    };
 
-            if (error) throw error;
-
-            setCounter(60);
-            const msg = 'A new 6-digit verification code has been sent to your email.';
-            if (Platform.OS === 'web') alert(msg);
-            else Alert.alert('Code Sent', msg);
-        } catch (error: any) {
-            const msg = error.message || 'Failed to resend code';
-            if (Platform.OS === 'web') alert(msg);
-            else Alert.alert('Error', msg);
-        } finally {
-            setResending(false);
-        }
+    const getUserInitial = () => {
+        if (userName && userName.trim()) return userName.trim().charAt(0).toUpperCase();
+        if (targetEmail && targetEmail.trim()) return targetEmail.trim().charAt(0).toUpperCase();
+        return 'U';
     };
 
     return (
@@ -201,44 +225,41 @@ export default function OTP() {
                             style={s.backBtn}
                             activeOpacity={0.7}
                         >
-                            <Ionicons name="arrow-back" size={20} color="#F59E0B" />
+                            <Ionicons name="arrow-back" size={18} color="#F59E0B" />
                         </TouchableOpacity>
 
                         <View style={s.securityBadge}>
-                            <Ionicons name="shield-checkmark" size={13} color="#F59E0B" />
-                            <Text style={s.securityBadgeText}>OTP VERIFICATION</Text>
+                            <Ionicons name="shield-checkmark" size={12} color="#F59E0B" />
+                            <Text style={s.securityBadgeText}>ENCRYPTED OTP</Text>
                         </View>
 
-                        <View style={{ width: 36 }} />
+                        <View style={{ width: 32 }} />
                     </View>
 
-                    {/* Main Card Content */}
+                    {/* Compact Card Content */}
                     <View style={s.card}>
-                        {/* Logo Circle */}
-                        <View style={s.logoWrapper}>
-                            <LinearGradient colors={['#F59E0B', '#D97706']} style={s.logoBorderRing}>
-                                <View style={s.logoInnerCard}>
-                                    <Image
-                                        source={
-                                            settings?.app_logo
-                                                ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url }
-                                                : require('../../assets/images/logo.png')
-                                        }
-                                        style={s.logoImage}
-                                        resizeMode="contain"
-                                    />
-                                </View>
+                        {/* Compact Avatar / Logo Badge */}
+                        <View style={s.avatarWrapper}>
+                            <LinearGradient colors={['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
+                                {userAvatar ? (
+                                    <Image source={{ uri: userAvatar }} style={s.avatarImage} />
+                                ) : (
+                                    <View style={s.avatarFallback}>
+                                        <Text style={s.avatarInitialText}>{getUserInitial()}</Text>
+                                    </View>
+                                )}
                             </LinearGradient>
+                            <View style={s.activeBadge}>
+                                <Ionicons name="mail" size={11} color="#020617" />
+                            </View>
                         </View>
 
                         {/* Title & Subtitle */}
-                        <Text style={s.titleText}>Verify Security Code</Text>
-                        <Text style={s.subtitleText}>
-                            We sent a 6-digit verification code to
-                        </Text>
+                        <Text style={s.titleText}>Verify Email Code</Text>
+                        <Text style={s.subtitleText}>Enter the 6-digit code sent to</Text>
                         <Text style={s.emailHighlightText}>{targetEmail || 'your registered email'}</Text>
 
-                        {/* 6-Digit OTP Inputs */}
+                        {/* Compact 6-Digit OTP Box Row */}
                         <View style={s.otpRow}>
                             {otp.map((digit, index) => (
                                 <View
@@ -264,7 +285,7 @@ export default function OTP() {
                             ))}
                         </View>
 
-                        {/* Verify Button */}
+                        {/* Verify Code Button */}
                         <TouchableOpacity
                             onPress={handleVerify}
                             disabled={loading}
@@ -281,8 +302,8 @@ export default function OTP() {
                                     <ActivityIndicator color="#020617" size="small" />
                                 ) : (
                                     <View style={s.verifyBtnContent}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#020617" />
-                                        <Text style={s.verifyBtnText}>Verify Code & Continue</Text>
+                                        <Ionicons name="checkmark-circle" size={18} color="#020617" />
+                                        <Text style={s.verifyBtnText}>Verify Code</Text>
                                     </View>
                                 )}
                             </LinearGradient>
@@ -290,7 +311,7 @@ export default function OTP() {
 
                         {/* Resend Section */}
                         <View style={s.resendContainer}>
-                            <Text style={s.resendLabel}>Didn't receive the code?</Text>
+                            <Text style={s.resendLabel}>Didn't receive the email?</Text>
                             <TouchableOpacity
                                 disabled={counter > 0 || resending}
                                 onPress={handleResend}
@@ -327,20 +348,20 @@ const s = StyleSheet.create({
     },
     topGlow: {
         position: 'absolute',
-        top: -100,
+        top: -80,
         alignSelf: 'center',
-        width: 320,
-        height: 320,
-        borderRadius: 160,
+        width: 280,
+        height: 280,
+        borderRadius: 140,
         backgroundColor: 'rgba(245, 158, 11, 0.12)',
     },
     bottomGlow: {
         position: 'absolute',
-        bottom: -100,
+        bottom: -80,
         alignSelf: 'center',
-        width: 340,
-        height: 340,
-        borderRadius: 170,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
         backgroundColor: 'rgba(15, 23, 42, 0.8)',
     },
     safeArea: {
@@ -349,22 +370,22 @@ const s = StyleSheet.create({
     keyboardView: {
         flex: 1,
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
         alignSelf: 'center',
         width: '100%',
-        maxWidth: 440,
+        maxWidth: 340,
     },
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 10,
+        paddingTop: 6,
     },
     backBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderColor: 'rgba(245, 158, 11, 0.3)',
         borderWidth: 1,
@@ -374,17 +395,17 @@ const s = StyleSheet.create({
     securityBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
         backgroundColor: 'rgba(245, 158, 11, 0.1)',
         borderColor: 'rgba(245, 158, 11, 0.3)',
         borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 16,
     },
     securityBadgeText: {
         color: '#F59E0B',
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '800',
         letterSpacing: 0.5,
     },
@@ -392,116 +413,135 @@ const s = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
+        paddingVertical: 10,
     },
-    logoWrapper: {
-        marginBottom: 16,
+    avatarWrapper: {
+        position: 'relative',
+        marginBottom: 10,
     },
-    logoBorderRing: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        padding: 3,
+    avatarBorderRing: {
+        width: 58,
+        height: 58,
+        borderRadius: 29,
+        padding: 2.5,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
-    logoInnerCard: {
-        width: 66,
-        height: 66,
-        borderRadius: 33,
+    avatarImage: {
+        width: 53,
+        height: 53,
+        borderRadius: 26.5,
+        backgroundColor: '#0F172A',
+    },
+    avatarFallback: {
+        width: 53,
+        height: 53,
+        borderRadius: 26.5,
         backgroundColor: '#0F172A',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(245, 158, 11, 0.3)',
     },
-    logoImage: {
-        width: 42,
-        height: 42,
+    avatarInitialText: {
+        color: '#F59E0B',
+        fontSize: 22,
+        fontWeight: '900',
+    },
+    activeBadge: {
+        position: 'absolute',
+        bottom: 1,
+        right: 1,
+        backgroundColor: '#F59E0B',
+        borderRadius: 8,
+        width: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     titleText: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '800',
         letterSpacing: -0.3,
-        marginBottom: 6,
+        marginBottom: 3,
     },
     subtitleText: {
         color: '#94A3B8',
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '500',
         textAlign: 'center',
     },
     emailHighlightText: {
         color: '#F59E0B',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
-        marginTop: 2,
-        marginBottom: 24,
+        marginTop: 1,
+        marginBottom: 18,
     },
     otpRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         width: '100%',
-        gap: 8,
-        marginBottom: 28,
+        gap: 6,
+        marginBottom: 20,
     },
     otpBox: {
-        flex: 1,
-        height: 54,
-        borderRadius: 14,
+        width: 44,
+        height: 44,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
+        borderWidth: 1.2,
     },
     otpBoxEmpty: {
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     otpBoxFilled: {
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
         borderColor: '#F59E0B',
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.4,
-        shadowRadius: 6,
-        elevation: 4,
+        shadowRadius: 5,
+        elevation: 3,
     },
     otpInput: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '800',
         width: '100%',
         textAlign: 'center',
     },
     verifyBtnWrapper: {
         width: '100%',
-        marginBottom: 20,
+        marginBottom: 16,
     },
     verifyBtnGradient: {
-        height: 54,
-        borderRadius: 16,
+        height: 44,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 5,
     },
     verifyBtnContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     verifyBtnText: {
         color: '#020617',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '800',
     },
     resendContainer: {
@@ -509,16 +549,16 @@ const s = StyleSheet.create({
     },
     resendLabel: {
         color: '#94A3B8',
-        fontSize: 13,
+        fontSize: 11,
         fontWeight: '500',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     resendBtn: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     resendBtnText: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
     },
     resendBtnActive: {
@@ -528,17 +568,17 @@ const s = StyleSheet.create({
         color: '#64748B',
     },
     counterBadge: {
-        marginLeft: 6,
+        marginLeft: 5,
         backgroundColor: 'rgba(245, 158, 11, 0.15)',
-        paddingHorizontal: 8,
+        paddingHorizontal: 6,
         paddingVertical: 2,
-        borderRadius: 12,
+        borderRadius: 10,
         borderWidth: 1,
         borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     counterText: {
         color: '#F59E0B',
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '800',
     },
 });
