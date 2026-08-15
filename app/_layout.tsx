@@ -127,8 +127,8 @@ export default function RootLayout() {
     const loaded = true;
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
-    const [initialized, setInitialized] = useState(false);
-    const [authChecked, setAuthChecked] = useState(false);
+    const [initialized, setInitialized] = useState(true);
+    const [authChecked, setAuthChecked] = useState(true);
     const router = useRouter();
     const segments = useSegments();
     const { settings, loading: settingsLoading } = useAppSettings();
@@ -174,14 +174,7 @@ export default function RootLayout() {
     };
 
     useEffect(() => {
-        // Safety timeout: Ensure app layout initializes within 1.5s even if network is slow/offline
-        const bootTimer = setTimeout(() => {
-            setAuthChecked(true);
-            setInitialized(true);
-        }, 300);
-
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-            clearTimeout(bootTimer);
             if (error) {
                 console.log("Session init error returned:", error.message);
                 if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token') || error.message?.includes('Refresh token')) {
@@ -203,7 +196,6 @@ export default function RootLayout() {
             setAuthChecked(true);
             setInitialized(true);
         }).catch(async (error) => {
-            clearTimeout(bootTimer);
             console.log("Session init error thrown:", error?.message || error);
             if (error?.message?.includes('Refresh Token') || error?.message?.includes('refresh_token') || error?.message?.includes('Refresh token')) {
                 await forceSignOut();

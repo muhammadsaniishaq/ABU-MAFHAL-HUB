@@ -32,7 +32,7 @@ export default function PinUnlockScreen() {
 
     const [pin, setPin] = useState('');
     const [savedPin, setSavedPin] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [biometricAvailable, setBiometricAvailable] = useState(false);
     const [userEmail, setUserEmail] = useState<string>('');
