@@ -264,14 +264,10 @@ export default function SignupScreen() {
                 setShowSuccessModal(true);
                 setTimeout(() => {
                     setShowSuccessModal(false);
-                    if (settings?.require_email_verif && !data.user?.email_confirmed_at) {
-                        router.push({
-                            pathname: '/otp' as any,
-                            params: { email: cleanEmail, type: 'signup' }
-                        });
-                    } else {
-                        router.replace('/pin-setup' as any);
-                    }
+                    router.push({
+                        pathname: '/otp' as any,
+                        params: { email: cleanEmail, mode: 'signup' }
+                    });
                 }, 1600);
             }
         } catch (error: any) {

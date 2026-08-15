@@ -159,40 +159,45 @@ export default function PinSetupScreen() {
             if (confirmPin === pin) {
                 setLoading(true);
                 try {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) throw new Error('User session not found');
-
+                    // 1. Store PIN in local storage & unlock app instantly
                     if (Platform.OS === 'web') {
                         await AsyncStorage.setItem('user_transaction_pin', pin);
                     } else {
                         await SecureStore.setItemAsync('user_transaction_pin', pin);
                     }
-
-                    const { error: dbError } = await supabase
-                        .from('profiles')
-                        .update({ transaction_pin: pin })
-                        .eq('id', user.id);
-
-                    if (dbError) throw dbError;
-
                     await AsyncStorage.setItem('app_unlocked', 'true');
-                    if (Platform.OS !== 'web') Vibration.vibrate(50);
+                    await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
                     setStoredPin(pin);
-                    setMode('verify');
 
+                    // 2. Sync to Supabase profiles gracefully
+                    try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user?.id) {
+                            await supabase
+                                .from('profiles')
+                                .update({ transaction_pin: pin })
+                                .eq('id', user.id);
+                        }
+                    } catch (e) {
+                        console.log('Profile transaction_pin sync notice:', e);
+                    }
+
+                    if (Platform.OS !== 'web') Vibration.vibrate(50);
+
+                    // 3. Inform user & navigate straight to dashboard
+                    const msg = 'Success! Your 4-digit Transaction PIN has been set successfully.';
                     if (Platform.OS === 'web') {
-                        alert('Success! Your 4-digit Transaction PIN has been set successfully.');
+                        alert(msg);
                         router.replace('/dashboard' as any);
                     } else {
-                        Alert.alert('Success', 'Your 4-digit Transaction PIN has been set successfully!', [
-                            { text: 'Continue', onPress: () => router.replace('/dashboard' as any) },
+                        Alert.alert('Success! 🎉', msg, [
+                            { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
                         ]);
                     }
                 } catch (error: any) {
-                    Alert.alert('Error', error.message || 'Failed to set PIN');
-                    setConfirmPin('');
-                    setPin('');
-                    setMode('create');
+                    const errMsg = error.message || 'Failed to save PIN';
+                    if (Platform.OS === 'web') alert(errMsg);
+                    else Alert.alert('Error', errMsg);
                 } finally {
                     setLoading(false);
                 }
