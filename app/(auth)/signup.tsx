@@ -167,45 +167,87 @@ export default function SignupScreen() {
 
     const strength = getPasswordStrength();
 
+    const notifyUser = (title: string, message: string) => {
+        if (Platform.OS === 'web') {
+            if (typeof window !== 'undefined' && window.alert) {
+                window.alert(`${title}\n\n${message}`);
+            } else {
+                Alert.alert(title, message);
+            }
+        } else {
+            Alert.alert(title, message);
+        }
+    };
+
     // Signup Handler
     const handleSignup = async () => {
-        if (!fullName.trim() || !username.trim() || !email.trim() || !phone.trim() || !password) {
-            Alert.alert('Missing Fields', 'Please fill in all required fields.');
+        const cleanFullName = fullName.trim();
+        const cleanUsername = username.trim().toLowerCase();
+        const cleanEmail = email.trim();
+        const cleanPhoneInput = phone.trim();
+
+        if (!cleanFullName) {
+            notifyUser('Missing Field', 'Please enter your Full Name.');
+            return;
+        }
+
+        if (!cleanUsername) {
+            notifyUser('Missing Field', 'Please choose a Username.');
+            return;
+        }
+
+        if (!cleanEmail || !cleanEmail.includes('@')) {
+            notifyUser('Invalid Email', 'Please enter a valid Email Address.');
+            return;
+        }
+
+        if (!cleanPhoneInput) {
+            notifyUser('Missing Field', 'Please enter your Phone Number.');
+            return;
+        }
+
+        if (!password) {
+            notifyUser('Missing Password', 'Please enter a Password.');
+            return;
+        }
+
+        if (password.length < 6) {
+            notifyUser('Weak Password', 'Password must be at least 6 characters long.');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Password Mismatch', 'Password and Confirm Password do not match.');
+            notifyUser('Password Mismatch', 'Password and Confirm Password do not match.');
             return;
         }
 
         if (!acceptTerms) {
-            Alert.alert('Terms Required', 'Please accept the Terms of Service & Privacy Policy to proceed.');
+            notifyUser('Terms Required', 'Please check the box to accept the Terms of Service & Privacy Policy.');
             return;
         }
 
         if (usernameAvailable === false) {
-            Alert.alert('Username Taken', 'The username you selected is already in use.');
+            notifyUser('Username Taken', 'The username you selected is already in use. Please try another.');
             return;
         }
 
         if (emailAvailable === false) {
-            Alert.alert('Email In Use', 'An account already exists with this email address.');
+            notifyUser('Email In Use', 'An account already exists with this email address. Please Log In instead.');
             return;
         }
 
         setLoading(true);
 
         try {
-            const cleanPhone = selectedCountry.dialCode + phone.replace(/^0+/, '').trim();
+            const cleanPhone = selectedCountry.dialCode + cleanPhoneInput.replace(/^0+/, '');
 
             const { data, error } = await supabase.auth.signUp({
-                email: email.trim(),
+                email: cleanEmail,
                 password: password,
                 options: {
                     data: {
-                        full_name: fullName.trim(),
-                        username: username.trim().toLowerCase(),
+                        full_name: cleanFullName,
+                        username: cleanUsername,
                         phone: cleanPhone,
                         referral_code: referralCode.trim() || null,
                         country: selectedCountry.name,
@@ -213,7 +255,10 @@ export default function SignupScreen() {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                notifyUser('Registration Error', error.message || 'An error occurred during account creation.');
+                return;
+            }
 
             if (data.user) {
                 setShowSuccessModal(true);
@@ -222,7 +267,7 @@ export default function SignupScreen() {
                     if (settings?.require_email_verif && !data.user?.email_confirmed_at) {
                         router.push({
                             pathname: '/otp' as any,
-                            params: { email: email.trim(), type: 'signup' }
+                            params: { email: cleanEmail, type: 'signup' }
                         });
                     } else {
                         router.replace('/pin-setup' as any);
@@ -230,7 +275,7 @@ export default function SignupScreen() {
                 }, 1600);
             }
         } catch (error: any) {
-            Alert.alert('Registration Error', error.message || 'An error occurred during account creation.');
+            notifyUser('Registration Error', error.message || 'An error occurred during account creation.');
         } finally {
             setLoading(false);
         }
