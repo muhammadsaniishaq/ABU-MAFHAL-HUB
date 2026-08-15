@@ -110,14 +110,14 @@ export default function Referrals() {
     };
 
     const copyLinkToClipboard = async () => {
-        const refLink = `${stats.baseUrl}/ref/${stats.code}`;
+        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
         await Clipboard.setStringAsync(refLink);
         Alert.alert("Link Copied!", "Referral link copied to clipboard!");
     };
 
     const shareLink = async () => {
         try {
-            const refLink = `${stats.baseUrl}/ref/${stats.code}`;
+            const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
             await Share.share({
                 message: `Join me on Abu Mafhal Sub for cheap data & instant VTU services!\n\nClick to sign up directly:\n${refLink}\n\nOr use my referral code "${stats.code}" when registering!`,
             });
