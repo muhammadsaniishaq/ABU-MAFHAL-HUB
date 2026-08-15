@@ -1,52 +1,88 @@
-import { View, Text, TouchableOpacity, Image, Dimensions, Vibration, Platform, Alert, StyleSheet, ActivityIndicator } from 'react-native';
-import { useAppSettings } from '../../hooks/useAppSettings';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    Image,
+    StyleSheet,
+    Platform,
+    Alert,
+    Vibration,
+    ActivityIndicator,
+    Animated,
+    Modal,
+    Linking,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../services/supabase';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { supabase, forceSignOut } from '../../services/supabase';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 export default function PinSetupScreen() {
     const { settings } = useAppSettings();
-    const { action } = useLocalSearchParams(); // could be 'verify' or 'setup' explicitly if needed
+    const router = useRouter();
+    const { action } = useLocalSearchParams();
+
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
-    
-    // Modes: 'create' -> 'confirm' -> 'verify'
     const [mode, setMode] = useState<'create' | 'confirm' | 'verify'>('create');
     const [storedPin, setStoredPin] = useState<string | null>(null);
     const [biometricEnabled, setBiometricEnabled] = useState(false);
-    
-    const [loading, setLoading] = useState(true);
-    const router = useRouter();
+
+    const [loading, setLoading] = useState(false);
+    const [showPin, setShowPin] = useState(false);
+    const [showForgotModal, setShowForgotModal] = useState(false);
+
+    // Profile Details
+    const [userName, setUserName] = useState<string>('');
+    const [userEmail, setUserEmail] = useState<string>('');
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
+
+    // Animation
+    const shakeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         checkExistingPin();
     }, []);
 
+    const triggerShakeAnimation = () => {
+        Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: 12, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: -12, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+        ]).start();
+    };
+
     const checkExistingPin = async () => {
         try {
-            // Check local secure store first
-            let savedPin = Platform.OS === 'web' 
+            let savedPin = Platform.OS === 'web'
                 ? await AsyncStorage.getItem('user_transaction_pin')
                 : await SecureStore.getItemAsync('user_transaction_pin');
-            
-            // If not found locally, check Supabase profile
-            if (!savedPin) {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', user.id).single();
-                    if (data?.transaction_pin) {
-                        savedPin = data.transaction_pin;
-                        // Save it back locally
-                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', savedPin as string);
-                        else await SecureStore.setItemAsync('user_transaction_pin', savedPin as string);
-                    }
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email || '');
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('full_name, avatar_url, transaction_pin')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (data?.full_name) setUserName(data.full_name);
+                if (data?.avatar_url) setUserAvatar(data.avatar_url);
+
+                if (!savedPin && data?.transaction_pin) {
+                    savedPin = data.transaction_pin;
+                    if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', savedPin as string);
+                    else await SecureStore.setItemAsync('user_transaction_pin', savedPin as string);
                 }
             }
 
@@ -57,21 +93,17 @@ export default function PinSetupScreen() {
                 setMode('create');
             }
 
-            // Check if biometrics is explicitly enabled by user
             const bioStatus = await AsyncStorage.getItem('biometrics_enabled');
-            if (bioStatus === 'true') {
+            if (bioStatus === 'true' && Platform.OS !== 'web') {
                 const hasHardware = await LocalAuthentication.hasHardwareAsync();
                 const isEnrolled = await LocalAuthentication.isEnrolledAsync();
                 if (hasHardware && isEnrolled) {
                     setBiometricEnabled(true);
                 }
             }
-
         } catch (error) {
-            console.error("Error checking PIN:", error);
+            console.error('Error checking PIN:', error);
             setMode('create');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -93,25 +125,26 @@ export default function PinSetupScreen() {
 
     const handlePress = (key: string) => {
         if (loading) return;
-        Vibration.vibrate(10);
-        
+        if (Platform.OS !== 'web') Vibration.vibrate(10);
+
         const currentPin = mode === 'confirm' ? confirmPin : pin;
         const setCurrent = mode === 'confirm' ? setConfirmPin : setPin;
 
         if (key === 'back') {
-            setCurrent(prev => prev.slice(0, -1));
+            setCurrent((prev) => prev.slice(0, -1));
             return;
         }
 
         if (currentPin.length < 4) {
-             setCurrent(prev => prev + key);
+            setCurrent((prev) => prev + key);
         }
     };
 
     const handleSuccessfulVerification = async () => {
-        Vibration.vibrate(50);
+        if (Platform.OS !== 'web') Vibration.vibrate(50);
+        await AsyncStorage.setItem('app_unlocked', 'true');
         await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
-        router.back(); // Go back to where they came from
+        router.replace('/dashboard' as any);
     };
 
     const processCompletePin = async () => {
@@ -124,16 +157,14 @@ export default function PinSetupScreen() {
                 setLoading(true);
                 try {
                     const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) throw new Error("User not found");
+                    if (!user) throw new Error('User session not found');
 
-                    // Save to local SecureStore
                     if (Platform.OS === 'web') {
                         await AsyncStorage.setItem('user_transaction_pin', pin);
                     } else {
                         await SecureStore.setItemAsync('user_transaction_pin', pin);
                     }
 
-                    // Update in DB
                     const { error: dbError } = await supabase
                         .from('profiles')
                         .update({ transaction_pin: pin })
@@ -142,20 +173,20 @@ export default function PinSetupScreen() {
                     if (dbError) throw dbError;
 
                     await AsyncStorage.setItem('app_unlocked', 'true');
-                    Vibration.vibrate(50);
+                    if (Platform.OS !== 'web') Vibration.vibrate(50);
                     setStoredPin(pin);
                     setMode('verify');
-                    
+
                     if (Platform.OS === 'web') {
-                        alert("Success! PIN created successfully!");
+                        alert('Success! Your 4-digit Transaction PIN has been set successfully.');
                         router.replace('/dashboard' as any);
                     } else {
-                        Alert.alert("Success", "PIN created successfully!", [
-                            { text: "Continue", onPress: () => router.replace('/dashboard' as any) }
+                        Alert.alert('Success', 'Your 4-digit Transaction PIN has been set successfully!', [
+                            { text: 'Continue', onPress: () => router.replace('/dashboard' as any) },
                         ]);
                     }
                 } catch (error: any) {
-                    Alert.alert("Error", error.message || "Failed to set PIN");
+                    Alert.alert('Error', error.message || 'Failed to set PIN');
                     setConfirmPin('');
                     setPin('');
                     setMode('create');
@@ -163,8 +194,11 @@ export default function PinSetupScreen() {
                     setLoading(false);
                 }
             } else {
-                Vibration.vibrate([50, 50, 50]);
-                Alert.alert("Mismatch", "PINs do not match. Please try again.");
+                triggerShakeAnimation();
+                if (Platform.OS !== 'web') Vibration.vibrate([50, 50, 50]);
+                const msg = 'PINs do not match. Please enter your PIN again.';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Mismatch', msg);
                 setConfirmPin('');
                 setPin('');
                 setMode('create');
@@ -173,14 +207,16 @@ export default function PinSetupScreen() {
             if (pin === storedPin) {
                 handleSuccessfulVerification();
             } else {
-                Vibration.vibrate([50, 50, 50]);
-                Alert.alert("Incorrect PIN", "The PIN you entered is incorrect. Please try again.");
+                triggerShakeAnimation();
+                if (Platform.OS !== 'web') Vibration.vibrate([50, 50, 50]);
+                const msg = 'The PIN you entered is incorrect. Please try again.';
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Incorrect PIN', msg);
                 setPin('');
             }
         }
     };
 
-    // Auto-advance
     useEffect(() => {
         if (mode === 'create' && pin.length === 4) {
             processCompletePin();
@@ -191,147 +227,268 @@ export default function PinSetupScreen() {
         }
     }, [pin, confirmPin, mode]);
 
-    const handleForgotPin = () => {
-        Alert.alert(
-            "Reset PIN",
-            "To reset your PIN, we need to send an OTP to your email or phone.",
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Proceed", onPress: () => {
-                    // Logic for forgot PIN. E.g. logging out or sending OTP
-                    Alert.alert("Notice", "Please contact support to reset your PIN securely.");
-                }}
-            ]
-        );
+    const handleSignOut = async () => {
+        try {
+            await forceSignOut();
+            await AsyncStorage.removeItem('app_unlocked');
+            await AsyncStorage.removeItem('has_active_session');
+            await AsyncStorage.removeItem('user_transaction_pin');
+            router.replace('/');
+        } catch (e) {
+            router.replace('/');
+        }
     };
 
-    if (loading) {
-        return (
-            <SafeAreaView style={s.centerContainer}>
-                <ActivityIndicator size="large" color="#0d1b3e" />
-            </SafeAreaView>
-        );
-    }
+    const handleContactSupport = () => {
+        setShowForgotModal(false);
+        const supportPhone = settings?.support_phone || '2348000000000';
+        const url = `https://wa.me/${supportPhone.replace(/\+/g, '')}?text=Hello%20Support,%20I%20need%20help%20resetting%20my%20PIN.`;
+        Linking.openURL(url).catch(() => {
+            router.push('/support' as any);
+        });
+    };
+
+    const getUserInitial = () => {
+        if (userName && userName.trim()) return userName.trim().charAt(0).toUpperCase();
+        if (userEmail && userEmail.trim()) return userEmail.trim().charAt(0).toUpperCase();
+        return 'U';
+    };
 
     const currentPinStr = mode === 'confirm' ? confirmPin : pin;
 
     return (
         <View style={s.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            <StatusBar style="dark" />
-            
-            {/* Colorful Mesh Gradient Background */}
-            <View style={StyleSheet.absoluteFillObject} className="pointer-events-none">
-                <LinearGradient colors={['rgba(245, 166, 35, 0.08)', 'rgba(245, 166, 35, 0)']} style={s.topGlow} />
-                <LinearGradient colors={['rgba(13, 27, 62, 0.06)', 'rgba(13, 27, 62, 0)']} style={s.bottomGlow} />
-            </View>
+            <StatusBar style="light" />
 
-            <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                {/* Header bar with Back Button */}
+            {/* Deep Royal Mesh Gradient */}
+            <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={StyleSheet.absoluteFillObject} />
+
+            {/* Glowing Ambient Lights */}
+            <View style={s.topGlow} />
+            <View style={s.bottomGlow} />
+
+            <SafeAreaView style={s.safeArea}>
+                {/* Header Navigation Bar */}
                 <View style={s.topBar}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backButton} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={20} color="#0d1b3e" />
+                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={20} color="#F59E0B" />
+                    </TouchableOpacity>
+
+                    <View style={s.securityBadge}>
+                        <Ionicons name="shield-checkmark" size={13} color="#F59E0B" />
+                        <Text style={s.securityBadgeText}>ENCRYPTED RESET</Text>
+                    </View>
+
+                    <View style={{ width: 36 }} />
+                </View>
+
+                {/* Main Setup Card */}
+                <View style={s.card}>
+                    {/* User Profile Avatar Ring */}
+                    <View style={s.avatarWrapper}>
+                        <LinearGradient colors={['#F59E0B', '#D97706', '#78350F']} style={s.avatarBorderRing}>
+                            {userAvatar ? (
+                                <Image source={{ uri: userAvatar }} style={s.avatarImage} />
+                            ) : (
+                                <View style={s.avatarFallback}>
+                                    <Text style={s.avatarInitialText}>{getUserInitial()}</Text>
+                                </View>
+                            )}
+                        </LinearGradient>
+                        <View style={s.activeBadge}>
+                            <Ionicons name="lock-closed" size={12} color="#020617" />
+                        </View>
+                    </View>
+
+                    {/* Title & Subtitle */}
+                    <Text style={s.titleText}>
+                        {mode === 'create' ? 'Create New PIN' : mode === 'confirm' ? 'Confirm New PIN' : 'Enter PIN'}
+                    </Text>
+                    <Text style={s.subtitleText}>
+                        {mode === 'create'
+                            ? 'Set a 4-digit PIN to secure all transactions'
+                            : mode === 'confirm'
+                            ? 'Re-enter your 4-digit PIN to verify'
+                            : 'Enter your PIN to complete verification'}
+                    </Text>
+
+                    {/* Step Indicator Pills */}
+                    <View style={s.stepPillsContainer}>
+                        <View style={[s.stepPill, mode === 'create' ? s.stepPillActive : s.stepPillCompleted]}>
+                            <Text style={[s.stepPillText, mode === 'create' ? s.stepPillTextActive : s.stepPillTextCompleted]}>
+                                1. Create PIN
+                            </Text>
+                        </View>
+
+                        <Ionicons name="chevron-forward" size={14} color="#64748B" />
+
+                        <View style={[s.stepPill, mode === 'confirm' ? s.stepPillActive : s.stepPillInactive]}>
+                            <Text style={[s.stepPillText, mode === 'confirm' ? s.stepPillTextActive : s.stepPillTextInactive]}>
+                                2. Confirm
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* PIN Mask Toggle & Dots */}
+                    <View style={s.pinSection}>
+                        <Animated.View style={[s.dotsContainer, { transform: [{ translateX: shakeAnim }] }]}>
+                            {[0, 1, 2, 3].map((idx) => {
+                                const filled = idx < currentPinStr.length;
+                                const currentDigit = currentPinStr[idx];
+                                return (
+                                    <View key={idx} style={[s.dot, filled ? s.dotFilled : s.dotEmpty]}>
+                                        {filled && showPin && (
+                                            <Text style={s.dotNumberText}>{currentDigit}</Text>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </Animated.View>
+
+                        <TouchableOpacity
+                            onPress={() => setShowPin(!showPin)}
+                            style={s.eyeToggleBtn}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name={showPin ? 'eye-off-outline' : 'eye-outline'} size={18} color="#94A3B8" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Keypad Grid */}
+                    <View style={s.keypadGrid}>
+                        {[
+                            [1, 2, 3],
+                            [4, 5, 6],
+                            [7, 8, 9],
+                        ].map((row, rIdx) => (
+                            <View key={rIdx} style={s.keypadRow}>
+                                {row.map((num) => (
+                                    <TouchableOpacity
+                                        key={num}
+                                        onPress={() => handlePress(num.toString())}
+                                        style={s.keypadButton}
+                                        activeOpacity={0.75}
+                                    >
+                                        <Text style={s.keypadButtonText}>{num}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        ))}
+
+                        <View style={s.keypadRow}>
+                            {/* Biometric (Verify Mode Only) */}
+                            {mode === 'verify' && biometricEnabled ? (
+                                <TouchableOpacity
+                                    onPress={handleBiometricAuth}
+                                    style={[s.keypadButton, s.actionKeypadButton]}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="finger-print" size={26} color="#F59E0B" />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={[s.keypadButton, { backgroundColor: 'transparent', borderWidth: 0 }]} />
+                            )}
+
+                            {/* Digit 0 */}
+                            <TouchableOpacity
+                                onPress={() => handlePress('0')}
+                                style={s.keypadButton}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={s.keypadButtonText}>0</Text>
+                            </TouchableOpacity>
+
+                            {/* Backspace */}
+                            <TouchableOpacity
+                                onPress={() => handlePress('back')}
+                                style={[s.keypadButton, s.actionKeypadButton]}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="backspace-outline" size={24} color="#F59E0B" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Reset & Recovery Help Button */}
+                    <TouchableOpacity
+                        style={s.helpBtn}
+                        onPress={() => setShowForgotModal(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="help-circle-outline" size={15} color="#F59E0B" />
+                        <Text style={s.helpBtnText}>Need Help Resetting PIN?</Text>
                     </TouchableOpacity>
                 </View>
-
-                {/* Compact Premium Dialer Card */}
-                <View style={s.card}>
-                    
-                    {/* Header Section */}
-                    <View style={s.headerContainer}>
-                        <View style={s.logoCard}>
-                            <Image 
-                                source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
-                                style={s.logo}
-                                resizeMode="contain"
-                            />
-                        </View>
-                        <Text style={s.title}>
-                            {mode === 'create' ? 'Create PIN' : mode === 'confirm' ? 'Confirm PIN' : 'Enter PIN'}
-                        </Text>
-                        <Text style={s.subtitle}>
-                            {mode === 'create' ? 'Secure your transactions' : mode === 'confirm' ? 'Re-enter your PIN' : 'Verify your identity to proceed'}
-                        </Text>
-                    </View>
-
-                    {/* Modern Dots */}
-                    <View style={s.dotsContainer}>
-                        {[0, 1, 2, 3].map((idx) => {
-                            const filled = idx < currentPinStr.length;
-                            return (
-                                <View 
-                                    key={idx} 
-                                    style={[s.dot, filled ? s.dotFilled : s.dotEmpty]} 
-                                />
-                            );
-                        })}
-                    </View>
-
-                    {/* Premium Keypad */}
-                    <View style={s.keypadContainer}>
-                         <View style={s.keypadGrid}>
-                            {[
-                                [1, 2, 3],
-                                [4, 5, 6],
-                                [7, 8, 9]
-                            ].map((row, rIdx) => (
-                                <View key={rIdx} style={s.keypadRow}>
-                                    {row.map(num => (
-                                        <TouchableOpacity
-                                            key={num}
-                                            onPress={() => handlePress(num.toString())}
-                                            style={s.keypadButton}
-                                            activeOpacity={0.6}
-                                        >
-                                            <Text style={s.keypadButtonText}>{num}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            ))}
-                            
-                            <View style={s.keypadRow}>
-                                {/* Bottom Left: Biometric (Only show if Verify mode AND enabled) */}
-                                {mode === 'verify' && biometricEnabled ? (
-                                    <TouchableOpacity
-                                        onPress={handleBiometricAuth}
-                                        style={[s.keypadButton, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }]}
-                                        activeOpacity={0.6}
-                                    >
-                                        <Ionicons name="finger-print" size={24} color="#0d1b3e" />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={[s.keypadButton, { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0, elevation: 0 }]} />
-                                )}
-                                
-                                <TouchableOpacity
-                                    onPress={() => handlePress('0')}
-                                    style={s.keypadButton}
-                                    activeOpacity={0.6}
-                                >
-                                    <Text style={s.keypadButtonText}>0</Text>
-                                </TouchableOpacity>
-
-                                {/* Bottom Right: Backspace */}
-                                <TouchableOpacity
-                                    onPress={() => handlePress('back')}
-                                    style={s.keypadButton}
-                                    activeOpacity={0.6}
-                                >
-                                    <Ionicons name="backspace-outline" size={24} color="#f5a623" style={{ marginRight: 2 }} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Forgot PIN Link (Only in verify mode) */}
-                    {mode === 'verify' && (
-                        <TouchableOpacity style={s.forgotPinBtn} onPress={handleForgotPin}>
-                            <Text style={s.forgotPinText}>Forgot PIN?</Text>
-                        </TouchableOpacity>
-                    )}
-
-                </View>
             </SafeAreaView>
+
+            {/* Forgot / Reset Help Modal */}
+            <Modal
+                visible={showForgotModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowForgotModal(false)}
+            >
+                <View style={s.modalOverlay}>
+                    <View style={s.modalCard}>
+                        <View style={s.modalHeader}>
+                            <View style={s.modalIconCircle}>
+                                <Ionicons name="key-outline" size={26} color="#F59E0B" />
+                            </View>
+                            <Text style={s.modalTitle}>PIN Reset Assistance</Text>
+                            <Text style={s.modalSub}>
+                                Choose an option to get help setting your 4-digit transaction PIN.
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={s.modalOptionBtn}
+                            onPress={() => {
+                                setShowForgotModal(false);
+                                router.push('/otp' as any);
+                            }}
+                        >
+                            <Ionicons name="mail-unread-outline" size={20} color="#F59E0B" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={s.modalOptionTitle}>Reset via Email OTP</Text>
+                                <Text style={s.modalOptionSub}>Send a 6-digit verification code to your email</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={s.modalOptionBtn} onPress={handleContactSupport}>
+                            <Ionicons name="chatbubbles-outline" size={20} color="#10B981" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={s.modalOptionTitle}>Contact Support Desk</Text>
+                                <Text style={s.modalOptionSub}>Get live assistance from ABU MAFHAL SUB team</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[s.modalOptionBtn, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}
+                            onPress={() => {
+                                setShowForgotModal(false);
+                                handleSignOut();
+                            }}
+                        >
+                            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                            <View style={s.modalOptionTextCol}>
+                                <Text style={[s.modalOptionTitle, { color: '#EF4444' }]}>Sign Out</Text>
+                                <Text style={s.modalOptionSub}>Log out of your account cleanly</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={s.modalCloseBtn}
+                            onPress={() => setShowForgotModal(false)}
+                        >
+                            <Text style={s.modalCloseBtnText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -339,165 +496,342 @@ export default function PinSetupScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f4f6fb',
-    },
-    centerContainer: {
-        flex: 1,
-        backgroundColor: '#f4f6fb',
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: '#020617',
     },
     topGlow: {
         position: 'absolute',
-        top: -150,
-        right: -150,
-        width: 450,
-        height: 450,
-        borderRadius: 225,
+        top: -100,
+        alignSelf: 'center',
+        width: 320,
+        height: 320,
+        borderRadius: 160,
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
     },
     bottomGlow: {
         position: 'absolute',
-        bottom: -150,
-        left: -150,
-        width: 450,
-        height: 450,
-        borderRadius: 225,
+        bottom: -100,
+        alignSelf: 'center',
+        width: 340,
+        height: 340,
+        borderRadius: 170,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    },
+    safeArea: {
+        flex: 1,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
     },
     topBar: {
-        position: 'absolute',
-        top: Platform.OS === 'ios' ? 44 : 20,
-        left: 20,
-        zIndex: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 10,
     },
-    backButton: {
+    backBtn: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#ffffff',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    securityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
         borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#0a1633',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.02,
-        shadowRadius: 4,
-        elevation: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    securityBadgeText: {
+        color: '#F59E0B',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
     },
     card: {
-        width: '90%',
-        maxWidth: 320,
-        backgroundColor: '#ffffff',
-        borderRadius: 32,
-        paddingHorizontal: 20,
-        paddingTop: 28,
-        paddingBottom: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#0d1b3e',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.04,
-        shadowRadius: 16,
-        elevation: 4,
-    },
-    headerContainer: {
-        alignItems: 'center',
-        width: '100%',
-    },
-    logoCard: {
-        width: 48, // Reduced size slightly for a cleaner look
-        height: 48,
-        backgroundColor: '#f8fafc',
-        borderRadius: 14,
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        paddingVertical: 10,
+    },
+    avatarWrapper: {
+        position: 'relative',
+        marginBottom: 12,
+    },
+    avatarBorderRing: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        padding: 3,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    avatarImage: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: '#0F172A',
+    },
+    avatarFallback: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: '#0F172A',
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(245, 166, 35, 0.2)', 
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
-    logo: {
-        width: 24,
-        height: 24,
+    avatarInitialText: {
+        color: '#F59E0B',
+        fontSize: 28,
+        fontWeight: '900',
     },
-    title: {
-        fontSize: 18,
+    activeBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        backgroundColor: '#F59E0B',
+        borderRadius: 10,
+        width: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    titleText: {
+        color: '#FFFFFF',
+        fontSize: 22,
         fontWeight: '800',
-        color: '#0d1b3e',
-        marginBottom: 4,
         letterSpacing: -0.3,
+        marginBottom: 4,
     },
-    subtitle: {
-        fontSize: 11,
-        color: '#64748b',
+    subtitleText: {
+        color: '#94A3B8',
+        fontSize: 12,
         fontWeight: '500',
         textAlign: 'center',
+        marginBottom: 14,
+    },
+    stepPillsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 18,
+    },
+    stepPill: {
         paddingHorizontal: 12,
-        lineHeight: 14,
+        paddingVertical: 5,
+        borderRadius: 16,
+        borderWidth: 1,
+    },
+    stepPillActive: {
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderColor: '#F59E0B',
+    },
+    stepPillCompleted: {
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderColor: '#10B981',
+    },
+    stepPillInactive: {
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    stepPillText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    stepPillTextActive: {
+        color: '#F59E0B',
+    },
+    stepPillTextCompleted: {
+        color: '#10B981',
+    },
+    stepPillTextInactive: {
+        color: '#64748B',
+    },
+    pinSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 20,
     },
     dotsContainer: {
         flexDirection: 'row',
-        gap: 12,
-        marginVertical: 18,
-        justifyContent: 'center',
         alignItems: 'center',
+        gap: 14,
     },
     dot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        borderWidth: 1.2,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     dotEmpty: {
-        backgroundColor: '#ffffff',
-        borderColor: '#cbd5e1',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1.5,
     },
     dotFilled: {
-        backgroundColor: '#f5a623',
-        borderColor: '#f5a623',
-        transform: [{ scale: 1.1 }],
+        backgroundColor: '#F59E0B',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 8,
+        elevation: 6,
     },
-    keypadContainer: {
-        width: '100%',
+    dotNumberText: {
+        color: '#020617',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    eyeToggleBtn: {
+        padding: 6,
     },
     keypadGrid: {
-        gap: 8, // Reduced gap for a tighter layout
         width: '100%',
+        maxWidth: 290,
+        gap: 14,
+        marginBottom: 16,
     },
     keypadRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: 10, // Added slight padding so buttons don't touch edges
+        alignItems: 'center',
     },
     keypadButton: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#ffffff',
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#0a1633',
-        shadowOffset: { width: 0, height: 1.5 },
-        shadowOpacity: 0.01,
-        shadowRadius: 3,
-        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     keypadButtonText: {
-        fontSize: 20,
+        color: '#FFFFFF',
+        fontSize: 26,
         fontWeight: '700',
-        color: '#0d1b3e',
     },
-    forgotPinBtn: {
-        marginTop: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
+    actionKeypadButton: {
+        backgroundColor: 'rgba(245, 158, 11, 0.08)',
+        borderColor: 'rgba(245, 158, 11, 0.25)',
     },
-    forgotPinText: {
-        color: '#f5a623',
+    helpBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+    },
+    helpBtnText: {
+        color: '#F59E0B',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(2, 6, 23, 0.85)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#0F172A',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+        borderWidth: 1,
+        borderRadius: 24,
+        padding: 22,
+        alignItems: 'center',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+    modalIconCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    modalTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+    modalSub: {
+        color: '#94A3B8',
         fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    modalOptionBtn: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+    },
+    modalOptionTextCol: {
+        flex: 1,
+    },
+    modalOptionTitle: {
+        color: '#FFFFFF',
+        fontSize: 14,
         fontWeight: '700',
-    }
+        marginBottom: 2,
+    },
+    modalOptionSub: {
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    modalCloseBtn: {
+        width: '100%',
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 6,
+    },
+    modalCloseBtnText: {
+        color: '#94A3B8',
+        fontSize: 14,
+        fontWeight: '700',
+    },
 });
