@@ -541,6 +541,7 @@ export default function SignupScreen() {
                                         onPress={() => setAcceptTerms(!acceptTerms)}
                                         style={styles.checkboxTouch}
                                         activeOpacity={0.8}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <View style={[
                                             styles.checkboxBox, 
@@ -553,13 +554,13 @@ export default function SignupScreen() {
                                         </Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7}>
+                                    <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                         <Text style={[styles.termsLink, { color: theme.accentTeal }]}> Terms</Text>
                                     </TouchableOpacity>
 
                                     <Text style={[styles.termsText, { color: theme.textSecondary }]}> & </Text>
 
-                                    <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7}>
+                                    <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                         <Text style={[styles.termsLink, { color: theme.accentTeal }]}>Privacy Policy</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -570,6 +571,7 @@ export default function SignupScreen() {
                                     disabled={loading}
                                     style={styles.primaryBtn}
                                     activeOpacity={0.85}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <LinearGradient 
                                         colors={['#0E1A2E', '#1E293B']} 
@@ -588,19 +590,19 @@ export default function SignupScreen() {
 
                                 {/* Social Sign Up Grid */}
                                 <View style={styles.socialGrid}>
-                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                                         {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={14} color="#EA4335" />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
                                     </TouchableOpacity>
 
                                     {(Platform.OS === 'ios' || Platform.OS === 'web') && (
-                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                                             {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={14} color={theme.textPrimary} />}
                                             <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
                                         </TouchableOpacity>
                                     )}
 
-                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
+                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                                         {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={14} color={theme.textPrimary} />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
                                     </TouchableOpacity>
@@ -609,7 +611,7 @@ export default function SignupScreen() {
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Already have an account?</Text>
-                                    <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8}>
+                                    <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                         <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Sign In</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -682,7 +684,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 14,
         paddingTop: 2,
-        paddingBottom: 10,
+        paddingBottom: 80,
     },
     topControlRow: {
         flexDirection: 'row',
