@@ -286,7 +286,7 @@ export default function UserProfileScreen() {
         }
     };
 
-    const refLink = `https://abumafhal.com.ng/register?ref=${profile?.username || profile?.custom_id || ''}`;
+    const refLink = `https://abumafhal.com.ng/ref/${profile?.referral_code || profile?.username || profile?.custom_id || ''}`;
 
     return (
         <View style={{ flex: 1, backgroundColor: L.bg, alignItems: 'center' }}>
