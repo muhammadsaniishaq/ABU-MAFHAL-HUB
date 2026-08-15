@@ -46,9 +46,16 @@ export default function Referrals() {
                 .from('app_settings')
                 .select('value')
                 .eq('key', 'referral_url')
-                .single();
+                .maybeSingle();
             
-            const dynamicUrl = settings?.value?.url || 'https://abumafhal.com.ng';
+            let dynamicUrl = 'https://abumafhal.com.ng';
+            if (settings?.value) {
+                if (typeof settings.value === 'string') {
+                    dynamicUrl = settings.value.trim().replace(/\/+$/, '');
+                } else if (typeof settings.value === 'object' && settings.value.url) {
+                    dynamicUrl = String(settings.value.url).trim().replace(/\/+$/, '');
+                }
+            }
 
             // 1. Get User Profile for Code and Balance
             const { data: profile } = await supabase
@@ -102,11 +109,17 @@ export default function Referrals() {
         Alert.alert("Copied", "Referral code copied to clipboard!");
     };
 
+    const copyLinkToClipboard = async () => {
+        const refLink = `${stats.baseUrl}/ref/${stats.code}`;
+        await Clipboard.setStringAsync(refLink);
+        Alert.alert("Link Copied!", "Referral link copied to clipboard!");
+    };
+
     const shareLink = async () => {
         try {
-            const refLink = `${stats.baseUrl}?ref=${stats.code}`;
+            const refLink = `${stats.baseUrl}/ref/${stats.code}`;
             await Share.share({
-                message: `Join me on Abu Mafhal Sub and get cheaper data!\n\nUse my code "${stats.code}" to sign up or click the link below:\n${refLink}`,
+                message: `Join me on Abu Mafhal Sub for cheap data & instant VTU services!\n\nClick to sign up directly:\n${refLink}\n\nOr use my referral code "${stats.code}" when registering!`,
             });
         } catch (error) {
             console.log(error);
@@ -210,10 +223,17 @@ export default function Referrals() {
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={shareLink} className="bg-[#0d1b3e] py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-[#0d1b3e]/30">
-                        <Ionicons name="share-social" size={18} color="#f5a623" />
-                        <Text className="text-white font-bold text-base">Invite Friends Now</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity onPress={copyLinkToClipboard} className="flex-1 bg-slate-100 py-3.5 rounded-xl flex-row items-center justify-center gap-2 border border-slate-200">
+                            <Ionicons name="link" size={16} color="#0d1b3e" />
+                            <Text className="text-[#0d1b3e] font-bold text-sm">Copy Link</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={shareLink} className="flex-1 bg-[#0d1b3e] py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-[#0d1b3e]/30">
+                            <Ionicons name="share-social" size={16} color="#f5a623" />
+                            <Text className="text-white font-bold text-sm">Share Link</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* How It Works Section */}

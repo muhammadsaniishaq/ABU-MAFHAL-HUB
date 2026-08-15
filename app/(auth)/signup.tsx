@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
@@ -31,6 +31,7 @@ export default function SignupScreen() {
     const { width } = useWindowDimensions();
     const isTabletOrDesktop = width >= 768;
     const router = useRouter();
+    const params = useLocalSearchParams<{ ref?: string; referral?: string; code?: string }>();
     const { settings } = useAppSettings();
     const { isDark, toggleTheme, theme } = useAuthTheme();
     const scrollViewRef = useRef<ScrollView>(null);
@@ -45,6 +46,20 @@ export default function SignupScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [referralCode, setReferralCode] = useState('');
     const [acceptTerms, setAcceptTerms] = useState(false);
+
+    // Auto-capture referral code from URL
+    useEffect(() => {
+        let codeFromUrl = params.ref || params.referral || params.code || '';
+        if (!codeFromUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                codeFromUrl = urlParams.get('ref') || urlParams.get('referral') || urlParams.get('code') || '';
+            } catch (e) {}
+        }
+        if (codeFromUrl) {
+            setReferralCode(String(codeFromUrl).trim());
+        }
+    }, [params.ref, params.referral, params.code]);
 
     // Visibility & UI States
     const [showPassword, setShowPassword] = useState(false);

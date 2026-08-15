@@ -99,7 +99,7 @@ export default function Splash() {
 
   useEffect(() => {
     if (ref) {
-      router.replace(`/(auth)/login?ref=${ref}`);
+      router.replace(`/(auth)/signup?ref=${ref}`);
       return;
     }
     setIsReady(true);
