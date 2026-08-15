@@ -351,24 +351,28 @@ export default function LoginScreen() {
                                 />
                                 <View style={{ marginLeft: 6 }}>
                                     <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
-                                    <Text style={[styles.brandTagline, { color: theme.gold }]}>FINTECH & DIGITAL HUB</Text>
+                                    <Text style={[styles.brandTagline, { color: '#F59E0B' }]}>ROYAL FINTECH & DIGITAL HUB</Text>
                                 </View>
                             </View>
 
                             {/* Security Badge Pill */}
-                            <View style={[styles.securityPill, { backgroundColor: isDark ? 'rgba(8, 228, 199, 0.12)' : 'rgba(14, 26, 46, 0.06)' }]}>
-                                <Ionicons name="shield-checkmark" size={11} color="#08E4C7" style={{ marginRight: 3 }} />
-                                <Text style={[styles.securityPillText, { color: isDark ? '#08E4C7' : '#0E1A2E' }]}>256-Bit SSL</Text>
+                            <View style={[styles.securityPill, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.08)', borderColor: '#F59E0B', borderWidth: 1 }]}>
+                                <Ionicons name="shield-checkmark" size={11} color="#F59E0B" style={{ marginRight: 3 }} />
+                                <Text style={[styles.securityPillText, { color: isDark ? '#F59E0B' : '#0F172A' }]}>256-Bit SSL</Text>
                             </View>
 
                             <TouchableOpacity 
                                 onPress={toggleTheme} 
                                 style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
                                 activeOpacity={0.8}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                                <Ionicons name={isDark ? "sunny" : "moon"} size={14} color={isDark ? "#FDE047" : "#0E1A2E"} />
+                                <Ionicons name={isDark ? "sunny" : "moon"} size={14} color={isDark ? "#FDE047" : "#0F172A"} />
                             </TouchableOpacity>
                         </View>
+
+                        {/* Royal Gold Header Accent Line */}
+                        <View style={{ height: 2, backgroundColor: '#F59E0B', borderRadius: 1, marginVertical: 6, opacity: 0.8 }} />
 
                         {/* Centered Single-Screen Locked Card */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
@@ -381,11 +385,24 @@ export default function LoginScreen() {
                             {/* Welcome Headline */}
                             <View style={styles.headlineBox}>
                                 <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>
-                                    Welcome Back <Text style={{ color: theme.gold }}>!</Text>
+                                    Welcome Back <Text style={{ color: '#F59E0B' }}>!</Text>
                                 </Text>
                                 <Text style={[styles.welcomeSubText, { color: theme.textSecondary }]}>
-                                    Sign in to access your wallet, identity, and services.
+                                    Sign in to access your royal wallet, VTU services, and rewards.
                                 </Text>
+
+                                {/* Feature Pills Badge Row */}
+                                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, justifyContent: 'center' }}>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B' }}>
+                                        <Text style={{ color: isDark ? '#FDE047' : '#92400E', fontSize: 8.5, fontWeight: '900' }}>⚡ Instant VTU</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#D1FAE5', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' }}>
+                                        <Text style={{ color: isDark ? '#6EE7B7' : '#065F46', fontSize: 8.5, fontWeight: '900' }}>🔒 100% Secure</Text>
+                                    </View>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#DBEAFE', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#3B82F6' }}>
+                                        <Text style={{ color: isDark ? '#93C5FD' : '#1E40AF', fontSize: 8.5, fontWeight: '900' }}>💎 Zero Fees</Text>
+                                    </View>
+                                </View>
                             </View>
 
                             {/* Login Type Tabs (Email vs Phone) */}
