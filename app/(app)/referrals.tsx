@@ -48,6 +48,7 @@ export default function ReferralsScreen() {
     const [calcCount, setCalcCount] = useState(20);
     const [showQrModal, setShowQrModal] = useState(false);
     const [historyFilter, setHistoryFilter] = useState<'all' | 'paid' | 'pending'>('all');
+    const [selectedTemplate, setSelectedTemplate] = useState<number>(1);
 
     const fetchReferralData = useCallback(async () => {
         setLoading(true);
@@ -69,6 +70,10 @@ export default function ReferralsScreen() {
                 } else if (typeof settings.value === 'object' && settings.value.url) {
                     dynamicUrl = String(settings.value.url).trim().replace(/\/+$/, '');
                 }
+            }
+
+            if (!dynamicUrl.startsWith('http://') && !dynamicUrl.startsWith('https://')) {
+                dynamicUrl = 'https://' + dynamicUrl;
             }
 
             // 1. Get User Profile for Code and Balance
@@ -98,13 +103,15 @@ export default function ReferralsScreen() {
             const total = refs?.reduce((acc, curr) => acc + (curr.status === 'paid' ? (curr.reward_amount || 0) : 0), 0) || 0;
             const pending = refs?.reduce((acc, curr) => acc + (curr.status === 'pending' ? (curr.reward_amount || 0) : 0), 0) || 0;
 
+            const userCode = profile?.referral_code || profile?.username || user.id.substring(0, 8);
+
             setReferrals((refs as any) || []);
             setStats({
                 totalEarnings: total,
                 pendingEarnings: pending,
                 referralCount: refs?.length || 0,
                 balance: profile?.referral_balance || 0,
-                code: profile?.referral_code || profile?.username || 'user',
+                code: userCode,
                 baseUrl: dynamicUrl
             });
 
@@ -119,24 +126,31 @@ export default function ReferralsScreen() {
         fetchReferralData();
     }, [fetchReferralData]);
 
+    const activeCode = stats.code || 'USER';
+    const referralLink = `${stats.baseUrl}/signup?ref=${encodeURIComponent(activeCode)}`;
+
     const copyToClipboard = async () => {
-        await Clipboard.setStringAsync(stats.code);
+        await Clipboard.setStringAsync(activeCode);
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2500);
-        Alert.alert("Code Copied! 📋", `Referral code "${stats.code}" copied to clipboard.`);
+        Alert.alert("Code Copied! 📋", `Referral code "${activeCode}" copied to clipboard.`);
     };
 
     const copyLinkToClipboard = async () => {
-        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
-        await Clipboard.setStringAsync(refLink);
+        await Clipboard.setStringAsync(referralLink);
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2500);
-        Alert.alert("Link Copied! 🔗", "Your unique referral link has been copied.");
+        Alert.alert("Link Copied! 🔗", `Referral link copied to clipboard:\n${referralLink}`);
     };
 
     const getShareMessage = () => {
-        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
-        return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\nSign up using my link:\n${refLink}\n\nOr enter code "${stats.code}" during registration to claim your welcome bonus! 🎉`;
+        if (selectedTemplate === 2) {
+            return `🎁 CLAIM YOUR ₦500 WELCOME BONUS!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`;
+        }
+        if (selectedTemplate === 3) {
+            return `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nEarn ₦500 cash per referral + 0.5% lifetime commissions on data purchases on Abu Mafhal Sub.\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`;
+        }
+        return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\nSign up using my link:\n${referralLink}\n\nOr enter code "${activeCode}" during registration! 🎉`;
     };
 
     const shareNative = async () => {
@@ -157,8 +171,7 @@ export default function ReferralsScreen() {
     };
 
     const shareTelegram = () => {
-        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
-        const url = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(getShareMessage())}`;
+        const url = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(getShareMessage())}`;
         if (Platform.OS === 'web') {
             window.open(url, '_blank');
         } else {
@@ -233,6 +246,7 @@ export default function ReferralsScreen() {
         }
     };
 
+
     const getRankTier = (count: number) => {
         if (count >= 50) return { title: 'Royal Platinum Ambassador 👑', color: '#F59E0B', badgeBg: 'rgba(245, 158, 11, 0.2)', nextTarget: 50, nextTitle: 'Max Level', remaining: 0, percent: 100 };
         if (count >= 15) return { title: 'Gold Ambassador 🥇', color: '#EAB308', badgeBg: 'rgba(234, 179, 8, 0.2)', nextTarget: 50, nextTitle: 'Royal Platinum 👑', remaining: 50 - count, percent: Math.min(100, Math.round((count / 50) * 100)) };
@@ -241,7 +255,6 @@ export default function ReferralsScreen() {
     };
 
     const currentRank = getRankTier(stats.referralCount);
-    const referralLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
 
     const filteredReferrals = referrals.filter(r => {
         if (historyFilter === 'paid') return r.status === 'paid';
@@ -372,11 +385,34 @@ export default function ReferralsScreen() {
                         style={[styles.codeDisplayBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : '#FEF3C7', borderColor: '#F59E0B' }]}
                         activeOpacity={0.8}
                     >
-                        <Text style={[styles.codeText, { color: isDark ? '#FDE047' : '#92400E' }]}>{stats.code}</Text>
+                        <Text style={[styles.codeText, { color: isDark ? '#FDE047' : '#92400E' }]}>{activeCode}</Text>
                         <View style={styles.copyIconCircle}>
                             <Ionicons name={copiedCode ? "checkmark-circle" : "copy"} size={16} color="#0F172A" />
                         </View>
                     </TouchableOpacity>
+
+                    {/* Marketing Share Template Selector */}
+                    <Text style={[styles.inputLabelHeader, { color: theme.textMuted, marginTop: 4 }]}>CHOOSE SHARE MESSAGE TEMPLATE</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                        {[
+                            { id: 1, label: 'Standard 🚀' },
+                            { id: 2, label: '₦500 Bonus 🎁' },
+                            { id: 3, label: 'Business 💼' }
+                        ].map(tmpl => (
+                            <TouchableOpacity
+                                key={tmpl.id}
+                                onPress={() => setSelectedTemplate(tmpl.id)}
+                                style={[
+                                    styles.templatePill,
+                                    selectedTemplate === tmpl.id ? { backgroundColor: '#F59E0B', borderColor: '#F59E0B' } : { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }
+                                ]}
+                            >
+                                <Text style={[styles.templatePillText, { color: selectedTemplate === tmpl.id ? '#0F172A' : theme.textPrimary }]}>
+                                    {tmpl.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
 
                     {/* Copy Link & Social Share Buttons */}
                     <View style={styles.shareBtnRow}>
@@ -417,6 +453,37 @@ export default function ReferralsScreen() {
                             <Ionicons name="share-social" size={15} color="#0F172A" />
                             <Text style={[styles.actionBtnText, { color: '#0F172A' }]}>More</Text>
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Monthly Ambassador Leaderboard Card */}
+                <View style={[styles.sectionCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Ionicons name="trophy" size={18} color="#F59E0B" />
+                        <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+                            MONTHLY AMBASSADOR CONTEST
+                        </Text>
+                    </View>
+                    <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
+                        Top 3 referrers every month win cash bonuses directly to their wallets!
+                    </Text>
+
+                    <View style={styles.leaderboardGrid}>
+                        <View style={[styles.leaderboardItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: '#F59E0B' }]}>
+                            <Text style={{ fontSize: 20 }}>🥇</Text>
+                            <Text style={[styles.leaderRankTitle, { color: theme.textPrimary }]}>1st Place</Text>
+                            <Text style={styles.leaderPrizeText}>₦50,000</Text>
+                        </View>
+                        <View style={[styles.leaderboardItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: '#94A3B8' }]}>
+                            <Text style={{ fontSize: 20 }}>🥈</Text>
+                            <Text style={[styles.leaderRankTitle, { color: theme.textPrimary }]}>2nd Place</Text>
+                            <Text style={styles.leaderPrizeText}>₦25,000</Text>
+                        </View>
+                        <View style={[styles.leaderboardItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: '#CD7F32' }]}>
+                            <Text style={{ fontSize: 20 }}>🥉</Text>
+                            <Text style={[styles.leaderRankTitle, { color: theme.textPrimary }]}>3rd Place</Text>
+                            <Text style={styles.leaderPrizeText}>₦10,000</Text>
+                        </View>
                     </View>
                 </View>
 
@@ -598,7 +665,7 @@ export default function ReferralsScreen() {
                             </TouchableOpacity>
                         </View>
                         <Text style={[styles.modalSub, { color: theme.textSecondary }]}>
-                            Ask your friend to scan this QR code using their camera to register directly under you!
+                            Scan with any mobile camera to register directly under code <Text style={{ fontWeight: '900', color: '#F59E0B' }}>{activeCode}</Text>!
                         </Text>
 
                         {/* Render QR Code */}
@@ -611,7 +678,13 @@ export default function ReferralsScreen() {
                             />
                         </View>
 
-                        <Text style={[styles.qrCodeTextLabel, { color: '#F59E0B' }]}>CODE: {stats.code}</Text>
+                        {/* Full Verified Signup URL Display */}
+                        <View style={[styles.modalUrlContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }]}>
+                            <Ionicons name="globe-outline" size={13} color="#F59E0B" />
+                            <Text numberOfLines={1} style={[styles.modalUrlText, { color: theme.textPrimary }]}>
+                                {referralLink}
+                            </Text>
+                        </View>
 
                         <TouchableOpacity 
                             onPress={copyLinkToClipboard}
@@ -619,7 +692,7 @@ export default function ReferralsScreen() {
                             activeOpacity={0.8}
                         >
                             <Ionicons name="copy-outline" size={15} color="#0F172A" />
-                            <Text style={styles.modalCopyBtnText}>Copy Link</Text>
+                            <Text style={styles.modalCopyBtnText}>{copiedLink ? "Copied!" : "Copy Signup Link"}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -833,6 +906,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    templatePill: {
+        flex: 1,
+        height: 30,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    templatePillText: {
+        fontSize: 9,
+        fontWeight: '800',
+    },
     shareBtnRow: {
         flexDirection: 'row',
         gap: 6,
@@ -850,6 +935,29 @@ const styles = StyleSheet.create({
     actionBtnText: {
         fontSize: 10.5,
         fontWeight: '800',
+    },
+    leaderboardGrid: {
+        flexDirection: 'row',
+        gap: 6,
+        marginTop: 4,
+    },
+    leaderboardItem: {
+        flex: 1,
+        padding: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    leaderRankTitle: {
+        fontSize: 10,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    leaderPrizeText: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#F59E0B',
+        marginTop: 1,
     },
     calcPillRow: {
         flexDirection: 'row',
@@ -1062,11 +1170,20 @@ const styles = StyleSheet.create({
         elevation: 3,
         marginBottom: 12,
     },
-    qrCodeTextLabel: {
-        fontSize: 13,
-        fontWeight: '900',
-        letterSpacing: 1.5,
+    modalUrlContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 1,
         marginBottom: 14,
+        maxWidth: '100%',
+    },
+    modalUrlText: {
+        fontSize: 10.5,
+        fontWeight: '700',
     },
     modalCopyBtn: {
         flexDirection: 'row',
@@ -1083,4 +1200,3 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
 });
-
