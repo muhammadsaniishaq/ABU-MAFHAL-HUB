@@ -256,28 +256,33 @@ export default function RootLayout() {
                 router.replace('/dashboard' as any);
             } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
                 AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
-                    if (unlocked === 'true') {
+                    let localPin = Platform.OS === 'web'
+                        ? await AsyncStorage.getItem('user_transaction_pin')
+                        : await SecureStore.getItemAsync('user_transaction_pin');
+
+                    if (!localPin) {
+                        const { data } = await supabase
+                            .from('profiles')
+                            .select('transaction_pin')
+                            .eq('id', session.user.id)
+                            .maybeSingle();
+
+                        if (data?.transaction_pin) {
+                            localPin = data.transaction_pin;
+                            if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                            else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
+                        }
+                    }
+
+                    if (!localPin) {
+                        // User has no PIN set yet (e.g. fresh Google OAuth signup) -> Route to PIN Setup!
+                        router.replace('/pin-setup' as any);
+                    } else if (unlocked === 'true') {
+                        // User has PIN and app is unlocked -> Route to Dashboard!
                         router.replace('/dashboard' as any);
                     } else {
-                        let localPin = Platform.OS === 'web'
-                            ? await AsyncStorage.getItem('user_transaction_pin')
-                            : await SecureStore.getItemAsync('user_transaction_pin');
-
-                        if (!localPin) {
-                            const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', session.user.id).maybeSingle();
-                            if (data?.transaction_pin) {
-                                localPin = data.transaction_pin;
-                                if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
-                                else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
-                            }
-                        }
-
-                        if (localPin) {
-                            router.replace('/pin' as any);
-                        } else {
-                            await AsyncStorage.setItem('app_unlocked', 'true');
-                            router.replace('/dashboard' as any);
-                        }
+                        // User has PIN but app is locked -> Route to PIN Verification!
+                        router.replace('/pin' as any);
                     }
                 }).catch(() => {
                     router.replace('/dashboard' as any);
