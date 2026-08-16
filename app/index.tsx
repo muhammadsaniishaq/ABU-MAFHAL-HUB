@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useAppSettings } from '../hooks/useAppSettings';
 import {
   View,
   Text,
@@ -9,81 +8,34 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  ScrollView,
+  Platform,
+  useWindowDimensions,
+  Linking,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase, processOAuthReturn } from '../services/supabase';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-const { width: W, height: H } = Dimensions.get('window');
+import { supabase, processOAuthReturn } from '../services/supabase';
+import { useAppSettings } from '../hooks/useAppSettings';
+import Mascot3D from '../components/Mascot3D';
 
-const T = {
-  navy:    '#030C22',
-  navyMid: '#08183B',
-  gold:    '#F7C948',
-  goldDk:  '#B8860B',
-  white:   '#FFFFFF',
-  textSub: '#A0B0D0',
-};
-
-function useReveal(delay = 0) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(24)).current;
-  useEffect(() => {
-    const anim = Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 600, delay, useNativeDriver: true }),
-    ]);
-    anim.start();
-    return () => anim.stop();
-  }, []);
-  return { opacity, transform: [{ translateY }] };
-}
-
-function useFloat(delay = 0, duration = 3000) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(translateY, { toValue: -15, duration, delay, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
-  return { transform: [{ translateY }] };
-}
-
-function useRotate(duration = 20000) {
-  const rotate = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.timing(rotate, { toValue: 1, duration, useNativeDriver: true })
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
-  const spin = rotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
-  });
-  return { transform: [{ rotate: spin }] };
-}
-
-export default function Splash() {
-  const { settings } = useAppSettings();
+export default function LandingPage() {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
   const router = useRouter();
   const { ref } = useLocalSearchParams<{ ref?: string }>();
-  
-  const [isReady, setIsReady] = useState(true);
-  const [partners, setPartners] = useState<any[]>([]);
+  const { settings } = useAppSettings();
 
+  const [partners, setPartners] = useState<any[]>([]);
+  const scrollAnim = useRef(new Animated.Value(0)).current;
+
+  // 1. Session Auto-Detection & OAuth Return Exchange
   useEffect(() => {
     let isSubscribed = true;
 
@@ -94,7 +46,7 @@ export default function Splash() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && isSubscribed) {
           await AsyncStorage.setItem('has_active_session', 'true');
-          
+
           let localPin = Platform.OS === 'web'
             ? await AsyncStorage.getItem('user_transaction_pin')
             : await SecureStore.getItemAsync('user_transaction_pin');
@@ -116,18 +68,15 @@ export default function Splash() {
           const unlocked = await AsyncStorage.getItem('app_unlocked');
 
           if (!localPin) {
-            // First-time Google OAuth user without PIN -> Route to PIN Setup!
             router.replace('/pin-setup' as any);
           } else if (unlocked === 'true') {
-            // App unlocked -> Route to Dashboard!
             router.replace('/dashboard' as any);
           } else {
-            // PIN set, app locked -> Route to PIN!
             router.replace('/pin' as any);
           }
         }
       } catch (e) {
-        console.log('Splash session check notice:', e);
+        console.log('Landing session check notice:', e);
       }
     };
 
@@ -145,7 +94,13 @@ export default function Splash() {
     };
   }, []);
 
+  // 2. Fetch Partners & Referral Link handling
   useEffect(() => {
+    if (ref) {
+      router.replace(`/(auth)/signup?ref=${ref}`);
+      return;
+    }
+
     const fetchPartners = async () => {
       try {
         const { data } = await supabase
@@ -157,35 +112,16 @@ export default function Splash() {
       } catch (e) {}
     };
     fetchPartners();
-  }, []);
-
-  useEffect(() => {
-    if (ref) {
-      router.replace(`/(auth)/signup?ref=${ref}`);
-      return;
-    }
-    setIsReady(true);
   }, [ref]);
 
-  const r1 = useReveal(200);
-  const r2 = useReveal(400);
-  const r3 = useReveal(600);
-  const r4 = useReveal(800);
-
-  const float1 = useFloat(0, 3000);
-  const float2 = useFloat(500, 4000);
-  const float3 = useFloat(1000, 3500);
-  const float4 = useFloat(1500, 4500);
-  const rotateAnim = useRotate();
-
-  const scrollAnim = useRef(new Animated.Value(0)).current;
+  // Partners marquee animation
   useEffect(() => {
     if (partners.length > 0) {
       scrollAnim.setValue(0);
       const anim = Animated.loop(
         Animated.timing(scrollAnim, {
           toValue: 1,
-          duration: Math.max(10000, partners.length * 6000), // smooth speed
+          duration: Math.max(10000, partners.length * 5000),
           easing: Easing.linear,
           useNativeDriver: true,
         })
@@ -197,249 +133,665 @@ export default function Splash() {
 
   const translateX = scrollAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [W, -W * 4] // ensures it scrolls completely
+    outputRange: [width, -width * 3]
   });
-
-  if (!isReady) return <View style={{ flex: 1, backgroundColor: T.navy }} />;
 
   return (
     <View style={s.container}>
       <StatusBar style="light" />
       
-      {/* Background Gradients */}
-      <LinearGradient colors={['#030B1C', '#0A1E4A', '#030B1C']} style={StyleSheet.absoluteFillObject} />
-      
-      {/* Multiple Decorative Swirls simulating the rich gold/blue waves */}
-      <View style={s.glow2} />
-      <View style={s.swirl1} />
-      <View style={s.swirl2} />
-      <View style={s.swirl3} />
-      <View style={s.swirl4} />
-      <View style={s.glow1} />
+      {/* Royal Navy Gradient */}
+      <LinearGradient colors={['#020617', '#0F172A', '#020617']} style={StyleSheet.absoluteFillObject} />
 
-      {/* Floating Particles for extra decoration */}
-      <Animated.View style={[s.particle, { top: '15%', left: '15%', width: 8, height: 8 }, float1]} />
-      <Animated.View style={[s.particle, { top: '35%', right: '12%', width: 6, height: 6, opacity: 0.8 }, float2]} />
-      <Animated.View style={[s.particle, { top: '55%', left: '8%', width: 10, height: 10, opacity: 0.6 }, float3]} />
-      <Animated.View style={[s.particle, { bottom: '25%', right: '20%', width: 7, height: 7 }, float4]} />
+      {/* Decorative Glow Effects */}
+      <View style={s.topGlow} />
+      <View style={s.bottomGlow} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={s.content}>
-          {/* Logo Area with Rich Decorations Restored */}
-          <Animated.View style={[s.logoWrapper, r1]}>
-            <View style={s.logoCircle}>
-              <Animated.View style={[s.logoDashedRing, rotateAnim]} />
-              <View style={s.logoInnerCircle}>
-                <Image 
-                  source={require('../assets/images/logo.png')} 
-                  style={s.logoImg} 
-                  resizeMode="contain" 
-                />
+        
+        {/* Navigation Header Bar */}
+        <View style={[s.navbar, isDesktop && s.desktopNavbar]}>
+          <View style={s.brandRow}>
+            <Image
+              source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../assets/images/logo.png'))}
+              style={s.logoImage}
+              resizeMode="contain"
+            />
+            <View style={{ marginLeft: 8 }}>
+              <Text style={s.brandTitle}>ABUMAFHAL</Text>
+              <Text style={s.brandSub}>FINTECH & DIGITAL HUB</Text>
+            </View>
+          </View>
+
+          {/* Security Badge */}
+          <View style={s.securityBadge}>
+            <Ionicons name="shield-checkmark" size={12} color="#F59E0B" />
+            <Text style={s.securityBadgeText}>256-BIT SSL SECURED</Text>
+          </View>
+
+          {/* Top Auth Buttons */}
+          <View style={s.navButtonsRow}>
+            <TouchableOpacity 
+              onPress={() => router.push('/login' as any)} 
+              style={s.signInOutlineBtn}
+              activeOpacity={0.8}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={s.signInOutlineBtnText}>Sign In</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => router.push('/signup' as any)} 
+              style={s.registerGoldBtn}
+              activeOpacity={0.85}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <LinearGradient colors={['#F59E0B', '#D97706']} style={s.registerGoldBtnGradient}>
+                <Text style={s.registerGoldBtnText}>Get Started</Text>
+                <Ionicons name="arrow-forward" size={14} color="#0F172A" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Scrollable Landing Content */}
+        <ScrollView 
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* Main Hero Card Container */}
+          <View style={[s.heroContainer, isDesktop && s.desktopHeroContainer]}>
+            
+            {/* Mascot & Welcome Badge */}
+            <View style={s.mascotWrapper}>
+              <Mascot3D size={isDesktop ? 120 : 95} greetingText="Welcome to ABU MAFHAL! 👋" isDarkMode={true} />
+            </View>
+
+            {/* Hero Main Headline */}
+            <View style={s.headlineBox}>
+              <View style={s.badgePill}>
+                <Ionicons name="sparkles" size={11} color="#F59E0B" style={{ marginRight: 4 }} />
+                <Text style={s.badgePillText}>Nigeria's #1 Automated VTU & Telecom Hub</Text>
+              </View>
+
+              <Text style={[s.heroTitle, isDesktop && s.desktopHeroTitle]}>
+                One Sub <Text style={{ color: '#F59E0B' }}>.</Text> Endless Possibilities <Text style={{ color: '#F59E0B' }}>!</Text>
+              </Text>
+              
+              <Text style={s.heroSub}>
+                Instant cheap data bundles, airtime top-up, electricity bill payment & cable TV subscriptions delivered in 0.1 seconds.
+              </Text>
+
+              {/* Feature Pills Row */}
+              <View style={s.featurePillsRow}>
+                <View style={[s.pillItem, { borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                  <Text style={[s.pillText, { color: '#FDE047' }]}>🎁 ₦500 Bonus</Text>
+                </View>
+                <View style={[s.pillItem, { borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                  <Text style={[s.pillText, { color: '#6EE7B7' }]}>🔒 100% Automated</Text>
+                </View>
+                <View style={[s.pillItem, { borderColor: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                  <Text style={[s.pillText, { color: '#93C5FD' }]}>💎 Wholesale Prices</Text>
+                </View>
               </View>
             </View>
-            <Text style={s.brandTitle}>ABU MAFHAL</Text>
-            <View style={s.subWrapper}>
-              <View style={s.subLine} />
-              <Ionicons name="diamond" size={10} color={T.gold} style={{ marginHorizontal: 8 }} />
-              <Text style={s.brandSub}>SUB</Text>
-              <Ionicons name="diamond" size={10} color={T.gold} style={{ marginHorizontal: 8 }} />
-              <View style={s.subLine} />
+
+            {/* Primary Action Hero Buttons */}
+            <View style={[s.heroActionRow, isDesktop && s.desktopHeroActionRow]}>
+              <TouchableOpacity 
+                onPress={() => router.push('/signup' as any)}
+                style={s.heroPrimaryBtn}
+                activeOpacity={0.88}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <LinearGradient colors={['#F59E0B', '#B45309']} style={s.heroPrimaryBtnGradient}>
+                  <Text style={s.heroPrimaryBtnText}>Create Free Account</Text>
+                  <Ionicons name="chevron-forward-circle" size={18} color="#0F172A" />
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => router.push('/login' as any)}
+                style={s.heroSecondaryBtn}
+                activeOpacity={0.8}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="log-in-outline" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
+                <Text style={s.heroSecondaryBtnText}>Sign In to Account</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={s.tagline}>One Sub. Endless Possibilities.</Text>
-          </Animated.View>
 
-          <View style={{ flex: 1 }} />
+          </View>
 
-          {/* Bottom Area */}
-          <Animated.View style={[s.bottomSection, r2]}>
-            {/* Dots */}
-            <View style={s.dotsContainer}>
-              <View style={[s.dot, { backgroundColor: T.gold }]} />
-              <View style={[s.dot, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
-              <View style={[s.dot, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+          {/* Services Grid Section */}
+          <View style={s.sectionContainer}>
+            <View style={s.sectionHeaderBox}>
+              <Text style={s.sectionSubtitle}>OUR SERVICES</Text>
+              <Text style={s.sectionTitle}>Everything You Need In One App</Text>
             </View>
 
-            {/* Service Icons Grid */}
-            <Animated.View style={[s.grid, r3]}>
-              {[
-                { icon: 'phone-portrait-outline', label: 'Airtime' },
-                { icon: 'wifi-outline', label: 'Data' },
-                { icon: 'document-text-outline', label: 'Bills' },
-                { icon: 'flash-outline', label: 'Electricity' },
-                { icon: 'tv-outline', label: 'Cable TV' },
-              ].map((item, i) => (
-                <View key={i} style={s.gridItem}>
-                  <View style={s.iconBox}>
-                    <Ionicons name={item.icon as any} size={18} color={T.gold} />
-                  </View>
-                  <Text style={s.iconLabel}>{item.label}</Text>
+            <View style={s.servicesGrid}>
+              
+              {/* Card 1: Airtime Topup */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#F59E0B' }]}>
+                  <Ionicons name="phone-portrait" size={20} color="#F59E0B" />
                 </View>
-              ))}
-            </Animated.View>
+                <Text style={s.serviceCardTitle}>Airtime Top-Up</Text>
+                <Text style={s.serviceCardSub}>Instant airtime recharge for MTN, Airtel, Glo & 9mobile with up to 3% discount.</Text>
+              </View>
 
-            <Animated.Text style={[s.footerText, r3]}>
-              Fast. <Text style={{ color: T.gold }}>Secure.</Text> Reliable.
-            </Animated.Text>
+              {/* Card 2: Cheap Data Bundles */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10B981' }]}>
+                  <Ionicons name="wifi" size={20} color="#10B981" />
+                </View>
+                <Text style={s.serviceCardTitle}>Data Bundles</Text>
+                <Text style={s.serviceCardSub}>Super cheap SME, Gifting & Direct data with 30-day validity starting at ₦220/GB.</Text>
+              </View>
 
-            {/* Auto Scrolling Partners (Enlarged) */}
-            {partners.length > 0 && (
-              <Animated.View style={[r3, { overflow: 'hidden', height: 40, width: '100%', marginBottom: 20 }]}>
+              {/* Card 3: Electricity Bills */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: '#3B82F6' }]}>
+                  <Ionicons name="flash" size={20} color="#3B82F6" />
+                </View>
+                <Text style={s.serviceCardTitle}>Electricity Tokens</Text>
+                <Text style={s.serviceCardSub}>Pay prepaid & postpaid electricity bills for IKEDC, EKEDC, AEDC, IBEDC & get instant tokens.</Text>
+              </View>
+
+              {/* Card 4: Cable TV Subscriptions */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: '#A855F7' }]}>
+                  <Ionicons name="tv" size={20} color="#A855F7" />
+                </View>
+                <Text style={s.serviceCardTitle}>Cable TV Renewals</Text>
+                <Text style={s.serviceCardSub}>Instant renewal for DSTV, GOTV & Startimes with zero convenience fees.</Text>
+              </View>
+
+              {/* Card 5: Virtual Bank Accounts */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(236, 72, 153, 0.15)', borderColor: '#EC4899' }]}>
+                  <Ionicons name="wallet" size={20} color="#EC4899" />
+                </View>
+                <Text style={s.serviceCardTitle}>Virtual Accounts</Text>
+                <Text style={s.serviceCardSub}>Get your dedicated Wema, Moniepoint & Sterling accounts for 24/7 instant wallet funding.</Text>
+              </View>
+
+              {/* Card 6: Refer & Earn Rewards */}
+              <View style={s.serviceCard}>
+                <View style={[s.serviceIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#F59E0B' }]}>
+                  <Ionicons name="gift" size={20} color="#F59E0B" />
+                </View>
+                <Text style={s.serviceCardTitle}>Refer & Earn ₦500</Text>
+                <Text style={s.serviceCardSub}>Invite your friends with your custom link and earn instant cash bonuses directly into your wallet.</Text>
+              </View>
+
+            </View>
+          </View>
+
+          {/* Why Choose Us Section */}
+          <View style={s.whyUsContainer}>
+            <Text style={s.sectionSubtitle}>WHY CHOOSE ABU MAFHAL</Text>
+            <Text style={s.sectionTitle}>Built For Speed, Reliability & Security</Text>
+
+            <View style={s.whyUsGrid}>
+              <View style={s.whyUsItem}>
+                <Ionicons name="speedometer-outline" size={24} color="#F59E0B" />
+                <Text style={s.whyUsItemTitle}>0.1s Instant Delivery</Text>
+                <Text style={s.whyUsItemSub}>All orders are processed automatically by automated API servers.</Text>
+              </View>
+
+              <View style={s.whyUsItem}>
+                <Ionicons name="lock-closed-outline" size={24} color="#10B981" />
+                <Text style={s.whyUsItemTitle}>Bank-Grade Security</Text>
+                <Text style={s.whyUsItemSub}>256-Bit SSL encryption & 4-digit transaction PIN protection.</Text>
+              </View>
+
+              <View style={s.whyUsItem}>
+                <Ionicons name="headset-outline" size={24} color="#3B82F6" />
+                <Text style={s.whyUsItemTitle}>24/7 Dedicated Support</Text>
+                <Text style={s.whyUsItemSub}>Live WhatsApp & phone support team available around the clock.</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Partners Marquee Ticker */}
+          {partners.length > 0 && (
+            <View style={s.partnersContainer}>
+              <Text style={s.partnersTitle}>OFFICIAL TELECOM & PAYMENT PARTNERS</Text>
+              <Animated.View style={{ overflow: 'hidden', height: 44, width: '100%' }}>
                 <Animated.View style={{ flexDirection: 'row', transform: [{ translateX }] }}>
-                  {/* Repeat multiple times to avoid empty gaps */}
-                  {[...partners, ...partners, ...partners, ...partners, ...partners].map((p, i) => (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 32, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                  {[...partners, ...partners, ...partners].map((p, i) => (
+                    <View key={i} style={s.partnerBadge}>
                       {p.logo_url ? (
-                         <Image source={{ uri: p.logo_url }} style={{ width: 20, height: 20, borderRadius: 4, marginRight: 8 }} resizeMode="contain" />
+                        <Image source={{ uri: p.logo_url }} style={s.partnerLogo} resizeMode="contain" />
                       ) : (
-                         <Ionicons name="business" size={16} color={T.gold} style={{ marginRight: 8 }} />
+                        <Ionicons name="business" size={16} color="#F59E0B" style={{ marginRight: 6 }} />
                       )}
-                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>
-                        {p.name}
-                      </Text>
+                      <Text style={s.partnerText}>{p.name}</Text>
                     </View>
                   ))}
                 </Animated.View>
               </Animated.View>
-            )}
+            </View>
+          )}
 
-            {/* Action Buttons: Get Started & Sign In */}
-            <Animated.View style={[r4, { width: '100%', gap: 12 }]}>
-              <TouchableOpacity 
-                style={s.btn}
-                onPress={() => router.push('/signup' as any)}
-                activeOpacity={0.9}
-              >
-                <Text style={s.btnText}>Get Started (Register)</Text>
-                <Ionicons name="arrow-forward" size={16} color={T.navy} />
-              </TouchableOpacity>
+          {/* Footer Bar */}
+          <View style={s.footerContainer}>
+            <View style={s.footerBrandRow}>
+              <Text style={s.footerBrandTitle}>ABU MAFHAL SUB</Text>
+              <Text style={s.footerBrandSub}>© 2026 ABU MAFHAL HUB. All rights reserved.</Text>
+            </View>
 
-              <TouchableOpacity 
-                style={s.btnLogin}
-                onPress={() => router.push('/login' as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.btnLoginText}>Already have an account? Sign In</Text>
+            <View style={s.footerLinksRow}>
+              <TouchableOpacity onPress={() => router.push('/privacy')} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.footerLinkText}>Privacy Policy</Text>
               </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-        </View>
+              <Text style={{ color: '#64748B' }}>•</Text>
+              <TouchableOpacity onPress={() => router.push('/terms')} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.footerLinkText}>Terms of Service</Text>
+              </TouchableOpacity>
+              <Text style={{ color: '#64748B' }}>•</Text>
+              <TouchableOpacity onPress={() => router.push('/login')} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.footerLinkText}>Account Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: T.navy },
-  
-  // Rich Decorations
-  swirl1: { 
-    position: 'absolute', top: '-10%', left: '-50%', width: W * 2, height: 400, 
-    borderRadius: W, borderWidth: 1.5, borderColor: 'rgba(247, 201, 72, 0.2)', 
-    transform: [{ rotate: '-15deg' }] 
+  container: {
+    flex: 1,
+    backgroundColor: '#020617',
   },
-  swirl2: { 
-    position: 'absolute', top: '5%', left: '-40%', width: W * 1.8, height: 350, 
-    borderRadius: W, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', 
-    transform: [{ rotate: '-10deg' }] 
-  },
-  swirl3: { 
-    position: 'absolute', bottom: '-15%', right: '-50%', width: W * 2, height: 500, 
-    borderRadius: W, borderWidth: 1.5, borderColor: 'rgba(247, 201, 72, 0.15)', 
-    transform: [{ rotate: '25deg' }] 
-  },
-  swirl4: { 
-    position: 'absolute', bottom: '0%', right: '-40%', width: W * 1.5, height: 400, 
-    borderRadius: W, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', 
-    transform: [{ rotate: '35deg' }] 
-  },
-  glow1: {
-    position: 'absolute', top: '15%', left: '10%', width: W * 0.8, height: W * 0.8,
-    borderRadius: W * 0.4, backgroundColor: 'rgba(247, 201, 72, 0.08)',
-  },
-  glow2: {
-    position: 'absolute', bottom: '10%', right: '-20%', width: W * 1.2, height: W * 1.2,
-    borderRadius: W * 0.6, backgroundColor: 'rgba(10, 30, 74, 0.8)',
-  },
-  particle: {
-    position: 'absolute', backgroundColor: T.gold, borderRadius: 50,
-    shadowColor: T.gold, shadowOpacity: 1, shadowRadius: 8, elevation: 5
-  },
-
-  content: { flex: 1, padding: 24, justifyContent: 'space-between', zIndex: 10 },
-  
-  // Logo Adjustments (BEAUTIFUL BOLD DECORATIONS)
-  logoWrapper: { alignItems: 'center', marginTop: '12%', zIndex: 20 },
-  logoCircle: { 
-    width: 140, height: 140, borderRadius: 70, 
-    backgroundColor: 'rgba(10, 25, 49, 0.6)', 
-    alignItems: 'center', justifyContent: 'center', 
-    borderWidth: 2, borderColor: 'rgba(245, 166, 35, 0.4)', 
-    marginBottom: 16, 
-    shadowColor: '#f5a623', shadowOpacity: 0.8, shadowRadius: 20, elevation: 15 
-  },
-  logoDashedRing: {
+  topGlow: {
     position: 'absolute',
-    width: 156, height: 156, borderRadius: 78,
-    borderWidth: 1.5, borderColor: 'rgba(247, 201, 72, 0.4)',
-    borderStyle: 'dashed',
+    top: -120,
+    alignSelf: 'center',
+    width: 360,
+    height: 360,
+    borderRadius: 180,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
   },
-  logoInnerCircle: {
-    width: 116, height: 116, borderRadius: 58,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: '#d4890e', 
-    shadowColor: '#ffffff', shadowOpacity: 0.5, shadowRadius: 10, elevation: 10
+  bottomGlow: {
+    position: 'absolute',
+    bottom: -120,
+    alignSelf: 'center',
+    width: 380,
+    height: 380,
+    borderRadius: 190,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
   },
-  logoImg: { width: 76, height: 76 },
-
-  brandTitle: { color: T.white, fontSize: 26, fontWeight: '900', letterSpacing: 1.5, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
-  
-  // New SUB Decorations
-  subWrapper: { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
-  subLine: { height: 2, width: 40, backgroundColor: 'rgba(247, 201, 72, 0.6)', borderRadius: 2 },
-  brandSub: { 
-    color: '#f5a623', 
-    fontSize: 20, 
-    fontWeight: '900', 
-    letterSpacing: 8,
-    textShadowColor: 'rgba(245, 166, 35, 0.8)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
+  navbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
   },
-  
-  tagline: { color: T.white, fontSize: 13, marginTop: 12, fontWeight: '500', opacity: 0.9 },
-
-  bottomSection: { alignItems: 'center', paddingBottom: 10, zIndex: 20 },
-  dotsContainer: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 35 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  
-  grid: { 
-    flexDirection: 'row', justifyContent: 'space-between', 
-    width: '100%', marginBottom: 35 
+  desktopNavbar: {
+    paddingHorizontal: 40,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
   },
-  gridItem: { alignItems: 'center', gap: 10 },
-  iconBox: {
-    width: 44, height: 44, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(247, 201, 72, 0.3)',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#F7C948', shadowOpacity: 0.15, shadowRadius: 8, elevation: 3
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  iconLabel: { color: T.white, fontSize: 9.5, fontWeight: '600' },
-  
-  footerText: { textAlign: 'center', color: T.white, fontSize: 13, fontWeight: '700', marginBottom: 25 },
-
-  btn: { 
-    backgroundColor: T.gold, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, 
-    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 18, width: '100%',
-    elevation: 8, shadowColor: T.gold, shadowOpacity: 0.4, shadowRadius: 15, shadowOffset: { width: 0, height: 6 } 
+  logoImage: {
+    width: 32,
+    height: 32,
   },
-  btnText: { color: T.navy, fontSize: 14, fontWeight: '900' },
-  btnLogin: {
-    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16,
-    borderWidth: 1, borderColor: 'rgba(247, 201, 72, 0.4)',
+  brandTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  brandSub: {
+    color: '#F59E0B',
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: '#F59E0B',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  securityBadgeText: {
+    color: '#F59E0B',
+    fontSize: 8.5,
+    fontWeight: '800',
+    marginLeft: 3,
+  },
+  navButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  signInOutlineBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center', justifyContent: 'center', width: '100%',
   },
-  btnLoginText: { color: T.gold, fontSize: 13, fontWeight: '700' },
+  signInOutlineBtnText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  registerGoldBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  registerGoldBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  registerGoldBtnText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  heroContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  desktopHeroContainer: {
+    maxWidth: 900,
+    alignSelf: 'center',
+    paddingTop: 40,
+  },
+  mascotWrapper: {
+    marginBottom: 12,
+  },
+  headlineBox: {
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  badgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 10,
+  },
+  badgePillText: {
+    color: '#F59E0B',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    lineHeight: 34,
+  },
+  desktopHeroTitle: {
+    fontSize: 38,
+    lineHeight: 46,
+  },
+  heroSub: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 18,
+    maxWidth: 520,
+  },
+  featurePillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  pillItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  pillText: {
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  heroActionRow: {
+    width: '100%',
+    maxWidth: 380,
+    gap: 10,
+    marginTop: 24,
+  },
+  desktopHeroActionRow: {
+    flexDirection: 'row',
+    maxWidth: 460,
+  },
+  heroPrimaryBtn: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  heroPrimaryBtnGradient: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  heroPrimaryBtnText: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '900',
+    marginRight: 6,
+  },
+  heroSecondaryBtn: {
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  heroSecondaryBtnText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderColor: 'rgba(245, 158, 11, 0.15)',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  sectionHeaderBox: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionSubtitle: {
+    color: '#F59E0B',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  servicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  serviceCard: {
+    width: Platform.OS === 'web' ? 280 : '47%',
+    backgroundColor: '#0F172A',
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+  },
+  serviceIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  serviceCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  serviceCardSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  whyUsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+    alignItems: 'center',
+  },
+  whyUsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginTop: 20,
+    justifyContent: 'center',
+  },
+  whyUsItem: {
+    width: Platform.OS === 'web' ? 260 : '100%',
+    backgroundColor: '#0F172A',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  whyUsItemTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  whyUsItemSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  partnersContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  partnersTitle: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+  },
+  partnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 16,
+  },
+  partnerLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  partnerText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  footerContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    borderTopWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+    alignItems: 'center',
+    gap: 12,
+  },
+  footerBrandRow: {
+    alignItems: 'center',
+  },
+  footerBrandTitle: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  footerBrandSub: {
+    color: '#64748B',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  footerLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  footerLinkText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
 });
