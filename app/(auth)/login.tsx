@@ -370,7 +370,7 @@ export default function LoginScreen() {
                         bounces={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Top Control Bar with Brand & Security Badge */}
+                        {/* Top Control Bar with Brand & Theme Toggle */}
                         <View style={styles.topControlRow}>
                             <View style={styles.brandRow}>
                                 <Image
@@ -382,12 +382,6 @@ export default function LoginScreen() {
                                     <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>ABUMAFHAL</Text>
                                     <Text style={[styles.brandTagline, { color: '#F59E0B' }]}>ROYAL FINTECH & DIGITAL HUB</Text>
                                 </View>
-                            </View>
-
-                            {/* Security Badge Pill */}
-                            <View style={[styles.securityPill, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.08)', borderColor: '#F59E0B', borderWidth: 1 }]}>
-                                <Ionicons name="shield-checkmark" size={11} color="#F59E0B" style={{ marginRight: 3 }} />
-                                <Text style={[styles.securityPillText, { color: isDark ? '#F59E0B' : '#0F172A' }]}>256-Bit SSL</Text>
                             </View>
 
                             <TouchableOpacity 
