@@ -184,15 +184,28 @@ export default function PinSetupScreen() {
 
                     if (Platform.OS !== 'web') Vibration.vibrate(50);
 
-                    // 3. Inform user & navigate straight to dashboard
-                    const msg = 'Success! Your 4-digit Transaction PIN has been set successfully.';
-                    if (Platform.OS === 'web') {
-                        alert(msg);
-                        router.replace('/dashboard' as any);
+                    // 3. Check active session & navigate appropriately (avoids falling back to Splash Page '/')
+                    const { data: { session } } = await supabase.auth.getSession();
+                    
+                    if (session) {
+                        if (Platform.OS === 'web') {
+                            alert('Success! Your 4-digit Transaction PIN has been set successfully.');
+                            router.replace('/dashboard' as any);
+                        } else {
+                            Alert.alert('Success! 🎉', 'Your 4-digit Transaction PIN has been set successfully.', [
+                                { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
+                            ]);
+                        }
                     } else {
-                        Alert.alert('Success! 🎉', msg, [
-                            { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
-                        ]);
+                        const msg = 'Success! Your account & 4-digit Transaction PIN have been created successfully. Please sign in to access your dashboard.';
+                        if (Platform.OS === 'web') {
+                            alert(msg);
+                            router.replace('/login' as any);
+                        } else {
+                            Alert.alert('Setup Complete! 🎉', msg, [
+                                { text: 'Sign In Now', onPress: () => router.replace('/login' as any) },
+                            ]);
+                        }
                     }
                 } catch (error: any) {
                     const errMsg = error.message || 'Failed to save PIN';
