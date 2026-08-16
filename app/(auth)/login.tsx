@@ -677,7 +677,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-       scrollContent: {
+    container: {
+        flex: 1,
+    },
+    scrollContent: {
         paddingHorizontal: 14,
         paddingTop: 2,
         paddingBottom: 100,
@@ -880,7 +883,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-    },      justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
