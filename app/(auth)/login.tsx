@@ -14,7 +14,7 @@ import * as Linking from 'expo-linking';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { supabase } from '../../services/supabase';
+import { supabase, processOAuthReturn } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
 import Mascot3D from '../../components/Mascot3D';
@@ -55,20 +55,49 @@ export default function LoginScreen() {
         checkBiometrics();
         loadSavedCredentials();
 
-        // Listen for Google OAuth error responses in web URL query/hash params
+        // Listen for Google OAuth returns & error responses in web URL query/hash params
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            try {
-                const searchParams = new URLSearchParams(window.location.search);
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
-                const errCode = searchParams.get('error') || hashParams.get('error');
+            (async () => {
+                const isOAuthSessionSet = await processOAuthReturn();
+                if (isOAuthSessionSet) {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                        let localPin = await AsyncStorage.getItem('user_transaction_pin');
+                        if (!localPin) {
+                            const { data } = await supabase
+                                .from('profiles')
+                                .select('transaction_pin')
+                                .eq('id', session.user.id)
+                                .maybeSingle();
 
-                if (errorDesc || errCode) {
-                    const cleanError = (errorDesc || errCode || '').replace(/\+/g, ' ');
-                    Alert.alert('Google Authentication Notice', cleanError);
-                    window.history.replaceState({}, document.title, window.location.pathname);
+                            if (data?.transaction_pin) {
+                                localPin = data.transaction_pin;
+                                await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                            }
+                        }
+
+                        if (!localPin) {
+                            router.replace('/pin-setup' as any);
+                        } else {
+                            router.replace('/dashboard' as any);
+                        }
+                        return;
+                    }
                 }
-            } catch (e) {}
+
+                try {
+                    const searchParams = new URLSearchParams(window.location.search);
+                    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                    const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
+                    const errCode = searchParams.get('error') || hashParams.get('error');
+
+                    if (errorDesc || errCode) {
+                        const cleanError = (errorDesc || errCode || '').replace(/\+/g, ' ');
+                        Alert.alert('Google Authentication Notice', cleanError);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } catch (e) {}
+            })();
         }
     }, []);
 

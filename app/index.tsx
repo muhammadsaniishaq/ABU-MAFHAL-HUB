@@ -15,7 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../services/supabase';
+import { supabase, processOAuthReturn } from '../services/supabase';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -89,6 +89,8 @@ export default function Splash() {
 
     const checkSessionAndNavigate = async () => {
       try {
+        await processOAuthReturn();
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && isSubscribed) {
           await AsyncStorage.setItem('has_active_session', 'true');

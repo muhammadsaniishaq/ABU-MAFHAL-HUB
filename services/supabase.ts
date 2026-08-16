@@ -88,3 +88,49 @@ export const forceSignOut = async () => {
         }
     }
 };
+
+// Global OAuth Return Token & PKCE Code Exchange Helper
+export const processOAuthReturn = async (): Promise<boolean> => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+
+    try {
+        let codeStr: string | null = null;
+        let accessTokenStr: string | null = null;
+        let refreshTokenStr: string | null = null;
+
+        // 1. Search Query Parameters (?code=... or ?access_token=...)
+        const searchParams = new URLSearchParams(window.location.search);
+        codeStr = searchParams.get('code');
+        accessTokenStr = searchParams.get('access_token');
+        refreshTokenStr = searchParams.get('refresh_token');
+
+        // 2. Hash Parameters (#access_token=... or #code=...)
+        if (!codeStr && !accessTokenStr && window.location.hash) {
+            const hashClean = window.location.hash.substring(1);
+            const hashParams = new URLSearchParams(hashClean);
+            codeStr = hashParams.get('code');
+            accessTokenStr = hashParams.get('access_token');
+            refreshTokenStr = hashParams.get('refresh_token');
+        }
+
+        if (codeStr) {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(codeStr);
+            if (!error && data?.session) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+        } else if (accessTokenStr && refreshTokenStr) {
+            const { data, error } = await supabase.auth.setSession({
+                access_token: accessTokenStr,
+                refresh_token: refreshTokenStr,
+            });
+            if (!error && data?.session) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+        }
+    } catch (e) {
+        console.log('OAuth return processing notice:', e);
+    }
+    return false;
+};
