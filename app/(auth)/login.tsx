@@ -387,7 +387,7 @@ export default function LoginScreen() {
                         bounces={false}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {/* Top Control Bar with Brand & Theme Toggle */}
+                        {/* Top Control Bar with Brand, Support & Theme Toggle */}
                         <View style={styles.topControlRow}>
                             <View style={styles.brandRow}>
                                 <Image
@@ -401,14 +401,28 @@ export default function LoginScreen() {
                                 </View>
                             </View>
 
-                            <TouchableOpacity 
-                                onPress={toggleTheme} 
-                                style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
-                                activeOpacity={0.8}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                                <Ionicons name={isDark ? "sunny" : "moon"} size={14} color={isDark ? "#FDE047" : "#0F172A"} />
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                {/* WhatsApp Quick Support Header Action */}
+                                <TouchableOpacity
+                                    onPress={() => Linking.openURL('https://wa.me/2348001234567?text=Hello%20ABUMAFHAL%20Support')}
+                                    style={[styles.supportHeaderBtn, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#E6F4EA', borderColor: '#10B981' }]}
+                                    activeOpacity={0.8}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <Ionicons name="logo-whatsapp" size={12} color="#10B981" />
+                                    <Text style={[styles.supportHeaderBtnText, { color: isDark ? '#6EE7B7' : '#047857' }]}>Help</Text>
+                                </TouchableOpacity>
+
+                                {/* Theme Toggle */}
+                                <TouchableOpacity 
+                                    onPress={toggleTheme} 
+                                    style={[styles.themeToggleBtn, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
+                                    activeOpacity={0.8}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <Ionicons name={isDark ? "sunny" : "moon"} size={13} color={isDark ? "#FDE047" : "#0F172A"} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Royal Gold Header Accent Line */}
@@ -419,7 +433,7 @@ export default function LoginScreen() {
                             
                             {/* Compact 3D Male Cartoon Mascot */}
                             <View style={styles.mascotContainer}>
-                                <Mascot3D size={95} greetingText="Welcome Back! 👋" isDarkMode={isDark} />
+                                <Mascot3D size={90} greetingText="Welcome Back! 👋" isDarkMode={isDark} />
                             </View>
 
                             {/* Welcome Headline */}
@@ -432,15 +446,15 @@ export default function LoginScreen() {
                                 </Text>
 
                                 {/* Feature Pills Badge Row */}
-                                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, justifyContent: 'center' }}>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B' }}>
-                                        <Text style={{ color: isDark ? '#FDE047' : '#92400E', fontSize: 8.5, fontWeight: '900' }}>⚡ Instant VTU</Text>
+                                <View style={{ flexDirection: 'row', gap: 5, marginTop: 5, justifyContent: 'center' }}>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#F59E0B' }}>
+                                        <Text style={{ color: isDark ? '#FDE047' : '#92400E', fontSize: 8, fontWeight: '900' }}>⚡ Instant VTU</Text>
                                     </View>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#D1FAE5', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' }}>
-                                        <Text style={{ color: isDark ? '#6EE7B7' : '#065F46', fontSize: 8.5, fontWeight: '900' }}>🔒 100% Secure</Text>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#D1FAE5', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#10B981' }}>
+                                        <Text style={{ color: isDark ? '#6EE7B7' : '#065F46', fontSize: 8, fontWeight: '900' }}>🔒 100% Encrypted</Text>
                                     </View>
-                                    <View style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#DBEAFE', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12, borderWidth: 1, borderColor: '#3B82F6' }}>
-                                        <Text style={{ color: isDark ? '#93C5FD' : '#1E40AF', fontSize: 8.5, fontWeight: '900' }}>💎 Zero Fees</Text>
+                                    <View style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#DBEAFE', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#3B82F6' }}>
+                                        <Text style={{ color: isDark ? '#93C5FD' : '#1E40AF', fontSize: 8, fontWeight: '900' }}>💎 Zero Cashout Fee</Text>
                                     </View>
                                 </View>
                             </View>
@@ -458,7 +472,7 @@ export default function LoginScreen() {
                                 ]}>
                                     <Ionicons 
                                         name="person-circle" 
-                                        size={16} 
+                                        size={15} 
                                         color={focusedInput === 'identifier' ? '#F59E0B' : theme.textMuted} 
                                         style={{ marginRight: 6 }} 
                                     />
@@ -476,14 +490,14 @@ export default function LoginScreen() {
                                 </View>
 
                                 {/* Password Input */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 8 }]}>Password</Text>
+                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 6 }]}>Password</Text>
                                 <View style={[
                                     styles.inputFieldBox, 
                                     { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? '#F59E0B' : theme.borderPrimary }
                                 ]}>
                                     <Ionicons 
                                         name="lock-closed" 
-                                        size={16} 
+                                        size={15} 
                                         color={focusedInput === 'password' ? '#F59E0B' : theme.textMuted} 
                                         style={{ marginRight: 6 }} 
                                     />
@@ -498,8 +512,16 @@ export default function LoginScreen() {
                                         onBlur={() => setFocusedInput(null)}
                                     />
                                     <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 2 }}>
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={16} color={theme.textMuted} />
+                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={15} color={theme.textMuted} />
                                     </TouchableOpacity>
+                                </View>
+
+                                {/* Security Active Micro Banner */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, gap: 4 }}>
+                                    <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                                    <Text style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 8.5, fontWeight: '700' }}>
+                                        Bank-Grade 256-Bit SSL Encrypted Session
+                                    </Text>
                                 </View>
 
                                 {/* Options Row */}
@@ -511,15 +533,15 @@ export default function LoginScreen() {
                                     >
                                         <View style={[
                                             styles.checkboxBox, 
-                                            rememberMe && { backgroundColor: theme.accentTeal, borderColor: theme.accentTeal }
+                                            rememberMe && { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }
                                         ]}>
-                                            {rememberMe && <Ionicons name="checkmark" size={10} color="#0E1A2E" />}
+                                            {rememberMe && <Ionicons name="checkmark" size={9} color="#0F172A" />}
                                         </View>
                                         <Text style={[styles.checkboxLabel, { color: theme.textSecondary }]}>Remember Me</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity onPress={() => setShowForgotModal(true)} activeOpacity={0.8}>
-                                        <Text style={[styles.forgotLink, { color: theme.gold }]}>Forgot Password?</Text>
+                                        <Text style={[styles.forgotLink, { color: '#F59E0B' }]}>Forgot Password?</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -540,7 +562,7 @@ export default function LoginScreen() {
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Sign In to Account</Text>
-                                                <Ionicons name="arrow-forward-circle" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
+                                                <Ionicons name="arrow-forward-circle" size={15} color="#0F172A" style={{ marginLeft: 5 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -554,7 +576,7 @@ export default function LoginScreen() {
                                         activeOpacity={0.8}
                                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     >
-                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={16} color="#F59E0B" style={{ marginRight: 6 }} />
+                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={14} color="#F59E0B" style={{ marginRight: 5 }} />
                                         <Text style={[styles.biometricBtnText, { color: isDark ? '#FDE047' : '#92400E' }]}>
                                             Quick Sign In with {biometricType}
                                         </Text>
@@ -674,7 +696,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 14,
-        paddingTop: 2,
+        paddingTop: 0,
         paddingBottom: 100,
     },
     topControlRow: {
@@ -693,18 +715,31 @@ const styles = StyleSheet.create({
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 13.5,
         letterSpacing: 0.5,
     },
     brandTagline: {
         fontWeight: '700',
-        fontSize: 7.5,
+        fontSize: 7,
         letterSpacing: 0.8,
     },
+    supportHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3.5,
+        borderRadius: 14,
+        borderWidth: 1,
+        gap: 3,
+    },
+    supportHeaderBtnText: {
+        fontSize: 9,
+        fontWeight: '800',
+    },
     themeToggleBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -724,19 +759,19 @@ const styles = StyleSheet.create({
     },
     headlineBox: {
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     welcomeTitle: {
         fontWeight: '900',
-        fontSize: 20,
+        fontSize: 18,
         textAlign: 'center',
     },
     welcomeSubText: {
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '500',
         textAlign: 'center',
         marginTop: 2,
-        lineHeight: 14,
+        lineHeight: 13,
     },
     loginTypeContainer: {
         flexDirection: 'row',
@@ -760,20 +795,20 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     loginTypeText: {
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '600',
     },
     formContainer: {
         width: '100%',
     },
     inputLabel: {
-        fontWeight: '700',
-        fontSize: 10.5,
-        marginBottom: 4,
+        fontWeight: '800',
+        fontSize: 9.5,
+        marginBottom: 3,
     },
     inputFieldBox: {
-        height: 42,
-        borderRadius: 12,
+        height: 38,
+        borderRadius: 10,
         borderWidth: 1,
         paddingHorizontal: 10,
         flexDirection: 'row',
@@ -781,23 +816,23 @@ const styles = StyleSheet.create({
     },
     textInput: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
     },
     optionsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 8,
-        marginBottom: 10,
+        marginTop: 6,
+        marginBottom: 8,
     },
     checkboxRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     checkboxBox: {
-        width: 15,
-        height: 15,
+        width: 14,
+        height: 14,
         borderRadius: 4,
         borderWidth: 1.5,
         borderColor: '#94A3B8',
@@ -806,15 +841,15 @@ const styles = StyleSheet.create({
         marginRight: 5,
     },
     checkboxLabel: {
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '600',
     },
     forgotLink: {
-        fontSize: 10.5,
-        fontWeight: '700',
+        fontSize: 9.5,
+        fontWeight: '800',
     },
     primaryLoginBtn: {
-        borderRadius: 20,
+        borderRadius: 18,
         overflow: 'hidden',
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 2 },
@@ -824,39 +859,39 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 38,
+        height: 36,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#0F172A',
         fontWeight: '900',
-        fontSize: 13,
+        fontSize: 11.5,
     },
     biometricBtn: {
-        height: 36,
-        borderRadius: 18,
+        height: 34,
+        borderRadius: 17,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     biometricBtnText: {
         fontWeight: '800',
-        fontSize: 11,
+        fontSize: 10,
     },
     dividerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 8,
+        marginVertical: 6,
     },
     dividerLine: {
         flex: 1,
         height: 1,
     },
     dividerText: {
-        fontSize: 8.5,
+        fontSize: 8,
         fontWeight: '800',
         letterSpacing: 0.8,
         marginHorizontal: 8,
@@ -865,12 +900,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 8,
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     socialTile: {
         flex: 1,
-        height: 36,
-        borderRadius: 18,
+        height: 34,
+        borderRadius: 17,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
@@ -878,7 +913,7 @@ const styles = StyleSheet.create({
     },
     socialTileText: {
         fontWeight: '700',
-        fontSize: 10.5,
+        fontSize: 9.5,
         marginLeft: 4,
     },
     footerLinkRow: {
@@ -888,11 +923,11 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     footerText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '500',
     },
     signupLinkText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
     },
     modalOverlay: {
