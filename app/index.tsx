@@ -74,6 +74,10 @@ export default function LandingPage() {
           } else {
             router.replace('/pin' as any);
           }
+        } else if (Platform.OS === 'web' && typeof window !== 'undefined' && isSubscribed) {
+          if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+            window.location.replace('/landing.html');
+          }
         }
       } catch (e) {
         console.log('Landing session check notice:', e);
