@@ -164,15 +164,32 @@ export default function LoginScreen() {
     const handleLoginWithCredentials = async (userIdent: string, userPass: string) => {
         const cleanIdent = userIdent.trim();
         if (!cleanIdent || !userPass) {
-            Alert.alert('Missing Credentials', 'Please enter your email/phone and password.');
+            const msg = 'Please enter your email, phone number, or username and password.';
+            if (Platform.OS === 'web') alert(msg);
+            else Alert.alert('Missing Credentials', msg);
             return;
         }
 
         setLoading(true);
         try {
+            let emailToUse = cleanIdent;
             const isEmailInput = cleanIdent.includes('@');
-            const loginCredentials = isEmailInput 
-                ? { email: cleanIdent, password: userPass }
+
+            if (!isEmailInput) {
+                // Check if user entered phone number or username
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('email, phone_number, username')
+                    .or(`phone_number.eq.${cleanIdent},username.eq.${cleanIdent},id.eq.${cleanIdent}`)
+                    .maybeSingle();
+
+                if (profile?.email) {
+                    emailToUse = profile.email;
+                }
+            }
+
+            const loginCredentials = emailToUse.includes('@')
+                ? { email: emailToUse, password: userPass }
                 : { phone: cleanIdent, password: userPass };
 
             const { data, error } = await supabase.auth.signInWithPassword(loginCredentials);
@@ -181,7 +198,7 @@ export default function LoginScreen() {
                 if (error.message.includes('Email not confirmed') || error.message.includes('Email not verified')) {
                     router.push({
                         pathname: '/otp' as any,
-                        params: { email: isEmailInput ? cleanIdent : '', type: 'signup' }
+                        params: { email: emailToUse, type: 'signup' }
                     });
                     return;
                 }
@@ -428,53 +445,28 @@ export default function LoginScreen() {
                                 </View>
                             </View>
 
-                            {/* Login Type Tabs (Email vs Phone) */}
-                            <View style={[styles.loginTypeContainer, { backgroundColor: isDark ? '#0A1424' : '#E2E8F0' }]}>
-                                <TouchableOpacity 
-                                    onPress={() => setLoginType('email')} 
-                                    style={[styles.loginTypeTab, loginType === 'email' && [styles.loginTypeTabActive, { backgroundColor: theme.primaryNavy }]]}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="mail-outline" size={13} color={loginType === 'email' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 4 }} />
-                                    <Text style={[styles.loginTypeText, loginType === 'email' ? { color: '#FFFFFF', fontWeight: '800' } : { color: theme.textMuted }]}>
-                                        Email
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    onPress={() => setLoginType('phone')} 
-                                    style={[styles.loginTypeTab, loginType === 'phone' && [styles.loginTypeTabActive, { backgroundColor: theme.primaryNavy }]]}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons name="call-outline" size={13} color={loginType === 'phone' ? '#08E4C7' : theme.textMuted} style={{ marginRight: 4 }} />
-                                    <Text style={[styles.loginTypeText, loginType === 'phone' ? { color: '#FFFFFF', fontWeight: '800' } : { color: theme.textMuted }]}>
-                                        Phone
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-
                             {/* Form Input Fields */}
                             <View style={styles.formContainer}>
                                 
-                                {/* Identifier Input */}
+                                {/* Universal Login Identifier Input */}
                                 <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                                    {loginType === 'email' ? 'Email Address' : 'Phone Number'}
+                                    Email, Phone Number, or Username
                                 </Text>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'identifier' ? theme.borderFocus : theme.borderPrimary }
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'identifier' ? '#F59E0B' : theme.borderPrimary }
                                 ]}>
                                     <Ionicons 
-                                        name={loginType === 'email' ? "mail" : "call"} 
+                                        name="person-circle" 
                                         size={16} 
-                                        color={focusedInput === 'identifier' ? theme.accentTeal : theme.textMuted} 
+                                        color={focusedInput === 'identifier' ? '#F59E0B' : theme.textMuted} 
                                         style={{ marginRight: 6 }} 
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder={loginType === 'email' ? 'name@example.com' : '08012345678'}
+                                        placeholder="Email, Phone (080...) or Username"
                                         placeholderTextColor={theme.textMuted}
-                                        keyboardType={loginType === 'email' ? 'email-address' : 'phone-pad'}
+                                        keyboardType="email-address"
                                         autoCapitalize="none"
                                         value={identifier}
                                         onChangeText={setIdentifier}
@@ -487,12 +479,12 @@ export default function LoginScreen() {
                                 <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 8 }]}>Password</Text>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? '#F59E0B' : theme.borderPrimary }
                                 ]}>
                                     <Ionicons 
                                         name="lock-closed" 
                                         size={16} 
-                                        color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} 
+                                        color={focusedInput === 'password' ? '#F59E0B' : theme.textMuted} 
                                         style={{ marginRight: 6 }} 
                                     />
                                     <TextInput 
@@ -822,33 +814,33 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     primaryLoginBtn: {
-        borderRadius: 12,
+        borderRadius: 20,
         overflow: 'hidden',
         shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        elevation: 4,
-        marginBottom: 10,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+        marginBottom: 8,
     },
     primaryBtnGradient: {
-        height: 44,
+        height: 38,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
         color: '#0F172A',
         fontWeight: '900',
-        fontSize: 13.5,
+        fontSize: 13,
     },
     biometricBtn: {
-        height: 38,
-        borderRadius: 12,
+        height: 36,
+        borderRadius: 18,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     biometricBtnText: {
         fontWeight: '800',
@@ -857,7 +849,7 @@ const styles = StyleSheet.create({
     dividerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 10,
+        marginVertical: 8,
     },
     dividerLine: {
         flex: 1,
@@ -873,12 +865,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 8,
         justifyContent: 'space-between',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     socialTile: {
         flex: 1,
-        height: 42,
-        borderRadius: 12,
+        height: 36,
+        borderRadius: 18,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
