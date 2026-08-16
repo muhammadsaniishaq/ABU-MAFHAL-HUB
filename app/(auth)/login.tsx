@@ -586,47 +586,30 @@ export default function LoginScreen() {
                                 {/* Social Login Divider */}
                                 <View style={styles.dividerRow}>
                                     <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
-                                    <Text style={[styles.dividerText, { color: theme.textMuted }]}>OR CONTINUE WITH</Text>
+                                    <Text style={[styles.dividerText, { color: theme.textMuted }]}>OR SIGN IN WITH</Text>
                                     <View style={[styles.dividerLine, { backgroundColor: theme.borderPrimary }]} />
                                 </View>
 
-                                {/* Social Provider Buttons Grid */}
-                                <View style={styles.socialGrid}>
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('google')} 
-                                        disabled={!!socialLoading} 
-                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
-                                        activeOpacity={0.8}
-                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                                    >
-                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={16} color="#EA4335" />}
-                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
-                                    </TouchableOpacity>
-
-                                    {(Platform.OS === 'ios' || Platform.OS === 'web') && (
-                                        <TouchableOpacity 
-                                            onPress={() => handleSocialAuth('apple')} 
-                                            disabled={!!socialLoading} 
-                                            style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
-                                            activeOpacity={0.8}
-                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                                        >
-                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={16} color={theme.textPrimary} />}
-                                            <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
-                                        </TouchableOpacity>
+                                {/* Official Google Sign In Button */}
+                                <TouchableOpacity 
+                                    onPress={() => handleSocialAuth('google')} 
+                                    disabled={!!socialLoading} 
+                                    style={[
+                                        styles.googleLoginBtn, 
+                                        { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#CBD5E1' }
+                                    ]} 
+                                    activeOpacity={0.85}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                >
+                                    {socialLoading === 'google' ? (
+                                        <ActivityIndicator size="small" color="#EA4335" />
+                                    ) : (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Ionicons name="logo-google" size={16} color="#EA4335" style={{ marginRight: 8 }} />
+                                            <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Continue with Google</Text>
+                                        </View>
                                     )}
-
-                                    <TouchableOpacity 
-                                        onPress={() => handleSocialAuth('github')} 
-                                        disabled={!!socialLoading} 
-                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
-                                        activeOpacity={0.8}
-                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                                    >
-                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={16} color={theme.textPrimary} />}
-                                        <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                </TouchableOpacity>
 
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
@@ -895,6 +878,25 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 0.8,
         marginHorizontal: 8,
+    },
+    googleLoginBtn: {
+        width: '100%',
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    googleLoginBtnText: {
+        fontWeight: '800',
+        fontSize: 10.5,
+        letterSpacing: 0.2,
     },
     socialGrid: {
         flexDirection: 'row',
