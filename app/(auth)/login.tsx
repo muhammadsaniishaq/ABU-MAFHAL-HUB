@@ -462,9 +462,9 @@ export default function LoginScreen() {
                             {/* Form Input Fields */}
                             <View style={styles.formContainer}>
                                 
-                                {/* Universal Login Identifier Input */}
+                                {/* Login Identifier Input */}
                                 <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                                    Email, Phone Number, or Username
+                                    Email or Phone Number
                                 </Text>
                                 <View style={[
                                     styles.inputFieldBox, 
@@ -478,7 +478,7 @@ export default function LoginScreen() {
                                     />
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="Email, Phone (080...) or Username"
+                                        placeholder="Enter Email or Phone Number"
                                         placeholderTextColor={theme.textMuted}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -605,7 +605,11 @@ export default function LoginScreen() {
                                         <ActivityIndicator size="small" color="#EA4335" />
                                     ) : (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="logo-google" size={16} color="#EA4335" style={{ marginRight: 8 }} />
+                                            <Image 
+                                                source={require('../../assets/images/google-g.png')} 
+                                                style={{ width: 18, height: 18, marginRight: 8 }} 
+                                                resizeMode="contain" 
+                                            />
                                             <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Continue with Google</Text>
                                         </View>
                                     )}

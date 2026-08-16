@@ -707,7 +707,11 @@ export default function SignupScreen() {
                                         <ActivityIndicator size="small" color="#EA4335" />
                                     ) : (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Ionicons name="logo-google" size={16} color="#EA4335" style={{ marginRight: 8 }} />
+                                            <Image 
+                                                source={require('../../assets/images/google-g.png')} 
+                                                style={{ width: 18, height: 18, marginRight: 8 }} 
+                                                resizeMode="contain" 
+                                            />
                                             <Text style={[styles.googleLoginBtnText, { color: theme.textPrimary }]}>Sign Up with Google</Text>
                                         </View>
                                     )}
