@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -82,6 +83,65 @@ export default function Splash() {
   
   const [isReady, setIsReady] = useState(true);
   const [partners, setPartners] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const checkSessionAndNavigate = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && isSubscribed) {
+          await AsyncStorage.setItem('has_active_session', 'true');
+          
+          let localPin = Platform.OS === 'web'
+            ? await AsyncStorage.getItem('user_transaction_pin')
+            : await SecureStore.getItemAsync('user_transaction_pin');
+
+          if (!localPin) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('transaction_pin')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            if (data?.transaction_pin) {
+              localPin = data.transaction_pin;
+              if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+              else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
+            }
+          }
+
+          const unlocked = await AsyncStorage.getItem('app_unlocked');
+
+          if (!localPin) {
+            // First-time Google OAuth user without PIN -> Route to PIN Setup!
+            router.replace('/pin-setup' as any);
+          } else if (unlocked === 'true') {
+            // App unlocked -> Route to Dashboard!
+            router.replace('/dashboard' as any);
+          } else {
+            // PIN set, app locked -> Route to PIN!
+            router.replace('/pin' as any);
+          }
+        }
+      } catch (e) {
+        console.log('Splash session check notice:', e);
+      }
+    };
+
+    checkSessionAndNavigate();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user && isSubscribed) {
+        checkSessionAndNavigate();
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const fetchPartners = async () => {
