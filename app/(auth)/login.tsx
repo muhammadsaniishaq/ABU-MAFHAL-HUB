@@ -431,11 +431,6 @@ export default function LoginScreen() {
                         {/* Centered Single-Screen Locked Card */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* Compact 3D Male Cartoon Mascot */}
-                            <View style={styles.mascotContainer}>
-                                <Mascot3D size={90} greetingText="Welcome Back! 👋" isDarkMode={isDark} />
-                            </View>
-
                             {/* Welcome Headline */}
                             <View style={styles.headlineBox}>
                                 <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>
@@ -697,17 +692,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logoImage: {
-        width: 28,
-        height: 28,
+        width: 42,
+        height: 42,
+        marginRight: 6,
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 15,
         letterSpacing: 0.5,
     },
     brandTagline: {
         fontWeight: '700',
-        fontSize: 7.5,
+        fontSize: 8,
         letterSpacing: 0.8,
     },
     supportHeaderBtn: {

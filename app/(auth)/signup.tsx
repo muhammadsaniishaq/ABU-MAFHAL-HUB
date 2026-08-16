@@ -454,11 +454,6 @@ export default function SignupScreen() {
                         {/* Centered Form Card Wrapper */}
                         <View style={[styles.cardWrapper, isTabletOrDesktop && styles.desktopCardWrapper]}>
                             
-                            {/* Compact 3D Male Cartoon Mascot */}
-                            <View style={styles.mascotContainer}>
-                                <Mascot3D size={85} greetingText="Welcome to ABUMAFHAL! ✨" isDarkMode={isDark} />
-                            </View>
-
                             {/* Headline */}
                             <View style={styles.headlineBox}>
                                 <Text style={[styles.welcomeTitle, { color: theme.textPrimary }]}>
@@ -813,13 +808,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logoImage: {
-        width: 26,
-        height: 26,
+        width: 42,
+        height: 42,
         marginRight: 6,
     },
     brandTitle: {
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 15,
         letterSpacing: 0.5,
     },
     supportHeaderBtn: {
