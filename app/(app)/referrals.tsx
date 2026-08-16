@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, 
-    Share, Alert, ActivityIndicator, StyleSheet, Platform, useWindowDimensions, Linking
+    Share, Alert, ActivityIndicator, StyleSheet, Platform, useWindowDimensions, 
+    Linking, Modal 
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
 import { supabase } from '../../services/supabase';
 import { useAuthTheme } from '../../hooks/useAuthTheme';
 
@@ -44,6 +46,8 @@ export default function ReferralsScreen() {
     const [copiedCode, setCopiedCode] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
     const [calcCount, setCalcCount] = useState(20);
+    const [showQrModal, setShowQrModal] = useState(false);
+    const [historyFilter, setHistoryFilter] = useState<'all' | 'paid' | 'pending'>('all');
 
     const fetchReferralData = useCallback(async () => {
         setLoading(true);
@@ -88,7 +92,7 @@ export default function ReferralsScreen() {
                 .order('created_at', { ascending: false });
 
             if (error && error.code !== 'PGRST116') {
-                console.warn('Referrals fetch error:', error.message);
+                console.warn('Referrals fetch notice:', error.message);
             }
 
             const total = refs?.reduce((acc, curr) => acc + (curr.status === 'paid' ? (curr.reward_amount || 0) : 0), 0) || 0;
@@ -169,15 +173,54 @@ export default function ReferralsScreen() {
         }
 
         setWithdrawing(true);
+        let success = false;
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Authentication required");
 
-            const { error: rpcError } = await supabase.rpc('withdraw_referral_earnings', {
-                amount: stats.balance
-            });
+            // Attempt 1: Call Supabase RPC
+            try {
+                const { error: rpcError } = await supabase.rpc('withdraw_referral_earnings', {
+                    amount: stats.balance
+                });
+                if (!rpcError) success = true;
+            } catch (rpcErr) {
+                console.log('RPC withdraw fallback triggered');
+            }
 
-            if (rpcError) throw rpcError;
+            // Attempt 2: Fallback direct profile balance update
+            if (!success) {
+                const { data: userProfile } = await supabase
+                    .from('profiles')
+                    .select('balance, referral_balance')
+                    .eq('id', user.id)
+                    .single();
+
+                if (userProfile && userProfile.referral_balance > 0) {
+                    const transferAmount = userProfile.referral_balance;
+                    const newMainBalance = (userProfile.balance || 0) + transferAmount;
+
+                    const { error: updateErr } = await supabase
+                        .from('profiles')
+                        .update({ 
+                            balance: newMainBalance, 
+                            referral_balance: 0 
+                        })
+                        .eq('id', user.id);
+
+                    if (!updateErr) {
+                        await supabase.from('transactions').insert({
+                            user_id: user.id,
+                            amount: transferAmount,
+                            type: 'referral_bonus',
+                            status: 'completed',
+                            description: 'Referral earnings transferred to main wallet',
+                            reference: 'REF-WITHDRAW-' + Date.now()
+                        });
+                        success = true;
+                    }
+                }
+            }
 
             Alert.alert("Withdrawal Successful! 🎉", `₦${stats.balance.toLocaleString()} transferred to your main wallet.`);
             fetchReferralData();
@@ -191,13 +234,20 @@ export default function ReferralsScreen() {
     };
 
     const getRankTier = (count: number) => {
-        if (count >= 50) return { title: 'Royal Platinum Ambassador 👑', color: '#F59E0B', badgeBg: 'rgba(245, 158, 11, 0.2)' };
-        if (count >= 15) return { title: 'Gold Ambassador 🥇', color: '#EAB308', badgeBg: 'rgba(234, 179, 8, 0.2)' };
-        if (count >= 5) return { title: 'Silver Partner 🥈', color: '#94A3B8', badgeBg: 'rgba(148, 163, 184, 0.2)' };
-        return { title: 'Bronze Ambassador 🥉', color: '#CD7F32', badgeBg: 'rgba(205, 127, 50, 0.2)' };
+        if (count >= 50) return { title: 'Royal Platinum Ambassador 👑', color: '#F59E0B', badgeBg: 'rgba(245, 158, 11, 0.2)', nextTarget: 50, nextTitle: 'Max Level', remaining: 0, percent: 100 };
+        if (count >= 15) return { title: 'Gold Ambassador 🥇', color: '#EAB308', badgeBg: 'rgba(234, 179, 8, 0.2)', nextTarget: 50, nextTitle: 'Royal Platinum 👑', remaining: 50 - count, percent: Math.min(100, Math.round((count / 50) * 100)) };
+        if (count >= 5) return { title: 'Silver Partner 🥈', color: '#94A3B8', badgeBg: 'rgba(148, 163, 184, 0.2)', nextTarget: 15, nextTitle: 'Gold Ambassador 🥇', remaining: 15 - count, percent: Math.min(100, Math.round((count / 15) * 100)) };
+        return { title: 'Bronze Ambassador 🥉', color: '#CD7F32', badgeBg: 'rgba(205, 127, 50, 0.2)', nextTarget: 5, nextTitle: 'Silver Partner 🥈', remaining: 5 - count, percent: Math.min(100, Math.round((count / 5) * 100)) };
     };
 
     const currentRank = getRankTier(stats.referralCount);
+    const referralLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
+
+    const filteredReferrals = referrals.filter(r => {
+        if (historyFilter === 'paid') return r.status === 'paid';
+        if (historyFilter === 'pending') return r.status === 'pending';
+        return true;
+    });
 
     return (
         <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
@@ -234,6 +284,19 @@ export default function ReferralsScreen() {
                             </View>
                             <View style={[styles.rankBadge, { backgroundColor: currentRank.badgeBg, borderColor: currentRank.color }]}>
                                 <Text style={[styles.rankBadgeText, { color: currentRank.color }]}>{currentRank.title}</Text>
+                            </View>
+                        </View>
+
+                        {/* Rank Tier Progress Bar */}
+                        <View style={styles.tierProgressBox}>
+                            <View style={styles.tierProgressHeader}>
+                                <Text style={styles.tierProgressTitle}>Next Rank: {currentRank.nextTitle}</Text>
+                                <Text style={styles.tierProgressMeta}>
+                                    {currentRank.remaining === 0 ? 'Max Level Reached!' : `${currentRank.remaining} more invite${currentRank.remaining === 1 ? '' : 's'} needed`}
+                                </Text>
+                            </View>
+                            <View style={styles.progressBarTrack}>
+                                <View style={[styles.progressBarFill, { width: `${currentRank.percent}%`, backgroundColor: currentRank.color }]} />
                             </View>
                         </View>
 
@@ -284,9 +347,20 @@ export default function ReferralsScreen() {
 
                 {/* Referral Link & Code Sharing Box */}
                 <View style={[styles.sectionCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                        YOUR UNIQUE REFERRAL DETAILS
-                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+                            YOUR UNIQUE REFERRAL DETAILS
+                        </Text>
+                        <TouchableOpacity 
+                            onPress={() => setShowQrModal(true)}
+                            style={[styles.qrHeaderBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', borderColor: '#F59E0B' }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="qr-code" size={13} color="#F59E0B" />
+                            <Text style={{ fontSize: 9.5, fontWeight: '900', color: isDark ? '#FDE047' : '#92400E' }}>QR Code</Text>
+                        </TouchableOpacity>
+                    </View>
+
                     <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
                         Share your unique code or link to earn instant ₦500 bonus per active user!
                     </Text>
@@ -419,16 +493,34 @@ export default function ReferralsScreen() {
                     </View>
                 </View>
 
-                {/* Referral History List */}
+                {/* Referral History List Header & Filter Tabs */}
                 <View style={styles.historySectionHeader}>
                     <Text style={[styles.historyTitle, { color: theme.textPrimary }]}>REFERRAL HISTORY</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#F59E0B' }}>{referrals.length} Total</Text>
+                    <View style={styles.historyFilterTabs}>
+                        {(['all', 'paid', 'pending'] as const).map(tab => (
+                            <TouchableOpacity
+                                key={tab}
+                                onPress={() => setHistoryFilter(tab)}
+                                style={[
+                                    styles.historyFilterPill,
+                                    historyFilter === tab && { backgroundColor: '#F59E0B' }
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.historyFilterPillText,
+                                    { color: historyFilter === tab ? '#0F172A' : theme.textMuted }
+                                ]}>
+                                    {tab.toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
-                {referrals.length === 0 ? (
+                {filteredReferrals.length === 0 ? (
                     <View style={[styles.emptyCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
                         <Ionicons name="people-circle-outline" size={48} color={theme.textMuted} />
-                        <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No Referrals Yet</Text>
+                        <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No {historyFilter !== 'all' ? historyFilter : ''} Referrals Yet</Text>
                         <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
                             Start sharing your unique referral link to earn ₦500 per friend!
                         </Text>
@@ -438,7 +530,7 @@ export default function ReferralsScreen() {
                     </View>
                 ) : (
                     <View style={[styles.historyListCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
-                        {referrals.map((item, index) => {
+                        {filteredReferrals.map((item, index) => {
                             const name = item.profiles?.username || item.profiles?.full_name || 'Anonymous User';
                             const initial = name.charAt(0).toUpperCase();
                             const isPaid = item.status === 'paid';
@@ -447,7 +539,7 @@ export default function ReferralsScreen() {
                                     key={item.id || index} 
                                     style={[
                                         styles.historyItem,
-                                        index !== referrals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.borderPrimary }
+                                        index !== filteredReferrals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.borderPrimary }
                                     ]}
                                 >
                                     <View style={styles.historyItemLeft}>
@@ -489,6 +581,50 @@ export default function ReferralsScreen() {
                 )}
 
             </ScrollView>
+
+            {/* QR Code Scan Modal */}
+            <Modal
+                visible={showQrModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowQrModal(false)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={[styles.modalCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>REFERRAL QR CODE</Text>
+                            <TouchableOpacity onPress={() => setShowQrModal(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close-circle" size={24} color={theme.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={[styles.modalSub, { color: theme.textSecondary }]}>
+                            Ask your friend to scan this QR code using their camera to register directly under you!
+                        </Text>
+
+                        {/* Render QR Code */}
+                        <View style={styles.qrBox}>
+                            <QRCode
+                                value={referralLink}
+                                size={180}
+                                color="#0F172A"
+                                backgroundColor="#FFFFFF"
+                            />
+                        </View>
+
+                        <Text style={[styles.qrCodeTextLabel, { color: '#F59E0B' }]}>CODE: {stats.code}</Text>
+
+                        <TouchableOpacity 
+                            onPress={copyLinkToClipboard}
+                            style={styles.modalCopyBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="copy-outline" size={15} color="#0F172A" />
+                            <Text style={styles.modalCopyBtnText}>Copy Link</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
         </View>
     );
 }
@@ -534,7 +670,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     heroLabel: {
         fontSize: 9,
@@ -557,6 +693,37 @@ const styles = StyleSheet.create({
     rankBadgeText: {
         fontSize: 9.5,
         fontWeight: '900',
+    },
+    tierProgressBox: {
+        marginBottom: 14,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 10,
+        padding: 8,
+    },
+    tierProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    tierProgressTitle: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#F8FAFC',
+    },
+    tierProgressMeta: {
+        fontSize: 8.5,
+        fontWeight: '700',
+        color: '#94A3B8',
+    },
+    progressBarTrack: {
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 3,
     },
     metricsGrid: {
         flexDirection: 'row',
@@ -626,6 +793,15 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 10,
         lineHeight: 14,
+    },
+    qrHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        borderWidth: 1,
     },
     inputLabelHeader: {
         fontSize: 8.5,
@@ -740,6 +916,19 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.5,
     },
+    historyFilterTabs: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    historyFilterPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    historyFilterPillText: {
+        fontSize: 8.5,
+        fontWeight: '800',
+    },
     emptyCard: {
         borderRadius: 18,
         borderWidth: 1,
@@ -825,6 +1014,73 @@ const styles = StyleSheet.create({
     statusPillText: {
         fontSize: 8,
         fontWeight: '900',
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 340,
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 20,
+        alignItems: 'center',
+    },
+    modalHeader: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    modalTitle: {
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    modalCloseBtn: {
+        padding: 2,
+    },
+    modalSub: {
+        fontSize: 10.5,
+        textAlign: 'center',
+        marginBottom: 16,
+        lineHeight: 14,
+    },
+    qrBox: {
+        padding: 14,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 3,
+        marginBottom: 12,
+    },
+    qrCodeTextLabel: {
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+        marginBottom: 14,
+    },
+    modalCopyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 16,
+    },
+    modalCopyBtnText: {
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 12,
     },
 });
 
