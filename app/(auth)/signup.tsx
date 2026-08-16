@@ -672,15 +672,15 @@ export default function SignupScreen() {
                                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <LinearGradient 
-                                        colors={['#0E1A2E', '#1E293B']} 
+                                        colors={['#F59E0B', '#D97706']} 
                                         style={styles.primaryBtnGradient}
                                     >
                                         {loading ? (
-                                            <ActivityIndicator color="#08E4C7" size="small" />
+                                            <ActivityIndicator color="#0F172A" size="small" />
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Create My Account</Text>
-                                                <Ionicons name="checkmark-circle" size={16} color="#08E4C7" style={{ marginLeft: 6 }} />
+                                                <Ionicons name="checkmark-circle" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -688,20 +688,38 @@ export default function SignupScreen() {
 
                                 {/* Social Sign Up Grid */}
                                 <View style={styles.socialGrid}>
-                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={14} color="#EA4335" />}
+                                    <TouchableOpacity 
+                                        onPress={() => handleSocialAuth('google')} 
+                                        disabled={!!socialLoading} 
+                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                        activeOpacity={0.8} 
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                    >
+                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={16} color="#EA4335" />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
                                     </TouchableOpacity>
 
                                     {(Platform.OS === 'ios' || Platform.OS === 'web') && (
-                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={14} color={theme.textPrimary} />}
+                                        <TouchableOpacity 
+                                            onPress={() => handleSocialAuth('apple')} 
+                                            disabled={!!socialLoading} 
+                                            style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                            activeOpacity={0.8} 
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                        >
+                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={16} color={theme.textPrimary} />}
                                             <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
                                         </TouchableOpacity>
                                     )}
 
-                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={14} color={theme.textPrimary} />}
+                                    <TouchableOpacity 
+                                        onPress={() => handleSocialAuth('github')} 
+                                        disabled={!!socialLoading} 
+                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                        activeOpacity={0.8} 
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                    >
+                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={16} color={theme.textPrimary} />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -710,7 +728,7 @@ export default function SignupScreen() {
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Already have an account?</Text>
                                     <TouchableOpacity onPress={() => router.push('/login' as any)} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                        <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Sign In</Text>
+                                        <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Sign In</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -782,7 +800,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 14,
         paddingTop: 2,
-        paddingBottom: 80,
+        paddingBottom: 100,
     },
     topControlRow: {
         flexDirection: 'row',
@@ -912,35 +930,35 @@ const styles = StyleSheet.create({
         textDecorationLine: 'underline',
     },
     primaryBtn: {
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: 'hidden',
-        shadowColor: '#0E1A2E',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 4,
-        elevation: 3,
-        marginBottom: 8,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 10,
     },
     primaryBtnGradient: {
-        height: 38,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
-        color: '#FFFFFF',
-        fontWeight: '800',
-        fontSize: 12.5,
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 13.5,
     },
     socialGrid: {
         flexDirection: 'row',
-        gap: 6,
+        gap: 8,
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 14,
     },
     socialTile: {
         flex: 1,
-        height: 34,
-        borderRadius: 8,
+        height: 42,
+        borderRadius: 12,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',

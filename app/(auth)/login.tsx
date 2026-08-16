@@ -537,23 +537,24 @@ export default function LoginScreen() {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Primary Login Button */}
+                                 {/* Primary Login Button */}
                                 <TouchableOpacity 
                                     onPress={handleLogin}
                                     disabled={loading}
                                     style={styles.primaryLoginBtn}
                                     activeOpacity={0.85}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <LinearGradient 
-                                        colors={['#0E1A2E', '#1E293B']} 
+                                        colors={['#F59E0B', '#D97706']} 
                                         style={styles.primaryBtnGradient}
                                     >
                                         {loading ? (
-                                            <ActivityIndicator color="#08E4C7" size="small" />
+                                            <ActivityIndicator color="#0F172A" size="small" />
                                         ) : (
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.primaryBtnText}>Sign In to Account</Text>
-                                                <Ionicons name="arrow-forward" size={16} color="#08E4C7" style={{ marginLeft: 6 }} />
+                                                <Ionicons name="arrow-forward-circle" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -563,11 +564,12 @@ export default function LoginScreen() {
                                 {biometricAvailable && (
                                     <TouchableOpacity 
                                         onPress={handleBiometricAuth}
-                                        style={[styles.biometricBtn, { backgroundColor: isDark ? 'rgba(8, 228, 199, 0.1)' : '#EFF6FF', borderColor: theme.accentTeal }]}
+                                        style={[styles.biometricBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7', borderColor: '#F59E0B' }]}
                                         activeOpacity={0.8}
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     >
-                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={16} color={theme.accentTeal} style={{ marginRight: 6 }} />
-                                        <Text style={[styles.biometricBtnText, { color: theme.textPrimary }]}>
+                                        <Ionicons name={biometricType === 'Face ID' ? "scan-outline" : "finger-print"} size={16} color="#F59E0B" style={{ marginRight: 6 }} />
+                                        <Text style={[styles.biometricBtnText, { color: isDark ? '#FDE047' : '#92400E' }]}>
                                             Quick Sign In with {biometricType}
                                         </Text>
                                     </TouchableOpacity>
@@ -582,20 +584,38 @@ export default function LoginScreen() {
 
                                 {/* Social Provider Buttons Grid */}
                                 <View style={styles.socialGrid}>
-                                    <TouchableOpacity onPress={() => handleSocialAuth('google')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={15} color="#EA4335" />}
+                                    <TouchableOpacity 
+                                        onPress={() => handleSocialAuth('google')} 
+                                        disabled={!!socialLoading} 
+                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                    >
+                                        {socialLoading === 'google' ? <ActivityIndicator size="small" color="#EA4335" /> : <Ionicons name="logo-google" size={16} color="#EA4335" />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Google</Text>
                                     </TouchableOpacity>
 
                                     {(Platform.OS === 'ios' || Platform.OS === 'web') && (
-                                        <TouchableOpacity onPress={() => handleSocialAuth('apple')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={15} color={theme.textPrimary} />}
+                                        <TouchableOpacity 
+                                            onPress={() => handleSocialAuth('apple')} 
+                                            disabled={!!socialLoading} 
+                                            style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                            activeOpacity={0.8}
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                        >
+                                            {socialLoading === 'apple' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-apple" size={16} color={theme.textPrimary} />}
                                             <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>Apple</Text>
                                         </TouchableOpacity>
                                     )}
 
-                                    <TouchableOpacity onPress={() => handleSocialAuth('github')} disabled={!!socialLoading} style={[styles.socialTile, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]} activeOpacity={0.8}>
-                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={15} color={theme.textPrimary} />}
+                                    <TouchableOpacity 
+                                        onPress={() => handleSocialAuth('github')} 
+                                        disabled={!!socialLoading} 
+                                        style={[styles.socialTile, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: 'rgba(245, 158, 11, 0.3)' }]} 
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                    >
+                                        {socialLoading === 'github' ? <ActivityIndicator size="small" color={theme.textPrimary} /> : <Ionicons name="logo-github" size={16} color={theme.textPrimary} />}
                                         <Text style={[styles.socialTileText, { color: theme.textPrimary }]}>GitHub</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -603,8 +623,12 @@ export default function LoginScreen() {
                                 {/* Footer Link */}
                                 <View style={styles.footerLinkRow}>
                                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>Don't have an account?</Text>
-                                    <TouchableOpacity onPress={() => router.push('/signup' as any)} activeOpacity={0.8}>
-                                        <Text style={[styles.signupLinkText, { color: theme.accentTeal }]}> Create Account</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => router.push('/signup' as any)} 
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Text style={[styles.signupLinkText, { color: '#F59E0B' }]}> Create Account</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -659,13 +683,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    scrollContent: {
+       scrollContent: {
         paddingHorizontal: 14,
         paddingTop: 2,
-        paddingBottom: 80,
+        paddingBottom: 100,
     },
     topControlRow: {
         flexDirection: 'row',
@@ -762,8 +783,8 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     inputFieldBox: {
-        height: 38,
-        borderRadius: 10,
+        height: 42,
+        borderRadius: 12,
         borderWidth: 1,
         paddingHorizontal: 10,
         flexDirection: 'row',
@@ -804,42 +825,42 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     primaryLoginBtn: {
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: 'hidden',
-        shadowColor: '#0E1A2E',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 4,
-        elevation: 3,
-        marginBottom: 8,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+        marginBottom: 10,
     },
     primaryBtnGradient: {
-        height: 40,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryBtnText: {
-        color: '#FFFFFF',
-        fontWeight: '800',
-        fontSize: 12.5,
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 13.5,
     },
     biometricBtn: {
-        height: 34,
-        borderRadius: 10,
+        height: 38,
+        borderRadius: 12,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     biometricBtnText: {
-        fontWeight: '700',
+        fontWeight: '800',
         fontSize: 11,
     },
     dividerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 8,
+        marginVertical: 10,
     },
     dividerLine: {
         flex: 1,
@@ -853,18 +874,19 @@ const styles = StyleSheet.create({
     },
     socialGrid: {
         flexDirection: 'row',
-        gap: 6,
+        gap: 8,
         justifyContent: 'space-between',
-        marginBottom: 12,
+        marginBottom: 14,
     },
     socialTile: {
         flex: 1,
-        height: 34,
-        borderRadius: 8,
+        height: 42,
+        borderRadius: 12,
         borderWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+    },      justifyContent: 'center',
     },
     socialTileText: {
         fontWeight: '700',
