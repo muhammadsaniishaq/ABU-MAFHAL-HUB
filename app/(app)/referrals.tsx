@@ -49,6 +49,7 @@ export default function ReferralsScreen() {
     const [showQrModal, setShowQrModal] = useState(false);
     const [historyFilter, setHistoryFilter] = useState<'all' | 'paid' | 'pending'>('all');
     const [selectedTemplate, setSelectedTemplate] = useState<number>(1);
+    const [rewardAmount, setRewardAmount] = useState<number>(500);
 
     const fetchReferralData = useCallback(async () => {
         setLoading(true);
@@ -56,21 +57,36 @@ export default function ReferralsScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // 0. Fetch Dynamic Referral Settings URL
-            const { data: settings } = await supabase
+            // 0. Fetch Dynamic Referral Settings (URL & Reward Amount from Admin app_settings)
+            const { data: settingsList } = await supabase
                 .from('app_settings')
-                .select('value')
-                .eq('key', 'referral_url')
-                .maybeSingle();
-            
+                .select('key, value')
+                .in('key', ['referral_url', 'referral_reward']);
+
             let dynamicUrl = 'https://abumafhal.com.ng';
-            if (settings?.value) {
-                if (typeof settings.value === 'string') {
-                    dynamicUrl = settings.value.trim().replace(/\/+$/, '');
-                } else if (typeof settings.value === 'object' && settings.value.url) {
-                    dynamicUrl = String(settings.value.url).trim().replace(/\/+$/, '');
+            let configuredReward = 500;
+
+            settingsList?.forEach(item => {
+                if (item.key === 'referral_url' && item.value) {
+                    if (typeof item.value === 'string') {
+                        dynamicUrl = item.value.trim().replace(/\/+$/, '');
+                    } else if (typeof item.value === 'object' && item.value.url) {
+                        dynamicUrl = String(item.value.url).trim().replace(/\/+$/, '');
+                    }
                 }
-            }
+                if (item.key === 'referral_reward' && item.value !== undefined && item.value !== null) {
+                    if (typeof item.value === 'object' && item.value.amount !== undefined) {
+                        configuredReward = Number(item.value.amount);
+                    } else if (typeof item.value === 'number') {
+                        configuredReward = item.value;
+                    } else if (typeof item.value === 'string') {
+                        configuredReward = Number(item.value);
+                    }
+                }
+            });
+
+            if (isNaN(configuredReward)) configuredReward = 0;
+            setRewardAmount(configuredReward);
 
             if (!dynamicUrl.startsWith('http://') && !dynamicUrl.startsWith('https://')) {
                 dynamicUrl = 'https://' + dynamicUrl;
@@ -145,10 +161,14 @@ export default function ReferralsScreen() {
 
     const getShareMessage = () => {
         if (selectedTemplate === 2) {
-            return `🎁 CLAIM YOUR ₦500 WELCOME BONUS!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`;
+            return rewardAmount > 0
+                ? `🎁 CLAIM YOUR ₦${rewardAmount} WELCOME BONUS!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`
+                : `🎁 REGISTER NOW ON ABU MAFHAL SUB!\n\nSign up on Abu Mafhal Sub for the cheapest MTN, Airtel, Glo & 9mobile data & airtime in Nigeria!\n\nUse my direct registration link:\n${referralLink}\n\nOr enter code "${activeCode}" at signup! ⚡`;
         }
         if (selectedTemplate === 3) {
-            return `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nEarn ₦500 cash per referral + 0.5% lifetime commissions on data purchases on Abu Mafhal Sub.\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`;
+            return rewardAmount > 0
+                ? `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nEarn ₦${rewardAmount} cash per referral + 0.5% lifetime commissions on data purchases on Abu Mafhal Sub.\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`
+                : `💼 START YOUR VTU DATA RESELLING BUSINESS TODAY!\n\nStart your VTU reselling business on Abu Mafhal Sub & earn lifetime commissions!\n\nRegister now:\n${referralLink}\n\nCode: ${activeCode} 🚀`;
         }
         return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\nSign up using my link:\n${referralLink}\n\nOr enter code "${activeCode}" during registration! 🎉`;
     };
@@ -523,7 +543,7 @@ export default function ReferralsScreen() {
                             Refer {calcCount} active friends to earn:
                         </Text>
                         <Text style={{ fontSize: 24, fontWeight: '900', color: isDark ? '#6EE7B7' : '#047857', marginVertical: 2 }}>
-                            ₦{(calcCount * 500).toLocaleString()}
+                            ₦{(calcCount * rewardAmount).toLocaleString()}
                         </Text>
                         <Text style={{ fontSize: 9.5, color: theme.textMuted }}>
                             * Plus recurring commission on every VTU transaction they perform!
@@ -555,7 +575,11 @@ export default function ReferralsScreen() {
                         <View style={[styles.stepNumCircle, { backgroundColor: '#F59E0B' }]}><Ionicons name="cash" size={12} color="#0F172A" /></View>
                         <View style={{ flex: 1 }}>
                             <Text style={[styles.stepHeader, { color: theme.textPrimary }]}>Get Instant Commission!</Text>
-                            <Text style={[styles.stepBody, { color: theme.textSecondary }]}>₦500 bonus is credited immediately to your Available Rewards balance.</Text>
+                            <Text style={[styles.stepBody, { color: theme.textSecondary }]}>
+                                {rewardAmount > 0 
+                                    ? `₦${rewardAmount} bonus is credited immediately to your Available Rewards balance.`
+                                    : `Your referral is tracked immediately in your Referral History.`}
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -589,7 +613,10 @@ export default function ReferralsScreen() {
                         <Ionicons name="people-circle-outline" size={48} color={theme.textMuted} />
                         <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No {historyFilter !== 'all' ? historyFilter : ''} Referrals Yet</Text>
                         <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-                            Start sharing your unique referral link to earn ₦500 per friend!
+                            {rewardAmount > 0 
+                                ? `Start sharing your unique referral link to earn ₦${rewardAmount} per friend!`
+                                : `Start sharing your unique referral link to track all your referred friends!`
+                            }
                         </Text>
                         <TouchableOpacity onPress={shareWhatsApp} style={styles.emptyActionBtn} activeOpacity={0.8}>
                             <Text style={styles.emptyActionBtnText}>Invite Friends Now 🚀</Text>
@@ -598,9 +625,12 @@ export default function ReferralsScreen() {
                 ) : (
                     <View style={[styles.historyListCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
                         {filteredReferrals.map((item, index) => {
-                            const name = item.profiles?.username || item.profiles?.full_name || 'Anonymous User';
-                            const initial = name.charAt(0).toUpperCase();
+                            const fullName = item.profiles?.full_name;
+                            const username = item.profiles?.username;
+                            const name = fullName ? (username ? `${fullName} (@${username})` : fullName) : (username ? `@${username}` : 'Referred User');
+                            const initial = (fullName || username || 'U').charAt(0).toUpperCase();
                             const isPaid = item.status === 'paid';
+                            const rewardVal = item.reward_amount ?? 0;
                             return (
                                 <View 
                                     key={item.id || index} 
@@ -627,7 +657,7 @@ export default function ReferralsScreen() {
 
                                     <View style={styles.historyItemRight}>
                                         <Text style={[styles.historyReward, { color: isPaid ? '#10B981' : '#F59E0B' }]}>
-                                            +₦{(item.reward_amount || 500).toLocaleString()}
+                                            +₦{rewardVal.toLocaleString()}
                                         </Text>
                                         <View style={[
                                             styles.statusPill,

@@ -1,4 +1,4 @@
--- Automated & Dynamic Referral Payout Function & Trigger (Bulletproof & Exception-Safe)
+-- Fix Referral Commission to respect 0 (zero) setting from Admin app_settings
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 DECLARE
@@ -49,14 +49,14 @@ BEGIN
     ON CONFLICT (id) DO UPDATE SET
         referrer_id = COALESCE(public.profiles.referrer_id, EXCLUDED.referrer_id);
 
-    -- 3. Referral Reward Processing (Wrapped in EXCEPTION block so user registration NEVER fails)
+    -- 3. Referral Reward Processing
     BEGIN
         -- Check if Referral System is Enabled
         SELECT COALESCE((value->>'enabled')::boolean, true) INTO is_enabled
         FROM public.app_settings WHERE key = 'referral_enabled';
 
         IF referrer_uid IS NOT NULL AND (is_enabled IS NULL OR is_enabled = true) THEN
-            -- Fetch reward from settings (supports both JSON object {"amount": 500} and scalar numbers)
+            -- Fetch reward from app_settings (supports both JSON object {"amount": 500} and scalar numbers)
             SELECT 
                 CASE 
                     WHEN jsonb_typeof(value) = 'object' AND value->>'amount' IS NOT NULL THEN (value->>'amount')::decimal
@@ -65,19 +65,19 @@ BEGIN
                 END INTO reward_val
             FROM public.app_settings WHERE key = 'referral_reward';
             
-            -- Fallback default reward if not configured
+            -- Fallback ONLY if setting key is missing (NULL)
             IF reward_val IS NULL THEN 
                 reward_val := 0.00; 
             END IF;
 
-            -- Log referral transaction record
+            -- Log referral transaction record so referee ALWAYS appears in referrer's referral count and list
             INSERT INTO public.referrals (referrer_id, referee_id, status, reward_amount)
             VALUES (referrer_uid, new.id, 'paid', reward_val)
             ON CONFLICT (referee_id) DO UPDATE SET
                 reward_amount = EXCLUDED.reward_amount,
                 status = 'paid';
 
-            -- Instantly credit referrer's referral_balance if reward_val > 0
+            -- Only credit referrer's referral_balance if reward_val > 0
             IF reward_val > 0 THEN
                 UPDATE public.profiles 
                 SET referral_balance = COALESCE(referral_balance, 0) + reward_val
@@ -92,6 +92,7 @@ BEGIN
                     jsonb_build_object('type', 'referral', 'referee_id', new.id)
                 );
             ELSE
+                -- Notification for registration when zero bonus is set
                 INSERT INTO public.notifications (user_id, title, body, data)
                 VALUES (
                     referrer_uid, 
