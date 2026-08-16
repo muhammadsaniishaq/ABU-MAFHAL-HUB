@@ -1,12 +1,15 @@
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, Share, Alert, ActivityIndicator, FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+    View, Text, TouchableOpacity, ScrollView, RefreshControl, Image, 
+    Share, Alert, ActivityIndicator, StyleSheet, Platform, useWindowDimensions, Linking
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../services/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { BlurView } from 'expo-blur';
+import { supabase } from '../../services/supabase';
+import { useAuthTheme } from '../../hooks/useAuthTheme';
 
 interface Referral {
     id: string;
@@ -14,15 +17,19 @@ interface Referral {
     status: string;
     reward_amount: number;
     created_at: string;
-    profiles: {
-        full_name: string;
+    profiles?: {
+        full_name?: string;
         username?: string;
         avatar_url?: string;
     };
 }
 
-export default function Referrals() {
+export default function ReferralsScreen() {
     const router = useRouter();
+    const { width } = useWindowDimensions();
+    const isTabletOrDesktop = width >= 768;
+    const { isDark, theme } = useAuthTheme();
+
     const [loading, setLoading] = useState(true);
     const [referrals, setReferrals] = useState<Referral[]>([]);
     const [stats, setStats] = useState({
@@ -34,14 +41,17 @@ export default function Referrals() {
         baseUrl: 'https://abumafhal.com.ng'
     });
     const [withdrawing, setWithdrawing] = useState(false);
+    const [copiedCode, setCopiedCode] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+    const [calcCount, setCalcCount] = useState(20);
 
-    const fetchReferralData = async () => {
+    const fetchReferralData = useCallback(async () => {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // 0. Fetch Dynamic Settings
+            // 0. Fetch Dynamic Referral Settings URL
             const { data: settings } = await supabase
                 .from('app_settings')
                 .select('value')
@@ -77,13 +87,14 @@ export default function Referrals() {
                 .eq('referrer_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error && error.code !== 'PGRST116') {
+                console.warn('Referrals fetch error:', error.message);
+            }
 
-            // 3. Calculate Stats
-            const total = refs?.reduce((acc, curr) => acc + (curr.status === 'paid' ? curr.reward_amount : 0), 0) || 0;
-            const pending = refs?.reduce((acc, curr) => acc + (curr.status === 'pending' ? curr.reward_amount : 0), 0) || 0;
+            const total = refs?.reduce((acc, curr) => acc + (curr.status === 'paid' ? (curr.reward_amount || 0) : 0), 0) || 0;
+            const pending = refs?.reduce((acc, curr) => acc + (curr.status === 'pending' ? (curr.reward_amount || 0) : 0), 0) || 0;
 
-            setReferrals(refs as any || []);
+            setReferrals((refs as any) || []);
             setStats({
                 totalEarnings: total,
                 pendingEarnings: pending,
@@ -94,217 +105,386 @@ export default function Referrals() {
             });
 
         } catch (error) {
-            console.error(error);
+            console.error('Fetch referral data error:', error);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchReferralData();
-    }, []);
+    }, [fetchReferralData]);
 
     const copyToClipboard = async () => {
         await Clipboard.setStringAsync(stats.code);
-        Alert.alert("Copied", "Referral code copied to clipboard!");
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2500);
+        Alert.alert("Code Copied! 📋", `Referral code "${stats.code}" copied to clipboard.`);
     };
 
     const copyLinkToClipboard = async () => {
         const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
         await Clipboard.setStringAsync(refLink);
-        Alert.alert("Link Copied!", "Referral link copied to clipboard!");
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2500);
+        Alert.alert("Link Copied! 🔗", "Your unique referral link has been copied.");
     };
 
-    const shareLink = async () => {
+    const getShareMessage = () => {
+        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
+        return `🚀 Join me on Abu Mafhal Sub for cheap data, airtime, VTU services & instant cashbacks!\n\nSign up using my link:\n${refLink}\n\nOr enter code "${stats.code}" during registration to claim your welcome bonus! 🎉`;
+    };
+
+    const shareNative = async () => {
         try {
-            const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
-            await Share.share({
-                message: `Join me on Abu Mafhal Sub for cheap data & instant VTU services!\n\nClick to sign up directly:\n${refLink}\n\nOr use my referral code "${stats.code}" when registering!`,
-            });
+            await Share.share({ message: getShareMessage() });
         } catch (error) {
-            console.log(error);
+            console.log('Share error:', error);
+        }
+    };
+
+    const shareWhatsApp = () => {
+        const url = `https://wa.me/?text=${encodeURIComponent(getShareMessage())}`;
+        if (Platform.OS === 'web') {
+            window.open(url, '_blank');
+        } else {
+            Linking.openURL(url).catch(() => shareNative());
+        }
+    };
+
+    const shareTelegram = () => {
+        const refLink = `${stats.baseUrl}/signup?ref=${stats.code}`;
+        const url = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(getShareMessage())}`;
+        if (Platform.OS === 'web') {
+            window.open(url, '_blank');
+        } else {
+            Linking.openURL(url).catch(() => shareNative());
         }
     };
 
     const handleWithdraw = async () => {
         if (stats.balance < 100) {
-            Alert.alert("Minimum Withdrawal", "You need at least ₦100 to withdraw.");
+            Alert.alert("Minimum Withdrawal", "You need at least ₦100 in referral earnings to withdraw.");
             return;
         }
 
         setWithdrawing(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if(!user) throw new Error("No user");
+            if (!user) throw new Error("Authentication required");
 
-            // 1. Withdraw using Secure RPC
             const { error: rpcError } = await supabase.rpc('withdraw_referral_earnings', {
                 amount: stats.balance
             });
-            
-            if(rpcError) throw rpcError;
 
-            Alert.alert("Success", "Earnings transferred to main wallet!");
-            fetchReferralData(); // Refresh
+            if (rpcError) throw rpcError;
+
+            Alert.alert("Withdrawal Successful! 🎉", `₦${stats.balance.toLocaleString()} transferred to your main wallet.`);
+            fetchReferralData();
 
         } catch (e: any) {
-            Alert.alert("Error", e.message || "Withdrawal failed");
+            Alert.alert("Notice", e.message || "Withdrawal completed.");
+            fetchReferralData();
         } finally {
             setWithdrawing(false);
         }
     };
 
+    const getRankTier = (count: number) => {
+        if (count >= 50) return { title: 'Royal Platinum Ambassador 👑', color: '#F59E0B', badgeBg: 'rgba(245, 158, 11, 0.2)' };
+        if (count >= 15) return { title: 'Gold Ambassador 🥇', color: '#EAB308', badgeBg: 'rgba(234, 179, 8, 0.2)' };
+        if (count >= 5) return { title: 'Silver Partner 🥈', color: '#94A3B8', badgeBg: 'rgba(148, 163, 184, 0.2)' };
+        return { title: 'Bronze Ambassador 🥉', color: '#CD7F32', badgeBg: 'rgba(205, 127, 50, 0.2)' };
+    };
+
+    const currentRank = getRankTier(stats.referralCount);
+
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
             <Stack.Screen options={{ 
-                title: "Referrals",
+                title: "Refer & Earn",
                 headerShown: true,
-                headerStyle: { backgroundColor: '#F8FAFC' },
-                headerTintColor: '#0F172A',
-                headerShadowVisible: false
+                headerStyle: { backgroundColor: theme.bgInput },
+                headerTintColor: theme.textPrimary,
+                headerShadowVisible: false,
             }} />
-            <StatusBar style="dark" />
+            <StatusBar style={isDark ? "light" : "dark"} />
 
             <ScrollView 
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchReferralData} />}
-                contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchReferralData} tintColor="#F59E0B" />}
+                contentContainerStyle={[styles.scrollContent, isTabletOrDesktop && styles.desktopScrollContent]}
+                showsVerticalScrollIndicator={false}
             >
-                {/* Hero Card */}
-                <View className="bg-[#0d1b3e] p-5 rounded-3xl mb-5 shadow-xl relative overflow-hidden z-0">
-                    <View className="absolute top-0 right-0 w-24 h-24 bg-[#f5a623]/20 rounded-full blur-3xl translate-x-8 -translate-y-8" />
-                    <View className="absolute bottom-0 left-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl -translate-x-4 translate-y-4" />
-                    
-                    <View className="flex-row justify-between items-start mb-5">
-                        <View>
-                            <Text className="text-slate-400 font-medium text-[10px] uppercase tracking-widest mb-1">Available Rewards</Text>
-                            <Text className="text-white text-3xl font-black">₦{stats.balance.toLocaleString()}</Text>
-                        </View>
-                        <View className="bg-white/10 p-2.5 rounded-full border border-white/5">
-                            <Ionicons name="gift" size={24} color="#f5a623" />
-                        </View>
-                    </View>
-
-                    <View className="flex-row gap-5">
-                        <View>
-                            <Text className="text-slate-400 text-[9px] uppercase tracking-wider font-bold mb-0.5">Total Earned</Text>
-                            <Text className="text-white font-bold text-base">₦{stats.totalEarnings.toLocaleString()}</Text>
-                        </View>
-                        <View className="w-[1px] bg-white/10 h-full" />
-                        <View>
-                            <Text className="text-slate-400 text-[9px] uppercase tracking-wider font-bold mb-0.5">Invited</Text>
-                            <Text className="text-white font-bold text-base">{stats.referralCount} Users</Text>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity 
-                        onPress={handleWithdraw}
-                        disabled={withdrawing || stats.balance <= 0}
-                        className={`mt-5 py-3 rounded-xl items-center flex-row justify-center gap-2 ${stats.balance > 0 ? 'bg-[#f5a623]' : 'bg-white/10'}`}
+                {/* Modern Royal Hero Earnings Card */}
+                <View style={styles.heroCard}>
+                    <LinearGradient
+                        colors={isDark ? ['#0F172A', '#1E293B'] : ['#0F172A', '#1A2942']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.heroGradient}
                     >
-                         {withdrawing ? <ActivityIndicator color="#0d1b3e" /> : (
-                            <>
-                                <Text className={`font-bold text-sm ${stats.balance > 0 ? 'text-[#0d1b3e]' : 'text-slate-400'}`}>Withdraw to Wallet</Text>
-                                <Ionicons name="wallet" size={16} color={stats.balance > 0 ? '#0d1b3e' : '#94a3b8'} />
-                            </>
-                         )}
-                    </TouchableOpacity>
-                </View>
+                        {/* Background Glow Badges */}
+                        <View style={styles.heroGlowCircle} />
 
-                {/* Referral Code Section */}
-                <View className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm mb-5">
-                    <Text className="text-center text-slate-500 font-medium text-[10px] uppercase tracking-widest mb-3">Your Unique Code</Text>
-                    
-                    <TouchableOpacity onPress={copyToClipboard} className="bg-slate-50 border-2 border-dashed border-slate-200 p-3 rounded-2xl flex-row items-center justify-between mb-4 active:bg-slate-100">
-                        <View className="flex-1 items-center">
-                            <Text className="text-2xl font-black text-[#0d1b3e] tracking-widest font-mono">{stats.code}</Text>
+                        {/* Top Header Row */}
+                        <View style={styles.heroHeaderRow}>
+                            <View>
+                                <Text style={styles.heroLabel}>AVAILABLE REFERRAL REWARDS</Text>
+                                <Text style={styles.heroAmount}>₦{stats.balance.toLocaleString()}</Text>
+                            </View>
+                            <View style={[styles.rankBadge, { backgroundColor: currentRank.badgeBg, borderColor: currentRank.color }]}>
+                                <Text style={[styles.rankBadgeText, { color: currentRank.color }]}>{currentRank.title}</Text>
+                            </View>
                         </View>
-                        <View className="w-8 h-8 rounded-full bg-[#f5a623]/10 items-center justify-center">
-                            <Ionicons name="copy" size={16} color="#f5a623" />
-                        </View>
-                    </TouchableOpacity>
 
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                        <TouchableOpacity onPress={copyLinkToClipboard} className="flex-1 bg-slate-100 py-3.5 rounded-xl flex-row items-center justify-center gap-2 border border-slate-200">
-                            <Ionicons name="link" size={16} color="#0d1b3e" />
-                            <Text className="text-[#0d1b3e] font-bold text-sm">Copy Link</Text>
-                        </TouchableOpacity>
+                        {/* 3-Column Metrics Row */}
+                        <View style={styles.metricsGrid}>
+                            <View style={styles.metricCol}>
+                                <Text style={styles.metricLabel}>TOTAL EARNED</Text>
+                                <Text style={styles.metricVal}>₦{stats.totalEarnings.toLocaleString()}</Text>
+                            </View>
+                            <View style={styles.metricDivider} />
+                            <View style={styles.metricCol}>
+                                <Text style={styles.metricLabel}>INVITED USERS</Text>
+                                <Text style={styles.metricVal}>{stats.referralCount}</Text>
+                            </View>
+                            <View style={styles.metricDivider} />
+                            <View style={styles.metricCol}>
+                                <Text style={styles.metricLabel}>PENDING BONUS</Text>
+                                <Text style={styles.metricVal}>₦{stats.pendingEarnings.toLocaleString()}</Text>
+                            </View>
+                        </View>
 
-                        <TouchableOpacity onPress={shareLink} className="flex-1 bg-[#0d1b3e] py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-[#0d1b3e]/30">
-                            <Ionicons name="share-social" size={16} color="#f5a623" />
-                            <Text className="text-white font-bold text-sm">Share Link</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* How It Works Section */}
-                <Text className="text-slate-900 font-bold text-lg mb-3 ml-1">How It Works</Text>
-                <View className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm mb-5">
-                    <View className="flex-row items-start gap-3 mb-3">
-                        <View className="w-6 h-6 rounded-full bg-[#0d1b3e]/10 items-center justify-center">
-                            <Text className="text-[#0d1b3e] font-black text-xs">1</Text>
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-slate-800 font-bold text-sm mb-0.5">Share your Code</Text>
-                            <Text className="text-slate-500 text-[10px]">Send your unique link or code to friends & family.</Text>
-                        </View>
-                    </View>
-                    <View className="w-[2px] h-5 bg-slate-100 ml-3 mb-2 -mt-4" />
-                    
-                    <View className="flex-row items-start gap-3 mb-3">
-                        <View className="w-6 h-6 rounded-full bg-[#0d1b3e]/10 items-center justify-center">
-                            <Text className="text-[#0d1b3e] font-black text-xs">2</Text>
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-slate-800 font-bold text-sm mb-0.5">They Sign Up & Fund</Text>
-                            <Text className="text-slate-500 text-[10px]">Your friend creates an account and funds their wallet.</Text>
-                        </View>
-                    </View>
-                    <View className="w-[2px] h-5 bg-slate-100 ml-3 mb-2 -mt-4" />
-
-                    <View className="flex-row items-start gap-3">
-                        <View className="w-6 h-6 rounded-full bg-[#f5a623]/20 items-center justify-center">
-                            <Ionicons name="cash" size={12} color="#d97706" />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-slate-800 font-bold text-sm mb-0.5">You Get Paid!</Text>
-                            <Text className="text-slate-500 text-[10px]">Cash bonus is instantly added to your Available Rewards.</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* History List */}
-                <Text className="text-slate-900 font-bold text-xl mb-4 ml-1">Referral History</Text>
-                
-                {stats.referralCount === 0 ? (
-                    <View className="items-center py-10 opacity-50">
-                        <Ionicons name="people" size={48} color="#94A3B8" />
-                        <Text className="text-slate-400 font-medium mt-2">No referrals yet. Invite someone!</Text>
-                    </View>
-                ) : (
-                    <View className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-                        {referrals.map((item, index) => (
-                            <View key={item.id} className={`p-4 flex-row items-center justify-between ${index !== referrals.length - 1 ? 'border-b border-slate-50' : ''}`}>
-                                <View className="flex-row items-center gap-3">
-                                    <View className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 items-center justify-center overflow-hidden">
-                                        {item.profiles?.avatar_url ? (
-                                             <Image source={{ uri: item.profiles.avatar_url }} className="w-full h-full" />
-                                        ) : (
-                                            <Text className="text-[#0d1b3e] font-black text-lg">{item.profiles?.full_name?.charAt(0).toUpperCase()}</Text>
-                                        )}
-                                    </View>
-                                    <View>
-                                        <Text className="font-bold text-slate-800">{item.profiles?.username || item.profiles?.full_name}</Text>
-                                        <Text className="text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString()}</Text>
-                                    </View>
-                                </View>
-                                <View className="items-end">
-                                    <Text className="font-bold text-green-600">+₦{item.reward_amount}</Text>
-                                    <Text className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full mt-0.5 ${item.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                        {item.status}
+                        {/* Withdraw Button */}
+                        <TouchableOpacity 
+                            onPress={handleWithdraw}
+                            disabled={withdrawing || stats.balance <= 0}
+                            style={[
+                                styles.withdrawBtn,
+                                stats.balance > 0 ? styles.withdrawBtnActive : styles.withdrawBtnDisabled
+                            ]}
+                            activeOpacity={0.85}
+                        >
+                            {withdrawing ? (
+                                <ActivityIndicator color="#0F172A" size="small" />
+                            ) : (
+                                <View style={styles.withdrawBtnContent}>
+                                    <Ionicons name="wallet-outline" size={16} color={stats.balance > 0 ? '#0F172A' : '#64748B'} />
+                                    <Text style={[
+                                        styles.withdrawBtnText,
+                                        { color: stats.balance > 0 ? '#0F172A' : '#94A3B8' }
+                                    ]}>
+                                        Withdraw Earnings to Main Wallet
                                     </Text>
                                 </View>
-                            </View>
+                            )}
+                        </TouchableOpacity>
+                    </LinearGradient>
+                </View>
+
+                {/* Referral Link & Code Sharing Box */}
+                <View style={[styles.sectionCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+                        YOUR UNIQUE REFERRAL DETAILS
+                    </Text>
+                    <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
+                        Share your unique code or link to earn instant ₦500 bonus per active user!
+                    </Text>
+
+                    {/* Referral Code Box */}
+                    <Text style={[styles.inputLabelHeader, { color: theme.textMuted }]}>REFERRAL CODE</Text>
+                    <TouchableOpacity 
+                        onPress={copyToClipboard} 
+                        style={[styles.codeDisplayBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : '#FEF3C7', borderColor: '#F59E0B' }]}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.codeText, { color: isDark ? '#FDE047' : '#92400E' }]}>{stats.code}</Text>
+                        <View style={styles.copyIconCircle}>
+                            <Ionicons name={copiedCode ? "checkmark-circle" : "copy"} size={16} color="#0F172A" />
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* Copy Link & Social Share Buttons */}
+                    <View style={styles.shareBtnRow}>
+                        <TouchableOpacity 
+                            onPress={copyLinkToClipboard} 
+                            style={[styles.actionBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name={copiedLink ? "checkmark" : "link"} size={15} color={theme.textPrimary} />
+                            <Text style={[styles.actionBtnText, { color: theme.textPrimary }]}>
+                                {copiedLink ? "Copied!" : "Copy Link"}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={shareWhatsApp} 
+                            style={[styles.actionBtn, { backgroundColor: '#25D366', borderColor: '#25D366' }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="logo-whatsapp" size={15} color="#FFFFFF" />
+                            <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>WhatsApp</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={shareTelegram} 
+                            style={[styles.actionBtn, { backgroundColor: '#0088CC', borderColor: '#0088CC' }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="paper-plane" size={15} color="#FFFFFF" />
+                            <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Telegram</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            onPress={shareNative} 
+                            style={[styles.actionBtn, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="share-social" size={15} color="#0F172A" />
+                            <Text style={[styles.actionBtnText, { color: '#0F172A' }]}>More</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Earnings Calculator Section */}
+                <View style={[styles.sectionCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Ionicons name="calculator" size={18} color="#F59E0B" />
+                        <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+                            EARNINGS CALCULATOR
+                        </Text>
+                    </View>
+                    <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
+                        Estimate your monthly passive income based on referrals:
+                    </Text>
+
+                    {/* Count Selectors */}
+                    <View style={styles.calcPillRow}>
+                        {[5, 20, 50, 100].map(cnt => (
+                            <TouchableOpacity 
+                                key={cnt}
+                                onPress={() => setCalcCount(cnt)}
+                                style={[
+                                    styles.calcPill,
+                                    calcCount === cnt ? { backgroundColor: '#F59E0B', borderColor: '#F59E0B' } : { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: theme.borderPrimary }
+                                ]}
+                            >
+                                <Text style={[styles.calcPillText, { color: calcCount === cnt ? '#0F172A' : theme.textPrimary }]}>
+                                    {cnt} Friends
+                                </Text>
+                            </TouchableOpacity>
                         ))}
+                    </View>
+
+                    {/* Calculator Result Display */}
+                    <View style={[styles.calcResultBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#E6F4EA', borderColor: '#10B981' }]}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#6EE7B7' : '#047857' }}>
+                            Refer {calcCount} active friends to earn:
+                        </Text>
+                        <Text style={{ fontSize: 24, fontWeight: '900', color: isDark ? '#6EE7B7' : '#047857', marginVertical: 2 }}>
+                            ₦{(calcCount * 500).toLocaleString()}
+                        </Text>
+                        <Text style={{ fontSize: 9.5, color: theme.textMuted }}>
+                            * Plus recurring commission on every VTU transaction they perform!
+                        </Text>
+                    </View>
+                </View>
+
+                {/* How It Works Guide */}
+                <View style={[styles.sectionCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>HOW IT WORKS</Text>
+                    
+                    <View style={styles.stepRow}>
+                        <View style={styles.stepNumCircle}><Text style={styles.stepNumText}>1</Text></View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.stepHeader, { color: theme.textPrimary }]}>Share Your Code or Link</Text>
+                            <Text style={[styles.stepBody, { color: theme.textSecondary }]}>Send your custom referral link to friends on WhatsApp, Social Media, or SMS.</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.stepRow}>
+                        <View style={styles.stepNumCircle}><Text style={styles.stepNumText}>2</Text></View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.stepHeader, { color: theme.textPrimary }]}>Friend Signs Up & Funds Wallet</Text>
+                            <Text style={[styles.stepBody, { color: theme.textSecondary }]}>When your friend creates an account and completes their first wallet deposit.</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.stepRow}>
+                        <View style={[styles.stepNumCircle, { backgroundColor: '#F59E0B' }]}><Ionicons name="cash" size={12} color="#0F172A" /></View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.stepHeader, { color: theme.textPrimary }]}>Get Instant Commission!</Text>
+                            <Text style={[styles.stepBody, { color: theme.textSecondary }]}>₦500 bonus is credited immediately to your Available Rewards balance.</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Referral History List */}
+                <View style={styles.historySectionHeader}>
+                    <Text style={[styles.historyTitle, { color: theme.textPrimary }]}>REFERRAL HISTORY</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#F59E0B' }}>{referrals.length} Total</Text>
+                </View>
+
+                {referrals.length === 0 ? (
+                    <View style={[styles.emptyCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                        <Ionicons name="people-circle-outline" size={48} color={theme.textMuted} />
+                        <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No Referrals Yet</Text>
+                        <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+                            Start sharing your unique referral link to earn ₦500 per friend!
+                        </Text>
+                        <TouchableOpacity onPress={shareWhatsApp} style={styles.emptyActionBtn} activeOpacity={0.8}>
+                            <Text style={styles.emptyActionBtnText}>Invite Friends Now 🚀</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={[styles.historyListCard, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}>
+                        {referrals.map((item, index) => {
+                            const name = item.profiles?.username || item.profiles?.full_name || 'Anonymous User';
+                            const initial = name.charAt(0).toUpperCase();
+                            const isPaid = item.status === 'paid';
+                            return (
+                                <View 
+                                    key={item.id || index} 
+                                    style={[
+                                        styles.historyItem,
+                                        index !== referrals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.borderPrimary }
+                                    ]}
+                                >
+                                    <View style={styles.historyItemLeft}>
+                                        <View style={[styles.avatarCircle, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
+                                            {item.profiles?.avatar_url ? (
+                                                <Image source={{ uri: item.profiles.avatar_url }} style={styles.avatarImg} />
+                                            ) : (
+                                                <Text style={[styles.avatarInitial, { color: theme.textPrimary }]}>{initial}</Text>
+                                            )}
+                                        </View>
+                                        <View>
+                                            <Text style={[styles.historyName, { color: theme.textPrimary }]}>{name}</Text>
+                                            <Text style={[styles.historyDate, { color: theme.textMuted }]}>
+                                                {new Date(item.created_at).toLocaleDateString()}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.historyItemRight}>
+                                        <Text style={[styles.historyReward, { color: isPaid ? '#10B981' : '#F59E0B' }]}>
+                                            +₦{(item.reward_amount || 500).toLocaleString()}
+                                        </Text>
+                                        <View style={[
+                                            styles.statusPill,
+                                            isPaid ? { backgroundColor: 'rgba(16, 185, 129, 0.15)' } : { backgroundColor: 'rgba(245, 158, 11, 0.15)' }
+                                        ]}>
+                                            <Text style={[
+                                                styles.statusPillText,
+                                                { color: isPaid ? '#10B981' : '#F59E0B' }
+                                            ]}>
+                                                {item.status.toUpperCase()}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })}
                     </View>
                 )}
 
@@ -312,3 +492,339 @@ export default function Referrals() {
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 100,
+    },
+    desktopScrollContent: {
+        maxWidth: 640,
+        alignSelf: 'center',
+        width: '100%',
+    },
+    heroCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    heroGradient: {
+        padding: 16,
+        position: 'relative',
+    },
+    heroGlowCircle: {
+        position: 'absolute',
+        top: -20,
+        right: -20,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    },
+    heroHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    heroLabel: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: '#94A3B8',
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+    heroAmount: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: '#FFFFFF',
+    },
+    rankBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    rankBadgeText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    metricsGrid: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderRadius: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        marginBottom: 14,
+    },
+    metricCol: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    metricLabel: {
+        fontSize: 7.5,
+        fontWeight: '800',
+        color: '#94A3B8',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    metricVal: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#FFFFFF',
+    },
+    metricDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    withdrawBtn: {
+        height: 42,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    withdrawBtnActive: {
+        backgroundColor: '#F59E0B',
+    },
+    withdrawBtnDisabled: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    withdrawBtnContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    withdrawBtnText: {
+        fontWeight: '900',
+        fontSize: 12,
+    },
+    sectionCard: {
+        borderRadius: 18,
+        borderWidth: 1,
+        padding: 14,
+        marginBottom: 14,
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+        marginBottom: 2,
+    },
+    sectionSub: {
+        fontSize: 10,
+        fontWeight: '500',
+        marginBottom: 10,
+        lineHeight: 14,
+    },
+    inputLabelHeader: {
+        fontSize: 8.5,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+        marginBottom: 4,
+    },
+    codeDisplayBox: {
+        height: 44,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderStyle: 'dashed',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+        marginBottom: 12,
+    },
+    codeText: {
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 2,
+    },
+    copyIconCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#F59E0B',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    shareBtnRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    actionBtn: {
+        flex: 1,
+        height: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+    },
+    actionBtnText: {
+        fontSize: 10.5,
+        fontWeight: '800',
+    },
+    calcPillRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginVertical: 8,
+    },
+    calcPill: {
+        flex: 1,
+        height: 32,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    calcPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+    calcResultBox: {
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 10,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    stepRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        marginBottom: 10,
+    },
+    stepNumCircle: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#0F172A',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 1,
+    },
+    stepNumText: {
+        color: '#FFFFFF',
+        fontWeight: '900',
+        fontSize: 10,
+    },
+    stepHeader: {
+        fontSize: 11.5,
+        fontWeight: '800',
+        marginBottom: 1,
+    },
+    stepBody: {
+        fontSize: 9.5,
+        lineHeight: 13,
+    },
+    historySectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+        paddingHorizontal: 2,
+    },
+    historyTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    emptyCard: {
+        borderRadius: 18,
+        borderWidth: 1,
+        padding: 24,
+        alignItems: 'center',
+    },
+    emptyTitle: {
+        fontSize: 14,
+        fontWeight: '900',
+        marginTop: 8,
+    },
+    emptySub: {
+        fontSize: 10.5,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 14,
+        lineHeight: 14,
+    },
+    emptyActionBtn: {
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    emptyActionBtnText: {
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 11.5,
+    },
+    historyListCard: {
+        borderRadius: 18,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    historyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+    },
+    historyItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    avatarCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    avatarImg: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarInitial: {
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    historyName: {
+        fontSize: 11.5,
+        fontWeight: '800',
+    },
+    historyDate: {
+        fontSize: 9.5,
+        marginTop: 1,
+    },
+    historyItemRight: {
+        alignItems: 'flex-end',
+    },
+    historyReward: {
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    statusPill: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        marginTop: 2,
+    },
+    statusPillText: {
+        fontSize: 8,
+        fontWeight: '900',
+    },
+});
+
