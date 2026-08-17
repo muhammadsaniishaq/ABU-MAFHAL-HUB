@@ -157,6 +157,33 @@ export default function OTP() {
         if (codeToken.length !== 6 || loading) return;
 
         setLoading(true);
+
+        // Google Authenticator 2FA TOTP Verification Flow
+        if (params.type === '2fa' && params.factorId) {
+            try {
+                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+                    factorId: params.factorId
+                });
+                if (challengeError) throw challengeError;
+
+                const { error: verifyError } = await supabase.auth.mfa.verify({
+                    factorId: params.factorId,
+                    challengeId: challengeData.id,
+                    code: codeToken
+                });
+                if (verifyError) throw verifyError;
+
+                // 2FA Verified! Lock app & route to PIN unlock screen
+                await AsyncStorage.removeItem('app_unlocked');
+                router.replace('/(auth)/pin' as any);
+                return;
+            } catch (err: any) {
+                setLoading(false);
+                Alert.alert('2FA Verification Failed ❌', err.message || 'Invalid 6-digit Google Authenticator code. Please check your app and try again.');
+                return;
+            }
+        }
+
         try {
             // 1. Check local custom OTP code first
             const storedOtp = await AsyncStorage.getItem(`recovery_otp_${targetEmail}`);

@@ -13,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { supabase, processOAuthReturn } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
@@ -263,15 +264,53 @@ export default function LoginScreen() {
 
                 await AsyncStorage.setItem(`user_role_${data.user.id}`, resolvedRole || 'user');
                 await AsyncStorage.setItem('has_active_session', 'true');
-                await AsyncStorage.setItem('app_unlocked', 'true');
+                
+                // MANDATORY SECURITY: Lock app on fresh login so PIN or 2FA MUST be entered!
+                await AsyncStorage.removeItem('app_unlocked');
                 await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
 
-                const validRedirect = redirectTo && typeof redirectTo === 'string' && redirectTo.startsWith('/') && !redirectTo.includes('://') && !redirectTo.includes('/auth/login') ? redirectTo : null;
+                // Check 2FA Google Authenticator status
+                try {
+                    const { data: mfaData } = await supabase.auth.mfa.listFactors();
+                    const activeTotp = mfaData?.totp?.find((f: any) => f.status === 'verified');
+                    if (activeTotp) {
+                        // 2FA is enabled -> Route to 2FA OTP verification!
+                        router.replace({
+                            pathname: '/(auth)/otp' as any,
+                            params: { email: userEmail, type: '2fa', factorId: activeTotp.id }
+                        });
+                        return;
+                    }
+                } catch (mfaErr) {
+                    console.log('Login MFA check notice:', mfaErr);
+                }
 
-                if (validRedirect) {
-                    router.replace(validRedirect as any);
+                // Check if user has a PIN configured
+                let userPin = Platform.OS === 'web'
+                    ? await AsyncStorage.getItem('user_transaction_pin')
+                    : await SecureStore.getItemAsync('user_transaction_pin');
+
+                if (!userPin) {
+                    const { data: profPin } = await supabase
+                        .from('profiles')
+                        .select('transaction_pin')
+                        .eq('id', data.user.id)
+                        .maybeSingle();
+
+                    if (profPin?.transaction_pin) {
+                        const fetchedPin = profPin.transaction_pin;
+                        userPin = fetchedPin;
+                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', fetchedPin);
+                        else await SecureStore.setItemAsync('user_transaction_pin', fetchedPin);
+                    }
+                }
+
+                if (!userPin) {
+                    // Fresh user with no PIN set yet -> Must setup PIN first!
+                    router.replace('/(auth)/pin-setup' as any);
                 } else {
-                    router.replace('/dashboard' as any);
+                    // User has PIN -> Must enter PIN on /pin screen! No bypass!
+                    router.replace('/(auth)/pin' as any);
                 }
             }
         } catch (error: any) {
