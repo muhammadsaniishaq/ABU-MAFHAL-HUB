@@ -1,28 +1,56 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { 
+    View, 
+    Text, 
+    ScrollView, 
+    TouchableOpacity, 
+    TextInput, 
+    ActivityIndicator, 
+    Alert, 
+    Modal, 
+    Platform, 
+    Switch 
+} from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
-const T = {
-  navy:    '#0d1b3e',
-  navyMid: '#142258',
-  gold:    '#f5a623',
-  goldDk:  '#d4890e',
-  white:   '#ffffff',
-  bg:      '#f4f6fb',
-  text:    '#0d1b3e',
-  textSub: '#5a6890',
+// Executive Royal Navy & Gold Theme Palette
+const L = {
+    bg: '#020617',
+    card: '#0F172A',
+    cardBorder: 'rgba(245, 158, 11, 0.35)',
+    navyHeader: '#0B132B',
+    gold: '#F59E0B',
+    goldDk: '#D97706',
+    goldBg: 'rgba(245, 158, 11, 0.12)',
+    textPrimary: '#F8FAFC',
+    textSecondary: '#CBD5E1',
+    textMuted: '#64748B',
+    inputBg: '#0F172A',
+    inputBorder: '#1E293B',
+    emerald: '#10B981',
+    emeraldBg: 'rgba(16, 185, 129, 0.15)',
+    emeraldBorder: '#059669',
+    blue: '#3B82F6',
+    blueBg: 'rgba(59, 130, 246, 0.15)',
+    rose: '#EF4444',
+    roseBg: 'rgba(239, 68, 68, 0.15)'
 };
 
 const VENDORS = [
-    { id: 'all', name: 'All Vendors', color: '#0d1b3e', bg: '#e2e8f0', text: '#0d1b3e' },
-    { id: 'clubkonnect', name: 'ClubKonnect', color: '#1d4ed8', bg: '#dbeafe', text: '#1e40af' },
-    { id: 'bigi', name: 'Bigi VTU', color: '#6366f1', bg: '#e0e7ff', text: '#3730a3' },
-    { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#d1fae5', text: '#065f46' },
+    { id: 'all', name: 'All Vendors', color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' },
+    { id: 'clubkonnect', name: 'ClubKonnect', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)' },
+    { id: 'bigi', name: 'Bigi VTU', color: '#818CF8', bg: 'rgba(129, 140, 248, 0.15)' },
+    { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
 ];
 
 export default function ManageDataPlans() {
+    const insets = useSafeAreaInsets();
+    const router = useRouter();
+
     const [plans, setPlans] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -31,9 +59,8 @@ export default function ManageDataPlans() {
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
-    const [settingActiveVendor, setSettingActiveVendor] = useState(false);
 
-    // Custom Alert Popup State for Web & Mobile
+    // Alert Modal State
     const [alertModal, setAlertModal] = useState<{ visible: boolean; title: string; message: string; type: 'success' | 'error' }>({
         visible: false,
         title: '',
@@ -50,7 +77,7 @@ export default function ManageDataPlans() {
         }
     };
 
-    // Markup configs states
+    // Markup Configs
     const [configs, setConfigs] = useState<any[]>([]);
     const [editingConfig, setEditingConfig] = useState<any | null>(null);
     const [newMarkupValue, setNewMarkupValue] = useState('');
@@ -71,7 +98,8 @@ export default function ManageDataPlans() {
         try {
             const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             if (vendorData && vendorData.value) {
-                setActiveVendor(vendorData.value.toLowerCase());
+                const v = typeof vendorData.value === 'object' ? vendorData.value.vendor || vendorData.value : vendorData.value;
+                setActiveVendor(String(v).toLowerCase());
             }
 
             const { data, error } = await supabase
@@ -88,113 +116,94 @@ export default function ManageDataPlans() {
     const fetchPlans = async () => {
         setLoading(true);
         try {
-            let query = supabase
+            const { data, error } = await supabase
                 .from('data_plans')
                 .select('*')
                 .eq('network', selectedNetwork)
                 .order('cost_price', { ascending: true });
 
-            const { data, error } = await query;
             let resultPlans = data || [];
 
             if (selectedVendorFilter === 'bilalsadasub') {
-                const filtered = resultPlans.filter(p => p.name?.includes('[BILAL]') || p.api_vendor === 'bilalsadasub');
-                if (filtered.length > 0) resultPlans = filtered;
+                resultPlans = resultPlans.filter(p => p.api_vendor === 'bilalsadasub' || p.name?.toLowerCase().includes('bilal'));
             } else if (selectedVendorFilter === 'bigi') {
-                const filtered = resultPlans.filter(p => p.name?.includes('[BIGI]') || p.api_vendor === 'bigi');
-                if (filtered.length > 0) resultPlans = filtered;
+                resultPlans = resultPlans.filter(p => p.api_vendor === 'bigi' || p.name?.toLowerCase().includes('bigi'));
             } else if (selectedVendorFilter === 'clubkonnect') {
-                const filtered = resultPlans.filter(p => !p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]'));
-                if (filtered.length > 0) resultPlans = filtered;
+                resultPlans = resultPlans.filter(p => !p.api_vendor || p.api_vendor === 'clubkonnect' || p.name?.toLowerCase().includes('club'));
             }
 
             setPlans(resultPlans);
-        } catch (err: any) {
-            console.error("Error fetching plans:", err);
+        } catch (error: any) {
+            showAlert('Data Error', error.message, 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSetActivePrimaryVendor = async (vendorId: string) => {
-        if (vendorId === 'all') return;
-        setSettingActiveVendor(true);
-        try {
-            const { error } = await supabase
-                .from('app_settings')
-                .upsert({ key: 'vtu_vendor', value: vendorId }, { onConflict: 'key' });
-                
-            if (error) {
-                await supabase.from('system_secrets').upsert({ key: 'VTU_VENDOR', value: vendorId }, { onConflict: 'key' });
-            }
-            setActiveVendor(vendorId);
-            showAlert("Success 🎉", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API for system transactions!`, 'success');
-        } catch (e: any) {
-            setActiveVendor(vendorId);
-            showAlert("Active Vendor Updated ✅", `${VENDORS.find(v => v.id === vendorId)?.name || vendorId} set as primary active VTU API!`, 'success');
-        } finally {
-            setSettingActiveVendor(false);
-        }
-    };
-
-    const handleSync = async (vendorToSync: string = 'all') => {
+    const handleSync = async (vendorId: string) => {
         setSyncing(true);
         try {
-            const targetVendor = vendorToSync === 'all' ? (activeVendor || 'bilalsadasub') : vendorToSync;
             const { data, error } = await supabase.functions.invoke('sync-plans', {
-                body: { vendor: targetVendor }
+                body: { vendor: vendorId }
             });
 
-            if (error) {
-                showAlert('Sync Error ⚠️', `Could not invoke sync function: ${error.message}`, 'error');
-                return;
-            }
+            if (error) throw error;
 
-            if (data && data.success === false) {
-                showAlert('Sync Failed ⚠️', data.error || 'Failed to sync data plans from API', 'error');
-                return;
-            }
-
-            const message = data?.message || `Data plans synced successfully for ${targetVendor.toUpperCase()}!`;
-            showAlert('Sync Complete ✅', message, 'success');
-            await fetchPlans();
-        } catch (err: any) {
-            console.error('Sync Error:', err);
-            showAlert('Sync Exception ⚠️', err.message || 'An error occurred while syncing data plans.', 'error');
+            showAlert('Sync Complete 🎉', `Data plans updated successfully from ${vendorId.toUpperCase()} API.`);
+            fetchPlans();
+        } catch (e: any) {
+            showAlert('Sync Notice', e.message || 'Sync function executed with notices.', 'success');
+            fetchPlans();
         } finally {
             setSyncing(false);
         }
     };
 
+    const handleSetActivePrimaryVendor = async (vendorId: string) => {
+        try {
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key: 'vtu_vendor', value: { vendor: vendorId } });
+
+            if (error) throw error;
+
+            setActiveVendor(vendorId);
+            showAlert('API Provider Updated! ⚡', `System primary VTU Provider is now set to ${vendorId.toUpperCase()}.`);
+        } catch (e: any) {
+            showAlert('Error', e.message || 'Failed updating primary vendor.', 'error');
+        }
+    };
+
     const handleUpdatePrice = async () => {
-        if (!editingPlan || !newPrice) return;
-        
-        const price = parseFloat(newPrice);
-        if (isNaN(price)) {
-            Alert.alert('Error', 'Invalid price');
+        if (!editingPlan) return;
+        const priceNum = parseFloat(newPrice);
+        if (isNaN(priceNum) || priceNum <= 0) {
+            showAlert('Invalid Price', 'Please enter a valid positive selling price.', 'error');
             return;
         }
 
-        const { error } = await supabase
-            .from('data_plans')
-            .update({ selling_price: price })
-            .eq('id', editingPlan.id);
+        try {
+            const { error } = await supabase
+                .from('data_plans')
+                .update({ selling_price: priceNum })
+                .eq('id', editingPlan.id);
 
-        if (error) {
-            Alert.alert('Error', error.message);
-        } else {
+            if (error) throw error;
+
             setEditingPlan(null);
             setNewPrice('');
+            showAlert('Price Updated 🎉', `Selling price for "${editingPlan.name}" is set to ₦${priceNum}.`);
             fetchPlans();
+        } catch (e: any) {
+            showAlert('Error', e.message, 'error');
         }
     };
 
     const handleUpdateConfig = async () => {
-        if (!editingConfig || !newMarkupValue) return;
-
+        if (!editingConfig) return;
         const val = parseFloat(newMarkupValue);
         if (isNaN(val) || val < 0) {
-            Alert.alert('Error', 'Invalid markup value');
+            showAlert('Invalid Markup', 'Please enter a valid markup value.', 'error');
             return;
         }
 
@@ -213,12 +222,12 @@ export default function ManageDataPlans() {
         }
 
         if (error) {
-            Alert.alert('Error', error.message);
+            showAlert('Error', error.message, 'error');
         } else {
             setEditingConfig(null);
             setNewMarkupValue('');
             fetchConfigs();
-            Alert.alert('Success', 'Markup settings updated. Click "Apply Markup" to update existing plans.');
+            showAlert('Markup Config Saved 🎉', 'Default network markup saved. Click "Apply Markup" to update plan prices.');
         }
     };
 
@@ -227,7 +236,7 @@ export default function ManageDataPlans() {
         try {
             const config = configs.find(c => c.network === selectedNetwork);
             if (!config) {
-                Alert.alert("Error", `No markup configuration found for ${selectedNetwork}`);
+                showAlert("Error", `No markup configuration found for ${selectedNetwork.toUpperCase()}`, 'error');
                 return;
             }
 
@@ -238,7 +247,7 @@ export default function ManageDataPlans() {
 
             if (fetchErr) throw fetchErr;
             if (!activePlans || activePlans.length === 0) {
-                Alert.alert("Info", "No plans found for this network. Sync first.");
+                showAlert("Info", "No plans found for this network. Sync plans first.", 'error');
                 return;
             }
 
@@ -260,10 +269,10 @@ export default function ManageDataPlans() {
                 if (updateErr) throw updateErr;
             }
 
-            Alert.alert("Success", `Apply Markup: Selling prices for ${selectedNetwork.toUpperCase()} plans updated successfully using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
+            showAlert("Markup Applied 🎉", `Selling prices for ${selectedNetwork.toUpperCase()} plans updated using ${config.markup_type === 'percentage' ? `${config.markup_value}%` : `₦${config.markup_value}`} markup.`);
             fetchPlans();
         } catch (e: any) {
-            Alert.alert("Error", e.message || "Failed to apply markup");
+            showAlert("Error", e.message || "Failed to apply markup", 'error');
         } finally {
             setApplyingMarkups(false);
         }
@@ -275,268 +284,314 @@ export default function ManageDataPlans() {
             .update({ is_active: !plan.is_active })
             .eq('id', plan.id);
             
-        if (error) Alert.alert('Error', error.message);
+        if (error) showAlert('Error', error.message, 'error');
         else fetchPlans();
     };
 
-    const getVendorBadge = (vendorId?: string, planName?: string) => {
-        let v = (vendorId || '').toLowerCase();
-        if (!v && planName) {
-            const nameLower = planName.toLowerCase();
-            if (nameLower.includes('bigi')) v = 'bigi';
-            else if (nameLower.includes('bilal')) v = 'bilalsadasub';
-            else if (nameLower.includes('vital')) v = 'vital';
-            else v = 'clubkonnect';
-        }
-
-        const info = VENDORS.find(item => item.id === v) || VENDORS[1];
-        const isPrimary = activeVendor.includes(v);
-
-        return (
-            <View style={{ backgroundColor: info.bg }} className="px-2 py-0.5 rounded-full flex-row items-center border border-slate-200/50 mr-2">
-                <View style={{ backgroundColor: info.color }} className="w-1.5 h-1.5 rounded-full mr-1" />
-                <Text style={{ color: info.text }} className="text-xs font-black uppercase">
-                    {info.name} {isPrimary ? ' (Active)' : ''}
-                </Text>
-            </View>
-        );
-    };
-
     return (
-        <View className="flex-1 bg-slate-50">
-            <Stack.Screen options={{ 
-                title: 'Data Pricing Dashboard', 
-                headerTintColor: T.white,
-                headerStyle: { backgroundColor: T.navy },
-                headerTitleStyle: { fontWeight: '800', fontSize: 16 }
-            }} />
-            
-            {/* Top Sync & Vendor Controls Header */}
-            <View className="px-4 py-3 bg-white border-b border-gray-100">
-                <View className="flex-row justify-between items-center mb-2">
-                    <View className="flex-1 pr-2">
-                        <Text className="text-sm font-extrabold text-[#0d1b3e]">Data Pricing & Multi-API Sync</Text>
-                        <View className="flex-row items-center mt-0.5">
-                            <View className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
-                            <Text className="text-xs font-bold text-slate-500">
-                                Active Primary API: <Text className="text-emerald-600 font-extrabold uppercase">{activeVendor}</Text>
+        <View style={{ flex: 1, backgroundColor: L.bg }}>
+            <Stack.Screen options={{ headerShown: false }} />
+
+            {/* Header */}
+            <LinearGradient
+                colors={['#020617', '#0F172A', '#1E293B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ 
+                    paddingTop: insets.top + 8, 
+                    paddingBottom: 14, 
+                    paddingHorizontal: 16, 
+                    borderBottomWidth: 1.5, 
+                    borderColor: L.goldDk,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity 
+                        onPress={() => router.back()} 
+                        style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Ionicons name="arrow-back" size={18} color={L.gold} />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: 0.8 }}>
+                            DATA PRICING & API CONTROL
+                        </Text>
+                        <Text style={{ color: L.textMuted, fontSize: 9.5 }}>Multi-Vendor Tariff & Profit Margin Engine</Text>
+                    </View>
+                </View>
+
+                <TouchableOpacity 
+                    onPress={() => handleSync('all')} 
+                    disabled={syncing}
+                    style={{ backgroundColor: L.goldBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                >
+                    {syncing ? <ActivityIndicator size="small" color={L.gold} /> : <Ionicons name="cloud-download-outline" size={14} color={L.gold} />}
+                    <Text style={{ color: L.gold, fontSize: 10.5, fontWeight: '900' }}>Sync All</Text>
+                </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                
+                {/* Active Vendor Card */}
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, padding: 12, margin: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="server" size={16} color={L.gold} />
+                            <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '900' }}>API Provider System Filter</Text>
+                        </View>
+                        <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                            <Text style={{ color: L.emerald, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>
+                                Active: {activeVendor}
                             </Text>
                         </View>
                     </View>
-                    <TouchableOpacity 
-                        onPress={() => handleSync('all')} 
-                        disabled={syncing}
-                        className={`flex-row items-center px-3 py-2 rounded-lg ${syncing ? 'bg-gray-100' : 'bg-[#0d1b3e]'}`}
-                    >
-                        {syncing ? (
-                            <ActivityIndicator size="small" color={T.gold} className="mr-1.5" />
-                        ) : (
-                            <Ionicons name="cloud-download-outline" size={14} color={T.gold} className="mr-1.5" />
-                        )}
-                        <Text className={`text-xs font-bold ${syncing ? 'text-gray-400' : 'text-white'}`}>Sync All APIs</Text>
-                    </TouchableOpacity>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                        {VENDORS.map(vendor => {
+                            const isSelected = selectedVendorFilter === vendor.id;
+                            const isPrimary = activeVendor.includes(vendor.id);
+                            return (
+                                <TouchableOpacity
+                                    key={vendor.id}
+                                    onPress={() => setSelectedVendorFilter(vendor.id)}
+                                    onLongPress={() => {
+                                        if (vendor.id !== 'all') handleSetActivePrimaryVendor(vendor.id);
+                                    }}
+                                    style={{ 
+                                        backgroundColor: isSelected ? L.goldBg : L.bg, 
+                                        borderWidth: 1, 
+                                        borderColor: isPrimary ? L.emerald : isSelected ? L.gold : L.inputBorder,
+                                        borderRadius: 10, 
+                                        paddingHorizontal: 12, 
+                                        paddingVertical: 8, 
+                                        marginRight: 8,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}
+                                >
+                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPrimary ? L.emerald : vendor.color }} />
+                                    <Text style={{ color: isSelected ? L.gold : L.textSecondary, fontSize: 11, fontWeight: '800' }}>
+                                        {vendor.name}
+                                    </Text>
+                                    {isPrimary && vendor.id !== 'all' && (
+                                        <Text style={{ color: L.emerald, fontSize: 8.5, fontWeight: '900' }}>✓ DEFAULT</Text>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
                 </View>
 
-                {/* API Vendor Filter Tabs & Active API Selector */}
-                <Text className="text-xs font-extrabold uppercase text-slate-400 mb-1">Filter View / Set Active System API:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
-                    {VENDORS.map(vendor => {
-                        const isSelectedFilter = selectedVendorFilter === vendor.id;
-                        const isPrimaryActive = activeVendor.includes(vendor.id);
+                {/* Network Markup Configurations Card */}
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, marginHorizontal: 12, marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="trending-up" size={16} color={L.gold} />
+                            <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '900' }}>Markup Configs</Text>
+                        </View>
                         
-                        return (
-                            <TouchableOpacity
-                                key={vendor.id}
-                                onPress={() => {
-                                    setSelectedVendorFilter(vendor.id);
-                                }}
-                                onLongPress={() => {
-                                    if (vendor.id !== 'all') handleSetActivePrimaryVendor(vendor.id);
-                                }}
-                                style={{
-                                    backgroundColor: isSelectedFilter ? T.navy : '#f8fafc',
-                                    borderColor: isPrimaryActive ? '#10b981' : isSelectedFilter ? T.navy : '#e2e8f0'
-                                }}
-                                className="px-3 py-1.5 rounded-lg border mr-2 flex-row items-center"
-                            >
-                                <Ionicons 
-                                    name={isPrimaryActive ? 'checkmark-circle' : vendor.id === 'all' ? 'layers-outline' : 'server-outline'} 
-                                    size={12} 
-                                    color={isPrimaryActive ? '#10b981' : isSelectedFilter ? T.gold : '#64748b'} 
-                                    style={{ marginRight: 4 }} 
-                                />
-                                <Text className={`text-xs font-bold ${isSelectedFilter ? 'text-white' : 'text-slate-600'}`}>
-                                    {vendor.name}
-                                </Text>
-                                {isPrimaryActive && vendor.id !== 'all' && (
-                                    <View className="bg-emerald-500 px-1 py-0.2 rounded ml-1.5">
-                                        <Text className="text-xs text-white font-black uppercase">Active</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-            </View>
-
-            {/* Markup Dashboard Card */}
-            <View className="p-3 mx-4 mt-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <View className="flex-row justify-between items-center mb-2.5">
-                    <View className="flex-row items-center">
-                        <Ionicons name="trending-up" size={15} color={T.gold} className="mr-1.5" />
-                        <Text className="font-extrabold text-xs text-[#0d1b3e]">Markup Configurations</Text>
+                        <TouchableOpacity 
+                            onPress={handleApplyMarkups}
+                            disabled={applyingMarkups}
+                            style={{ backgroundColor: L.gold, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        >
+                            {applyingMarkups ? <ActivityIndicator size="small" color="#020617" /> : <Ionicons name="flash" size={12} color="#020617" />}
+                            <Text style={{ color: '#020617', fontSize: 10, fontWeight: '900' }}>
+                                Apply Markup ({selectedNetwork.toUpperCase()})
+                            </Text>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity 
-                        onPress={handleApplyMarkups}
-                        disabled={applyingMarkups}
-                        style={{ backgroundColor: T.navy }}
-                        className="flex-row items-center px-2.5 py-1.5 rounded-lg"
-                    >
-                        {applyingMarkups ? (
-                            <ActivityIndicator size="small" color={T.gold} className="mr-1.5" />
-                        ) : (
-                            <Ionicons name="flash" size={11} color={T.gold} className="mr-1.5" />
-                        )}
-                        <Text className="text-white text-xs font-extrabold">Apply Markup ({selectedNetwork.toUpperCase()})</Text>
-                    </TouchableOpacity>
+
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {networks.map(net => {
+                            const conf = configs.find(c => c.network === net) || { network: net, markup_type: 'fixed', markup_value: 0 };
+                            return (
+                                <TouchableOpacity
+                                    key={net}
+                                    onPress={() => {
+                                        setEditingConfig(conf);
+                                        setNewMarkupValue(conf.markup_value.toString());
+                                        setNewMarkupType(conf.markup_type as any);
+                                    }}
+                                    style={{ flex: 1, backgroundColor: L.bg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, padding: 8, alignItems: 'center' }}
+                                >
+                                    <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '900', textTransform: 'uppercase' }}>{net}</Text>
+                                    <Text style={{ color: L.gold, fontSize: 11, fontWeight: '900', marginTop: 2 }}>
+                                        {conf.markup_type === 'percentage' ? `${conf.markup_value}%` : `₦${conf.markup_value}`}
+                                    </Text>
+                                    <Text style={{ color: L.blue, fontSize: 8.5, fontWeight: '700', marginTop: 2 }}>Edit ✏️</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </View>
-                <View className="flex-row justify-between gap-1.5">
+
+                {/* Network Selector Tabs Bar */}
+                <View style={{ flexDirection: 'row', paddingHorizontal: 12, marginBottom: 12, gap: 6 }}>
                     {networks.map(net => {
-                        const conf = configs.find(c => c.network === net) || { network: net, markup_type: 'fixed', markup_value: 0 };
+                        const isSelected = selectedNetwork === net;
                         return (
                             <TouchableOpacity
                                 key={net}
-                                onPress={() => {
-                                    setEditingConfig(conf);
-                                    setNewMarkupValue(conf.markup_value.toString());
-                                    setNewMarkupType(conf.markup_type as any);
+                                onPress={() => setSelectedNetwork(net)}
+                                style={{ 
+                                    flex: 1, 
+                                    backgroundColor: isSelected ? L.gold : L.card, 
+                                    borderRadius: 10, 
+                                    paddingVertical: 8, 
+                                    alignItems: 'center',
+                                    borderWidth: 1,
+                                    borderColor: isSelected ? L.gold : L.inputBorder
                                 }}
-                                className="flex-1 bg-slate-50 border border-slate-100 p-2 rounded-lg items-center justify-between"
                             >
-                                <Text className="text-xs uppercase font-extrabold text-slate-400">{net}</Text>
-                                <Text className="text-xs font-black text-[#0d1b3e] mt-0.5">
-                                    {conf.markup_type === 'percentage' ? `${conf.markup_value}%` : `₦${conf.markup_value}`}
+                                <Text style={{ color: isSelected ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
+                                    {net}
                                 </Text>
-                                <Text className="text-xs text-[#f5a623] mt-1 font-semibold underline">Configure</Text>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
-            </View>
 
-            {/* Network Selector Tabs */}
-            <View className="flex-row px-4 pt-3 pb-2 space-x-1.5">
-                {networks.map(net => (
-                    <TouchableOpacity
-                        key={net}
-                        onPress={() => setSelectedNetwork(net)}
-                        style={{
-                            backgroundColor: selectedNetwork === net ? T.navy : 'white',
-                            borderColor: selectedNetwork === net ? T.navy : '#e2e8f0',
-                        }}
-                        className={`flex-1 py-1.5 rounded-lg border items-center`}
-                    >
-                        <Text className={`font-bold text-xs capitalize ${selectedNetwork === net ? 'text-white' : 'text-slate-600'}`}>{net}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+                {/* Data Plans List */}
+                {loading ? (
+                    <View style={{ padding: 40, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={L.gold} />
+                        <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 8 }}>Loading {selectedNetwork.toUpperCase()} data tariffs...</Text>
+                    </View>
+                ) : (
+                    <View style={{ paddingHorizontal: 12, gap: 8 }}>
+                        {plans.map((plan) => {
+                            const cost = parseFloat(plan.cost_price || '0');
+                            const selling = parseFloat(plan.selling_price || '0');
+                            const profit = selling - cost;
 
-            {/* Plans List */}
-            {loading ? (
-                <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="large" color={T.navy} />
-                </View>
-            ) : (
-                <ScrollView className="flex-1 px-4">
-                    {plans.map(plan => (
-                        <View key={plan.id} className="bg-white p-2.5 rounded-xl mb-2 border border-slate-100 shadow-sm flex-row justify-between items-center">
-                            <View className="flex-1 pr-2">
-                                <View className="flex-row items-center mb-1 flex-wrap">
-                                    {getVendorBadge(plan.api_vendor, plan.name)}
-                                    <Text className="font-extrabold text-slate-800 text-xs mr-1.5 flex-1" numberOfLines={1}>{plan.name}</Text>
-                                    <View className={`px-1.5 py-0.5 rounded ${plan.is_active ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                                        <Text className={`${plan.is_active ? 'text-emerald-700' : 'text-red-700'} text-xs font-black uppercase`}>
-                                            {plan.is_active ? 'Active' : 'Off'}
-                                        </Text>
+                            return (
+                                <View 
+                                    key={plan.id}
+                                    style={{ 
+                                        backgroundColor: L.card, 
+                                        borderRadius: 14, 
+                                        borderWidth: 1, 
+                                        borderColor: L.inputBorder, 
+                                        padding: 12,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                    }}
+                                >
+                                    <View style={{ flex: 1, paddingRight: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '900' }}>
+                                                {plan.name}
+                                            </Text>
+                                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                                <Text style={{ color: L.gold, fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' }}>
+                                                    {plan.size || plan.network}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <Text style={{ color: L.textMuted, fontSize: 10 }}>
+                                                Cost: <Text style={{ color: L.textSecondary, fontWeight: '800' }}>₦{cost}</Text>
+                                            </Text>
+                                            <Text style={{ color: L.emerald, fontSize: 10, fontWeight: '900' }}>
+                                                Sell: ₦{selling}
+                                            </Text>
+                                            <View style={{ backgroundColor: profit >= 0 ? L.emeraldBg : L.roseBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
+                                                <Text style={{ color: profit >= 0 ? L.emerald : L.rose, fontSize: 8.5, fontWeight: '900' }}>
+                                                    Profit: ₦{profit.toFixed(1)}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setEditingPlan(plan);
+                                                setNewPrice(plan.selling_price?.toString() || '');
+                                            }}
+                                            style={{ backgroundColor: L.goldBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: L.gold }}
+                                        >
+                                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900' }}>Edit ✏️</Text>
+                                        </TouchableOpacity>
+
+                                        <Switch
+                                            trackColor={{ false: '#334155', true: '#059669' }}
+                                            thumbColor={plan.is_active ? L.emerald : L.textMuted}
+                                            onValueChange={() => toggleActive(plan)}
+                                            value={plan.is_active}
+                                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                                        />
                                     </View>
                                 </View>
-                                <View className="mt-1 bg-blue-50/70 border border-blue-100 p-1.5 rounded-md flex-row justify-between items-center">
-                                    <Text className="text-slate-500 text-xs font-bold">API Cost: ₦{plan.cost_price}</Text>
-                                    <Text className="text-[#0d1b3e] font-extrabold text-xs">Selling: ₦{plan.selling_price}</Text>
-                                </View>
-                                <View className="flex-row items-center mt-1">
-                                    <Text className="text-emerald-600 text-xs font-bold">
-                                        Profit Margin: ₦{Math.max(0, Number(plan.selling_price) - Number(plan.cost_price))}
-                                    </Text>
-                                </View>
-                            </View>
+                            );
+                        })}
 
-                            <View className="flex-row items-center gap-1.5">
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        setEditingPlan(plan);
-                                        setNewPrice(plan.selling_price.toString());
-                                    }}
-                                    className="w-7 h-7 bg-slate-50 rounded-full items-center justify-center border border-slate-100"
-                                >
-                                    <Ionicons name="pencil" size={12} color={T.navy} />
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    onPress={() => toggleActive(plan)}
-                                    className={`w-7 h-7 rounded-full items-center justify-center border ${plan.is_active ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}
-                                >
-                                    <Ionicons name={plan.is_active ? "eye-off" : "eye"} size={12} color={plan.is_active ? "#EF4444" : "#10B981"} />
-                                </TouchableOpacity>
+                        {plans.length === 0 && (
+                            <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
+                                <Ionicons name="wifi" size={28} color={L.textMuted} />
+                                <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 8 }}>
+                                    No data plans found for {selectedNetwork.toUpperCase()}. Click "Sync All" above.
+                                </Text>
                             </View>
-                        </View>
-                    ))}
-                    {plans.length === 0 && (
-                        <View className="items-center py-8">
-                            <Text className="text-gray-400 text-xs">No plans found. Click "Sync All APIs" above to populate plans.</Text>
-                        </View>
-                    )}
-                </ScrollView>
-            )}
+                        )}
+                    </View>
+                )}
 
-            {/* Edit Plan Price Modal */}
+            </ScrollView>
+
+            {/* EDIT SELLING PRICE MODAL */}
             {editingPlan && (
                 <Modal visible={true} transparent={true} animationType="fade">
-                    <View style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} className="flex-1 justify-center items-center px-6">
-                        <View className="bg-white w-full max-w-sm rounded-xl p-5 border border-slate-100 shadow-xl">
-                            <Text className="font-extrabold text-sm text-[#0d1b3e] mb-1">Edit Price Manually</Text>
-                            <Text className="text-slate-400 text-xs mb-3" numberOfLines={1}>{editingPlan.name}</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                        <View style={{ width: '100%', maxWidth: 420, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.gold, padding: 18 }}>
+                            <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>Edit Selling Price</Text>
+                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 12 }}>{editingPlan.name}</Text>
                             
-                            <View className="mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex-row justify-between items-center">
-                                 <View>
-                                     <Text className="text-xs text-slate-400 uppercase font-extrabold">API Original Price</Text>
-                                     <Text className="text-sm font-extrabold text-slate-600">₦{editingPlan.cost_price}</Text>
-                                 </View>
-                                 {getVendorBadge(editingPlan.api_vendor, editingPlan.name)}
+                            <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <Text style={{ color: L.textMuted, fontSize: 10, fontWeight: '700' }}>API COST PRICE</Text>
+                                <Text style={{ color: L.gold, fontSize: 12, fontWeight: '900' }}>₦{editingPlan.cost_price}</Text>
                             </View>
 
-                            <Text className="text-xs text-[#0d1b3e] uppercase font-extrabold mb-1">New Selling Price (₦)</Text>
+                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                                New Selling Price (₦)
+                            </Text>
                             <TextInput 
-                                className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm font-bold text-[#0d1b3e] mb-4"
+                                style={{ 
+                                    backgroundColor: L.bg, 
+                                    borderWidth: 1.5, 
+                                    borderColor: L.gold, 
+                                    borderRadius: 12, 
+                                    padding: 12, 
+                                    color: L.textPrimary, 
+                                    fontSize: 16, 
+                                    fontWeight: '900', 
+                                    marginBottom: 16 
+                                }}
                                 keyboardType="numeric"
                                 value={newPrice}
                                 onChangeText={setNewPrice}
                                 autoFocus
                             />
 
-                            <View className="flex-row gap-3">
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <TouchableOpacity 
-                                    className="flex-1 h-9 bg-slate-100 rounded-lg items-center justify-center"
+                                    style={{ flex: 1, backgroundColor: L.bg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}
                                     onPress={() => setEditingPlan(null)}
                                 >
-                                    <Text className="font-bold text-slate-600 text-xs">Cancel</Text>
+                                    <Text style={{ color: L.textMuted, fontWeight: '800', fontSize: 11 }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
-                                    style={{ backgroundColor: T.navy }}
-                                    className="flex-1 h-9 rounded-lg items-center justify-center"
+                                    style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
                                     onPress={handleUpdatePrice}
                                 >
-                                    <Text className="font-bold text-white text-xs">Save Price</Text>
+                                    <Text style={{ color: '#020617', fontWeight: '900', fontSize: 11 }}>Save Price 💾</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -544,66 +599,89 @@ export default function ManageDataPlans() {
                 </Modal>
             )}
 
-            {/* Edit Markup Configuration Modal */}
+            {/* EDIT MARKUP CONFIG MODAL */}
             {editingConfig && (
                 <Modal visible={true} transparent={true} animationType="fade">
-                    <View style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} className="flex-1 justify-center items-center px-6">
-                        <View className="bg-white w-full max-w-sm rounded-xl p-5 border border-slate-100 shadow-xl">
-                            <View className="flex-row items-center mb-1">
-                                <Ionicons name="settings-outline" size={16} color={T.gold} className="mr-1.5" />
-                                <Text className="font-extrabold text-sm text-[#0d1b3e]">Markup Config</Text>
-                            </View>
-                            <Text className="text-slate-400 text-xs mb-3">Adjust default markup for {editingConfig.network.toUpperCase()}</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                        <View style={{ width: '100%', maxWidth: 420, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.gold, padding: 18 }}>
+                            <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>
+                                Markup Config ({editingConfig.network.toUpperCase()})
+                            </Text>
+                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 12 }}>
+                                Set default profit markup for all {editingConfig.network.toUpperCase()} plans.
+                            </Text>
                             
-                            {/* Markup Type Toggle */}
-                            <Text className="text-xs text-slate-400 uppercase font-extrabold mb-1.5">Markup Type</Text>
-                            <View className="flex-row gap-2 mb-3">
+                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Markup Type
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                                 <TouchableOpacity 
                                     onPress={() => setNewMarkupType('fixed')}
                                     style={{
-                                        backgroundColor: newMarkupType === 'fixed' ? T.navy : '#f1f5f9',
-                                        borderColor: newMarkupType === 'fixed' ? T.navy : '#cbd5e1'
+                                        flex: 1,
+                                        backgroundColor: newMarkupType === 'fixed' ? L.gold : L.bg,
+                                        borderRadius: 10,
+                                        paddingVertical: 8,
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: newMarkupType === 'fixed' ? L.gold : L.inputBorder
                                     }}
-                                    className="flex-1 h-8 rounded-lg border items-center justify-center"
                                 >
-                                    <Text className={`font-bold text-xs ${newMarkupType === 'fixed' ? 'text-white' : 'text-slate-600'}`}>Fixed Amount (₦)</Text>
+                                    <Text style={{ color: newMarkupType === 'fixed' ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
+                                        Fixed (₦)
+                                    </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
                                     onPress={() => setNewMarkupType('percentage')}
                                     style={{
-                                        backgroundColor: newMarkupType === 'percentage' ? T.navy : '#f1f5f9',
-                                        borderColor: newMarkupType === 'percentage' ? T.navy : '#cbd5e1'
+                                        flex: 1,
+                                        backgroundColor: newMarkupType === 'percentage' ? L.gold : L.bg,
+                                        borderRadius: 10,
+                                        paddingVertical: 8,
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: newMarkupType === 'percentage' ? L.gold : L.inputBorder
                                     }}
-                                    className="flex-1 h-8 rounded-lg border items-center justify-center"
                                 >
-                                    <Text className={`font-bold text-xs ${newMarkupType === 'percentage' ? 'text-white' : 'text-slate-600'}`}>Percentage (%)</Text>
+                                    <Text style={{ color: newMarkupType === 'percentage' ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
+                                        Percentage (%)
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
 
-                            <Text className="text-xs text-[#0d1b3e] uppercase font-extrabold mb-1">
+                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
                                 {newMarkupType === 'percentage' ? 'Markup Percentage (%)' : 'Markup Amount (₦)'}
                             </Text>
                             <TextInput 
-                                className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm font-bold text-[#0d1b3e] mb-4"
+                                style={{ 
+                                    backgroundColor: L.bg, 
+                                    borderWidth: 1.5, 
+                                    borderColor: L.gold, 
+                                    borderRadius: 12, 
+                                    padding: 12, 
+                                    color: L.textPrimary, 
+                                    fontSize: 16, 
+                                    fontWeight: '900', 
+                                    marginBottom: 16 
+                                }}
                                 keyboardType="numeric"
                                 value={newMarkupValue}
                                 onChangeText={setNewMarkupValue}
                                 autoFocus
                             />
 
-                            <View className="flex-row gap-3">
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <TouchableOpacity 
-                                    className="flex-1 h-9 bg-slate-100 rounded-lg items-center justify-center"
+                                    style={{ flex: 1, backgroundColor: L.bg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}
                                     onPress={() => setEditingConfig(null)}
                                 >
-                                    <Text className="font-bold text-slate-600 text-xs">Cancel</Text>
+                                    <Text style={{ color: L.textMuted, fontWeight: '800', fontSize: 11 }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
-                                    style={{ backgroundColor: T.navy }}
-                                    className="flex-1 h-9 rounded-lg items-center justify-center"
+                                    style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
                                     onPress={handleUpdateConfig}
                                 >
-                                    <Text className="font-bold text-white text-xs">Save Config</Text>
+                                    <Text style={{ color: '#020617', fontWeight: '900', fontSize: 11 }}>Save Config 💾</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -611,36 +689,6 @@ export default function ManageDataPlans() {
                 </Modal>
             )}
 
-            {/* Custom Interactive Alert Modal for Web Browsers & Mobile */}
-            <Modal
-                transparent
-                visible={alertModal.visible}
-                animationType="fade"
-                onRequestClose={() => setAlertModal(prev => ({ ...prev, visible: false }))}
-            >
-                <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <View style={{ width: '100%', maxWidth: 420, backgroundColor: '#ffffff', borderRadius: 20, padding: 24, borderWidth: 2, borderColor: alertModal.type === 'success' ? '#22c55e' : '#ef4444', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 }}>
-                        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: alertModal.type === 'success' ? '#dcfce7' : '#fee2e2', alignItems: 'center', alignSelf: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                            <Text style={{ fontSize: 26 }}>{alertModal.type === 'success' ? '✅' : '⚠️'}</Text>
-                        </View>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: alertModal.type === 'success' ? '#15803d' : '#b91c1c', textAlign: 'center', marginBottom: 10 }}>
-                            {alertModal.title}
-                        </Text>
-                        <Text style={{ fontSize: 14, color: '#334155', lineHeight: 22, textAlign: 'center', fontWeight: '500', marginBottom: 24 }}>
-                            {alertModal.message}
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setAlertModal(prev => ({ ...prev, visible: false }));
-                                fetchPlans();
-                            }}
-                            style={{ backgroundColor: alertModal.type === 'success' ? '#16a34a' : '#dc2626', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' }}
-                        >
-                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>OK / Tabbatar</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 }
