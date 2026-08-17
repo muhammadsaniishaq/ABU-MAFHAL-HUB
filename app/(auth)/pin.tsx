@@ -227,10 +227,11 @@ export default function PinUnlockScreen() {
                         .eq('id', user.id)
                         .maybeSingle();
                     if (prof?.transaction_pin) {
-                        validPin = prof.transaction_pin;
-                        setSavedPin(validPin);
-                        if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, validPin);
-                        else await SecureStore.setItemAsync(PIN_KEY, validPin);
+                        const fetchedPin = prof.transaction_pin;
+                        validPin = fetchedPin;
+                        setSavedPin(fetchedPin);
+                        if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, fetchedPin);
+                        else await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
                     }
                 }
             } catch (e) {
@@ -255,9 +256,10 @@ export default function PinUnlockScreen() {
                     .maybeSingle();
 
                 if (latestProf?.transaction_pin && latestProf.transaction_pin === enteredPin) {
-                    setSavedPin(latestProf.transaction_pin);
-                    if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, latestProf.transaction_pin);
-                    else await SecureStore.setItemAsync(PIN_KEY, latestProf.transaction_pin);
+                    const livePin = latestProf.transaction_pin;
+                    setSavedPin(livePin);
+                    if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, livePin);
+                    else await SecureStore.setItemAsync(PIN_KEY, livePin);
                     unlockSuccess();
                     return;
                 }
