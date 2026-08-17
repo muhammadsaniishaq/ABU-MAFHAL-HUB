@@ -487,17 +487,41 @@ export default function SecurityScreen() {
 
                             {/* Step 1: Scan QR Code */}
                             <Text style={{ color: L.goldLight, fontSize: 11, fontWeight: '900', marginBottom: 6 }}>
-                                Step 1: Scan QR Code in Authenticator App
+                                Step 1: Scan QR Code in Authenticator App 📷
                             </Text>
                             <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 10 }}>
-                                Open Google Authenticator or Authy app on your phone and scan the QR code below:
+                                Open Google Authenticator or Authy app on another phone or device and scan the QR code below:
                             </Text>
 
-                            <View style={{ alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 16, alignSelf: 'center', marginBottom: 14 }}>
+                            {/* Glowing Gold QR Container Box */}
+                            <View style={{ 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                backgroundColor: '#FFFFFF', 
+                                padding: 14, 
+                                borderRadius: 20, 
+                                alignSelf: 'center', 
+                                marginBottom: 14,
+                                borderWidth: 3,
+                                borderColor: L.gold,
+                                shadowColor: L.gold,
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.35,
+                                shadowRadius: 10,
+                                elevation: 8
+                            }}>
                                 {qrUrl ? (
-                                    <Image source={{ uri: qrUrl }} style={{ width: 180, height: 180 }} resizeMode="contain" />
+                                    <>
+                                        <Image source={{ uri: qrUrl }} style={{ width: 200, height: 200 }} resizeMode="contain" />
+                                        <View style={{ marginTop: 6, backgroundColor: '#0F172A', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 }}>
+                                            <Text style={{ color: L.gold, fontSize: 9, fontWeight: '900' }}>📱 SCAN WITH GOOGLE AUTHENTICATOR</Text>
+                                        </View>
+                                    </>
                                 ) : (
-                                    <ActivityIndicator size="large" color={L.gold} />
+                                    <View style={{ width: 200, height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                                        <ActivityIndicator size="large" color={L.gold} />
+                                        <Text style={{ color: '#0F172A', fontSize: 10, fontWeight: '700', marginTop: 8 }}>Generating Security QR...</Text>
+                                    </View>
                                 )}
                             </View>
 
