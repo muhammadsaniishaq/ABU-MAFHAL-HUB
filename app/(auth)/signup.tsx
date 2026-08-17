@@ -12,6 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 
 import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
@@ -78,6 +80,63 @@ export default function SignupScreen() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showCountryModal, setShowCountryModal] = useState(false);
     const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+    // Camera QR Scanner States & Handlers
+    const [permission, requestPermission] = useCameraPermissions();
+    const [showCameraScannerModal, setShowCameraScannerModal] = useState(false);
+    const [scanned, setScanned] = useState(false);
+
+    const openCameraScanner = async () => {
+        if (!permission?.granted) {
+            const res = await requestPermission();
+            if (!res.granted) {
+                Alert.alert("Camera Permission Required 📷", "Please allow camera access to scan your friend's referral QR code.");
+                return;
+            }
+        }
+        setScanned(false);
+        setShowCameraScannerModal(true);
+    };
+
+    const handleBarCodeScanned = ({ data }: { data: string }) => {
+        if (scanned) return;
+        setScanned(true);
+        
+        let extractedCode = data.trim();
+        try {
+            if (extractedCode.includes('ref=') || extractedCode.includes('code=')) {
+                const searchStr = extractedCode.includes('?') ? extractedCode.split('?')[1] : extractedCode;
+                const searchParams = new URLSearchParams(searchStr);
+                const codeParam = searchParams.get('ref') || searchParams.get('code') || searchParams.get('referral');
+                if (codeParam) extractedCode = codeParam;
+            } else if (extractedCode.includes('/')) {
+                const parts = extractedCode.split('/');
+                extractedCode = parts[parts.length - 1] || extractedCode;
+            }
+        } catch (e) {
+            console.log('QR parse notice:', e);
+        }
+
+        const cleanCode = extractedCode.toUpperCase().trim();
+        setReferralCode(cleanCode);
+        setShowCameraScannerModal(false);
+        Alert.alert("QR Code Scanned! 🎉", `Referral code "${cleanCode}" successfully applied.`);
+    };
+
+    const pickImageFromGallery = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 1,
+            });
+
+            if (!result.canceled && result.assets[0]?.uri) {
+                Alert.alert("Image Selected 🖼️", "If your image contains a referral code, you can paste or type it into the field.");
+            }
+        } catch (e) {
+            console.log('Gallery pick error:', e);
+        }
+    };
 
     // Real-Time Availability Validation States
     const [checkingUsername, setCheckingUsername] = useState(false);
@@ -616,15 +675,25 @@ export default function SignupScreen() {
                                     </View>
                                 )}
 
-                                {/* Referral Code (Optional) */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Referral Code (Optional)</Text>
+                                {/* Referral Code (Optional) + Camera Scan Button */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Referral Code (Optional)</Text>
+                                    <TouchableOpacity 
+                                        onPress={openCameraScanner} 
+                                        style={[styles.scanQrPill, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', borderColor: '#F59E0B' }]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="qr-code-outline" size={13} color="#F59E0B" />
+                                        <Text style={styles.scanQrPillText}>Scan QR 📷</Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'referralCode' ? theme.borderFocus : theme.borderPrimary, marginBottom: 8 }
+                                    { backgroundColor: theme.bgInput, borderColor: focusedInput === 'referralCode' ? theme.borderFocus : theme.borderPrimary, marginBottom: 6, paddingRight: 8 }
                                 ]}>
                                     <TextInput 
                                         style={[styles.textInput, { color: theme.textPrimary }]}
-                                        placeholder="ABUMAF123"
+                                        placeholder="ABUMAF123 or @username"
                                         placeholderTextColor={theme.textMuted}
                                         autoCapitalize="characters"
                                         value={referralCode}
@@ -632,7 +701,26 @@ export default function SignupScreen() {
                                         onFocus={() => setFocusedInput('referralCode')}
                                         onBlur={() => setFocusedInput(null)}
                                     />
+                                    {referralCode.trim().length > 0 ? (
+                                        <TouchableOpacity onPress={() => setReferralCode('')} style={{ padding: 4 }}>
+                                            <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity onPress={openCameraScanner} style={{ padding: 4 }}>
+                                            <Ionicons name="camera-outline" size={20} color="#F59E0B" />
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
+
+                                {/* Applied Referral Code Badge Indicator */}
+                                {referralCode.trim().length > 0 && (
+                                    <View style={[styles.referralBadgeBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: '#10B981' }]}>
+                                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                                        <Text style={[styles.referralBadgeText, { color: isDark ? '#6EE7B7' : '#047857' }]}>
+                                            Referral Applied: <Text style={{ fontWeight: '900' }}>{referralCode.trim().toUpperCase()}</Text> 🎉
+                                        </Text>
+                                    </View>
+                                )}
 
                                 {/* Terms & Privacy Acceptance Row */}
                                 <View style={styles.termsRow}>
@@ -775,6 +863,65 @@ export default function SignupScreen() {
                         <ActivityIndicator size="small" color="#08E4C7" style={{ marginTop: 10 }} />
                     </View>
                 </View>
+            </Modal>
+
+            {/* Camera QR Scanner Modal */}
+            <Modal
+                visible={showCameraScannerModal}
+                transparent={false}
+                animationType="slide"
+                onRequestClose={() => setShowCameraScannerModal(false)}
+            >
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+                    <StatusBar style="light" />
+                    <View style={styles.scannerHeader}>
+                        <TouchableOpacity onPress={() => setShowCameraScannerModal(false)} style={styles.scannerCloseBtn}>
+                            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.scannerTitle}>SCAN REFERRAL QR CODE</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+
+                    <View style={styles.scannerBody}>
+                        {permission?.granted ? (
+                            <View style={styles.cameraContainer}>
+                                <CameraView
+                                    style={StyleSheet.absoluteFillObject}
+                                    facing="back"
+                                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                                    barcodeScannerSettings={{
+                                        barcodeTypes: ["qr"],
+                                    }}
+                                />
+                                <View style={styles.viewfinderOverlay}>
+                                    <View style={styles.targetFrame}>
+                                        <View style={[styles.corner, styles.topLeft]} />
+                                        <View style={[styles.corner, styles.topRight]} />
+                                        <View style={[styles.corner, styles.bottomLeft]} />
+                                        <View style={[styles.corner, styles.bottomRight]} />
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.permissionBox}>
+                                <Ionicons name="camera-outline" size={64} color="#F59E0B" />
+                                <Text style={styles.permissionTitle}>Camera Access Needed</Text>
+                                <Text style={styles.permissionSub}>We need camera access to scan your friend's referral QR code.</Text>
+                                <TouchableOpacity onPress={requestPermission} style={styles.grantBtn}>
+                                    <Text style={styles.grantBtnText}>Grant Camera Permission</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={styles.scannerFooter}>
+                        <Text style={styles.scannerSubText}>Align the referral QR code inside the box to scan automatically</Text>
+                        <TouchableOpacity onPress={pickImageFromGallery} style={styles.galleryBtn}>
+                            <Ionicons name="images-outline" size={18} color="#0F172A" />
+                            <Text style={styles.galleryBtnText}>Pick from Gallery 🖼️</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
             </Modal>
 
         </View>
@@ -1079,5 +1226,162 @@ const styles = StyleSheet.create({
         fontSize: 9.5,
         fontWeight: '800',
         letterSpacing: 0.3,
+    },
+    scanQrPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    scanQrPillText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+        color: '#F59E0B',
+    },
+    referralBadgeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        borderWidth: 1,
+        marginBottom: 10,
+    },
+    referralBadgeText: {
+        fontSize: 10.5,
+        fontWeight: '600',
+    },
+    scannerHeader: {
+        height: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#1E293B',
+    },
+    scannerCloseBtn: {
+        padding: 4,
+    },
+    scannerTitle: {
+        color: '#FFFFFF',
+        fontWeight: '900',
+        fontSize: 14,
+        letterSpacing: 1,
+    },
+    scannerBody: {
+        flex: 1,
+        backgroundColor: '#000000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cameraContainer: {
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+    },
+    viewfinderOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    targetFrame: {
+        width: 240,
+        height: 240,
+        position: 'relative',
+        borderRadius: 16,
+    },
+    corner: {
+        position: 'absolute',
+        width: 28,
+        height: 28,
+        borderColor: '#F59E0B',
+    },
+    topLeft: {
+        top: 0,
+        left: 0,
+        borderTopWidth: 4,
+        borderLeftWidth: 4,
+        borderTopLeftRadius: 12,
+    },
+    topRight: {
+        top: 0,
+        right: 0,
+        borderTopWidth: 4,
+        borderRightWidth: 4,
+        borderTopRightRadius: 12,
+    },
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
+        borderBottomWidth: 4,
+        borderLeftWidth: 4,
+        borderBottomLeftRadius: 12,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+        borderBottomWidth: 4,
+        borderRightWidth: 4,
+        borderBottomRightRadius: 12,
+    },
+    permissionBox: {
+        alignItems: 'center',
+        padding: 24,
+    },
+    permissionTitle: {
+        color: '#FFFFFF',
+        fontWeight: '900',
+        fontSize: 18,
+        marginTop: 16,
+        marginBottom: 6,
+    },
+    permissionSub: {
+        color: '#94A3B8',
+        fontSize: 12,
+        textAlign: 'center',
+        marginBottom: 20,
+        lineHeight: 18,
+    },
+    grantBtn: {
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 16,
+    },
+    grantBtnText: {
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 13,
+    },
+    scannerFooter: {
+        padding: 20,
+        backgroundColor: '#0F172A',
+        alignItems: 'center',
+        gap: 12,
+    },
+    scannerSubText: {
+        color: '#94A3B8',
+        fontSize: 11,
+        textAlign: 'center',
+    },
+    galleryBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 16,
+    },
+    galleryBtnText: {
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 12,
     },
 });
