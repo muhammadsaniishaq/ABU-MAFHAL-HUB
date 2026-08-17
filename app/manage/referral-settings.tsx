@@ -134,8 +134,16 @@ export default function ReferralSettings() {
     const saveSettings = async () => {
         setSaving(true);
         try {
+            const cleanUrl = referralUrl
+                .trim()
+                .replace(/\/\(app\)/gi, '')
+                .replace(/\/\(auth\)/gi, '')
+                .replace(/\/referrals\/?$/gi, '')
+                .replace(/\/signup\/?$/gi, '')
+                .replace(/\/+$/, '');
+
             await supabase.from('app_settings').upsert({ key: 'referral_reward', value: { amount: Number(rewardAmount), currency: 'NGN' } });
-            await supabase.from('app_settings').upsert({ key: 'referral_url', value: { url: referralUrl } });
+            await supabase.from('app_settings').upsert({ key: 'referral_url', value: { url: cleanUrl } });
             await supabase.from('app_settings').upsert({ key: 'referral_enabled', value: { enabled: systemEnabled } });
             await supabase.from('app_settings').upsert({ key: 'min_withdrawal', value: { amount: Number(minWithdrawal) } });
             Alert.alert("Success", "Configuration saved!");

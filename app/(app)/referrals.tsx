@@ -68,10 +68,20 @@ export default function ReferralsScreen() {
 
             settingsList?.forEach(item => {
                 if (item.key === 'referral_url' && item.value) {
+                    let raw = '';
                     if (typeof item.value === 'string') {
-                        dynamicUrl = item.value.trim().replace(/\/+$/, '');
+                        raw = item.value;
                     } else if (typeof item.value === 'object' && item.value.url) {
-                        dynamicUrl = String(item.value.url).trim().replace(/\/+$/, '');
+                        raw = String(item.value.url);
+                    }
+                    if (raw) {
+                        dynamicUrl = raw
+                            .trim()
+                            .replace(/\/\(app\)/gi, '')
+                            .replace(/\/\(auth\)/gi, '')
+                            .replace(/\/referrals\/?$/gi, '')
+                            .replace(/\/signup\/?$/gi, '')
+                            .replace(/\/+$/, '');
                     }
                 }
                 if (item.key === 'referral_reward' && item.value !== undefined && item.value !== null) {
@@ -87,6 +97,13 @@ export default function ReferralsScreen() {
 
             if (isNaN(configuredReward)) configuredReward = 0;
             setRewardAmount(configuredReward);
+
+            dynamicUrl = dynamicUrl
+                .replace(/\/\(app\)/gi, '')
+                .replace(/\/\(auth\)/gi, '')
+                .replace(/\/referrals\/?$/gi, '')
+                .replace(/\/signup\/?$/gi, '')
+                .replace(/\/+$/, '');
 
             if (!dynamicUrl.startsWith('http://') && !dynamicUrl.startsWith('https://')) {
                 dynamicUrl = 'https://' + dynamicUrl;
