@@ -3,7 +3,7 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 import { View, ActivityIndicator, LogBox, Text, TextInput, Platform, AppState } from 'react-native';
@@ -224,10 +224,23 @@ export default function RootLayout() {
         }
     }, [loaded, initialized, authChecked]);
 
+    const backgroundTimeRef = useRef<number | null>(null);
+
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState) => {
             if (nextAppState === 'background' || nextAppState === 'inactive') {
-                AsyncStorage.removeItem('app_unlocked').catch(() => {});
+                if (!backgroundTimeRef.current) {
+                    backgroundTimeRef.current = Date.now();
+                }
+            } else if (nextAppState === 'active') {
+                if (backgroundTimeRef.current) {
+                    const elapsedMinutes = (Date.now() - backgroundTimeRef.current) / (1000 * 60);
+                    // Lock session ONLY if user has been away in background for more than 10 minutes!
+                    if (elapsedMinutes >= 10) {
+                        AsyncStorage.removeItem('app_unlocked').catch(() => {});
+                    }
+                    backgroundTimeRef.current = null;
+                }
             }
         });
         return () => subscription.remove();

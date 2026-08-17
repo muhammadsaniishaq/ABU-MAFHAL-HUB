@@ -205,45 +205,101 @@ export default function PinUnlockScreen() {
 
     const verifyPin = async (enteredPin: string) => {
         setVerifying(true);
-        if (enteredPin === savedPin) {
-            unlockSuccess();
-        } else {
-            triggerShakeAnimation();
-            const newAttempts = failedAttempts + 1;
-            setFailedAttempts(newAttempts);
+        let validPin = savedPin;
 
-            if (Platform.OS !== 'web') {
-                Vibration.vibrate([60, 60, 60]);
-            }
-
-            if (newAttempts >= 5) {
-                setLockoutSeconds(30);
-                const errMsg = 'Too many failed attempts. Security lock active for 30 seconds.';
-                if (Platform.OS === 'web') alert(errMsg);
-                else Alert.alert('Security Lock', errMsg);
-                setPin('');
-                setVerifying(false);
-                return;
-            }
-
-            const attemptsLeft = 5 - newAttempts;
-            const msg = `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining before security lock.`;
-
+        // 1. Check local storage if state was unpopulated
+        if (!validPin) {
             if (Platform.OS === 'web') {
-                alert(msg);
-                setPin('');
-                setVerifying(false);
+                validPin = await AsyncStorage.getItem(PIN_KEY);
             } else {
-                Alert.alert('Incorrect PIN', msg, [
-                    {
-                        text: 'Try Again',
-                        onPress: () => {
-                            setPin('');
-                            setVerifying(false);
-                        },
-                    },
-                ]);
+                validPin = await SecureStore.getItemAsync(PIN_KEY);
             }
+        }
+
+        // 2. Fallback check Supabase DB profile
+        if (!validPin) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: prof } = await supabase
+                        .from('profiles')
+                        .select('transaction_pin')
+                        .eq('id', user.id)
+                        .maybeSingle();
+                    if (prof?.transaction_pin) {
+                        validPin = prof.transaction_pin;
+                        setSavedPin(validPin);
+                        if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, validPin);
+                        else await SecureStore.setItemAsync(PIN_KEY, validPin);
+                    }
+                }
+            } catch (e) {
+                console.log('PIN DB fallback error:', e);
+            }
+        }
+
+        // 3. Verify against valid PIN or live DB check
+        if (validPin && enteredPin === validPin) {
+            unlockSuccess();
+            return;
+        }
+
+        // 4. Live DB verify check in case PIN was recently set or updated in another session
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: latestProf } = await supabase
+                    .from('profiles')
+                    .select('transaction_pin')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (latestProf?.transaction_pin && latestProf.transaction_pin === enteredPin) {
+                    setSavedPin(latestProf.transaction_pin);
+                    if (Platform.OS === 'web') await AsyncStorage.setItem(PIN_KEY, latestProf.transaction_pin);
+                    else await SecureStore.setItemAsync(PIN_KEY, latestProf.transaction_pin);
+                    unlockSuccess();
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        // If verification fails:
+        triggerShakeAnimation();
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
+        if (Platform.OS !== 'web') {
+            Vibration.vibrate([60, 60, 60]);
+        }
+
+        if (newAttempts >= 5) {
+            setLockoutSeconds(30);
+            const errMsg = 'Too many failed attempts. Security lock active for 30 seconds.';
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert('Security Lock', errMsg);
+            setPin('');
+            setVerifying(false);
+            return;
+        }
+
+        const attemptsLeft = 5 - newAttempts;
+        const msg = `Incorrect PIN. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining before security lock.`;
+
+        if (Platform.OS === 'web') {
+            alert(msg);
+            setPin('');
+            setVerifying(false);
+        } else {
+            Alert.alert('Incorrect PIN', msg, [
+                {
+                    text: 'Try Again',
+                    onPress: () => {
+                        setPin('');
+                        setVerifying(false);
+                    },
+                },
+            ]);
         }
     };
 
@@ -544,6 +600,8 @@ const s = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#020617',
+        height: '100%',
+        overflow: 'hidden',
     },
     centerContainer: {
         flex: 1,
@@ -579,13 +637,15 @@ const s = StyleSheet.create({
         flex: 1,
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingBottom: 16,
+        paddingBottom: 12,
+        height: '100%',
+        overflow: 'hidden',
     },
     topSecurityBar: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 10,
+        paddingTop: 6,
         paddingHorizontal: 6,
     },
     securityBadge: {
@@ -614,17 +674,17 @@ const s = StyleSheet.create({
     card: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
+        justifyContent: 'space-evenly',
+        paddingVertical: 4,
     },
     avatarWrapper: {
         position: 'relative',
-        marginBottom: 14,
+        marginBottom: 8,
     },
     avatarBorderRing: {
-        width: 84,
-        height: 84,
-        borderRadius: 42,
+        width: 76,
+        height: 76,
+        borderRadius: 38,
         padding: 3,
         alignItems: 'center',
         justifyContent: 'center',
@@ -635,15 +695,15 @@ const s = StyleSheet.create({
         elevation: 8,
     },
     avatarImage: {
-        width: 78,
-        height: 78,
-        borderRadius: 39,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         backgroundColor: '#0F172A',
     },
     avatarFallback: {
-        width: 78,
-        height: 78,
-        borderRadius: 39,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         backgroundColor: '#0F172A',
         alignItems: 'center',
         justifyContent: 'center',
@@ -652,7 +712,7 @@ const s = StyleSheet.create({
     },
     avatarInitialText: {
         color: '#F59E0B',
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '900',
     },
     activeBadge: {
@@ -664,32 +724,32 @@ const s = StyleSheet.create({
     },
     headerTextContainer: {
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 10,
     },
     greetingText: {
         color: '#F59E0B',
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '700',
         letterSpacing: 0.5,
         marginBottom: 2,
     },
     welcomeNameText: {
         color: '#FFFFFF',
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '800',
         letterSpacing: -0.3,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     emailSubText: {
         color: '#94A3B8',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '500',
     },
     pinSection: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        marginBottom: 24,
+        marginBottom: 14,
     },
     dotsContainer: {
         flexDirection: 'row',
@@ -734,7 +794,7 @@ const s = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        marginBottom: 24,
+        marginBottom: 14,
     },
     lockoutText: {
         color: '#EF4444',
@@ -743,9 +803,9 @@ const s = StyleSheet.create({
     },
     keypadGrid: {
         width: '100%',
-        maxWidth: 290,
-        gap: 14,
-        marginBottom: 20,
+        maxWidth: 270,
+        gap: 10,
+        marginBottom: 10,
     },
     keypadRow: {
         flexDirection: 'row',
@@ -753,18 +813,18 @@ const s = StyleSheet.create({
         alignItems: 'center',
     },
     keypadButton: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        width: 66,
+        height: 66,
+        borderRadius: 33,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: 'rgba(245, 158, 11, 0.2)',
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
+        shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
         elevation: 3,
     },
     keypadButtonText: {
