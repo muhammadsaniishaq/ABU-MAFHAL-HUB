@@ -25,6 +25,8 @@ export default function OTP() {
     const params = useLocalSearchParams<{
         email?: string;
         mode?: string;
+        type?: string;
+        factorId?: string;
         tempFullName?: string;
         tempUsername?: string;
         tempPhone?: string;
