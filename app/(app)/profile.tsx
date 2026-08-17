@@ -520,7 +520,7 @@ export default function UserProfileScreen() {
                                 <Ionicons name="chevron-forward" size={14} color={L.textMuted} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => setTwoFactorModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                            <TouchableOpacity onPress={() => router.push('/security')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                     <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center' }}>
                                         <Ionicons name="key" size={14} color={L.blue} />
