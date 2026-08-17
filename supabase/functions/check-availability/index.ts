@@ -29,11 +29,21 @@ serve(async (req) => {
     // Check availability in profiles table (admin access)
     // Prepare Query
     console.log(`Checking ${table}.${field} for value: ${value}`);
-    // deno-lint-ignore no-explicit-any
-    let query: any = (supabaseClient as any)
-      .from(table)
-      .select(field)
-      .eq(field, value);
+    let query: any = (supabaseClient as any).from(table).select(field);
+
+    if (field === 'username' || field === 'email') {
+      query = query.ilike(field, value.trim());
+    } else if (field === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '');
+      const last10 = digitsOnly.slice(-10);
+      if (last10.length >= 7) {
+        query = query.or(`phone.ilike.%${last10}%`);
+      } else {
+        query = query.eq(field, value.trim());
+      }
+    } else {
+      query = query.eq(field, value);
+    }
 
     // Apply additional filters (e.g. { document_type: 'nin' })
     if (filters && Object.keys(filters).length > 0) {

@@ -245,6 +245,32 @@ export default function SignupScreen() {
         return () => clearTimeout(timer);
     }, [email]);
 
+    // Real-time Phone Check
+    useEffect(() => {
+        const checkPhone = async () => {
+            const cleanP = phone.trim();
+            if (cleanP.length < 7) {
+                setPhoneAvailable(null);
+                return;
+            }
+            setCheckingPhone(true);
+            try {
+                const fullPhone = selectedCountry.dialCode + cleanP.replace(/^0+/, '');
+                const { data, error } = await supabase.functions.invoke('check-availability', {
+                    body: { field: 'phone', value: fullPhone }
+                });
+                if (error) throw error;
+                setPhoneAvailable(data.available);
+            } catch (error) {
+                console.log('Phone check error', error);
+            } finally {
+                setCheckingPhone(false);
+            }
+        };
+        const timer = setTimeout(checkPhone, 600);
+        return () => clearTimeout(timer);
+    }, [phone, selectedCountry]);
+
     // Password Strength Logic
     const getPasswordStrength = () => {
         let score = 0;
@@ -321,12 +347,17 @@ export default function SignupScreen() {
         }
 
         if (usernameAvailable === false) {
-            notifyUser('Username Taken', 'The username you selected is already in use. Please try another.');
+            notifyUser('Username Taken ❌', 'The username you selected is already in use. Please try another.');
             return;
         }
 
         if (emailAvailable === false) {
-            notifyUser('Email In Use', 'An account already exists with this email address. Please Log In instead.');
+            notifyUser('Email In Use ❌', 'An account already exists with this email address. Please Log In instead.');
+            return;
+        }
+
+        if (phoneAvailable === false) {
+            notifyUser('Phone Number In Use ❌', 'An account already exists with this phone number. Please Log In or use another phone number.');
             return;
         }
 
@@ -334,6 +365,37 @@ export default function SignupScreen() {
 
         try {
             const cleanPhone = selectedCountry.dialCode + cleanPhoneInput.replace(/^0+/, '');
+            const digits10 = cleanPhoneInput.replace(/\D/g, '').slice(-10);
+
+            // Direct Database Pre-Check to guarantee absolute uniqueness
+            try {
+                const { data: existingProfiles } = await supabase
+                    .from('profiles')
+                    .select('email, username, phone')
+                    .or(`email.ilike.${cleanEmail},username.ilike.${cleanUsername}${digits10 ? `,phone.ilike.%${digits10}%` : ''}`);
+
+                if (existingProfiles && existingProfiles.length > 0) {
+                    for (const existing of existingProfiles) {
+                        if (existing.email && existing.email.toLowerCase() === cleanEmail.toLowerCase()) {
+                            notifyUser('Email Already In Use 🔒', 'An account is already registered with this Email address.');
+                            setLoading(false);
+                            return;
+                        }
+                        if (existing.username && existing.username.toLowerCase() === cleanUsername.toLowerCase()) {
+                            notifyUser('Username Already Taken 🔒', 'This Username is already registered. Please choose a different username.');
+                            setLoading(false);
+                            return;
+                        }
+                        if (existing.phone && digits10 && existing.phone.includes(digits10)) {
+                            notifyUser('Phone Number Already In Use 🔒', 'An account is already registered with this Phone Number.');
+                            setLoading(false);
+                            return;
+                        }
+                    }
+                }
+            } catch (preCheckError) {
+                console.log('Pre-signup DB check notice:', preCheckError);
+            }
 
             const { data, error } = await supabase.auth.signUp({
                 email: cleanEmail,
@@ -644,7 +706,7 @@ export default function SignupScreen() {
 
                                     <View style={[
                                         styles.inputFieldBox, 
-                                        { flex: 1, backgroundColor: theme.bgInput, borderColor: focusedInput === 'phone' ? theme.borderFocus : theme.borderPrimary }
+                                        { flex: 1, backgroundColor: theme.bgInput, borderColor: phoneAvailable === false ? '#EF4444' : focusedInput === 'phone' ? theme.borderFocus : theme.borderPrimary }
                                     ]}>
                                         <TextInput 
                                             style={[styles.textInput, { color: theme.textPrimary }]}
@@ -656,8 +718,19 @@ export default function SignupScreen() {
                                             onFocus={() => setFocusedInput('phone')}
                                             onBlur={() => setFocusedInput(null)}
                                         />
+                                        {checkingPhone && <ActivityIndicator size="small" color={theme.accentTeal} />}
                                     </View>
                                 </View>
+                                {phoneAvailable === false && (
+                                    <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700', marginTop: -4, marginBottom: 4 }}>
+                                        ❌ Phone number is already registered
+                                    </Text>
+                                )}
+                                {phoneAvailable === true && (
+                                    <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700', marginTop: -4, marginBottom: 4 }}>
+                                        ✓ Phone number available
+                                    </Text>
+                                )}
 
                                 {/* Password & Confirm Password Side-by-Side */}
                                 <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
