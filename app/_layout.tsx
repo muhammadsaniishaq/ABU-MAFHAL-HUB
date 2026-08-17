@@ -260,47 +260,50 @@ export default function RootLayout() {
         if (session) {
             const isAdmin = isUserAdmin(userRole, session.user?.email);
 
-            if (isAuthGroup) {
-                const allowedAuthScreens = ['otp', 'pin-setup', 'pin'];
-                if (!allowedAuthScreens.includes(currentScreen)) {
-                    router.replace('/dashboard' as any);
-                }
-            } else if (isManagementGroup && !isAdmin) {
-                router.replace('/dashboard' as any);
-            } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
-                AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
-                    let localPin = Platform.OS === 'web'
-                        ? await AsyncStorage.getItem('user_transaction_pin')
-                        : await SecureStore.getItemAsync('user_transaction_pin');
+            AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
+                let localPin = Platform.OS === 'web'
+                    ? await AsyncStorage.getItem('user_transaction_pin')
+                    : await SecureStore.getItemAsync('user_transaction_pin');
 
-                    if (!localPin) {
-                        const { data } = await supabase
-                            .from('profiles')
-                            .select('transaction_pin')
-                            .eq('id', session.user.id)
-                            .maybeSingle();
+                if (!localPin) {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('transaction_pin')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
 
-                        if (data?.transaction_pin) {
-                            localPin = data.transaction_pin;
-                            if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
-                            else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
-                        }
+                    if (data?.transaction_pin) {
+                        localPin = data.transaction_pin;
+                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
+                        else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
                     }
+                }
 
-                    if (!localPin) {
-                        // User has no PIN set yet (e.g. fresh Google OAuth signup) -> Route to PIN Setup!
+                // 1. User has NO PIN configured -> Must complete PIN Setup first!
+                if (!localPin) {
+                    if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
                         router.replace('/pin-setup' as any);
-                    } else if (unlocked === 'true') {
-                        // User has PIN and app is unlocked -> Route to Dashboard!
-                        router.replace('/dashboard' as any);
-                    } else {
-                        // User has PIN but app is locked -> Route to PIN Verification!
+                    }
+                    return;
+                }
+
+                // 2. User has PIN, but app is LOCKED (unlocked !== 'true') -> STRICT MANDATORY UNLOCK!
+                if (unlocked !== 'true') {
+                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
                         router.replace('/pin' as any);
                     }
-                }).catch(() => {
+                    return;
+                }
+
+                // 3. User HAS PIN and app IS UNLOCKED (unlocked === 'true')
+                if (isAuthGroup && !['otp', 'pin-setup', 'pin'].includes(currentScreen)) {
                     router.replace('/dashboard' as any);
-                });
-            }
+                } else if (isManagementGroup && !isAdmin) {
+                    router.replace('/dashboard' as any);
+                } else if (currentScreen === 'index' || currentScreen === 'onboarding') {
+                    router.replace('/dashboard' as any);
+                }
+            }).catch(() => {});
         } else {
             if (!isPublicScreen && !isAuthGroup) {
                 router.replace('/');
