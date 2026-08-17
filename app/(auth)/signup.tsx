@@ -85,21 +85,22 @@ export default function SignupScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [showCameraScannerModal, setShowCameraScannerModal] = useState(false);
     const [scanned, setScanned] = useState(false);
+    const [isScanningImage, setIsScanningImage] = useState(false);
 
     const openCameraScanner = async () => {
-        if (!permission?.granted) {
-            const res = await requestPermission();
-            if (!res.granted) {
-                Alert.alert("Camera Permission Required 📷", "Please allow camera access to scan your friend's referral QR code.");
-                return;
-            }
-        }
         setScanned(false);
         setShowCameraScannerModal(true);
+        if (!permission?.granted) {
+            try {
+                await requestPermission();
+            } catch (e) {
+                console.log('Camera permission error:', e);
+            }
+        }
     };
 
     const handleBarCodeScanned = ({ data }: { data: string }) => {
-        if (scanned) return;
+        if (scanned || !data) return;
         setScanned(true);
         
         let extractedCode = data.trim();
@@ -130,11 +131,44 @@ export default function SignupScreen() {
                 quality: 1,
             });
 
-            if (!result.canceled && result.assets[0]?.uri) {
-                Alert.alert("Image Selected 🖼️", "If your image contains a referral code, you can paste or type it into the field.");
+            if (result.canceled || !result.assets || result.assets.length === 0) {
+                return;
             }
-        } catch (e) {
-            console.log('Gallery pick error:', e);
+
+            const selectedAsset = result.assets[0];
+            setIsScanningImage(true);
+
+            const formData = new FormData();
+            if (Platform.OS === 'web') {
+                const response = await fetch(selectedAsset.uri);
+                const blob = await response.blob();
+                formData.append('file', blob, 'qr.png');
+            } else {
+                formData.append('file', {
+                    uri: selectedAsset.uri,
+                    name: 'qr.png',
+                    type: 'image/png',
+                } as any);
+            }
+
+            const apiRes = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const jsonRes = await apiRes.json();
+            setIsScanningImage(false);
+
+            const qrText = jsonRes[0]?.symbol[0]?.data;
+            if (qrText) {
+                handleBarCodeScanned({ data: qrText });
+            } else {
+                Alert.alert("Scan Notice", "Could not detect a clear QR code in this image. Please ensure the QR code is centered and clear.");
+            }
+        } catch (e: any) {
+            setIsScanningImage(false);
+            console.log('Gallery QR decode error:', e);
+            Alert.alert("Notice", "Unable to decode image automatically. You can paste or type the referral code directly into the box.");
         }
     };
 
@@ -888,7 +922,10 @@ export default function SignupScreen() {
                                 <CameraView
                                     style={StyleSheet.absoluteFillObject}
                                     facing="back"
-                                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                                    onBarcodeScanned={scanned ? undefined : (res) => {
+                                        const val = res?.data || (res as any)?.nativeEvent?.data;
+                                        if (val) handleBarCodeScanned({ data: val });
+                                    }}
                                     barcodeScannerSettings={{
                                         barcodeTypes: ["qr"],
                                     }}
@@ -916,9 +953,15 @@ export default function SignupScreen() {
 
                     <View style={styles.scannerFooter}>
                         <Text style={styles.scannerSubText}>Align the referral QR code inside the box to scan automatically</Text>
-                        <TouchableOpacity onPress={pickImageFromGallery} style={styles.galleryBtn}>
-                            <Ionicons name="images-outline" size={18} color="#0F172A" />
-                            <Text style={styles.galleryBtnText}>Pick from Gallery 🖼️</Text>
+                        <TouchableOpacity onPress={pickImageFromGallery} style={styles.galleryBtn} disabled={isScanningImage}>
+                            {isScanningImage ? (
+                                <ActivityIndicator size="small" color="#0F172A" />
+                            ) : (
+                                <>
+                                    <Ionicons name="images-outline" size={18} color="#0F172A" />
+                                    <Text style={styles.galleryBtnText}>Pick from Gallery 🖼️</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </SafeAreaView>
