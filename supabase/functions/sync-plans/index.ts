@@ -160,14 +160,29 @@ Deno.serve(async (req) => {
                     }
                 }
             } else {
-                // ClubKonnect Logic
+                // ClubKonnect / NelloByte Systems Logic
                 try {
-                    const { data: ckUserIdSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'CLUBKONNECT_USER_ID').single();
-                    const userId = ckUserIdSetting?.value || DEFAULT_CLUBKONNECT_USER_ID;
-                    const url = `https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${userId}`;
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    networksData = data.MOBILE_NETWORK || data;
+                    const { data: secretsData } = await supabaseAdmin.from('system_secrets').select('key, value');
+                    const { data: settingsData } = await supabaseAdmin.from('app_settings').select('key, value');
+                    const sMap: Record<string, string> = {};
+                    if (settingsData) settingsData.forEach((s: any) => { if (typeof s.value === 'string') sMap[s.key.toUpperCase()] = s.value; });
+                    if (secretsData) secretsData.forEach((s: any) => { if (typeof s.value === 'string') sMap[s.key.toUpperCase()] = s.value; });
+
+                    const userId = sMap['CLUBKONNECT_USER_ID'] || sMap['CLUBKONNECT_USER'] || DEFAULT_CLUBKONNECT_USER_ID || 'CK101269551';
+                    const apiKey = sMap['CLUBKONNECT_API_KEY'] || sMap['CLUBKONNECT_KEY'] || '';
+                    
+                    const url1 = `https://www.nellobytesystems.com/APIDatabundlePlansV2.asp?UserID=${userId}&APIKey=${apiKey}`;
+                    const response1 = await fetch(url1);
+                    const data1 = await response1.json().catch(() => null);
+                    
+                    if (data1 && (data1.MOBILE_NETWORK || data1.MTN || data1.AIRTEL)) {
+                        networksData = data1.MOBILE_NETWORK || data1;
+                    } else {
+                        const url2 = `https://www.clubkonnect.com/APIDatabundlePlansV2.asp?UserID=${userId}&APIKey=${apiKey}`;
+                        const response2 = await fetch(url2);
+                        const data2 = await response2.json().catch(() => null);
+                        if (data2) networksData = data2.MOBILE_NETWORK || data2;
+                    }
                 } catch (err: any) {}
             }
 
