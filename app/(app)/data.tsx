@@ -393,14 +393,15 @@ export default function DataScreen() {
             const nameUpper = (p.originalName || p.name).toUpperCase();
             const filterUpper = planTypeFilter.toUpperCase();
 
-            // 1. Direct DB plan_type match first
-            if (planTypeDB && (planTypeDB === filterUpper || planTypeDB.includes(filterUpper))) {
-                // Matched directly via DB plan_type
-            } else if (filterUpper === 'CG' && (nameUpper.includes('CG') || nameUpper.includes('CORPORATE') || planTypeDB.includes('CORPORATE'))) {
+            if (planTypeDB === filterUpper || planTypeDB.includes(filterUpper) || nameUpper.includes(filterUpper)) {
+                // Direct match
+            } else if (filterUpper === 'CG' && (nameUpper.includes('CORPORATE') || nameUpper.includes('CG') || planTypeDB.includes('CORPORATE'))) {
                 // Matched CG / Corporate
-            } else if ((filterUpper === 'DIRECT' || filterUpper === 'GIFTING') && (nameUpper.includes('DIRECT') || nameUpper.includes('GIFTING') || planTypeDB.includes('GIFT'))) {
+            } else if ((filterUpper === 'DIRECT' || filterUpper === 'GIFTING') && (nameUpper.includes('DIRECT') || nameUpper.includes('GIFT') || planTypeDB.includes('GIFT'))) {
                 // Matched Direct / Gifting
-            } else if (!nameUpper.includes(filterUpper) && !planTypeDB.includes(filterUpper)) {
+            } else if (filterUpper === 'SME' && (nameUpper.includes('SME') || planTypeDB === 'SME')) {
+                // Matched SME
+            } else {
                 return false;
             }
         }

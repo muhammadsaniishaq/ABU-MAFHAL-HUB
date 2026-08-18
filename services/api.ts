@@ -167,7 +167,18 @@ export const api = {
                     volume: p.volume || '',
                     network: p.network,
                     apiVendor: p.api_vendor || activeVendor,
-                    plan_type: p.plan_type || (p.name?.toLowerCase().includes('corporate') || p.name?.toLowerCase().includes('cg') ? 'CG' : p.name?.toLowerCase().includes('gifting') ? 'Gifting' : 'SME'),
+                    plan_type: p.plan_type || (() => {
+                        const n = (p.name || '').toLowerCase();
+                        if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';
+                        if (n.includes('gifting') || n.includes('gift')) return 'GIFTING';
+                        if (n.includes('promo')) return 'PROMO';
+                        if (n.includes('mega')) return 'MEGA';
+                        if (n.includes('night')) return 'NIGHT';
+                        if (n.includes('direct')) return 'DIRECT';
+                        if (n.includes('coupon')) return 'COUPON';
+                        if (n.includes('sme') || n.includes('s-m-e')) return 'SME';
+                        return 'GENERAL';
+                    })(),
                     icon: ''
                 }));
             } catch (e) {

@@ -115,11 +115,24 @@ export default function ManageDataPlans() {
                 setActiveVendor(String(v).toLowerCase());
             }
 
-            // 2. Fetch Custom Plan Types from app_settings
+            // 2. Fetch Custom Plan Types from app_settings & system_secrets
+            let loadedTypes: string[] = [];
             const { data: typesData } = await supabase.from('app_settings').select('value').eq('key', 'data_plan_types').maybeSingle();
-            if (typesData && typesData.value && Array.isArray(typesData.value)) {
-                setPlanTypesList(typesData.value);
+            if (typesData && typesData.value) {
+                if (Array.isArray(typesData.value)) loadedTypes = typesData.value;
+                else if (typeof typesData.value === 'string') {
+                    try { loadedTypes = JSON.parse(typesData.value); } catch (_) {}
+                }
             }
+            if (loadedTypes.length === 0) {
+                const { data: secData } = await supabase.from('system_secrets').select('value').eq('key', 'DATA_PLAN_TYPES').maybeSingle();
+                if (secData && secData.value) {
+                    try { loadedTypes = JSON.parse(secData.value); } catch (_) {}
+                }
+            }
+            const baseTypes = ['SME', 'CG', 'GIFTING', 'PROMO', 'DIRECT', 'MEGA', 'NIGHT', 'COUPON'];
+            const mergedTypes = Array.from(new Set([...baseTypes, ...loadedTypes]));
+            setPlanTypesList(mergedTypes);
 
             // 3. Fetch Network Markup Configs
             const { data, error } = await supabase
@@ -187,20 +200,24 @@ export default function ManageDataPlans() {
             return;
         }
 
-        const updatedList = [...planTypesList, cleanName];
+        const updatedList = Array.from(new Set([...planTypesList, cleanName]));
         setPlanTypesList(updatedList);
         setNewCustomTypeName('');
         setShowAddTypeModal(false);
 
         try {
-            const { error } = await supabase
+            const { error: appErr } = await supabase
                 .from('app_settings')
-                .upsert({ key: 'data_plan_types', value: updatedList });
+                .upsert({ key: 'data_plan_types', value: updatedList }, { onConflict: 'key' });
 
-            if (error) throw error;
-            showAlert('Plan Type Added 🎉', `New Plan Type "${cleanName}" added successfully. User app will load these plans live.`);
+            const { error: secErr } = await supabase
+                .from('system_secrets')
+                .upsert({ key: 'DATA_PLAN_TYPES', value: JSON.stringify(updatedList) }, { onConflict: 'key' });
+
+            if (appErr && secErr) throw appErr || secErr;
+            showAlert('Plan Type Added 🎉', `New Plan Type "${cleanName}" added & saved permanently. It will remain active even after refresh.`);
         } catch (e: any) {
-            showAlert('Saved Locally', `Plan Type added to view. (${e.message})`);
+            showAlert('Saved to Memory', `Plan Type added to current session. (${e.message})`);
         }
     };
 
@@ -593,6 +610,7 @@ export default function ManageDataPlans() {
                             const selling = parseFloat(plan.selling_price || '0');
                             const profit = selling - cost;
                             const currentPlanType = plan.plan_type || (plan.name?.toLowerCase().includes('corporate') || plan.name?.toLowerCase().includes('cg') ? 'CG' : plan.name?.toLowerCase().includes('gifting') ? 'Gifting' : 'SME');
+                            const vendorName = plan.api_vendor ? plan.api_vendor.toUpperCase() : (plan.name?.toLowerCase().includes('bilal') ? 'BILALSADASUB' : plan.name?.toLowerCase().includes('bigi') ? 'BIGI' : 'CLUBKONNECT');
 
                             return (
                                 <View 
@@ -610,13 +628,18 @@ export default function ManageDataPlans() {
                                     }}
                                 >
                                     <View style={{ flex: 1, paddingRight: 8 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
                                             <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '900' }}>
                                                 {plan.name}
                                             </Text>
                                             <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1, borderColor: L.goldBorder }}>
                                                 <Text style={{ color: L.goldDk, fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' }}>
                                                     🏷️ {currentPlanType}
+                                                </Text>
+                                            </View>
+                                            <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                                                <Text style={{ color: '#1D4ED8', fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' }}>
+                                                    ⚡ API: {vendorName}
                                                 </Text>
                                             </View>
                                         </View>
