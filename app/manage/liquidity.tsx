@@ -335,17 +335,28 @@ export default function LiquidityVaultScreen() {
             // 2. Direct client DB query fallback
             const secretsMap: Record<string, string> = {};
 
+            const parseValue = (val: any): string => {
+                if (val === null || val === undefined) return '';
+                if (typeof val === 'string') return val.trim();
+                if (typeof val === 'object') {
+                    return val.apiKey || val.key || val.token || val.api_key || val.value || val.secret || val.vendor || JSON.stringify(val);
+                }
+                return String(val);
+            };
+
             const { data: settingsData } = await supabase.from('app_settings').select('*');
             if (settingsData) {
                 settingsData.forEach(s => {
-                    if (s.value && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
+                    const parsed = parseValue(s.value);
+                    if (parsed) secretsMap[s.key.toUpperCase()] = parsed;
                 });
             }
 
             const { data: secretsData } = await supabase.from('system_secrets').select('*');
             if (secretsData) {
                 secretsData.forEach(s => {
-                    if (s.value && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
+                    const parsed = parseValue(s.value);
+                    if (parsed) secretsMap[s.key.toUpperCase()] = parsed;
                 });
             }
 
@@ -354,7 +365,7 @@ export default function LiquidityVaultScreen() {
             const agentHubKey = secretsMap['AGENTHUB_API_KEY'] || secretsMap['AGENTHUB_KEY'] || '';
             const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || '';
             const paystackSecret = secretsMap['PAYSTACK_SECRET_KEY'] || secretsMap['PAYSTACK_KEY'] || '';
-            const clubkonnectKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || '';
+            const clubkonnectKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || secretsMap['CLUBKONNECT_PASS'] || secretsMap['CLUBKONNECT_USER_ID'] || secretsMap['CLUBKONNECT_USER'] || '';
             const idProKey = secretsMap['IDPRO_API_KEY'] || secretsMap['IDPRO_KEY'] || '';
             const payVesselKey = secretsMap['PAYVESSEL_API_KEY'] || secretsMap['PAYVESSEL_KEY'] || secretsMap['PAYVESSEL_SECRET_KEY'] || secretsMap['PAYBESSEL_API_KEY'] || secretsMap['PAYBESSEL_KEY'] || '';
             const nineBoostKey = secretsMap['NINEBOOST_API_KEY'] || secretsMap['NINEBOOST_KEY'] || secretsMap['NINEBOOST_TOKEN'] || '';

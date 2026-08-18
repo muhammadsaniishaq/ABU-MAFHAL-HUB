@@ -44,14 +44,14 @@ const extractStringValue = (val: any): string => {
                 const parsed = JSON.parse(trimmed);
                 if (typeof parsed === 'string') return parsed;
                 if (typeof parsed === 'object' && parsed !== null) {
-                    return parsed.key || parsed.token || parsed.api_key || parsed.value || parsed.secret || JSON.stringify(parsed);
+                    return parsed.key || parsed.token || parsed.api_key || parsed.apiKey || parsed.user_id || parsed.userId || parsed.value || parsed.secret || parsed.vendor || JSON.stringify(parsed);
                 }
             } catch (e) {}
         }
         return trimmed;
     }
     if (typeof val === 'object' && val !== null) {
-        return val.key || val.token || val.api_key || val.value || val.secret || '';
+        return val.key || val.token || val.api_key || val.apiKey || val.user_id || val.userId || val.value || val.secret || val.vendor || JSON.stringify(val);
     }
     return String(val);
 };

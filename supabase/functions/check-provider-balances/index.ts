@@ -59,13 +59,28 @@ serve(async (req: Request) => {
 
     const secrets: Record<string, string> = {}
 
+    const parseValue = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val === 'object') {
+        return val.apiKey || val.key || val.token || val.api_key || val.value || val.secret || val.vendor || JSON.stringify(val);
+      }
+      return String(val);
+    };
+
     // 1. Read from system_secrets table using Service Role Key (Bypasses RLS)
     try {
       const { data: secretsData } = await supabaseAdmin.from('system_secrets').select('*')
       if (secretsData) {
         secretsData.forEach(s => {
-          if (s.value && s.value.trim() !== '') {
-            secrets[s.key.toUpperCase()] = s.value.trim()
+          const parsed = parseValue(s.value);
+          if (parsed) secrets[s.key.toUpperCase()] = parsed;
+          if (typeof s.value === 'object' && s.value !== null) {
+            Object.entries(s.value).forEach(([subK, subV]) => {
+              if (typeof subV === 'string' && subV.trim() !== '') {
+                secrets[subK.toUpperCase()] = subV.trim();
+              }
+            });
           }
         })
       }
@@ -78,8 +93,14 @@ serve(async (req: Request) => {
       const { data: settingsData } = await supabaseAdmin.from('app_settings').select('*')
       if (settingsData) {
         settingsData.forEach(s => {
-          if (s.value && s.value.trim() !== '') {
-            secrets[s.key.toUpperCase()] = s.value.trim()
+          const parsed = parseValue(s.value);
+          if (parsed) secrets[s.key.toUpperCase()] = parsed;
+          if (typeof s.value === 'object' && s.value !== null) {
+            Object.entries(s.value).forEach(([subK, subV]) => {
+              if (typeof subV === 'string' && subV.trim() !== '') {
+                secrets[subK.toUpperCase()] = subV.trim();
+              }
+            });
           }
         })
       }

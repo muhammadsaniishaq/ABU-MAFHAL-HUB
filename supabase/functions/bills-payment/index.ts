@@ -63,18 +63,43 @@ Deno.serve(async (req: Request) => {
         const userId = user.id;
         console.log(`[Bills] User Authenticated: ${userId}`);
 
-        // Fetch dynamic secrets from Admin API Vault
+        // Fetch dynamic secrets from Admin API Vault & app_settings
         const rpcClient = createClient(supabaseUrl, supabaseServiceRoleKey);
         const { data: secretsData } = await rpcClient
             .from('system_secrets')
-            .select('key, value')
-            .in('key', ['CLUBKONNECT_USER_ID', 'CLUBKONNECT_API_KEY', 'BIGI_API_TOKEN', 'BIGI_API_PIN', 'BILALSADASUB_TOKEN', 'BILALSADASUB_API_TOKEN', 'BILAL_TOKEN', 'BILAL_API_TOKEN']);
+            .select('key, value');
+
+        const { data: appSettingsData } = await rpcClient
+            .from('app_settings')
+            .select('key, value');
+
+        const secretsMap: Record<string, string> = {};
+        if (appSettingsData) {
+            appSettingsData.forEach(s => {
+                if (typeof s.value === 'string' && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
+                else if (s.value && typeof s.value === 'object') {
+                    Object.entries(s.value).forEach(([subK, subV]) => {
+                        if (typeof subV === 'string' && subV.trim() !== '') secretsMap[subK.toUpperCase()] = subV.trim();
+                    });
+                }
+            });
+        }
+        if (secretsData) {
+            secretsData.forEach(s => {
+                if (typeof s.value === 'string' && s.value.trim() !== '') secretsMap[s.key.toUpperCase()] = s.value.trim();
+                else if (s.value && typeof s.value === 'object') {
+                    Object.entries(s.value).forEach(([subK, subV]) => {
+                        if (typeof subV === 'string' && subV.trim() !== '') secretsMap[subK.toUpperCase()] = subV.trim();
+                    });
+                }
+            });
+        }
             
-        const ckUserId = secretsData?.find(s => s.key === 'CLUBKONNECT_USER_ID')?.value;
-        const ckApiKey = secretsData?.find(s => s.key === 'CLUBKONNECT_API_KEY')?.value;
-        const bigiToken = secretsData?.find(s => s.key === 'BIGI_API_TOKEN')?.value;
-        const bigiPin = secretsData?.find(s => s.key === 'BIGI_API_PIN')?.value;
-        const bilalToken = secretsData?.find(s => s.key === 'BILALSADASUB_TOKEN' || s.key === 'BILALSADASUB_API_TOKEN' || s.key === 'BILAL_TOKEN' || s.key === 'BILAL_API_TOKEN')?.value;
+        const ckUserId = secretsMap['CLUBKONNECT_USER_ID'] || secretsMap['CLUBKONNECT_USER'] || Deno.env.get('CLUBKONNECT_USER_ID') || 'CK101269551';
+        const ckApiKey = secretsMap['CLUBKONNECT_API_KEY'] || secretsMap['CLUBKONNECT_KEY'] || secretsMap['CLUBKONNECT_PASS'] || Deno.env.get('CLUBKONNECT_API_KEY') || '';
+        const bigiToken = secretsMap['BIGI_API_TOKEN'] || secretsMap['BIGI_TOKEN'] || Deno.env.get('BIGI_API_TOKEN') || '';
+        const bigiPin = secretsMap['BIGI_API_PIN'] || secretsMap['BIGI_PIN'] || Deno.env.get('BIGI_API_PIN') || '';
+        const bilalToken = secretsMap['BILALSADASUB_TOKEN'] || secretsMap['BILAL_TOKEN'] || secretsMap['BILALSADASUB_API_KEY'] || secretsMap['BILAL_API_KEY'] || Deno.env.get('BILALSADASUB_TOKEN') || '';
 
         // Fetch VTU vendor from app_settings
         const { data: settingsData } = await rpcClient
@@ -327,7 +352,11 @@ Deno.serve(async (req: Request) => {
                             continue;
                         }
 
-                        if (result && (result.status === 'ORDER_RECEIVED' || result.status === 'ORDER_COMPLETED' || result.status === 'SUCCESS')) {
+                        const statusStr = String(result?.status || result?.msg || '').toUpperCase();
+                        const isSuccessStatus = statusStr.includes('RECEIVED') || statusStr.includes('COMPLETED') || statusStr.includes('SUCCESS') || statusStr === '00' || statusStr === '0' || statusStr === '200';
+                        const hasOrderId = result && (Boolean(result.orderid) || Boolean(result.order_id) || Boolean(result.reference) || Boolean(result.requestId));
+
+                        if (result && (isSuccessStatus || hasOrderId)) {
                             console.log(`[Bills] VTU Transaction Succeeded via: ${vendor}`);
                             break;
                         }
