@@ -17,35 +17,39 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
-// Executive Royal Navy & Gold Theme Palette
+// Executive Light Theme Palette (Clean White, Gold & Royal Navy)
 const L = {
-    bg: '#020617',
-    card: '#0F172A',
-    cardBorder: 'rgba(245, 158, 11, 0.35)',
-    navyHeader: '#0B132B',
+    bg: '#F4F6FB',
+    card: '#FFFFFF',
+    cardBorder: 'rgba(245, 158, 11, 0.4)',
+    navyHeader: '#0F172A',
+    navyMid: '#1E293B',
     gold: '#F59E0B',
     goldDk: '#D97706',
-    goldBg: 'rgba(245, 158, 11, 0.12)',
-    textPrimary: '#F8FAFC',
-    textSecondary: '#CBD5E1',
+    goldBg: '#FEF3C7',
+    goldBorder: '#FDE047',
+    textPrimary: '#0F172A',
+    textSecondary: '#334155',
     textMuted: '#64748B',
-    inputBg: '#0F172A',
-    inputBorder: '#1E293B',
+    inputBg: '#F8FAFC',
+    inputBorder: '#E2E8F0',
     emerald: '#10B981',
-    emeraldBg: 'rgba(16, 185, 129, 0.15)',
-    emeraldBorder: '#059669',
+    emeraldBg: '#D1FAE5',
+    emeraldBorder: '#A7F3D0',
     blue: '#3B82F6',
-    blueBg: 'rgba(59, 130, 246, 0.15)',
+    blueBg: '#DBEAFE',
     rose: '#EF4444',
-    roseBg: 'rgba(239, 68, 68, 0.15)'
+    roseBg: '#FEE2E2'
 };
 
 const VENDORS = [
-    { id: 'all', name: 'All Vendors', color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' },
-    { id: 'clubkonnect', name: 'ClubKonnect', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)' },
-    { id: 'bigi', name: 'Bigi VTU', color: '#818CF8', bg: 'rgba(129, 140, 248, 0.15)' },
-    { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+    { id: 'all', name: 'All Vendors', color: '#64748B', bg: '#F1F5F9' },
+    { id: 'clubkonnect', name: 'ClubKonnect', color: '#2563EB', bg: '#DBEAFE' },
+    { id: 'bigi', name: 'Bigi VTU', color: '#4F46E5', bg: '#E0E7FF' },
+    { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#D1FAE5' },
 ];
+
+const PLAN_TYPES = ['SME', 'CG', 'Gifting', 'Direct', 'Special'];
 
 export default function ManageDataPlans() {
     const insets = useSafeAreaInsets();
@@ -56,8 +60,12 @@ export default function ManageDataPlans() {
     const [syncing, setSyncing] = useState(false);
     const [selectedNetwork, setSelectedNetwork] = useState('mtn');
     const [selectedVendorFilter, setSelectedVendorFilter] = useState('all');
+    const [selectedPlanTypeFilter, setSelectedPlanTypeFilter] = useState('all');
+    
+    // Edit Modal States
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
+    const [selectedPlanType, setSelectedPlanType] = useState('SME');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
 
     // Alert Modal State
@@ -92,7 +100,7 @@ export default function ManageDataPlans() {
 
     useEffect(() => {
         fetchPlans();
-    }, [selectedNetwork, selectedVendorFilter]);
+    }, [selectedNetwork, selectedVendorFilter, selectedPlanTypeFilter]);
 
     const fetchConfigs = async () => {
         try {
@@ -124,12 +132,24 @@ export default function ManageDataPlans() {
 
             let resultPlans = data || [];
 
+            // Vendor Filter
             if (selectedVendorFilter === 'bilalsadasub') {
                 resultPlans = resultPlans.filter(p => p.api_vendor === 'bilalsadasub' || p.name?.toLowerCase().includes('bilal'));
             } else if (selectedVendorFilter === 'bigi') {
                 resultPlans = resultPlans.filter(p => p.api_vendor === 'bigi' || p.name?.toLowerCase().includes('bigi'));
             } else if (selectedVendorFilter === 'clubkonnect') {
                 resultPlans = resultPlans.filter(p => !p.api_vendor || p.api_vendor === 'clubkonnect' || p.name?.toLowerCase().includes('club'));
+            }
+
+            // Plan Type Filter
+            if (selectedPlanTypeFilter !== 'all') {
+                resultPlans = resultPlans.filter(p => {
+                    const pt = (p.plan_type || p.name || '').toUpperCase();
+                    const filter = selectedPlanTypeFilter.toUpperCase();
+                    if (filter === 'CG') return pt.includes('CG') || pt.includes('CORPORATE');
+                    if (filter === 'GIFTING') return pt.includes('GIFT') || pt.includes('DIRECT');
+                    return pt.includes(filter);
+                });
             }
 
             setPlans(resultPlans);
@@ -143,7 +163,7 @@ export default function ManageDataPlans() {
     const handleSync = async (vendorId: string) => {
         setSyncing(true);
         try {
-            const { data, error } = await supabase.functions.invoke('sync-plans', {
+            const { error } = await supabase.functions.invoke('sync-plans', {
                 body: { vendor: vendorId }
             });
 
@@ -185,14 +205,17 @@ export default function ManageDataPlans() {
         try {
             const { error } = await supabase
                 .from('data_plans')
-                .update({ selling_price: priceNum })
+                .update({ 
+                    selling_price: priceNum,
+                    plan_type: selectedPlanType 
+                })
                 .eq('id', editingPlan.id);
 
             if (error) throw error;
 
             setEditingPlan(null);
             setNewPrice('');
-            showAlert('Price Updated 🎉', `Selling price for "${editingPlan.name}" is set to ₦${priceNum}.`);
+            showAlert('Plan Updated 🎉', `Selling price set to ₦${priceNum} & Plan Type set to ${selectedPlanType}.`);
             fetchPlans();
         } catch (e: any) {
             showAlert('Error', e.message, 'error');
@@ -292,17 +315,17 @@ export default function ManageDataPlans() {
         <View style={{ flex: 1, backgroundColor: L.bg }}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Header */}
+            {/* Light Executive Header Bar */}
             <LinearGradient
-                colors={['#020617', '#0F172A', '#1E293B']}
+                colors={['#0F172A', '#1E293B', '#334155']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{ 
                     paddingTop: insets.top + 8, 
                     paddingBottom: 14, 
                     paddingHorizontal: 16, 
-                    borderBottomWidth: 1.5, 
-                    borderColor: L.goldDk,
+                    borderBottomWidth: 2, 
+                    borderColor: L.gold,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between'
@@ -311,35 +334,35 @@ export default function ManageDataPlans() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <TouchableOpacity 
                         onPress={() => router.back()} 
-                        style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: L.gold, alignItems: 'center', justifyContent: 'center' }}
                     >
                         <Ionicons name="arrow-back" size={18} color={L.gold} />
                     </TouchableOpacity>
                     <View>
                         <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: 0.8 }}>
-                            DATA PRICING & API CONTROL
+                            DATA PRICING & PLAN TYPES
                         </Text>
-                        <Text style={{ color: L.textMuted, fontSize: 9.5 }}>Multi-Vendor Tariff & Profit Margin Engine</Text>
+                        <Text style={{ color: '#94A3B8', fontSize: 9.5 }}>Configure Prices & Plan Types (SME, CG, Gifting, Direct)</Text>
                     </View>
                 </View>
 
                 <TouchableOpacity 
                     onPress={() => handleSync('all')} 
                     disabled={syncing}
-                    style={{ backgroundColor: L.goldBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: L.gold, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    style={{ backgroundColor: L.gold, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                 >
-                    {syncing ? <ActivityIndicator size="small" color={L.gold} /> : <Ionicons name="cloud-download-outline" size={14} color={L.gold} />}
-                    <Text style={{ color: L.gold, fontSize: 10.5, fontWeight: '900' }}>Sync All</Text>
+                    {syncing ? <ActivityIndicator size="small" color="#0F172A" /> : <Ionicons name="cloud-download" size={14} color="#0F172A" />}
+                    <Text style={{ color: '#0F172A', fontSize: 10.5, fontWeight: '900' }}>Sync All</Text>
                 </TouchableOpacity>
             </LinearGradient>
 
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
                 
                 {/* Active Vendor Card */}
-                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.cardBorder, padding: 12, margin: 12 }}>
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, margin: 12, elevation: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="server" size={16} color={L.gold} />
+                            <Ionicons name="server" size={16} color={L.navyHeader} />
                             <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '900' }}>API Provider System Filter</Text>
                         </View>
                         <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: L.emeraldBorder }}>
@@ -361,9 +384,9 @@ export default function ManageDataPlans() {
                                         if (vendor.id !== 'all') handleSetActivePrimaryVendor(vendor.id);
                                     }}
                                     style={{ 
-                                        backgroundColor: isSelected ? L.goldBg : L.bg, 
+                                        backgroundColor: isSelected ? L.navyHeader : vendor.bg, 
                                         borderWidth: 1, 
-                                        borderColor: isPrimary ? L.emerald : isSelected ? L.gold : L.inputBorder,
+                                        borderColor: isPrimary ? L.emerald : isSelected ? L.navyHeader : L.inputBorder,
                                         borderRadius: 10, 
                                         paddingHorizontal: 12, 
                                         paddingVertical: 8, 
@@ -374,7 +397,7 @@ export default function ManageDataPlans() {
                                     }}
                                 >
                                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPrimary ? L.emerald : vendor.color }} />
-                                    <Text style={{ color: isSelected ? L.gold : L.textSecondary, fontSize: 11, fontWeight: '800' }}>
+                                    <Text style={{ color: isSelected ? '#FFFFFF' : L.textPrimary, fontSize: 11, fontWeight: '800' }}>
                                         {vendor.name}
                                     </Text>
                                     {isPrimary && vendor.id !== 'all' && (
@@ -386,21 +409,52 @@ export default function ManageDataPlans() {
                     </ScrollView>
                 </View>
 
+                {/* Plan Type Selector Filter Row */}
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, marginHorizontal: 12, marginBottom: 12, elevation: 1 }}>
+                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>
+                        Filter by Plan Type Category:
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {['all', ...PLAN_TYPES].map(type => {
+                            const isSelected = selectedPlanTypeFilter === type;
+                            return (
+                                <TouchableOpacity
+                                    key={type}
+                                    onPress={() => setSelectedPlanTypeFilter(type)}
+                                    style={{
+                                        backgroundColor: isSelected ? L.gold : L.bg,
+                                        borderWidth: 1,
+                                        borderColor: isSelected ? L.goldDk : L.inputBorder,
+                                        borderRadius: 10,
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 6
+                                    }}
+                                >
+                                    <Text style={{ color: isSelected ? '#0F172A' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
+                                        {type === 'all' ? 'All Types' : type}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
+
                 {/* Network Markup Configurations Card */}
-                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, marginHorizontal: 12, marginBottom: 12 }}>
+                <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, marginHorizontal: 12, marginBottom: 12, elevation: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Ionicons name="trending-up" size={16} color={L.gold} />
+                            <Ionicons name="trending-up" size={16} color={L.goldDk} />
                             <Text style={{ color: L.textPrimary, fontSize: 12, fontWeight: '900' }}>Markup Configs</Text>
                         </View>
                         
                         <TouchableOpacity 
                             onPress={handleApplyMarkups}
                             disabled={applyingMarkups}
-                            style={{ backgroundColor: L.gold, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                            style={{ backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         >
-                            {applyingMarkups ? <ActivityIndicator size="small" color="#020617" /> : <Ionicons name="flash" size={12} color="#020617" />}
-                            <Text style={{ color: '#020617', fontSize: 10, fontWeight: '900' }}>
+                            {applyingMarkups ? <ActivityIndicator size="small" color={L.gold} /> : <Ionicons name="flash" size={12} color={L.gold} />}
+                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900' }}>
                                 Apply Markup ({selectedNetwork.toUpperCase()})
                             </Text>
                         </TouchableOpacity>
@@ -420,7 +474,7 @@ export default function ManageDataPlans() {
                                     style={{ flex: 1, backgroundColor: L.bg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, padding: 8, alignItems: 'center' }}
                                 >
                                     <Text style={{ color: L.textMuted, fontSize: 9.5, fontWeight: '900', textTransform: 'uppercase' }}>{net}</Text>
-                                    <Text style={{ color: L.gold, fontSize: 11, fontWeight: '900', marginTop: 2 }}>
+                                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', marginTop: 2 }}>
                                         {conf.markup_type === 'percentage' ? `${conf.markup_value}%` : `₦${conf.markup_value}`}
                                     </Text>
                                     <Text style={{ color: L.blue, fontSize: 8.5, fontWeight: '700', marginTop: 2 }}>Edit ✏️</Text>
@@ -440,15 +494,16 @@ export default function ManageDataPlans() {
                                 onPress={() => setSelectedNetwork(net)}
                                 style={{ 
                                     flex: 1, 
-                                    backgroundColor: isSelected ? L.gold : L.card, 
+                                    backgroundColor: isSelected ? L.navyHeader : L.card, 
                                     borderRadius: 10, 
                                     paddingVertical: 8, 
                                     alignItems: 'center',
                                     borderWidth: 1,
-                                    borderColor: isSelected ? L.gold : L.inputBorder
+                                    borderColor: isSelected ? L.navyHeader : L.inputBorder,
+                                    elevation: isSelected ? 2 : 0
                                 }}
                             >
-                                <Text style={{ color: isSelected ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
+                                <Text style={{ color: isSelected ? '#FFFFFF' : L.textSecondary, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
                                     {net}
                                 </Text>
                             </TouchableOpacity>
@@ -459,7 +514,7 @@ export default function ManageDataPlans() {
                 {/* Data Plans List */}
                 {loading ? (
                     <View style={{ padding: 40, alignItems: 'center' }}>
-                        <ActivityIndicator size="large" color={L.gold} />
+                        <ActivityIndicator size="large" color={L.navyHeader} />
                         <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 8 }}>Loading {selectedNetwork.toUpperCase()} data tariffs...</Text>
                     </View>
                 ) : (
@@ -468,6 +523,7 @@ export default function ManageDataPlans() {
                             const cost = parseFloat(plan.cost_price || '0');
                             const selling = parseFloat(plan.selling_price || '0');
                             const profit = selling - cost;
+                            const currentPlanType = plan.plan_type || (plan.name?.toLowerCase().includes('corporate') || plan.name?.toLowerCase().includes('cg') ? 'CG' : plan.name?.toLowerCase().includes('gifting') ? 'Gifting' : 'SME');
 
                             return (
                                 <View 
@@ -480,7 +536,8 @@ export default function ManageDataPlans() {
                                         padding: 12,
                                         flexDirection: 'row',
                                         alignItems: 'center',
-                                        justifyContent: 'space-between'
+                                        justifyContent: 'space-between',
+                                        elevation: 1
                                     }}
                                 >
                                     <View style={{ flex: 1, paddingRight: 8 }}>
@@ -488,9 +545,9 @@ export default function ManageDataPlans() {
                                             <Text style={{ color: L.textPrimary, fontSize: 12.5, fontWeight: '900' }}>
                                                 {plan.name}
                                             </Text>
-                                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 }}>
-                                                <Text style={{ color: L.gold, fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' }}>
-                                                    {plan.size || plan.network}
+                                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1, borderColor: L.goldBorder }}>
+                                                <Text style={{ color: L.goldDk, fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' }}>
+                                                    🏷️ {currentPlanType}
                                                 </Text>
                                             </View>
                                         </View>
@@ -515,15 +572,16 @@ export default function ManageDataPlans() {
                                             onPress={() => {
                                                 setEditingPlan(plan);
                                                 setNewPrice(plan.selling_price?.toString() || '');
+                                                setSelectedPlanType(currentPlanType);
                                             }}
-                                            style={{ backgroundColor: L.goldBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: L.gold }}
+                                            style={{ backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
                                         >
-                                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900' }}>Edit ✏️</Text>
+                                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900' }}>Edit Price/Type ✏️</Text>
                                         </TouchableOpacity>
 
                                         <Switch
-                                            trackColor={{ false: '#334155', true: '#059669' }}
-                                            thumbColor={plan.is_active ? L.emerald : L.textMuted}
+                                            trackColor={{ false: '#CBD5E1', true: '#059669' }}
+                                            thumbColor={plan.is_active ? L.emerald : '#FFFFFF'}
                                             onValueChange={() => toggleActive(plan)}
                                             value={plan.is_active}
                                             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -537,7 +595,7 @@ export default function ManageDataPlans() {
                             <View style={{ backgroundColor: L.card, borderRadius: 14, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}>
                                 <Ionicons name="wifi" size={28} color={L.textMuted} />
                                 <Text style={{ color: L.textMuted, fontSize: 11, marginTop: 8 }}>
-                                    No data plans found for {selectedNetwork.toUpperCase()}. Click "Sync All" above.
+                                    No data plans found for {selectedNetwork.toUpperCase()} ({selectedPlanTypeFilter}). Click "Sync All" above.
                                 </Text>
                             </View>
                         )}
@@ -546,27 +604,56 @@ export default function ManageDataPlans() {
 
             </ScrollView>
 
-            {/* EDIT SELLING PRICE MODAL */}
+            {/* EDIT SELLING PRICE & PLAN TYPE MODAL */}
             {editingPlan && (
                 <Modal visible={true} transparent={true} animationType="fade">
-                    <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-                        <View style={{ width: '100%', maxWidth: 420, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.gold, padding: 18 }}>
-                            <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>Edit Selling Price</Text>
-                            <Text style={{ color: L.textMuted, fontSize: 10, marginBottom: 12 }}>{editingPlan.name}</Text>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                        <View style={{ width: '100%', maxWidth: 440, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.navyHeader, padding: 20 }}>
+                            <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>Edit Price & Plan Type</Text>
+                            <Text style={{ color: L.textMuted, fontSize: 10.5, marginBottom: 12 }}>{editingPlan.name}</Text>
                             
                             <View style={{ backgroundColor: L.bg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                 <Text style={{ color: L.textMuted, fontSize: 10, fontWeight: '700' }}>API COST PRICE</Text>
-                                <Text style={{ color: L.gold, fontSize: 12, fontWeight: '900' }}>₦{editingPlan.cost_price}</Text>
+                                <Text style={{ color: L.navyHeader, fontSize: 13, fontWeight: '900' }}>₦{editingPlan.cost_price}</Text>
                             </View>
 
-                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                            {/* Plan Type Selector */}
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Select Plan Type Category
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                                {PLAN_TYPES.map(type => {
+                                    const isSelected = selectedPlanType === type;
+                                    return (
+                                        <TouchableOpacity
+                                            key={type}
+                                            onPress={() => setSelectedPlanType(type)}
+                                            style={{
+                                                backgroundColor: isSelected ? L.navyHeader : L.bg,
+                                                borderRadius: 8,
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 6,
+                                                borderWidth: 1,
+                                                borderColor: isSelected ? L.navyHeader : L.inputBorder
+                                            }}
+                                        >
+                                            <Text style={{ color: isSelected ? L.gold : L.textSecondary, fontSize: 10.5, fontWeight: '900' }}>
+                                                {type}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {/* New Selling Price Input */}
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
                                 New Selling Price (₦)
                             </Text>
                             <TextInput 
                                 style={{ 
                                     backgroundColor: L.bg, 
                                     borderWidth: 1.5, 
-                                    borderColor: L.gold, 
+                                    borderColor: L.navyHeader, 
                                     borderRadius: 12, 
                                     padding: 12, 
                                     color: L.textPrimary, 
@@ -588,10 +675,10 @@ export default function ManageDataPlans() {
                                     <Text style={{ color: L.textMuted, fontWeight: '800', fontSize: 11 }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
-                                    style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
+                                    style={{ flex: 1.5, backgroundColor: L.navyHeader, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
                                     onPress={handleUpdatePrice}
                                 >
-                                    <Text style={{ color: '#020617', fontWeight: '900', fontSize: 11 }}>Save Price 💾</Text>
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11 }}>Save Changes 💾</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -602,8 +689,8 @@ export default function ManageDataPlans() {
             {/* EDIT MARKUP CONFIG MODAL */}
             {editingConfig && (
                 <Modal visible={true} transparent={true} animationType="fade">
-                    <View style={{ flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-                        <View style={{ width: '100%', maxWidth: 420, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.gold, padding: 18 }}>
+                    <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                        <View style={{ width: '100%', maxWidth: 420, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.navyHeader, padding: 18 }}>
                             <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>
                                 Markup Config ({editingConfig.network.toUpperCase()})
                             </Text>
@@ -611,7 +698,7 @@ export default function ManageDataPlans() {
                                 Set default profit markup for all {editingConfig.network.toUpperCase()} plans.
                             </Text>
                             
-                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
                                 Markup Type
                             </Text>
                             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -619,15 +706,15 @@ export default function ManageDataPlans() {
                                     onPress={() => setNewMarkupType('fixed')}
                                     style={{
                                         flex: 1,
-                                        backgroundColor: newMarkupType === 'fixed' ? L.gold : L.bg,
+                                        backgroundColor: newMarkupType === 'fixed' ? L.navyHeader : L.bg,
                                         borderRadius: 10,
                                         paddingVertical: 8,
                                         alignItems: 'center',
                                         borderWidth: 1,
-                                        borderColor: newMarkupType === 'fixed' ? L.gold : L.inputBorder
+                                        borderColor: newMarkupType === 'fixed' ? L.navyHeader : L.inputBorder
                                     }}
                                 >
-                                    <Text style={{ color: newMarkupType === 'fixed' ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
+                                    <Text style={{ color: newMarkupType === 'fixed' ? '#FFFFFF' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
                                         Fixed (₦)
                                     </Text>
                                 </TouchableOpacity>
@@ -635,28 +722,28 @@ export default function ManageDataPlans() {
                                     onPress={() => setNewMarkupType('percentage')}
                                     style={{
                                         flex: 1,
-                                        backgroundColor: newMarkupType === 'percentage' ? L.gold : L.bg,
+                                        backgroundColor: newMarkupType === 'percentage' ? L.navyHeader : L.bg,
                                         borderRadius: 10,
                                         paddingVertical: 8,
                                         alignItems: 'center',
                                         borderWidth: 1,
-                                        borderColor: newMarkupType === 'percentage' ? L.gold : L.inputBorder
+                                        borderColor: newMarkupType === 'percentage' ? L.navyHeader : L.inputBorder
                                     }}
                                 >
-                                    <Text style={{ color: newMarkupType === 'percentage' ? '#020617' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
+                                    <Text style={{ color: newMarkupType === 'percentage' ? '#FFFFFF' : L.textSecondary, fontSize: 11, fontWeight: '900' }}>
                                         Percentage (%)
                                     </Text>
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={{ color: L.gold, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
                                 {newMarkupType === 'percentage' ? 'Markup Percentage (%)' : 'Markup Amount (₦)'}
                             </Text>
                             <TextInput 
                                 style={{ 
                                     backgroundColor: L.bg, 
                                     borderWidth: 1.5, 
-                                    borderColor: L.gold, 
+                                    borderColor: L.navyHeader, 
                                     borderRadius: 12, 
                                     padding: 12, 
                                     color: L.textPrimary, 
@@ -678,10 +765,10 @@ export default function ManageDataPlans() {
                                     <Text style={{ color: L.textMuted, fontWeight: '800', fontSize: 11 }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
-                                    style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
+                                    style={{ flex: 1.5, backgroundColor: L.navyHeader, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
                                     onPress={handleUpdateConfig}
                                 >
-                                    <Text style={{ color: '#020617', fontWeight: '900', fontSize: 11 }}>Save Config 💾</Text>
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 11 }}>Save Config 💾</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

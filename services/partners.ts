@@ -22,6 +22,7 @@ export interface DataPlan {
     originalName?: string; // For filtering when name is cleaned
     volume?: string;
     network?: string;
+    plan_type?: string;
 }
 
 export interface DataProvider {

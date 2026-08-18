@@ -393,13 +393,18 @@ export default function DataScreen() {
         
         // Plan Type Filter (Dynamic)
         if (planTypeFilter !== 'All') {
+            const planTypeDB = String(p.plan_type || '').toUpperCase();
             const nameUpper = (p.originalName || p.name).toUpperCase();
             const filterUpper = planTypeFilter.toUpperCase();
-            if (filterUpper === 'CG' && !nameUpper.includes('CG') && !nameUpper.includes('CORPORATE')) {
-                return false;
-            } else if (filterUpper === 'DIRECT' && !nameUpper.includes('DIRECT') && !nameUpper.includes('GIFTING')) {
-                return false;
-            } else if (filterUpper !== 'CG' && filterUpper !== 'DIRECT' && !nameUpper.includes(filterUpper)) {
+
+            // 1. Direct DB plan_type match first
+            if (planTypeDB && (planTypeDB === filterUpper || planTypeDB.includes(filterUpper))) {
+                // Matched directly via DB plan_type
+            } else if (filterUpper === 'CG' && (nameUpper.includes('CG') || nameUpper.includes('CORPORATE') || planTypeDB.includes('CORPORATE'))) {
+                // Matched CG / Corporate
+            } else if ((filterUpper === 'DIRECT' || filterUpper === 'GIFTING') && (nameUpper.includes('DIRECT') || nameUpper.includes('GIFTING') || planTypeDB.includes('GIFT'))) {
+                // Matched Direct / Gifting
+            } else if (!nameUpper.includes(filterUpper) && !planTypeDB.includes(filterUpper)) {
                 return false;
             }
         }
