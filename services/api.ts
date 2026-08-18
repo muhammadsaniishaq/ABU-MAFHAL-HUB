@@ -111,12 +111,11 @@ export const api = {
     data: {
         getPlans: async (network: string) => {
             try {
-                // Normalize network (mtn, glo, airtel, 9mobile, vitel)
+                // Normalize network (mtn, glo, airtel, 9mobile)
                 let netLower = (network || 'mtn').toLowerCase();
                 if (netLower.includes('mtn')) netLower = 'mtn';
                 else if (netLower.includes('glo')) netLower = 'glo';
                 else if (netLower.includes('airtel')) netLower = 'airtel';
-                else if (netLower.includes('vitel') || netLower.includes('vital')) netLower = 'vitel';
                 else if (netLower.includes('mobile') || netLower.includes('etisalat')) netLower = '9mobile';
 
                 // Check active VTU vendor from app_settings
@@ -128,40 +127,21 @@ export const api = {
                         .eq('key', 'vtu_vendor')
                         .maybeSingle();
                     if (vendorSetting?.value) {
-                        activeVendor = vendorSetting.value.toLowerCase();
+                        const v = typeof vendorSetting.value === 'object' ? vendorSetting.value.vendor || vendorSetting.value : vendorSetting.value;
+                        activeVendor = String(v).toLowerCase();
                     }
                 } catch (_) {}
 
-                let query = supabase
+                const { data: plans, error } = await supabase
                     .from('data_plans')
                     .select('*')
                     .or('is_active.eq.true,is_active.is.null')
+                    .eq('network', netLower)
                     .order('cost_price', { ascending: true });
 
-                if (netLower === 'vitel' || netLower === 'vital') {
-                    query = query.or('network.eq.vitel,network.eq.vital');
-                } else {
-                    query = query.eq('network', netLower);
-                }
-
-                const { data: plans, error } = await query;
                 if (error) throw new Error(error.message);
 
                 let resultPlans = plans || [];
-
-                // Filter by active vendor if matching plans exist, otherwise retain all active plans
-                if (resultPlans.length > 0) {
-                    if (activeVendor === 'bilalsadasub') {
-                        const bilalPlans = resultPlans.filter(p => p.name?.includes('[BILAL]') || p.api_vendor === 'bilalsadasub');
-                        if (bilalPlans.length > 0) resultPlans = bilalPlans;
-                    } else if (activeVendor === 'bigi') {
-                        const bigiPlans = resultPlans.filter(p => p.name?.includes('[BIGI]') || p.api_vendor === 'bigi');
-                        if (bigiPlans.length > 0) resultPlans = bigiPlans;
-                    } else if (activeVendor === 'clubkonnect') {
-                        const ckPlans = resultPlans.filter(p => p.api_vendor === 'clubkonnect' || (!p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]')));
-                        if (ckPlans.length > 0) resultPlans = ckPlans;
-                    }
-                }
 
                 return resultPlans.map(p => ({
                     id: p.plan_id,

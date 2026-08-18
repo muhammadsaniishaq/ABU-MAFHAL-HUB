@@ -96,7 +96,7 @@ export default function ManageDataPlans() {
     const [newMarkupType, setNewMarkupType] = useState<'fixed' | 'percentage'>('fixed');
     const [applyingMarkups, setApplyingMarkups] = useState(false);
 
-    const networks = ['mtn', 'glo', 'airtel', '9mobile', 'vitel'];
+    const networks = ['mtn', 'glo', 'airtel', '9mobile'];
 
     useEffect(() => {
         fetchConfigsAndPlanTypes();
