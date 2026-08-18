@@ -156,7 +156,6 @@ const NETWORK_LOGOS: Record<string, any> = {
     glo: require('../../assets/images/glo.png'),
     airtel: require('../../assets/images/airtel.png'),
     '9mobile': require('../../assets/images/9mobile.png'),
-    vitel: require('../../assets/images/vitel.png'),
 };
 
 const NETWORKS_DATA = [
@@ -164,7 +163,6 @@ const NETWORKS_DATA = [
     { id: 'glo', name: 'Glo', color: '#0F6A37', status: '4G LTE', prefixes: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'] },
     { id: 'airtel', name: 'Airtel', color: '#FF0000', status: '5G Ready', prefixes: ['0802', '0808', '0708', '0812', '0701', '0902', '0904', '0907', '0901', '0912'] },
     { id: '9mobile', name: '9mobile', color: '#006B3E', status: '4G Active', prefixes: ['0809', '0818', '0817', '0909', '0908'] },
-    { id: 'vitel', name: 'VITEL', color: '#6366F1', status: '4G Active', prefixes: ['070', '091'] },
 ];
 
 const getNetworkStyles = (netId: string, isSelected: boolean) => {
@@ -180,8 +178,6 @@ const getNetworkStyles = (netId: string, isSelected: boolean) => {
             return { bg: '#f0fdf4', border: '#16a34a', text: '#166534' };
         case '9mobile':
             return { bg: '#ecfdf5', border: '#059669', text: '#065f46' };
-        case 'vitel':
-            return { bg: '#eef2ff', border: '#6366f1', text: '#3730a3' };
         default:
             return { bg: '#f1f5f9', border: '#475569', text: '#1e293b' };
     }
@@ -1891,54 +1887,54 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   planListCard: {
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
-    marginBottom: 6,
-    shadowColor: '#0a1633',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 10,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
     overflow: 'hidden',
   },
   planListCardSelected: {
     borderColor: '#f5a623',
-    borderWidth: 1.5,
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
   planListCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 9,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   planVolumeBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    borderWidth: 1,
+    marginRight: 10,
+    borderWidth: 1.5,
     borderColor: '#e2e8f0',
   },
   planVolumeBadgeSelected: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   planVolumeValue: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#0d1b3e',
-    lineHeight: 14,
+    color: '#0f172a',
+    lineHeight: 16,
   },
   planVolumeUnit: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     fontWeight: '800',
     color: '#64748b',
     textTransform: 'uppercase',
@@ -1946,11 +1942,12 @@ const s = StyleSheet.create({
   planDetailsMid: {
     flex: 1,
     justifyContent: 'center',
+    marginRight: 8,
   },
   planListName: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#0d1b3e',
+    color: '#0f172a',
     flexShrink: 1,
   },
   planListNameSelected: {
@@ -1961,7 +1958,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   planListValidity: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: '#64748b',
   },
@@ -1969,25 +1966,25 @@ const s = StyleSheet.create({
     color: '#fde047',
   },
   tinyBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-    marginLeft: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   tinyBadgeText: {
     color: '#ffffff',
-    fontSize: 6.5,
+    fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.4,
   },
   planRightSide: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+    minWidth: 70,
   },
   planListPrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
-    color: '#0d1b3e',
+    color: '#0f172a',
     marginBottom: 2,
   },
   planListPriceSelected: {

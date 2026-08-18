@@ -111,13 +111,12 @@ export const api = {
     data: {
         getPlans: async (network: string) => {
             try {
-                // Normalize network (mtn, glo, airtel, 9mobile, vitel)
+                // Normalize network (mtn, glo, airtel, 9mobile)
                 let netLower = (network || 'mtn').toLowerCase();
                 if (netLower.includes('mtn')) netLower = 'mtn';
                 else if (netLower.includes('glo')) netLower = 'glo';
                 else if (netLower.includes('airtel')) netLower = 'airtel';
                 else if (netLower.includes('mobile') || netLower.includes('etisalat')) netLower = '9mobile';
-                else if (netLower.includes('vitel') || netLower.includes('vital')) netLower = 'vitel';
 
                 // Check active VTU vendor from app_settings
                 let activeVendor = 'bilalsadasub';
@@ -136,13 +135,8 @@ export const api = {
                     .from('data_plans')
                     .select('*')
                     .or('is_active.eq.true,is_active.is.null')
+                    .eq('network', netLower)
                     .order('cost_price', { ascending: true });
-
-                if (netLower === 'vitel' || netLower === 'vital') {
-                    query = query.or('network.eq.vitel,network.eq.vital');
-                } else {
-                    query = query.eq('network', netLower);
-                }
 
                 const { data: plans, error } = await query;
                 if (error) throw new Error(error.message);
