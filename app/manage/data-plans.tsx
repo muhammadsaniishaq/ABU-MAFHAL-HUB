@@ -609,7 +609,22 @@ export default function ManageDataPlans() {
                             const cost = parseFloat(plan.cost_price || '0');
                             const selling = parseFloat(plan.selling_price || '0');
                             const profit = selling - cost;
-                            const currentPlanType = plan.plan_type || (plan.name?.toLowerCase().includes('corporate') || plan.name?.toLowerCase().includes('cg') ? 'CG' : plan.name?.toLowerCase().includes('gifting') ? 'Gifting' : 'SME');
+                            
+                            const detectPlanType = (p: any): string => {
+                                if (p.plan_type && p.plan_type.trim() !== '') return p.plan_type.trim().toUpperCase();
+                                const n = (p.name || '').toLowerCase();
+                                if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';
+                                if (n.includes('gifting') || n.includes('gift')) return 'GIFTING';
+                                if (n.includes('promo')) return 'PROMO';
+                                if (n.includes('mega')) return 'MEGA';
+                                if (n.includes('night')) return 'NIGHT';
+                                if (n.includes('direct')) return 'DIRECT';
+                                if (n.includes('coupon')) return 'COUPON';
+                                if (n.includes('sme') || n.includes('s-m-e')) return 'SME';
+                                return 'DIRECT';
+                            };
+
+                            const currentPlanType = detectPlanType(plan);
                             const vendorName = plan.api_vendor ? plan.api_vendor.toUpperCase() : (plan.name?.toLowerCase().includes('bilal') ? 'BILALSADASUB' : plan.name?.toLowerCase().includes('bigi') ? 'BIGI' : 'CLUBKONNECT');
 
                             return (

@@ -251,10 +251,24 @@ Deno.serve(async (req) => {
                         const existingPlan = existingPlans?.[0];
                         let opError = null;
 
+                        const detectPlanType = (planName: string): string => {
+                            const n = (planName || '').toLowerCase();
+                            if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';
+                            if (n.includes('gifting') || n.includes('gift')) return 'GIFTING';
+                            if (n.includes('promo')) return 'PROMO';
+                            if (n.includes('mega')) return 'MEGA';
+                            if (n.includes('night')) return 'NIGHT';
+                            if (n.includes('direct')) return 'DIRECT';
+                            if (n.includes('coupon')) return 'COUPON';
+                            if (n.includes('sme') || n.includes('s-m-e')) return 'SME';
+                            return 'DIRECT';
+                        };
+
                         const recordData: any = {
                             network: networkName,
                             plan_id: planId,
                             name: name,
+                            plan_type: detectPlanType(name),
                             cost_price: costPrice,
                             selling_price: finalSellingPrice,
                             is_active: true,
