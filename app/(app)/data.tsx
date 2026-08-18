@@ -1460,30 +1460,44 @@ export default function DataScreen() {
     );
 
     function PlanTypeModal() {
-        // Dynamically get available types from current plans
+        // Dynamically get available types from current loaded plans & DB plan_type
         const availableTypes = new Set<string>();
         plans.forEach(p => {
+             const dbType = p.plan_type ? String(p.plan_type).trim().toUpperCase() : '';
+             if (dbType) {
+                 availableTypes.add(dbType);
+             }
              const n = (p.originalName || p.name).toUpperCase();
              if (n.includes('SME')) availableTypes.add('SME');
              else if (n.includes('CG') || n.includes('CORPORATE')) availableTypes.add('CG');
-             else if (n.includes('DIRECT') || n.includes('GIFTING')) availableTypes.add('Direct');
-             else if (n.includes('AWOOF')) availableTypes.add('Awoof');
-             else if (n.includes('MEGA')) availableTypes.add('Mega');
-             else availableTypes.add('Standard');
+             else if (n.includes('DIRECT') || n.includes('GIFTING')) availableTypes.add('DIRECT');
+             else if (n.includes('AWOOF')) availableTypes.add('AWOOF');
+             else if (n.includes('MEGA')) availableTypes.add('MEGA');
         });
+
+        if (availableTypes.size === 0) {
+            availableTypes.add('SME');
+            availableTypes.add('CG');
+            availableTypes.add('GIFTING');
+        }
 
         const typeMap: Record<string, { name: string; desc: string }> = {
              'SME': { name: 'SME Data', desc: 'Small and Medium Enterprise plans' },
              'CG': { name: 'Corporate Gifting (CG)', desc: 'Corporate Gifting data plans' },
-             'Direct': { name: 'Direct Data', desc: 'Direct network gifting plans' },
-             'Awoof': { name: 'Awoof Data', desc: 'Special promo Awoof plans' },
-             'Mega': { name: 'Mega Plans', desc: 'Large volume data plans' },
-             'Standard': { name: 'Standard Data', desc: 'Regular network data plans' },
+             'DIRECT': { name: 'Direct Data', desc: 'Direct network gifting plans' },
+             'GIFTING': { name: 'Gifting Data', desc: 'Direct network gifting plans' },
+             'AWOOF': { name: 'Awoof Data', desc: 'Special promo Awoof plans' },
+             'MEGA': { name: 'Mega Plans', desc: 'Large volume data plans' },
+             'STANDARD': { name: 'Standard Data', desc: 'Regular network data plans' },
         };
 
         const planTypes = [
             { id: 'All', name: 'All Plan Types', desc: 'Show all available data plans' },
-            ...Array.from(availableTypes).map(t => ({ id: t, ...typeMap[t] }))
+            ...Array.from(availableTypes).map(t => ({
+                id: t,
+                name: typeMap[t]?.name || `${t} Data Plans`,
+                desc: typeMap[t]?.desc || `Custom ${t} network data plans`
+            }))
         ];
 
         return (

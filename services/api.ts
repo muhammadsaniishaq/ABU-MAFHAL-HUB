@@ -149,7 +149,7 @@ export const api = {
 
                 let resultPlans = plans || [];
 
-                // Filter by active vendor (BilalSadaSub, Bigi, ClubKonnect)
+                // Filter by active vendor if matching plans exist, otherwise retain all active plans
                 if (resultPlans.length > 0) {
                     if (activeVendor === 'bilalsadasub') {
                         const bilalPlans = resultPlans.filter(p => p.name?.includes('[BILAL]') || p.api_vendor === 'bilalsadasub');
@@ -158,7 +158,7 @@ export const api = {
                         const bigiPlans = resultPlans.filter(p => p.name?.includes('[BIGI]') || p.api_vendor === 'bigi');
                         if (bigiPlans.length > 0) resultPlans = bigiPlans;
                     } else if (activeVendor === 'clubkonnect') {
-                        const ckPlans = resultPlans.filter(p => !p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]'));
+                        const ckPlans = resultPlans.filter(p => p.api_vendor === 'clubkonnect' || (!p.name?.includes('[BILAL]') && !p.name?.includes('[BIGI]')));
                         if (ckPlans.length > 0) resultPlans = ckPlans;
                     }
                 }
@@ -173,6 +173,7 @@ export const api = {
                     volume: p.volume || '',
                     network: p.network,
                     apiVendor: p.api_vendor || activeVendor,
+                    plan_type: p.plan_type || (p.name?.toLowerCase().includes('corporate') || p.name?.toLowerCase().includes('cg') ? 'CG' : p.name?.toLowerCase().includes('gifting') ? 'Gifting' : 'SME'),
                     icon: ''
                 }));
             } catch (e) {

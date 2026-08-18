@@ -49,8 +49,6 @@ const VENDORS = [
     { id: 'bilalsadasub', name: 'BilalSadaSub', color: '#059669', bg: '#D1FAE5' },
 ];
 
-const PLAN_TYPES = ['SME', 'CG', 'Gifting', 'Direct', 'Special'];
-
 export default function ManageDataPlans() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
@@ -62,10 +60,16 @@ export default function ManageDataPlans() {
     const [selectedVendorFilter, setSelectedVendorFilter] = useState('all');
     const [selectedPlanTypeFilter, setSelectedPlanTypeFilter] = useState('all');
     
+    // Custom Plan Types List
+    const [planTypesList, setPlanTypesList] = useState<string[]>(['SME', 'CG', 'Gifting', 'Direct', 'Special']);
+    const [showAddTypeModal, setShowAddTypeModal] = useState(false);
+    const [newCustomTypeName, setNewCustomTypeName] = useState('');
+
     // Edit Modal States
     const [editingPlan, setEditingPlan] = useState<any | null>(null);
     const [newPrice, setNewPrice] = useState('');
     const [selectedPlanType, setSelectedPlanType] = useState('SME');
+    const [customTypeInput, setCustomTypeInput] = useState('');
     const [activeVendor, setActiveVendor] = useState('clubkonnect');
 
     // Alert Modal State
@@ -95,21 +99,29 @@ export default function ManageDataPlans() {
     const networks = ['mtn', 'glo', 'airtel', '9mobile', 'vitel'];
 
     useEffect(() => {
-        fetchConfigs();
+        fetchConfigsAndPlanTypes();
     }, []);
 
     useEffect(() => {
         fetchPlans();
     }, [selectedNetwork, selectedVendorFilter, selectedPlanTypeFilter]);
 
-    const fetchConfigs = async () => {
+    const fetchConfigsAndPlanTypes = async () => {
         try {
+            // 1. Fetch Active VTU Vendor
             const { data: vendorData } = await supabase.from('app_settings').select('value').eq('key', 'vtu_vendor').single();
             if (vendorData && vendorData.value) {
                 const v = typeof vendorData.value === 'object' ? vendorData.value.vendor || vendorData.value : vendorData.value;
                 setActiveVendor(String(v).toLowerCase());
             }
 
+            // 2. Fetch Custom Plan Types from app_settings
+            const { data: typesData } = await supabase.from('app_settings').select('value').eq('key', 'data_plan_types').maybeSingle();
+            if (typesData && typesData.value && Array.isArray(typesData.value)) {
+                setPlanTypesList(typesData.value);
+            }
+
+            // 3. Fetch Network Markup Configs
             const { data, error } = await supabase
                 .from('data_configs')
                 .select('*')
@@ -132,13 +144,16 @@ export default function ManageDataPlans() {
 
             let resultPlans = data || [];
 
-            // Vendor Filter
+            // Vendor Filter (Soft filter - retain plans if no match)
             if (selectedVendorFilter === 'bilalsadasub') {
-                resultPlans = resultPlans.filter(p => p.api_vendor === 'bilalsadasub' || p.name?.toLowerCase().includes('bilal'));
+                const filtered = resultPlans.filter(p => p.api_vendor === 'bilalsadasub' || p.name?.toLowerCase().includes('bilal'));
+                if (filtered.length > 0) resultPlans = filtered;
             } else if (selectedVendorFilter === 'bigi') {
-                resultPlans = resultPlans.filter(p => p.api_vendor === 'bigi' || p.name?.toLowerCase().includes('bigi'));
+                const filtered = resultPlans.filter(p => p.api_vendor === 'bigi' || p.name?.toLowerCase().includes('bigi'));
+                if (filtered.length > 0) resultPlans = filtered;
             } else if (selectedVendorFilter === 'clubkonnect') {
-                resultPlans = resultPlans.filter(p => !p.api_vendor || p.api_vendor === 'clubkonnect' || p.name?.toLowerCase().includes('club'));
+                const filtered = resultPlans.filter(p => p.api_vendor === 'clubkonnect' || (!p.name?.toLowerCase().includes('bilal') && !p.name?.toLowerCase().includes('bigi')));
+                if (filtered.length > 0) resultPlans = filtered;
             }
 
             // Plan Type Filter
@@ -157,6 +172,35 @@ export default function ManageDataPlans() {
             showAlert('Data Error', error.message, 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCreateNewPlanType = async () => {
+        const cleanName = newCustomTypeName.trim().toUpperCase();
+        if (!cleanName) {
+            showAlert('Input Error', 'Please enter a valid Plan Type name.', 'error');
+            return;
+        }
+
+        if (planTypesList.includes(cleanName)) {
+            showAlert('Notice', `Plan Type "${cleanName}" already exists.`, 'error');
+            return;
+        }
+
+        const updatedList = [...planTypesList, cleanName];
+        setPlanTypesList(updatedList);
+        setNewCustomTypeName('');
+        setShowAddTypeModal(false);
+
+        try {
+            const { error } = await supabase
+                .from('app_settings')
+                .upsert({ key: 'data_plan_types', value: updatedList });
+
+            if (error) throw error;
+            showAlert('Plan Type Added 🎉', `New Plan Type "${cleanName}" added successfully. User app will load these plans live.`);
+        } catch (e: any) {
+            showAlert('Saved Locally', `Plan Type added to view. (${e.message})`);
         }
     };
 
@@ -202,12 +246,21 @@ export default function ManageDataPlans() {
             return;
         }
 
+        const finalPlanType = customTypeInput.trim() ? customTypeInput.trim().toUpperCase() : selectedPlanType;
+
+        // If custom type entered, add to planTypesList if not present
+        if (customTypeInput.trim() && !planTypesList.includes(finalPlanType)) {
+            const updated = [...planTypesList, finalPlanType];
+            setPlanTypesList(updated);
+            supabase.from('app_settings').upsert({ key: 'data_plan_types', value: updated }).then(() => {});
+        }
+
         try {
             const { error } = await supabase
                 .from('data_plans')
                 .update({ 
                     selling_price: priceNum,
-                    plan_type: selectedPlanType 
+                    plan_type: finalPlanType 
                 })
                 .eq('id', editingPlan.id);
 
@@ -215,7 +268,8 @@ export default function ManageDataPlans() {
 
             setEditingPlan(null);
             setNewPrice('');
-            showAlert('Plan Updated 🎉', `Selling price set to ₦${priceNum} & Plan Type set to ${selectedPlanType}.`);
+            setCustomTypeInput('');
+            showAlert('Plan Updated 🎉', `Selling price set to ₦${priceNum} & Plan Type set to ${finalPlanType}.`);
             fetchPlans();
         } catch (e: any) {
             showAlert('Error', e.message, 'error');
@@ -249,7 +303,7 @@ export default function ManageDataPlans() {
         } else {
             setEditingConfig(null);
             setNewMarkupValue('');
-            fetchConfigs();
+            fetchConfigsAndPlanTypes();
             showAlert('Markup Config Saved 🎉', 'Default network markup saved. Click "Apply Markup" to update plan prices.');
         }
     };
@@ -342,7 +396,7 @@ export default function ManageDataPlans() {
                         <Text style={{ fontSize: 13, fontWeight: '900', color: L.gold, letterSpacing: 0.8 }}>
                             DATA PRICING & PLAN TYPES
                         </Text>
-                        <Text style={{ color: '#94A3B8', fontSize: 9.5 }}>Configure Prices & Plan Types (SME, CG, Gifting, Direct)</Text>
+                        <Text style={{ color: '#94A3B8', fontSize: 9.5 }}>Dynamic Plan Types Creator & Multi-API Tariffs</Text>
                     </View>
                 </View>
 
@@ -409,14 +463,23 @@ export default function ManageDataPlans() {
                     </ScrollView>
                 </View>
 
-                {/* Plan Type Selector Filter Row */}
+                {/* Plan Type Creator & Selector Card */}
                 <View style={{ backgroundColor: L.card, borderRadius: 16, borderWidth: 1, borderColor: L.inputBorder, padding: 12, marginHorizontal: 12, marginBottom: 12, elevation: 1 }}>
-                    <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }}>
-                        Filter by Plan Type Category:
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
+                            Configured Plan Types Category:
+                        </Text>
+                        <TouchableOpacity 
+                            onPress={() => setShowAddTypeModal(true)}
+                            style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: L.emeraldBorder, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        >
+                            <Ionicons name="add-circle" size={14} color={L.emerald} />
+                            <Text style={{ color: L.emerald, fontSize: 10, fontWeight: '900' }}>➕ Add Plan Type</Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {['all', ...PLAN_TYPES].map(type => {
+                        {['all', ...planTypesList].map(type => {
                             const isSelected = selectedPlanTypeFilter === type;
                             return (
                                 <TouchableOpacity
@@ -519,6 +582,12 @@ export default function ManageDataPlans() {
                     </View>
                 ) : (
                     <View style={{ paddingHorizontal: 12, gap: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 4 }}>
+                            <Text style={{ color: L.navyHeader, fontSize: 11, fontWeight: '900' }}>
+                                Showing {plans.length} Data Plans for {selectedNetwork.toUpperCase()}
+                            </Text>
+                        </View>
+
                         {plans.map((plan) => {
                             const cost = parseFloat(plan.cost_price || '0');
                             const selling = parseFloat(plan.selling_price || '0');
@@ -573,6 +642,7 @@ export default function ManageDataPlans() {
                                                 setEditingPlan(plan);
                                                 setNewPrice(plan.selling_price?.toString() || '');
                                                 setSelectedPlanType(currentPlanType);
+                                                setCustomTypeInput('');
                                             }}
                                             style={{ backgroundColor: L.navyHeader, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
                                         >
@@ -604,6 +674,54 @@ export default function ManageDataPlans() {
 
             </ScrollView>
 
+            {/* ADD CUSTOM PLAN TYPE MODAL */}
+            <Modal visible={showAddTypeModal} transparent={true} animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                    <View style={{ width: '100%', maxWidth: 400, backgroundColor: L.card, borderRadius: 20, borderWidth: 1.5, borderColor: L.gold, padding: 20 }}>
+                        <Text style={{ color: L.textPrimary, fontSize: 14, fontWeight: '900', marginBottom: 2 }}>
+                            ➕ Add New Custom Plan Type
+                        </Text>
+                        <Text style={{ color: L.textMuted, fontSize: 10.5, marginBottom: 14 }}>
+                            Enter a new custom Plan Type category (e.g. PROMO, MEGA SME, HOT DEAL). It will load automatically for users!
+                        </Text>
+
+                        <TextInput 
+                            style={{ 
+                                backgroundColor: L.bg, 
+                                borderWidth: 1.5, 
+                                borderColor: L.navyHeader, 
+                                borderRadius: 12, 
+                                padding: 12, 
+                                color: L.textPrimary, 
+                                fontSize: 14, 
+                                fontWeight: '800', 
+                                marginBottom: 16 
+                            }}
+                            placeholder="e.g. PROMO, MEGA SME, NIGHT..."
+                            placeholderTextColor={L.textMuted}
+                            value={newCustomTypeName}
+                            onChangeText={setNewCustomTypeName}
+                            autoFocus
+                        />
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity 
+                                style={{ flex: 1, backgroundColor: L.bg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: L.inputBorder }}
+                                onPress={() => setShowAddTypeModal(false)}
+                            >
+                                <Text style={{ color: L.textMuted, fontWeight: '800', fontSize: 11 }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={{ flex: 1.5, backgroundColor: L.gold, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={handleCreateNewPlanType}
+                            >
+                                <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 11 }}>Create Plan Type 🚀</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             {/* EDIT SELLING PRICE & PLAN TYPE MODAL */}
             {editingPlan && (
                 <Modal visible={true} transparent={true} animationType="fade">
@@ -619,15 +737,18 @@ export default function ManageDataPlans() {
 
                             {/* Plan Type Selector */}
                             <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
-                                Select Plan Type Category
+                                Select or Type Custom Plan Category
                             </Text>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                                {PLAN_TYPES.map(type => {
-                                    const isSelected = selectedPlanType === type;
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                                {planTypesList.map(type => {
+                                    const isSelected = selectedPlanType === type && !customTypeInput.trim();
                                     return (
                                         <TouchableOpacity
                                             key={type}
-                                            onPress={() => setSelectedPlanType(type)}
+                                            onPress={() => {
+                                                setSelectedPlanType(type);
+                                                setCustomTypeInput('');
+                                            }}
                                             style={{
                                                 backgroundColor: isSelected ? L.navyHeader : L.bg,
                                                 borderRadius: 8,
@@ -644,6 +765,25 @@ export default function ManageDataPlans() {
                                     );
                                 })}
                             </View>
+
+                            {/* Custom Type Input Fallback */}
+                            <TextInput 
+                                style={{ 
+                                    backgroundColor: L.bg, 
+                                    borderWidth: 1, 
+                                    borderColor: customTypeInput.trim() ? L.gold : L.inputBorder, 
+                                    borderRadius: 10, 
+                                    padding: 10, 
+                                    color: L.textPrimary, 
+                                    fontSize: 12, 
+                                    fontWeight: '700', 
+                                    marginBottom: 14 
+                                }}
+                                placeholder="Or type new custom Plan Type (e.g. PROMO)..."
+                                placeholderTextColor={L.textMuted}
+                                value={customTypeInput}
+                                onChangeText={setCustomTypeInput}
+                            />
 
                             {/* New Selling Price Input */}
                             <Text style={{ color: L.navyHeader, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 6 }}>
@@ -664,7 +804,6 @@ export default function ManageDataPlans() {
                                 keyboardType="numeric"
                                 value={newPrice}
                                 onChangeText={setNewPrice}
-                                autoFocus
                             />
 
                             <View style={{ flexDirection: 'row', gap: 10 }}>
