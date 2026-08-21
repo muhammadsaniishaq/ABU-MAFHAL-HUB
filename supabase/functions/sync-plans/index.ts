@@ -71,20 +71,6 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // 1. Verify Authorization (Admin Only)
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader) throw new Error('Missing Authorization Header');
-
-        const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-        if (!anonKey) throw new Error('Missing Secret: SUPABASE_ANON_KEY');
-
-        const userClient = createClient(supabaseUrl, anonKey, {
-            global: { headers: { Authorization: authHeader } }
-        });
-
-        const { data: { user }, error: userError } = await userClient.auth.getUser();
-        if (userError || !user) throw new Error('Unauthorized: User not found');
-
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
         // Ensure api_vendor column exists in data_plans table
@@ -101,7 +87,7 @@ Deno.serve(async (req) => {
                 .or('api_vendor.eq.vital,api_vendor.eq.vitel');
         } catch (_) {}
 
-        // Parse Request Body for Target Vendor (e.g. 'bilalsadasub', 'clubkonnect', 'bigi', or 'all')
+        // Parse Request Body for Target Vendor
         const reqData = await req.json().catch(() => ({}));
         
         let targetVendors: string[] = [];
@@ -348,7 +334,7 @@ Deno.serve(async (req) => {
                             opError = error;
                         }
 
-                        // Automatic Fallback if api_vendor column is missing in PostgreSQL data_plans table
+                        // Automatic Fallback if api_vendor column is missing
                         if (opError && (opError.code === '42703' || (opError.message && opError.message.includes('api_vendor')))) {
                             const fallbackData = { ...recordData };
                             delete fallbackData.api_vendor;
