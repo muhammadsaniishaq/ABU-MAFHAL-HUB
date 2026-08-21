@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -265,6 +265,30 @@ export default function Dashboard() {
     } catch (e) { return ''; }
   };
 
+  const DEFAULT_PINNED_IDS = ['airtime', 'data', 'transfer', 'recharge_pin', 'airtime_cash', 'bills', 'cable', 'electricity', 'nin', 'tickets'];
+  const [pinnedActionIds, setPinnedActionIds] = useState<string[]>(DEFAULT_PINNED_IDS);
+  const [showEditQuickActionsModal, setShowEditQuickActionsModal] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@user_custom_quick_actions_v2').then((saved) => {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPinnedActionIds(parsed);
+          }
+        } catch (_) {}
+      }
+    });
+  }, []);
+
+  const saveQuickActionPreferences = async (newPinned: string[]) => {
+    setPinnedActionIds(newPinned);
+    try {
+      await AsyncStorage.setItem('@user_custom_quick_actions_v2', JSON.stringify(newPinned));
+    } catch (_) {}
+  };
+
   const featureMap: Record<string, string> = {
     '/transfer': 'feature_transfer', '/airtime': 'feature_airtime', '/data': 'feature_data',
     '/education': 'feature_education', '/bills': 'feature_bills', '/virtual-cards': 'feature_cards',
@@ -284,44 +308,55 @@ export default function Dashboard() {
     if (action.route) router.push(action.route as any);
   };
 
-  const allActions = [
-    { icon: 'phone-portrait-outline', label: 'Airtime',      color: '#f97316', route: '/airtime' },
-    { icon: 'key-outline',            label: 'Recharge PIN', color: '#10b981', route: '/recharge-pin' },
-    { icon: 'cash-outline',           label: 'Airtime ➔ Cash', color: '#16a34a', route: '/airtime-to-cash' },
-    { icon: 'wifi-outline',           label: 'Data',         color: '#22c55e', route: '/data' },
-    { icon: 'chevron-forward',        label: 'Transfer',     color: '#2563eb', route: '/transfer' },
-    { icon: 'receipt-outline',        label: 'Bills',        color: '#eab308', route: '/bills' },
-    { icon: 'person-add-outline',     label: 'NIN',          color: '#10b981', route: '/nin-services' },
-    { icon: 'ticket-outline',         label: 'Tickets',      color: '#e11d48', route: '/(app)/tickets' },
-    { icon: 'chatbubbles-outline',    label: 'Bulk SMS',     color: '#3B82F6', route: '/bulk-sms' },
-    { icon: 'tv-outline',             label: 'Cable TV',     color: '#8b5cf6', route: '/bills' },
-    { icon: 'flash-outline',          label: 'PHCN',         color: '#f5a623', route: '/bills' },
-    { icon: 'globe-outline',          label: 'Smile',        color: '#ec4899', route: '/smile' },
-    { icon: 'school-outline',         label: 'Education',    color: '#06b6d4', route: '/education' },
-    { icon: 'briefcase-outline',      label: 'CAC Reg',      color: '#8b5cf6', route: '/cac-services' },
-    { icon: 'rocket-outline',         label: 'Social',       color: '#ec4899', route: '/social-boost' },
-    { icon: 'star-outline',           label: 'Reviews',      color: '#f5a623', route: '/reviews' },
-    { icon: 'card-outline',           label: 'Cards',        color: '#8B5CF6', route: '/virtual-cards' },
-    { icon: 'wallet-outline',         label: 'Savings',      color: '#107C10', route: '/savings' },
-    { icon: 'cash-outline',           label: 'Loans',        color: '#EA580C', route: '/loans' },
-    { icon: 'logo-bitcoin',           label: 'Crypto',       color: '#F7931A', route: '/crypto' },
-    { icon: 'pie-chart-outline',      label: 'Insights',     color: '#DB2777', route: '/analytics' },
-    { icon: 'gift-outline',           label: 'Rewards',      color: '#9333EA', route: '/rewards' },
-    { icon: 'qr-code-outline',        label: 'QR Pay',       color: '#10B981', route: '/qr-pay' },
-    { icon: 'trending-up-outline',    label: 'Invest',       color: '#3B82F6', route: '/investments' },
-    { icon: 'shield-checkmark-outline', label: 'Insurance',  color: '#107C10', route: '/insurance' },
-    { icon: 'finger-print-outline',   label: 'BVN',          color: '#0056D2', route: '/bvn-services' },
+  const ALL_ACTIONS_CATALOG = [
+    { id: 'airtime',      icon: 'phone-portrait-outline', label: 'Airtime',      color: '#f97316', route: '/airtime', badge: null },
+    { id: 'data',         icon: 'wifi-outline',           label: 'Data',         color: '#22c55e', route: '/data', badge: null },
+    { id: 'transfer',     icon: 'swap-horizontal-outline',label: 'Transfer',     color: '#2563eb', route: '/transfer', badge: null },
+    { id: 'recharge_pin', icon: 'key-outline',            label: 'Recharge PIN', color: '#10b981', route: '/recharge-pin', badge: 'HOT' },
+    { id: 'airtime_cash', icon: 'cash-outline',           label: 'Airtime ➔ Cash', color: '#16a34a', route: '/airtime-to-cash', badge: 'NEW' },
+    { id: 'bills',        icon: 'receipt-outline',        label: 'Bills',        color: '#eab308', route: '/bills', badge: null },
+    { id: 'nin',          icon: 'person-add-outline',     label: 'NIN',          color: '#10b981', route: '/nin-services', badge: null },
+    { id: 'tickets',      icon: 'ticket-outline',         label: 'Tickets',      color: '#e11d48', route: '/(app)/tickets', badge: null },
+    { id: 'bulk_sms',     icon: 'chatbubbles-outline',    label: 'Bulk SMS',     color: '#3B82F6', route: '/bulk-sms', badge: null },
+    { id: 'cable',        icon: 'tv-outline',             label: 'Cable TV',     color: '#8b5cf6', route: '/bills', badge: null },
+    { id: 'electricity',  icon: 'flash-outline',          label: 'PHCN',         color: '#f5a623', route: '/bills', badge: null },
+    { id: 'smile',        icon: 'globe-outline',          label: 'Smile',        color: '#ec4899', route: '/smile', badge: null },
+    { id: 'education',    icon: 'school-outline',         label: 'Education',    color: '#06b6d4', route: '/education', badge: null },
+    { id: 'cac',          icon: 'briefcase-outline',      label: 'CAC Reg',      color: '#8b5cf6', route: '/cac-services', badge: 'POPULAR' },
+    { id: 'social',       icon: 'rocket-outline',         label: 'Social',       color: '#ec4899', route: '/social-boost', badge: 'BOOST' },
+    { id: 'reviews',      icon: 'star-outline',           label: 'Reviews',      color: '#f5a623', route: '/reviews', badge: null },
+    { id: 'cards',        icon: 'card-outline',           label: 'Cards',        color: '#8B5CF6', route: '/virtual-cards', badge: null },
+    { id: 'savings',      icon: 'wallet-outline',         label: 'Savings',      color: '#107C10', route: '/savings', badge: null },
+    { id: 'loans',        icon: 'cash-outline',           label: 'Loans',        color: '#EA580C', route: '/loans', badge: null },
+    { id: 'crypto',       icon: 'logo-bitcoin',           label: 'Crypto',       color: '#F7931A', route: '/crypto', badge: 'WEB3' },
+    { id: 'analytics',    icon: 'pie-chart-outline',      label: 'Insights',     color: '#DB2777', route: '/analytics', badge: null },
+    { id: 'rewards',      icon: 'gift-outline',           label: 'Rewards',      color: '#9333EA', route: '/rewards', badge: null },
+    { id: 'qr',           icon: 'qr-code-outline',        label: 'QR Pay',       color: '#10B981', route: '/qr-pay', badge: null },
+    { id: 'investments',  icon: 'trending-up-outline',    label: 'Invest',       color: '#3B82F6', route: '/investments', badge: null },
+    { id: 'insurance',    icon: 'shield-checkmark-outline', label: 'Insurance',  color: '#107C10', route: '/insurance', badge: null },
+    { id: 'bvn',          icon: 'finger-print-outline',   label: 'BVN',          color: '#0056D2', route: '/bvn-services', badge: null },
   ];
 
-  const filteredActions = allActions.filter(action => {
-    const featureKey = featureMap[action.route];
-    if (featureKey && hiddenFeatures.includes(featureKey)) return false;
-    return true;
-  });
+  const catalogMap = new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a]));
+
+  const pinnedActions = pinnedActionIds
+    .map(id => catalogMap.get(id))
+    .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a))
+    .filter(action => {
+      const featureKey = featureMap[action.route];
+      return !(featureKey && hiddenFeatures.includes(featureKey));
+    });
+
+  const unpinnedActions = ALL_ACTIONS_CATALOG
+    .filter(a => !pinnedActionIds.includes(a.id))
+    .filter(action => {
+      const featureKey = featureMap[action.route];
+      return !(featureKey && hiddenFeatures.includes(featureKey));
+    });
 
   const displayedActions = showAllActions 
-    ? [...filteredActions, { icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less' }]
-    : [...filteredActions.slice(0, 9), { icon: 'grid-outline', label: 'More', color: '#64748b', route: 'more' }];
+    ? [...pinnedActions, ...unpinnedActions, { id: 'less', icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less', badge: null }]
+    : [...pinnedActions.slice(0, 7), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
 
   const isVerified = userData?.kyc_tier && userData.kyc_tier > 1;
   const companyName = settings?.company_name || 'MAFHAL SUB';
@@ -504,13 +539,22 @@ export default function Dashboard() {
           </View>
         )}
 
-        {/* ─── Quick Actions ─── */}
+        {/* ─── Modernized Quick Actions Section ─── */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Quick Actions</Text>
-            <TouchableOpacity activeOpacity={0.7} style={s.editBtn}>
-              <Text style={s.editBtnTxt}>Edit</Text>
-              <Ionicons name="pencil-sharp" size={10} color={T.indigo} style={{ marginLeft: 2 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={s.sectionTitle}>Quick Actions</Text>
+              <View style={{ backgroundColor: T.navyMid + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: T.navyMid }}>{pinnedActions.length} Pinned</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              activeOpacity={0.7} 
+              style={s.editBtn}
+              onPress={() => setShowEditQuickActionsModal(true)}
+            >
+              <Ionicons name="create-outline" size={11} color={T.indigo} style={{ marginRight: 3 }} />
+              <Text style={s.editBtnTxt}>Edit Actions</Text>
             </TouchableOpacity>
           </View>
 
@@ -518,7 +562,7 @@ export default function Dashboard() {
             {displayedActions.map((act, index) => {
               return (
                 <TouchableOpacity
-                  key={index}
+                  key={act.id || index}
                   style={s.actionItem}
                   onPress={() => {
                     if (act.route === 'more') setShowAllActions(true);
@@ -527,8 +571,13 @@ export default function Dashboard() {
                   }}
                   activeOpacity={0.75}
                 >
-                  <View style={[s.actionIconBox, { backgroundColor: act.color + '14' }]}>
-                    <Ionicons name={act.icon as any} size={18} color={act.color} />
+                  <View style={[s.actionIconBox, { backgroundColor: act.color + '12', borderColor: act.color + '30', borderWidth: 1 }]}>
+                    <Ionicons name={act.icon as any} size={19} color={act.color} />
+                    {act.badge && (
+                      <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
+                        <Text style={s.badgeText}>{act.badge}</Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={s.actionLabel} numberOfLines={1}>{act.label}</Text>
                 </TouchableOpacity>
@@ -716,6 +765,168 @@ export default function Dashboard() {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* ─── CUSTOMIZE QUICK ACTIONS MODAL ─── */}
+      <Modal
+        visible={showEditQuickActionsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditQuickActionsModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(13, 27, 62, 0.75)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: T.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, maxHeight: '85%' }}>
+            
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: T.indigo + '15', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="apps-sharp" size={20} color={T.indigo} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: T.navy }}>Customize Shortcuts</Text>
+                  <Text style={{ fontSize: 10, color: T.textSub, fontWeight: '600' }}>Pin & organize services shown on your homepage</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowEditQuickActionsModal(false)}
+                style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="close" size={18} color={T.navy} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+              
+              {/* Pinned Shortcuts Section */}
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: T.navy, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    📌 Pinned Shortcuts ({pinnedActionIds.length})
+                  </Text>
+                  <Text style={{ fontSize: 9, color: T.indigo, fontWeight: '700' }}>Tap arrows to reorder</Text>
+                </View>
+
+                {pinnedActionIds.length === 0 ? (
+                  <View style={{ padding: 14, backgroundColor: T.bg, borderRadius: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: T.textSub, fontStyle: 'italic' }}>No pinned shortcuts. Add services below!</Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    {pinnedActionIds.map((id, idx) => {
+                      const item = catalogMap.get(id);
+                      if (!item) return null;
+                      return (
+                        <View key={id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: T.bg, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: item.color + '18', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name={item.icon as any} size={16} color={item.color} />
+                            </View>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: T.navy }}>{item.label}</Text>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            {/* Move Up */}
+                            <TouchableOpacity
+                              disabled={idx === 0}
+                              onPress={() => {
+                                if (idx > 0) {
+                                  const newArr = [...pinnedActionIds];
+                                  const temp = newArr[idx];
+                                  newArr[idx] = newArr[idx - 1];
+                                  newArr[idx - 1] = temp;
+                                  setPinnedActionIds(newArr);
+                                }
+                              }}
+                              style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: idx === 0 ? '#f1f5f9' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <Ionicons name="chevron-up" size={14} color={idx === 0 ? '#cbd5e1' : T.navy} />
+                            </TouchableOpacity>
+
+                            {/* Move Down */}
+                            <TouchableOpacity
+                              disabled={idx === pinnedActionIds.length - 1}
+                              onPress={() => {
+                                if (idx < pinnedActionIds.length - 1) {
+                                  const newArr = [...pinnedActionIds];
+                                  const temp = newArr[idx];
+                                  newArr[idx] = newArr[idx + 1];
+                                  newArr[idx + 1] = temp;
+                                  setPinnedActionIds(newArr);
+                                }
+                              }}
+                              style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: idx === pinnedActionIds.length - 1 ? '#f1f5f9' : '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <Ionicons name="chevron-down" size={14} color={idx === pinnedActionIds.length - 1 ? '#cbd5e1' : T.navy} />
+                            </TouchableOpacity>
+
+                            {/* Unpin */}
+                            <TouchableOpacity
+                              onPress={() => {
+                                setPinnedActionIds(pinnedActionIds.filter(pid => pid !== id));
+                              }}
+                              style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}
+                            >
+                              <Ionicons name="close-circle" size={16} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Available Services Section */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: T.navy, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  ➕ Available Services
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {ALL_ACTIONS_CATALOG.filter(a => !pinnedActionIds.includes(a.id)).map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => {
+                        setPinnedActionIds([...pinnedActionIds, item.id]);
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.bg, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}
+                    >
+                      <Ionicons name={item.icon as any} size={14} color={item.color} />
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: T.navy }}>{item.label}</Text>
+                      <Ionicons name="add-circle" size={14} color={T.indigo} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+            </ScrollView>
+
+            {/* Modal Bottom Actions */}
+            <View style={{ flexDirection: 'row', gap: 8, paddingTop: 10, borderTopWidth: 1, borderColor: '#f1f5f9' }}>
+              <TouchableOpacity
+                onPress={() => {
+                  saveQuickActionPreferences(DEFAULT_PINNED_IDS);
+                }}
+                style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: T.bg, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: T.textSub }}>Reset 🔄</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  saveQuickActionPreferences(pinnedActionIds);
+                  setShowEditQuickActionsModal(false);
+                }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: T.navy, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.gold }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '900', color: T.gold, textTransform: 'uppercase' }}>Save Shortcuts 💾</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
+
       <GlobalAnnouncementModal />
     </View>
   );
@@ -865,15 +1076,20 @@ const s = StyleSheet.create({
   editBtnTxt: { fontSize: 9.5, fontWeight: '700', color: T.indigo },
   seeAllTxt: { fontSize: 10.5, fontWeight: '700', color: T.indigo },
 
-  // Actions grid (5-column)
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  actionItem: { width: (W - 32 - 28 - 40) / 5, alignItems: 'center', marginBottom: 4 },
+  // Actions grid (4-column modernized layout)
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
+  actionItem: { width: (W - 32 - 28 - 30) / 4, alignItems: 'center', marginBottom: 8 },
   actionIconBox: {
-    width: 42, height: 42, borderRadius: 13,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 5,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    width: 48, height: 48, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6, position: 'relative',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1,
   },
-  actionLabel: { fontSize: 8, fontWeight: '600', color: T.textSub, textAlign: 'center' },
+  actionLabel: { fontSize: 9, fontWeight: '700', color: T.navy, textAlign: 'center' },
+  badgeOverlay: {
+    position: 'absolute', top: -4, right: -4, borderRadius: 6,
+    paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: '#FFFFFF',
+  },
+  badgeText: { fontSize: 6.5, fontWeight: '900', color: '#FFFFFF', textTransform: 'uppercase' },
 
   // Promo Banner
   promoContainer: {
