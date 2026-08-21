@@ -140,9 +140,9 @@ export const api = {
                     .order('cost_price', { ascending: true });
 
                 if (netLower === 'vitel' || netLower === 'vital') {
-                    query = query.or('network.eq.vitel,network.eq.vital');
+                    query = query.or('network.ilike.vitel,network.ilike.vital,network.eq.vitel,network.eq.vital');
                 } else {
-                    query = query.eq('network', netLower);
+                    query = query.ilike('network', netLower);
                 }
 
                 const { data: plans, error } = await query;

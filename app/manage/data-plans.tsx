@@ -149,12 +149,18 @@ export default function ManageDataPlans() {
     const fetchPlans = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('data_plans')
                 .select('*')
-                .eq('network', selectedNetwork)
                 .order('cost_price', { ascending: true });
 
+            if (selectedNetwork === 'vitel' || selectedNetwork === 'vital') {
+                query = query.or('network.ilike.vitel,network.ilike.vital,network.eq.vitel,network.eq.vital');
+            } else {
+                query = query.ilike('network', selectedNetwork);
+            }
+
+            const { data, error } = await query;
             let resultPlans = data || [];
 
             // Vendor Filter (Soft filter - retain plans if no match)
