@@ -54,6 +54,14 @@ const DEFAULT_CATALOG: Record<string, any[]> = {
         { PRODUCT_ID: '1GB_DATA', PRODUCT_AMOUNT: '300', PRODUCT_NAME: '9Mobile 1GB Data (30 Days)', validity: '30 Days' },
         { PRODUCT_ID: '2GB_DATA', PRODUCT_AMOUNT: '600', PRODUCT_NAME: '9Mobile 2GB Data (30 Days)', validity: '30 Days' },
         { PRODUCT_ID: '5GB_DATA', PRODUCT_AMOUNT: '1500', PRODUCT_NAME: '9Mobile 5GB Data (30 Days)', validity: '30 Days' },
+    ],
+    'VITAL': [
+        { PRODUCT_ID: '500MB_VITAL', PRODUCT_AMOUNT: '140', PRODUCT_NAME: 'VITAL 500MB Corporate Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '1GB_VITAL', PRODUCT_AMOUNT: '260', PRODUCT_NAME: 'VITAL 1GB Corporate Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '2GB_VITAL', PRODUCT_AMOUNT: '520', PRODUCT_NAME: 'VITAL 2GB Corporate Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '3GB_VITAL', PRODUCT_AMOUNT: '780', PRODUCT_NAME: 'VITAL 3GB Corporate Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '5GB_VITAL', PRODUCT_AMOUNT: '1300', PRODUCT_NAME: 'VITAL 5GB Corporate Data (30 Days)', validity: '30 Days' },
+        { PRODUCT_ID: '10GB_VITAL', PRODUCT_AMOUNT: '2600', PRODUCT_NAME: 'VITAL 10GB Corporate Data (30 Days)', validity: '30 Days' },
     ]
 };
 
@@ -82,18 +90,18 @@ Deno.serve(async (req) => {
         // Ensure api_vendor column exists in data_plans table
         try {
             await supabaseAdmin.rpc('exec_sql', {
-                sql: `ALTER TABLE data_plans ADD COLUMN IF NOT EXISTS api_vendor TEXT DEFAULT 'clubkonnect';`
+                sql: `ALTER TABLE data_plans ADD COLUMN IF NOT EXISTS api_vendor TEXT DEFAULT 'bilalsadasub';`
             });
         } catch (_) {}
 
-        // Parse Request Body for Target Vendor (e.g. 'clubkonnect', 'bigi', 'bilalsadasub', or 'all')
+        // Parse Request Body for Target Vendor (e.g. 'bilalsadasub', 'clubkonnect', 'bigi', or 'all')
         const reqData = await req.json().catch(() => ({}));
         
         let targetVendors: string[] = [];
         if (reqData.vendor && reqData.vendor !== 'all') {
             targetVendors = [reqData.vendor.toLowerCase()];
         } else if (reqData.vendor === 'all') {
-            targetVendors = ['clubkonnect', 'bigi', 'bilalsadasub'];
+            targetVendors = ['bilalsadasub', 'bigi', 'clubkonnect'];
         } else {
             const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').maybeSingle();
             const activeVendor = vendorSetting?.value || 'bilalsadasub';
@@ -106,6 +114,14 @@ Deno.serve(async (req) => {
 
         let totalInserted = 0;
         const syncSummary: string[] = [];
+        const networkCounts: Record<string, number> = {
+            mtn: 0,
+            glo: 0,
+            airtel: 0,
+            '9mobile': 0,
+            vital: 0
+        };
+        const syncedPlansList: any[] = [];
 
         for (const vendor of targetVendors) {
             let networksData: any = {};
@@ -199,7 +215,7 @@ Deno.serve(async (req) => {
                 if (networkName.includes('mtn')) networkName = 'mtn';
                 else if (networkName.includes('glo')) networkName = 'glo';
                 else if (networkName.includes('airtel')) networkName = 'airtel';
-                else if (networkName.includes('vitel') || networkName.includes('vital')) networkName = 'vitel';
+                else if (networkName.includes('vitel') || networkName.includes('vital')) networkName = 'vital';
                 else if (networkName.includes('mobile') || networkName.includes('etisalat') || networkName.includes('t2')) networkName = '9mobile';
 
                 if (!Array.isArray(plans)) continue;
@@ -242,15 +258,6 @@ Deno.serve(async (req) => {
                         }
                         finalSellingPrice = Math.round(finalSellingPrice);
 
-                        // Check if plan exists for this network & plan_id
-                        const { data: existingPlans } = await supabaseAdmin.from('data_plans')
-                            .select('id')
-                            .eq('network', networkName)
-                            .eq('plan_id', planId);
-
-                        const existingPlan = existingPlans?.[0];
-                        let opError = null;
-
                         const detectPlanType = (planName: string): string => {
                             const n = (planName || '').toLowerCase();
                             if (n.includes('corporate') || n.includes('cg') || n.includes('c-g')) return 'CG';
@@ -274,6 +281,15 @@ Deno.serve(async (req) => {
                             is_active: true,
                             api_vendor: vendor
                         };
+
+                        // Check if plan exists for this network & plan_id
+                        const { data: existingPlans } = await supabaseAdmin.from('data_plans')
+                            .select('id')
+                            .eq('network', networkName)
+                            .eq('plan_id', planId);
+
+                        const existingPlan = existingPlans?.[0];
+                        let opError = null;
 
                         if (existingPlan) {
                             const { error } = await supabaseAdmin.from('data_plans')
@@ -305,6 +321,8 @@ Deno.serve(async (req) => {
                         if (!opError) {
                             vendorInserted++;
                             totalInserted++;
+                            networkCounts[networkName] = (networkCounts[networkName] || 0) + 1;
+                            syncedPlansList.push(recordData);
                         }
                     }
                 }
@@ -314,7 +332,17 @@ Deno.serve(async (req) => {
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: `Synced ${totalInserted} data plans successfully! (${syncSummary.join(', ')})`,
+            message: `Synced ${totalInserted} data plans successfully across 5 networks!`,
+            total: totalInserted,
+            summaryByVendor: syncSummary.join(', '),
+            summaryByNetwork: {
+                MTN: networkCounts.mtn || 0,
+                GLO: networkCounts.glo || 0,
+                AIRTEL: networkCounts.airtel || 0,
+                '9MOBILE': networkCounts['9mobile'] || 0,
+                VITAL: networkCounts.vital || 0
+            },
+            plans: syncedPlansList
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,

@@ -128,6 +128,55 @@ export default function APIVaultScreen() {
     const [showBackupModal, setShowBackupModal] = useState(false);
     const [backupJsonText, setBackupJsonText] = useState('');
 
+    // Sync Data Plans State & Modal
+    const [syncingData, setSyncingData] = useState(false);
+    const [syncResultModal, setSyncResultModal] = useState<{
+        visible: boolean;
+        total: number;
+        summaryByVendor: string;
+        summaryByNetwork: Record<string, number>;
+        plans: any[];
+        vendorId: string;
+    }>({
+        visible: false,
+        total: 0,
+        summaryByVendor: '',
+        summaryByNetwork: {},
+        plans: [],
+        vendorId: ''
+    });
+
+    const handleSyncPlans = async (vendorTarget: string = 'all') => {
+        setSyncingData(true);
+        showToast(`⚡ Syncing Data Plans from ${vendorTarget.toUpperCase()} API...`);
+        try {
+            const { data, error } = await supabase.functions.invoke('sync-plans', {
+                body: { vendor: vendorTarget }
+            });
+
+            if (error) throw error;
+
+            if (data && data.success) {
+                setSyncResultModal({
+                    visible: true,
+                    total: data.total || 0,
+                    summaryByVendor: data.summaryByVendor || 'Synced',
+                    summaryByNetwork: data.summaryByNetwork || { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 },
+                    plans: data.plans || [],
+                    vendorId: vendorTarget.toUpperCase()
+                });
+                showToast(`🎉 Synced ${data.total || 0} Data Plans!`);
+            } else {
+                Alert.alert("Sync Notice", data?.message || "Synced data plans.");
+            }
+        } catch (err: any) {
+            console.error("Sync Error:", err);
+            Alert.alert("Sync Error", err?.message || "Failed to sync plans from API.");
+        } finally {
+            setSyncingData(false);
+        }
+    };
+
     useEffect(() => {
         fetchApiVaultData();
     }, []);
@@ -720,6 +769,21 @@ export default function APIVaultScreen() {
                     {/* Quick Action Strip */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingTop: 4 }}>
                         <TouchableOpacity
+                            onPress={() => handleSyncPlans('all')}
+                            disabled={syncingData}
+                            style={{ flex: 1.2, backgroundColor: '#1C2852', paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                        >
+                            {syncingData ? (
+                                <ActivityIndicator size="small" color={L.gold} />
+                            ) : (
+                                <>
+                                    <Ionicons name="cloud-download" size={12} color={L.gold} />
+                                    <Text style={{ color: L.gold, fontWeight: '900', fontSize: 10 }}>Sync All Plans</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                             onPress={testAllConnections}
                             disabled={testingAll}
                             style={{ flex: 1, backgroundColor: '#1C2852', paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.4)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
@@ -1211,6 +1275,98 @@ export default function APIVaultScreen() {
                                 <Text style={{ color: L.textSecondary, fontWeight: 'bold', fontSize: 11 }}>Close</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Ultra Premium Sync Report Modal */}
+            <Modal
+                visible={syncResultModal.visible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSyncResultModal(prev => ({ ...prev, visible: false }))}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.8)', justifyContent: 'flex-end' }}>
+                    <View style={{ backgroundColor: L.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%', borderTopWidth: 3, borderColor: L.goldDk }}>
+                        
+                        {/* Header */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: L.navyHeader, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Ionicons name="cloud-download-sharp" size={18} color={L.gold} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 15 }}>API DATA SYNC REPORT</Text>
+                                    <Text style={{ color: L.goldDk, fontSize: 10, fontWeight: '800' }}>VENDOR: {syncResultModal.vendorId}</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setSyncResultModal(prev => ({ ...prev, visible: false }))}
+                                style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: L.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: L.inputBorder }}
+                            >
+                                <Ionicons name="close" size={18} color={L.navyHeader} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Total Count Pill */}
+                        <View style={{ backgroundColor: L.emeraldBg, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: L.emeraldBorder, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ionicons name="checkmark-circle-sharp" size={18} color={L.emerald} />
+                                <Text style={{ color: L.emerald, fontWeight: '900', fontSize: 12 }}>Total Data Plans Synced</Text>
+                            </View>
+                            <View style={{ backgroundColor: L.emerald, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 }}>
+                                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>{syncResultModal.total} Plans</Text>
+                            </View>
+                        </View>
+
+                        {/* 5 Network Cards Grid */}
+                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Network Breakdown</Text>
+                        
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                            {[
+                                { name: 'MTN', count: syncResultModal.summaryByNetwork?.MTN || 0, color: '#D97706', bg: '#FEF3C7' },
+                                { name: 'GLO', count: syncResultModal.summaryByNetwork?.GLO || 0, color: '#16A34A', bg: '#DCFCE7' },
+                                { name: 'AIRTEL', count: syncResultModal.summaryByNetwork?.AIRTEL || 0, color: '#DC2626', bg: '#FEE2E2' },
+                                { name: '9MOBILE', count: syncResultModal.summaryByNetwork?.['9MOBILE'] || 0, color: '#059669', bg: '#D1FAE5' },
+                                { name: 'VITAL', count: syncResultModal.summaryByNetwork?.VITAL || 0, color: '#7C3AED', bg: '#EDE9FE' },
+                            ].map((net) => (
+                                <View key={net.name} style={{ width: '31%', backgroundColor: net.bg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: net.color, alignItems: 'center' }}>
+                                    <Text style={{ color: net.color, fontWeight: '900', fontSize: 11 }}>{net.name}</Text>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 14, marginTop: 2 }}>{net.count}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* Synced Plans List */}
+                        <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Synced Data Plans List</Text>
+                        
+                        <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={{ gap: 6 }}>
+                            {syncResultModal.plans.map((p, idx) => (
+                                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: L.bg, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: L.inputBorder }}>
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 11 }}>{p.name}</Text>
+                                            <View style={{ backgroundColor: L.goldBg, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.goldDk }}>
+                                                <Text style={{ color: L.goldDk, fontWeight: '900', fontSize: 8 }}>{p.plan_type || 'DIRECT'}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={{ color: L.textMuted, fontSize: 9, marginTop: 1 }}>ID: {p.plan_id} • Vendor: {p.api_vendor || 'bilalsadasub'}</Text>
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text style={{ color: L.emerald, fontWeight: '900', fontSize: 11 }}>₦{p.selling_price}</Text>
+                                        <Text style={{ color: L.textMuted, fontSize: 8 }}>Cost: ₦{p.cost_price}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            onPress={() => setSyncResultModal(prev => ({ ...prev, visible: false }))}
+                            style={{ backgroundColor: L.navyHeader, paddingVertical: 12, borderRadius: 14, alignItems: 'center', borderWidth: 1.5, borderColor: L.gold, marginTop: 14 }}
+                        >
+                            <Text style={{ color: L.gold, fontWeight: '900', fontSize: 12, textTransform: 'uppercase' }}>Done & Close</Text>
+                        </TouchableOpacity>
+
                     </View>
                 </View>
             </Modal>
