@@ -236,7 +236,7 @@ export default function LoginScreen() {
 
                 const KNOWN_ADMIN_EMAILS = ['sale.abumafhal@gmail.com', 'admin@abumafhal.com', 'abumafhal@gmail.com'];
                 const userEmail = data.user.email ? data.user.email.toLowerCase().trim() : '';
-                const isAdminEmail = userEmail && (KNOWN_ADMIN_EMAILS.includes(userEmail) || userEmail.includes('admin'));
+                const isAdminEmail = userEmail && KNOWN_ADMIN_EMAILS.includes(userEmail);
 
                 const { data: profile } = await supabase
                     .from('profiles')
@@ -248,6 +248,9 @@ export default function LoginScreen() {
                 if (isAdminEmail) {
                     resolvedRole = 'admin';
                     try { await supabase.from('profiles').update({ role: 'admin' }).eq('id', data.user.id); } catch (err) {}
+                } else if (profile?.role === 'admin' && !isAdminEmail) {
+                    resolvedRole = 'user';
+                    try { await supabase.from('profiles').update({ role: 'user' }).eq('id', data.user.id); } catch (err) {}
                 }
 
                 if (profile && profile.status === 'suspended') {

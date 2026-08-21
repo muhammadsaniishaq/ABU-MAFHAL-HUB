@@ -369,10 +369,11 @@ export default function SignupScreen() {
 
             // Direct Database Pre-Check to guarantee absolute uniqueness
             try {
+                const filterStr = `email.ilike."${cleanEmail}",username.ilike."${cleanUsername}"${digits10 ? `,phone.ilike."%${digits10}%"` : ''}`;
                 const { data: existingProfiles } = await supabase
                     .from('profiles')
                     .select('email, username, phone')
-                    .or(`email.ilike.${cleanEmail},username.ilike.${cleanUsername}${digits10 ? `,phone.ilike.%${digits10}%` : ''}`);
+                    .or(filterStr);
 
                 if (existingProfiles && existingProfiles.length > 0) {
                     for (const existing of existingProfiles) {
@@ -412,8 +413,22 @@ export default function SignupScreen() {
             });
 
             if (error) {
-                notifyUser('Registration Error', error.message || 'An error occurred during account creation.');
-                return;
+                const errMsg = error.message || '';
+                if (errMsg.toLowerCase().includes('already registered') || errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
+                    notifyUser('Account Already Registered 🔒', 'An account with this Email, Username, or Phone Number is already registered. Please log in.');
+                    setLoading(false);
+                    return;
+                } else if (errMsg.toLowerCase().includes('database error') || errMsg.toLowerCase().includes('saving new user')) {
+                    if (!data?.user) {
+                        notifyUser('Account Notice ℹ️', 'An account creation notice was received. If you already have an account, please log in.');
+                        setLoading(false);
+                        return;
+                    }
+                } else {
+                    notifyUser('Registration Error', errMsg || 'An error occurred during account creation.');
+                    setLoading(false);
+                    return;
+                }
             }
 
             if (data.user) {

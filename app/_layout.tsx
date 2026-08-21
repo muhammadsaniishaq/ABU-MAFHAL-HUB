@@ -138,7 +138,7 @@ export default function RootLayout() {
     const fetchUserRole = async (userId: string, userEmail?: string | null) => {
         try {
             const lowerEmail = userEmail ? userEmail.toLowerCase().trim() : '';
-            const isAdminEmail = lowerEmail && (KNOWN_ADMIN_EMAILS.includes(lowerEmail) || lowerEmail.includes('admin'));
+            const isAdminEmail = lowerEmail && KNOWN_ADMIN_EMAILS.includes(lowerEmail);
 
             // Load from cache first if state not set, keeping screen immediately interactive
             const cachedRole = await AsyncStorage.getItem(`user_role_${userId}`);
@@ -153,17 +153,22 @@ export default function RootLayout() {
                 .maybeSingle();
             
             let roleToSet = data?.role;
-            const profileEmail = data?.email || userEmail;
-            const checkEmail = profileEmail ? profileEmail.toLowerCase().trim() : '';
-            const isConfirmedAdmin = checkEmail && (KNOWN_ADMIN_EMAILS.includes(checkEmail) || checkEmail.includes('admin'));
+            const profileEmail = (data?.email || userEmail || '').toLowerCase().trim();
+            const isConfirmedAdmin = profileEmail && KNOWN_ADMIN_EMAILS.includes(profileEmail);
 
             if (isConfirmedAdmin) {
                 roleToSet = 'admin';
                 if (data && data.role !== 'admin') {
                     try { await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId); } catch (err) {}
                 }
-            } else if (!roleToSet) {
-                roleToSet = 'user';
+            } else {
+                // Ensure non-admin users are strictly 'user' and revert any accidental admin role in DB
+                if (data && data.role === 'admin' && !isConfirmedAdmin) {
+                    roleToSet = 'user';
+                    try { await supabase.from('profiles').update({ role: 'user' }).eq('id', userId); } catch (err) {}
+                } else if (!roleToSet) {
+                    roleToSet = 'user';
+                }
             }
 
             setUserRole(roleToSet);
