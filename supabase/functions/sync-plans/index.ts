@@ -94,50 +94,77 @@ Deno.serve(async (req) => {
             });
         } catch (_) {}
 
+        // Fix legacy vital/vitel api_vendor values in data_plans table
+        try {
+            await supabaseAdmin.from('data_plans')
+                .update({ api_vendor: 'bilalsadasub' })
+                .or('api_vendor.eq.vital,api_vendor.eq.vitel');
+        } catch (_) {}
+
         // Parse Request Body for Target Vendor (e.g. 'bilalsadasub', 'clubkonnect', 'bigi', or 'all')
         const reqData = await req.json().catch(() => ({}));
         
         let targetVendors: string[] = [];
         if (reqData.vendor && reqData.vendor !== 'all') {
             targetVendors = [reqData.vendor.toLowerCase()];
-        } else if (reqData.vendor === 'all') {
-            targetVendors = ['bilalsadasub', 'bigi', 'clubkonnect'];
         } else {
-            const { data: vendorSetting } = await supabaseAdmin.from('app_settings').select('value').eq('key', 'vtu_vendor').maybeSingle();
-            const activeVendor = vendorSetting?.value || 'bilalsadasub';
-            targetVendors = [activeVendor.toLowerCase()];
+            targetVendors = ['bilalsadasub', 'clubkonnect', 'bigi'];
         }
 
         // Fetch Markup Configs
         const { data: configs } = await supabaseAdmin.from('data_configs').select('*');
         const configMap = new Map(configs?.map((c: any) => [c.network.toLowerCase(), c]) || []);
 
-        let totalInserted = 0;
-        const syncSummary: string[] = [];
-        const networkCounts: Record<string, number> = {
-            mtn: 0,
-            glo: 0,
-            airtel: 0,
-            '9mobile': 0,
-            vital: 0
-        };
-        const syncedPlansList: any[] = [];
+        let globalTotalInserted = 0;
+        const vendorBreakdown: Record<string, {
+            name: string;
+            total: number;
+            networks: Record<string, number>;
+            plans: any[];
+        }> = {};
 
         for (const vendor of targetVendors) {
             let networksData: any = {};
+            const vendorNameMap: Record<string, string> = {
+                bilalsadasub: 'BilalSadaSub API',
+                clubkonnect: 'ClubKonnect API',
+                bigi: 'Bigi VTU API'
+            };
+
+            const currentVendorName = vendorNameMap[vendor] || vendor.toUpperCase();
+            vendorBreakdown[vendor] = {
+                name: currentVendorName,
+                total: 0,
+                networks: { MTN: 0, GLO: 0, AIRTEL: 0, '9MOBILE': 0, VITAL: 0 },
+                plans: []
+            };
 
             if (vendor === 'bilalsadasub') {
-                // BilalSadaSub API supports MTN, AIRTEL, GLO, T2 (9mobile), and VITEL (Vital Network)
-                const bilalNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2', 'VITEL'];
+                const { data: tokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BILALSADASUB_TOKEN').maybeSingle();
+                const bilalToken = tokenSetting?.value?.trim() || '';
+
+                const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                if (bilalToken) headers['Authorization'] = `Token ${bilalToken}`;
+
+                const bilalNetworks = [
+                    { code: 'MTN', canonical: 'mtn' },
+                    { code: 'AIRTEL', canonical: 'airtel' },
+                    { code: 'GLO', canonical: 'glo' },
+                    { code: 'T2', canonical: '9mobile' },
+                    { code: 'VITEL', canonical: 'vital' },
+                ];
+
                 for (const net of bilalNetworks) {
                     try {
-                        const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${net}`);
-                        const bRes = await res.json();
-                        const plansList = bRes?.data || bRes;
-                        if (Array.isArray(plansList)) {
-                            networksData[net] = plansList.map((p: any) => ({
+                        let plansList: any[] = [];
+                        const res = await fetch(`https://bilalsadasub.com/api/v1/plans/data?network=${net.code}`, { headers });
+                        const bRes = await res.json().catch(() => null);
+                        plansList = bRes?.data || (Array.isArray(bRes) ? bRes : []);
+
+                        if (Array.isArray(plansList) && plansList.length > 0) {
+                            networksData[net.canonical] = plansList.map((p: any) => ({
                                 PRODUCT_ID: (p.plan_id || p.id).toString(),
-                                PRODUCT_AMOUNT: (p.amount || 0).toString(),
+                                PRODUCT_AMOUNT: (p.amount || p.price || 0).toString(),
                                 PRODUCT_NAME: `${p.plan_name || p.name} (${p.plan_type || 'GIFTING'}) - ${p.plan_day || '30 days'} [BILAL]`,
                                 validity: p.plan_day || '30 days',
                                 volume: p.plan_name || ''
@@ -146,25 +173,25 @@ Deno.serve(async (req) => {
                     } catch (err: any) {}
                 }
             } else if (vendor === 'bigi') {
-                const { data: bigiTokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').single();
-                const bigiToken = bigiTokenSetting?.value;
+                const { data: bigiTokenSetting } = await supabaseAdmin.from('system_secrets').select('value').eq('key', 'BIGI_API_TOKEN').maybeSingle();
+                const bigiToken = bigiTokenSetting?.value?.trim();
 
                 if (bigiToken) {
                     const bigiNetworks = [
-                        { id: 1, name: 'MTN' },
-                        { id: 2, name: 'GLO' },
-                        { id: 3, name: 'AIRTEL' },
-                        { id: 4, name: '9MOBILE' }
+                        { id: 1, name: 'MTN', canonical: 'mtn' },
+                        { id: 2, name: 'GLO', canonical: 'glo' },
+                        { id: 3, name: 'AIRTEL', canonical: 'airtel' },
+                        { id: 4, name: '9MOBILE', canonical: '9mobile' }
                     ];
 
                     for (const net of bigiNetworks) {
                         try {
                             const res = await fetch(`https://api.bigisub.ng/api/v2/vtu/data/plans/?network=${net.id}`, {
-                                headers: { 'Authorization': `Bearer ${bigiToken.trim()}` }
+                                headers: { 'Authorization': `Bearer ${bigiToken}` }
                             });
-                            const bigiRes = await res.json();
-                            if (bigiRes.success && bigiRes.data) {
-                                networksData[net.name] = bigiRes.data.map((p: any) => ({
+                            const bigiRes = await res.json().catch(() => null);
+                            if (bigiRes && bigiRes.success && Array.isArray(bigiRes.data)) {
+                                networksData[net.canonical] = bigiRes.data.map((p: any) => ({
                                     PRODUCT_ID: p.id.toString(),
                                     PRODUCT_AMOUNT: p.amount.toString(),
                                     PRODUCT_NAME: `${p.size} ${p.plantype} - ${p.validity} [BIGI]`,
@@ -175,8 +202,7 @@ Deno.serve(async (req) => {
                         } catch (err: any) {}
                     }
                 }
-            } else {
-                // ClubKonnect / NelloByte Systems Logic
+            } else if (vendor === 'clubkonnect') {
                 try {
                     const { data: secretsData } = await supabaseAdmin.from('system_secrets').select('key, value');
                     const { data: settingsData } = await supabaseAdmin.from('app_settings').select('key, value');
@@ -202,12 +228,32 @@ Deno.serve(async (req) => {
                 } catch (err: any) {}
             }
 
-            // Fail-safe fallback to DEFAULT_CATALOG if API response empty
+            // Fallback 1: Query existing data_plans in database for this vendor
+            if (Object.keys(networksData).length === 0) {
+                const { data: dbPlans } = await supabaseAdmin
+                    .from('data_plans')
+                    .select('*')
+                    .eq('api_vendor', vendor);
+
+                if (dbPlans && dbPlans.length > 0) {
+                    dbPlans.forEach((p: any) => {
+                        const netKey = p.network || 'mtn';
+                        networksData[netKey] = networksData[netKey] || [];
+                        networksData[netKey].push({
+                            PRODUCT_ID: p.plan_id,
+                            PRODUCT_AMOUNT: p.cost_price.toString(),
+                            PRODUCT_NAME: p.name,
+                            validity: '30 Days',
+                            volume: p.name
+                        });
+                    });
+                }
+            }
+
+            // Fallback 2: Default catalog if database and API empty
             if (Object.keys(networksData).length === 0) {
                 networksData = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
             }
-
-            let vendorInserted = 0;
 
             for (const netKey in networksData) {
                 const plans = networksData[netKey];
@@ -319,30 +365,22 @@ Deno.serve(async (req) => {
                         }
 
                         if (!opError) {
-                            vendorInserted++;
-                            totalInserted++;
-                            networkCounts[networkName] = (networkCounts[networkName] || 0) + 1;
-                            syncedPlansList.push(recordData);
+                            globalTotalInserted++;
+                            vendorBreakdown[vendor].total++;
+                            const displayNetKey = networkName.toUpperCase() === 'VITAL' ? 'VITAL' : (networkName.toUpperCase() === '9MOBILE' ? '9MOBILE' : networkName.toUpperCase());
+                            vendorBreakdown[vendor].networks[displayNetKey] = (vendorBreakdown[vendor].networks[displayNetKey] || 0) + 1;
+                            vendorBreakdown[vendor].plans.push(recordData);
                         }
                     }
                 }
             }
-            syncSummary.push(`${vendor.toUpperCase()}: ${vendorInserted} plans`);
         }
 
         return new Response(JSON.stringify({ 
             success: true, 
-            message: `Synced ${totalInserted} data plans successfully across 5 networks!`,
-            total: totalInserted,
-            summaryByVendor: syncSummary.join(', '),
-            summaryByNetwork: {
-                MTN: networkCounts.mtn || 0,
-                GLO: networkCounts.glo || 0,
-                AIRTEL: networkCounts.airtel || 0,
-                '9MOBILE': networkCounts['9mobile'] || 0,
-                VITAL: networkCounts.vital || 0
-            },
-            plans: syncedPlansList
+            message: `Synced ${globalTotalInserted} data plans successfully across API vendors & networks!`,
+            total: globalTotalInserted,
+            vendorBreakdown: vendorBreakdown
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
