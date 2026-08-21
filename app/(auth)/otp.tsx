@@ -86,11 +86,17 @@ export default function OTP() {
     };
 
     const checkAndSendOtpEmail = async (emailToSend: string) => {
+        if (params.forceResend === 'true') {
+            await sendOtpEmail(emailToSend, true);
+            return;
+        }
         try {
-            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${emailToSend}`);
+            const cleanEmailLower = emailToSend.toLowerCase().trim();
+            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${cleanEmailLower}`);
             const storedTime = storedTimeStr ? parseInt(storedTimeStr, 10) : 0;
+            const hasStoredOtp = await AsyncStorage.getItem(`recovery_otp_${cleanEmailLower}`) || await AsyncStorage.getItem('latest_generated_otp');
             // If OTP was sent less than 60 seconds ago by Signup screen, skip auto-resending
-            if (storedTime && (Date.now() - storedTime < 60 * 1000)) {
+            if (storedTime && hasStoredOtp && (Date.now() - storedTime < 60 * 1000)) {
                 return;
             }
         } catch (e) {}
