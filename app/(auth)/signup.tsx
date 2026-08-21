@@ -546,6 +546,18 @@ export default function SignupScreen() {
         }
     };
 
+    const getLogoSource = () => {
+        if (settings?.app_logo) {
+            if (typeof settings.app_logo === 'string' && settings.app_logo.trim().length > 0) {
+                return { uri: settings.app_logo.trim() };
+            }
+            if (typeof settings.app_logo === 'object' && settings.app_logo.url && typeof settings.app_logo.url === 'string' && settings.app_logo.url.trim().length > 0) {
+                return { uri: settings.app_logo.url.trim() };
+            }
+        }
+        return require('../../assets/images/logo.png');
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -571,7 +583,7 @@ export default function SignupScreen() {
 
                             <View style={styles.brandRow}>
                                 <Image
-                                    source={(settings?.app_logo ? { uri: typeof settings.app_logo === 'string' ? settings.app_logo : settings.app_logo.url } : require('../../assets/images/logo.png'))}
+                                    source={getLogoSource()}
                                     style={styles.logoImage}
                                     resizeMode="contain"
                                 />
