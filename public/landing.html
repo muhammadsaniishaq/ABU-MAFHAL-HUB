@@ -1355,9 +1355,80 @@
       });
     });
   </script>
-  <!-- Floating WhatsApp Support Button -->
-  <a href="https://wa.me/2348001234567?text=Hello%20Mafhal%20Sub%20Support" target="_blank" aria-label="Chat on WhatsApp" style="position:fixed;bottom:20px;right:20px;z-index:999;width:48px;height:48px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(37,211,102,0.4);text-decoration:none;transition:transform 0.2s ease;">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffff"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-  </a>
+  <!-- Floating Action Button (FAB) matching User Dashboard -->
+  <div id="fab-backdrop" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(13,27,62,0.4);backdrop-filter:blur(3px);z-index:9998;transition:opacity 0.25s ease;" onclick="toggleFab(false)"></div>
+
+  <div id="landing-fab-wrapper" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;">
+    
+    <!-- FAB Pop-up Menu -->
+    <div id="fab-menu" style="display:none;flex-direction:column;align-items:flex-end;gap:12px;margin-bottom:14px;opacity:0;transform:translateY(15px);transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
+      
+      <!-- Option 1: WhatsApp Support -->
+      <a href="https://wa.me/2348145853539?text=Hello%20ABU%20MAFHAL%20Support" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <span style="font-size:11px;font-weight:700;color:var(--navy);background:var(--white);padding:6px 12px;border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);white-space:nowrap;">WhatsApp Support 💬</span>
+        <div style="width:44px;height:44px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(37,211,102,0.4);transition:transform 0.2s ease;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#ffffff"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+        </div>
+      </a>
+
+      <!-- Option 2: Support Center -->
+      <a href="/login" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <span style="font-size:11px;font-weight:700;color:var(--navy);background:var(--white);padding:6px 12px;border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);white-space:nowrap;">Help &amp; Tickets 🎧</span>
+        <div style="width:44px;height:44px;border-radius:50%;background:#e11d48;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(225,29,72,0.4);transition:transform 0.2s ease;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+        </div>
+      </a>
+
+      <!-- Option 3: Get Started -->
+      <a href="/signup" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+        <span style="font-size:11px;font-weight:700;color:var(--navy);background:var(--white);padding:6px 12px;border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);white-space:nowrap;">Get Started Free 🚀</span>
+        <div style="width:44px;height:44px;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(79,70,229,0.4);transition:transform 0.2s ease;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 12 2"/></svg>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Main Trigger Floating Plus (+) Button -->
+    <button id="fab-trigger-btn" onclick="toggleFab()" aria-label="Quick Actions Menu" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg, var(--navy), #162e6b);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(13,27,62,0.35);cursor:pointer;transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);outline:none;">
+      <svg id="fab-plus-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s ease;">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+
+  </div>
+
+  <script>
+    let isFabOpen = false;
+    function toggleFab(forceState) {
+      isFabOpen = typeof forceState === 'boolean' ? forceState : !isFabOpen;
+      const menu = document.getElementById('fab-menu');
+      const backdrop = document.getElementById('fab-backdrop');
+      const plusIcon = document.getElementById('fab-plus-icon');
+
+      if (isFabOpen) {
+        backdrop.style.display = 'block';
+        setTimeout(() => { backdrop.style.opacity = '1'; }, 10);
+        menu.style.display = 'flex';
+        setTimeout(() => {
+          menu.style.opacity = '1';
+          menu.style.transform = 'translateY(0)';
+        }, 10);
+        plusIcon.style.transform = 'rotate(45deg)';
+      } else {
+        backdrop.style.opacity = '0';
+        menu.style.opacity = '0';
+        menu.style.transform = 'translateY(15px)';
+        plusIcon.style.transform = 'rotate(0deg)';
+        setTimeout(() => {
+          if (!isFabOpen) {
+            backdrop.style.display = 'none';
+            menu.style.display = 'none';
+          }
+        }, 250);
+      }
+    }
+  </script>
 </body>
 </html>
