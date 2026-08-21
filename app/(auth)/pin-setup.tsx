@@ -184,28 +184,19 @@ export default function PinSetupScreen() {
 
                     if (Platform.OS !== 'web') Vibration.vibrate(50);
 
-                    // 3. Check active session & navigate appropriately (avoids falling back to Splash Page '/')
-                    const { data: { session } } = await supabase.auth.getSession();
-                    
-                    if (session) {
-                        if (Platform.OS === 'web') {
-                            alert('Success! Your 4-digit Transaction PIN has been set successfully.');
-                            router.replace('/dashboard' as any);
-                        } else {
-                            Alert.alert('Success! 🎉', 'Your 4-digit Transaction PIN has been set successfully.', [
-                                { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
-                            ]);
-                        }
+                    // 3. Mark app as unlocked & navigate straight to Dashboard
+                    await AsyncStorage.setItem('app_unlocked', 'true');
+                    await AsyncStorage.setItem('has_active_session', 'true');
+                    await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
+
+                    const successMsg = 'Success! 🎉 Your account & 4-digit Transaction PIN have been created successfully.';
+                    if (Platform.OS === 'web') {
+                        alert(successMsg);
+                        router.replace('/dashboard' as any);
                     } else {
-                        const msg = 'Success! Your account & 4-digit Transaction PIN have been created successfully. Please sign in to access your dashboard.';
-                        if (Platform.OS === 'web') {
-                            alert(msg);
-                            router.replace('/login' as any);
-                        } else {
-                            Alert.alert('Setup Complete! 🎉', msg, [
-                                { text: 'Sign In Now', onPress: () => router.replace('/login' as any) },
-                            ]);
-                        }
+                        Alert.alert('Setup Complete! 🎉', successMsg, [
+                            { text: 'Go to Dashboard', onPress: () => router.replace('/dashboard' as any) },
+                        ]);
                     }
                 } catch (error: any) {
                     const errMsg = error.message || 'Failed to save PIN';

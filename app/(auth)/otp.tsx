@@ -50,7 +50,8 @@ export default function OTP() {
             fetchActiveUserEmail();
         } else if (!initialEmailSentRef.current) {
             initialEmailSentRef.current = true;
-            sendOtpEmail(targetEmail);
+            // Check if fresh OTP was just sent by signup screen
+            checkAndSendOtpEmail(targetEmail);
         }
     }, [targetEmail]);
 
@@ -76,7 +77,7 @@ export default function OTP() {
 
                 if (!initialEmailSentRef.current) {
                     initialEmailSentRef.current = true;
-                    sendOtpEmail(user.email);
+                    checkAndSendOtpEmail(user.email);
                 }
             }
         } catch (e) {
@@ -84,7 +85,19 @@ export default function OTP() {
         }
     };
 
-    const sendOtpEmail = async (emailToSend: string) => {
+    const checkAndSendOtpEmail = async (emailToSend: string) => {
+        try {
+            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${emailToSend}`);
+            const storedTime = storedTimeStr ? parseInt(storedTimeStr, 10) : 0;
+            // If OTP was sent less than 60 seconds ago by Signup screen, skip auto-resending
+            if (storedTime && (Date.now() - storedTime < 60 * 1000)) {
+                return;
+            }
+        } catch (e) {}
+        await sendOtpEmail(emailToSend, true);
+    };
+
+    const sendOtpEmail = async (emailToSend: string, isForce: boolean = false) => {
         if (!emailToSend) return;
         setResending(true);
         try {
@@ -93,6 +106,9 @@ export default function OTP() {
             await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, generatedOtp);
             await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
 
+            const isReset = params.mode === 'reset-password' || params.mode === 'account-password';
+            const emailSubtitle = isReset ? 'Password Reset Verification' : 'Account Registration Verification';
+
             // 1. Dispatch HTML email with the 6-digit code via Edge Function
             try {
                 await supabase.functions.invoke('send-communication', {
@@ -100,11 +116,11 @@ export default function OTP() {
                         type: 'email',
                         recipient_mode: 'single',
                         recipient: emailToSend,
-                        subject: 'Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB',
+                        subject: `Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB`,
                         body: `
                             <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
                                 <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Security Verification & PIN Reset</p>
+                                <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">${emailSubtitle}</p>
                                 <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
                                 <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
                                     ${generatedOtp}
