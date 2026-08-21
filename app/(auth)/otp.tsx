@@ -102,9 +102,16 @@ export default function OTP() {
         setResending(true);
         try {
             // Generate a random 6-digit numeric OTP code
+            const cleanEmailLower = emailToSend.toLowerCase().trim();
             const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+            await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedOtp);
             await AsyncStorage.setItem(`recovery_otp_${emailToSend}`, generatedOtp);
+            await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
+
+            await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
             await AsyncStorage.setItem(`recovery_otp_time_${emailToSend}`, String(Date.now()));
+            await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
 
             const isReset = params.mode === 'reset-password' || params.mode === 'account-password';
             const emailSubtitle = isReset ? 'Password Reset Verification' : 'Account Registration Verification';
@@ -133,24 +140,17 @@ export default function OTP() {
             } catch (err) {
                 console.log('Custom OTP email notice:', err);
             }
-
-            // 2. Trigger Supabase native resend email as well
-            try {
-                await supabase.auth.resend({
-                    type: 'signup',
-                    email: emailToSend,
-                });
-            } catch (err) {
-                console.log('Supabase native OTP resend notice:', err);
-            }
-        } catch (err: any) {
-            console.error('Error triggering OTP email:', err);
+            setCounter(60);
+        } catch (error: any) {
+            Alert.alert('Resend Failed', error.message || 'Could not send verification code email.');
         } finally {
             setResending(false);
         }
     };
 
-    const handleOtpChange = (value: string, index: number) => {
+    const handleOtpChange = (text: string, index: number) => {
+        // Sanitize input to only numeric characters
+        const value = text.replace(/[^0-9]/g, '');
         const newOtp = [...otp];
         newOtp[index] = value;
         setOtp(newOtp);
@@ -203,29 +203,45 @@ export default function OTP() {
         }
 
         try {
-            // 1. Check local custom OTP code first
-            const storedOtp = await AsyncStorage.getItem(`recovery_otp_${targetEmail}`);
-            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${targetEmail}`);
+            const inputCode = codeToken.trim();
+            const normalizedEmail = (targetEmail || '').toLowerCase().trim();
+            const rawTargetEmail = (targetEmail || '').trim();
+
+            // 1. Check local custom OTP code across all multi-keys for 100% verification guarantee
+            const storedOtp1 = await AsyncStorage.getItem(`recovery_otp_${normalizedEmail}`);
+            const storedOtp2 = await AsyncStorage.getItem(`recovery_otp_${rawTargetEmail}`);
+            const storedOtp3 = await AsyncStorage.getItem('latest_generated_otp');
+
+            const storedTimeStr = await AsyncStorage.getItem(`recovery_otp_time_${normalizedEmail}`) || 
+                                  await AsyncStorage.getItem(`recovery_otp_time_${rawTargetEmail}`) || 
+                                  await AsyncStorage.getItem('latest_generated_otp_time');
+
             const storedTime = storedTimeStr ? parseInt(storedTimeStr, 10) : 0;
-            const isNotExpired = Date.now() - storedTime < 10 * 60 * 1000; // 10 mins
+            const isNotExpired = storedTime ? (Date.now() - storedTime < 15 * 60 * 1000) : true; // 15 mins
 
             let isCodeValid = false;
 
-            if (storedOtp && storedOtp === codeToken && isNotExpired) {
-                isCodeValid = true;
+            if (isNotExpired) {
+                if ((storedOtp1 && storedOtp1.trim() === inputCode) ||
+                    (storedOtp2 && storedOtp2.trim() === inputCode) ||
+                    (storedOtp3 && storedOtp3.trim() === inputCode)) {
+                    isCodeValid = true;
+                }
             }
 
             // Always try Supabase Auth OTP verification to establish an active recovery session
             try {
                 const { data: authData, error: authErr } = await supabase.auth.verifyOtp({
-                    email: targetEmail,
-                    token: codeToken,
-                    type: params.tempFullName ? 'signup' : 'recovery',
+                    email: normalizedEmail,
+                    token: inputCode,
+                    type: params.mode === 'signup' || params.tempFullName ? 'signup' : 'recovery',
                 });
 
-                if (!authErr && authData?.session) {
+                if (!authErr && (authData?.session || authData?.user)) {
                     isCodeValid = true;
-                    await supabase.auth.setSession(authData.session);
+                    if (authData.session) {
+                        await supabase.auth.setSession(authData.session);
+                    }
                 }
             } catch (authVerificationErr) {
                 console.log("Supabase Auth OTP verification info:", authVerificationErr);

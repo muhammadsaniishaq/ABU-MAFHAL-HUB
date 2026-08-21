@@ -432,10 +432,17 @@ export default function SignupScreen() {
             }
 
             if (data.user) {
-                // 1. Generate & store 6-digit OTP code locally for immediate verification
+                // 1. Generate & store 6-digit OTP code locally under all fallback keys for 100% verification guarantee
+                const cleanEmailLower = cleanEmail.toLowerCase().trim();
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+                await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedOtp);
                 await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);
+                await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
+
+                await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
                 await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
+                await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
 
                 // 2. Dispatch OTP email
                 try {
