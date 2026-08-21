@@ -412,11 +412,25 @@ export default function LoginScreen() {
 
     const getLogoSource = () => {
         if (settings?.app_logo) {
-            if (typeof settings.app_logo === 'string' && settings.app_logo.trim().length > 0) {
-                return { uri: settings.app_logo.trim() };
+            let logoUrl = '';
+            if (typeof settings.app_logo === 'string') {
+                const trimmed = settings.app_logo.trim();
+                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        logoUrl = parsed.url || parsed.uri || parsed.src || '';
+                    } catch (e) {
+                        logoUrl = '';
+                    }
+                } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+                    logoUrl = trimmed;
+                }
+            } else if (typeof settings.app_logo === 'object') {
+                logoUrl = settings.app_logo.url || settings.app_logo.uri || settings.app_logo.src || '';
             }
-            if (typeof settings.app_logo === 'object' && settings.app_logo.url && typeof settings.app_logo.url === 'string' && settings.app_logo.url.trim().length > 0) {
-                return { uri: settings.app_logo.url.trim() };
+
+            if (logoUrl && logoUrl.trim().length > 0) {
+                return { uri: logoUrl.trim() };
             }
         }
         return require('../../assets/images/logo.png');
