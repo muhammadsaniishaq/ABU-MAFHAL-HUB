@@ -193,63 +193,85 @@ export default function LoginScreen() {
                 ? { email: emailToUse, password: userPass }
                 : { phone: cleanIdent, password: userPass };
 
-            const { data, error } = await supabase.auth.signInWithPassword(loginCredentials);
+            let { data, error } = await supabase.auth.signInWithPassword(loginCredentials);
 
             if (error) {
                 if (error.message.includes('Email not confirmed') || error.message.includes('Email not verified')) {
                     const cleanEmail = emailToUse.toLowerCase().trim();
-                    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                    const isLocallyVerified = (await AsyncStorage.getItem(`verified_user_${cleanEmail}`)) === 'true' ||
+                                               (await AsyncStorage.getItem(`verified_user_${emailToUse}`)) === 'true';
 
-                    await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);
-                    await AsyncStorage.setItem(`recovery_otp_${emailToUse}`, generatedOtp);
-                    await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
-
-                    await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
-                    await AsyncStorage.setItem(`recovery_otp_time_${emailToUse}`, String(Date.now()));
-                    await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
-
-                    try {
-                        await supabase.functions.invoke('send-communication', {
-                            body: {
-                                type: 'email',
-                                recipient_mode: 'single',
-                                recipient: cleanEmail,
-                                subject: 'Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB',
-                                body: `
-                                    <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
-                                        <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                        <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Email Verification</p>
-                                        <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
-                                        <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
-                                            ${generatedOtp}
-                                        </div>
-                                        <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
-                                    </div>
-                                `,
-                            },
-                        });
-                    } catch (e) {
-                        console.log('Login OTP email dispatch notice:', e);
+                    if (isLocallyVerified) {
+                        try {
+                            await supabase.rpc('confirm_user_email', { target_email: cleanEmail });
+                            const retryRes = await supabase.auth.signInWithPassword(loginCredentials);
+                            if (!retryRes.error && retryRes.data?.user) {
+                                data = retryRes.data;
+                                error = null;
+                            }
+                        } catch (retryErr) {
+                            console.log('Auto-confirm retry notice:', retryErr);
+                        }
                     }
 
-                    router.push({
-                        pathname: '/otp' as any,
-                        params: { email: cleanEmail, mode: 'signup', forceResend: 'true' }
-                    });
-                    setLoading(false);
-                    return;
+                    if (error) {
+                        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+                        await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);
+                        await AsyncStorage.setItem(`recovery_otp_${emailToUse}`, generatedOtp);
+                        await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
+
+                        await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
+                        await AsyncStorage.setItem(`recovery_otp_time_${emailToUse}`, String(Date.now()));
+                        await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
+
+                        try {
+                            await supabase.functions.invoke('send-communication', {
+                                body: {
+                                    type: 'email',
+                                    recipient_mode: 'single',
+                                    recipient: cleanEmail,
+                                    subject: 'Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB',
+                                    body: `
+                                        <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
+                                            <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
+                                            <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Email Verification</p>
+                                            <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
+                                            <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
+                                                ${generatedOtp}
+                                            </div>
+                                            <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
+                                        </div>
+                                    `,
+                                },
+                            });
+                        } catch (e) {
+                            console.log('Login OTP email dispatch notice:', e);
+                        }
+
+                        router.push({
+                            pathname: '/otp' as any,
+                            params: { email: cleanEmail, mode: 'signup', forceResend: 'true' }
+                        });
+                        setLoading(false);
+                        return;
+                    }
+                } else {
+                    throw error;
                 }
-                throw error;
             }
 
-            if (data.user) {
+            if (data?.user) {
                 if (rememberMe) {
                     await AsyncStorage.setItem('saved_user_identifier', cleanIdent);
                     await AsyncStorage.setItem('saved_user_pass_secure', userPass);
                 }
 
-                if (settings?.require_email_verif && !data.user.email_confirmed_at && isEmailInput) {
-                    const cleanEmail = emailToUse.toLowerCase().trim();
+                const cleanEmail = emailToUse.toLowerCase().trim();
+                const isLocallyVerified = (await AsyncStorage.getItem(`verified_user_${cleanEmail}`)) === 'true' ||
+                                           (await AsyncStorage.getItem(`verified_user_${data.user.id}`)) === 'true';
+
+                if (settings?.require_email_verif && !data.user.email_confirmed_at && !isLocallyVerified && isEmailInput) {
                     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
                     await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);

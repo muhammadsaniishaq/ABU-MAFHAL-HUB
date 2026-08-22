@@ -257,10 +257,27 @@ export default function OTP() {
                 throw new Error('Invalid or expired 6-digit code. Please check your email and try again.');
             }
 
+            // Mark email as verified locally & call RPC to confirm email on Supabase Auth DB
+            await AsyncStorage.setItem(`verified_user_${normalizedEmail}`, 'true');
+            await AsyncStorage.setItem(`verified_user_${targetEmail}`, 'true');
+            try {
+                await supabase.rpc('confirm_user_email', { target_email: normalizedEmail });
+            } catch (rpcErr) {
+                console.log('RPC confirm_user_email notice:', rpcErr);
+            }
+
             // Clear used OTP
+            await AsyncStorage.removeItem(`recovery_otp_${normalizedEmail}`);
             await AsyncStorage.removeItem(`recovery_otp_${targetEmail}`);
+            await AsyncStorage.removeItem('latest_generated_otp');
 
             const { data: { user } } = await supabase.auth.getUser();
+            if (user?.id) {
+                await AsyncStorage.setItem(`verified_user_${user.id}`, 'true');
+                try {
+                    await supabase.from('profiles').update({ status: 'active' }).eq('id', user.id);
+                } catch (e) {}
+            }
             if (user && params.tempFullName) {
                 await supabase.from('profiles').insert({
                     id: user.id,
