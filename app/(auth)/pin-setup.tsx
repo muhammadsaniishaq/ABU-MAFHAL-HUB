@@ -169,13 +169,34 @@ export default function PinSetupScreen() {
                     await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
                     setStoredPin(pin);
 
-                    // 2. Sync to Supabase profiles gracefully
+                    // 2. Sync to Supabase profiles & confirm email gracefully
                     try {
+                        const pendingEmail = await AsyncStorage.getItem('pending_auth_email');
+                        const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
+
+                        if (pendingEmail) {
+                            try {
+                                await supabase.rpc('confirm_user_email', { target_email: pendingEmail });
+                            } catch (r) {}
+
+                            if (pendingPass) {
+                                try {
+                                    const { data: resData } = await supabase.auth.signInWithPassword({
+                                        email: pendingEmail,
+                                        password: pendingPass,
+                                    });
+                                    if (resData?.session) {
+                                        await supabase.auth.setSession(resData.session);
+                                    }
+                                } catch (s) {}
+                            }
+                        }
+
                         const { data: { user } } = await supabase.auth.getUser();
                         if (user?.id) {
                             await supabase
                                 .from('profiles')
-                                .update({ transaction_pin: pin })
+                                .update({ transaction_pin: pin, status: 'active' })
                                 .eq('id', user.id);
                         }
                     } catch (e) {

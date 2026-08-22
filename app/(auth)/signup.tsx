@@ -432,8 +432,12 @@ export default function SignupScreen() {
             }
 
             if (data.user) {
-                // 1. Generate & store 6-digit OTP code locally under all fallback keys for 100% verification guarantee
+                // 1. Save credentials locally for automatic session establishment upon OTP verification
                 const cleanEmailLower = cleanEmail.toLowerCase().trim();
+                await AsyncStorage.setItem('pending_auth_email', cleanEmailLower);
+                await AsyncStorage.setItem('pending_auth_pass', password);
+
+                // 2. Generate & store 6-digit OTP code locally under all fallback keys for 100% verification guarantee
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
                 await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedOtp);

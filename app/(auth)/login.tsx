@@ -215,6 +215,11 @@ export default function LoginScreen() {
                     }
 
                     if (error) {
+                        await AsyncStorage.setItem('pending_auth_email', cleanEmail);
+                        if (userPass) {
+                            await AsyncStorage.setItem('pending_auth_pass', userPass);
+                        }
+
                         const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
                         await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);

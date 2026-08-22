@@ -267,6 +267,25 @@ export default function OTP() {
                 console.log('RPC confirm_user_email notice:', rpcErr);
             }
 
+            // Establish active Supabase session if pending password exists
+            try {
+                const pendingPass = await AsyncStorage.getItem('pending_auth_pass');
+                const emailToLogin = (await AsyncStorage.getItem('pending_auth_email')) || normalizedEmail;
+                if (pendingPass && emailToLogin) {
+                    const { data: authData, error: signInErr } = await supabase.auth.signInWithPassword({
+                        email: emailToLogin,
+                        password: pendingPass,
+                    });
+                    if (!signInErr && authData?.session) {
+                        await supabase.auth.setSession(authData.session);
+                        await AsyncStorage.setItem('has_active_session', 'true');
+                        await AsyncStorage.setItem('app_unlocked', 'true');
+                    }
+                }
+            } catch (authSessionErr) {
+                console.log('Auto sign-in session notice:', authSessionErr);
+            }
+
             // Clear used OTP
             await AsyncStorage.removeItem(`recovery_otp_${normalizedEmail}`);
             await AsyncStorage.removeItem(`recovery_otp_${targetEmail}`);
