@@ -27,6 +27,7 @@ export default function OTP() {
         mode?: string;
         type?: string;
         factorId?: string;
+        forceResend?: string;
         tempFullName?: string;
         tempUsername?: string;
         tempPhone?: string;
