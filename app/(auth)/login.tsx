@@ -254,6 +254,10 @@ export default function LoginScreen() {
                             console.log('Login OTP email dispatch notice:', e);
                         }
 
+                        try {
+                            await supabase.auth.resend({ type: 'signup', email: cleanEmail });
+                        } catch (e) {}
+
                         router.push({
                             pathname: '/otp' as any,
                             params: { email: cleanEmail, mode: 'signup', forceResend: 'true' }

@@ -236,22 +236,31 @@ export default function OTP() {
                 }
             }
 
-            // Always try Supabase Auth OTP verification to establish an active recovery session
-            try {
-                const { data: authData, error: authErr } = await supabase.auth.verifyOtp({
-                    email: normalizedEmail,
-                    token: inputCode,
-                    type: params.mode === 'signup' || params.tempFullName ? 'signup' : 'recovery',
-                });
+            // Always try Supabase Auth OTP verification across all types to confirm email in Supabase Auth DB
+            let nativeVerifySuccess = false;
+            let activeAuthSession = null;
 
-                if (!authErr && (authData?.session || authData?.user)) {
-                    isCodeValid = true;
-                    if (authData.session) {
-                        await supabase.auth.setSession(authData.session);
+            const otpTypesToTry: Array<'signup' | 'email' | 'recovery'> = ['signup', 'email', 'recovery'];
+            for (const otpType of otpTypesToTry) {
+                try {
+                    const { data: authData, error: authErr } = await supabase.auth.verifyOtp({
+                        email: normalizedEmail,
+                        token: inputCode,
+                        type: otpType,
+                    });
+
+                    if (!authErr && (authData?.session || authData?.user)) {
+                        nativeVerifySuccess = true;
+                        isCodeValid = true;
+                        if (authData.session) {
+                            activeAuthSession = authData.session;
+                            await supabase.auth.setSession(authData.session);
+                        }
+                        break;
                     }
+                } catch (authVerificationErr) {
+                    console.log(`Supabase Auth OTP (${otpType}) notice:`, authVerificationErr);
                 }
-            } catch (authVerificationErr) {
-                console.log("Supabase Auth OTP verification info:", authVerificationErr);
             }
 
             if (!isCodeValid) {

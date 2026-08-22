@@ -448,7 +448,7 @@ export default function SignupScreen() {
                 await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
                 await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
 
-                // 2. Dispatch OTP email
+                // 2. Dispatch OTP email & trigger Supabase Auth native OTP token
                 try {
                     await supabase.functions.invoke('send-communication', {
                         body: {
@@ -471,6 +471,12 @@ export default function SignupScreen() {
                     });
                 } catch (e) {
                     console.log('Signup OTP email dispatch notice:', e);
+                }
+
+                try {
+                    await supabase.auth.resend({ type: 'signup', email: cleanEmail });
+                } catch (e) {
+                    console.log('Supabase native OTP resend notice:', e);
                 }
 
                 setShowSuccessModal(true);
