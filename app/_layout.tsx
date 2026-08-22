@@ -266,21 +266,33 @@ export default function RootLayout() {
             const isAdmin = isUserAdmin(userRole, session.user?.email);
 
             AsyncStorage.getItem('app_unlocked').then(async (unlocked) => {
+                const userId = session.user.id;
                 let localPin = Platform.OS === 'web'
-                    ? await AsyncStorage.getItem('user_transaction_pin')
-                    : await SecureStore.getItemAsync('user_transaction_pin');
+                    ? await AsyncStorage.getItem(`user_transaction_pin_${userId}`) || await AsyncStorage.getItem('user_transaction_pin')
+                    : await SecureStore.getItemAsync(`user_transaction_pin_${userId}`) || await SecureStore.getItemAsync('user_transaction_pin');
 
-                if (!localPin) {
-                    const { data } = await supabase
-                        .from('profiles')
-                        .select('transaction_pin')
-                        .eq('id', session.user.id)
-                        .maybeSingle();
+                // Query database profile to ensure this specific user has a transaction PIN set
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('transaction_pin')
+                    .eq('id', userId)
+                    .maybeSingle();
 
-                    if (data?.transaction_pin) {
-                        localPin = data.transaction_pin;
-                        if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
-                        else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
+                if (profileData) {
+                    if (profileData.transaction_pin) {
+                        localPin = profileData.transaction_pin;
+                        if (Platform.OS === 'web') {
+                            await AsyncStorage.setItem(`user_transaction_pin_${userId}`, localPin);
+                            await AsyncStorage.setItem('user_transaction_pin', localPin);
+                        } else {
+                            await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, localPin);
+                            await SecureStore.setItemAsync('user_transaction_pin', localPin);
+                        }
+                    } else {
+                        // User has no transaction_pin in DB -> Clear stale cached PIN
+                        localPin = null;
+                        await AsyncStorage.removeItem(`user_transaction_pin_${userId}`);
+                        await AsyncStorage.removeItem('user_transaction_pin');
                     }
                 }
 

@@ -58,7 +58,6 @@ export const forceSignOut = async () => {
             'recent_phone_verifications',
             'biometrics_setup_completed',
             'biometrics_enabled',
-            'user_transaction_pin',
             'data_favorites'
         ];
         const keysToRemove = allKeys.filter(k => {

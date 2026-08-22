@@ -160,10 +160,14 @@ export default function PinSetupScreen() {
                 setLoading(true);
                 try {
                     // 1. Store PIN in local storage & unlock app instantly
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    const uId = currentUser?.id;
                     if (Platform.OS === 'web') {
                         await AsyncStorage.setItem('user_transaction_pin', pin);
+                        if (uId) await AsyncStorage.setItem(`user_transaction_pin_${uId}`, pin);
                     } else {
                         await SecureStore.setItemAsync('user_transaction_pin', pin);
+                        if (uId) await SecureStore.setItemAsync(`user_transaction_pin_${uId}`, pin);
                     }
                     await AsyncStorage.setItem('app_unlocked', 'true');
                     await AsyncStorage.setItem('last_security_verification_time', String(Date.now()));
