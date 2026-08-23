@@ -359,9 +359,11 @@ export default function Dashboard() {
       if (!cust) return item;
       return {
         ...item,
-        label: cust.custom_label  || item.label,
-        color: cust.custom_color  || item.color,
+        icon: cust.custom_icon || item.icon,
+        label: cust.custom_label || item.label,
+        color: cust.custom_color || item.color,
         badge: cust.custom_badge !== undefined ? cust.custom_badge : item.badge,
+        bgStyle: cust.custom_bg_style || 'tint',
       };
     });
 
@@ -588,6 +590,23 @@ export default function Dashboard() {
 
           <View style={s.actionsGrid}>
             {displayedActions.map((act, index) => {
+              const bgStyle = (act as any).bgStyle || 'tint';
+              let boxBg = act.color + '14';
+              let boxBorder = act.color + '28';
+              let iconColor = act.color;
+
+              if (bgStyle === 'white') {
+                boxBg = '#FFFFFF';
+                boxBorder = '#E2E8F0';
+              } else if (bgStyle === 'gold') {
+                boxBg = '#FEF3C7';
+                boxBorder = '#FCD34D';
+              } else if (bgStyle === 'navy') {
+                boxBg = '#0F172A';
+                boxBorder = '#1E293B';
+                iconColor = '#F59E0B';
+              }
+
               return (
                 <TouchableOpacity
                   key={act.id || index}
@@ -599,13 +618,13 @@ export default function Dashboard() {
                   }}
                   activeOpacity={0.75}
                 >
-                  <View style={[s.actionIconBox, { backgroundColor: act.color + '12', borderColor: act.color + '30', borderWidth: 1 }]}>
-                    <Ionicons name={act.icon as any} size={19} color={act.color} />
-                    {act.badge && (
+                  <View style={[s.actionIconBox, { backgroundColor: boxBg, borderColor: boxBorder }]}>
+                    <Ionicons name={act.icon as any} size={21} color={iconColor} />
+                    {act.badge ? (
                       <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
                         <Text style={s.badgeText}>{act.badge}</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                   <Text style={s.actionLabel} numberOfLines={1}>{act.label}</Text>
                 </TouchableOpacity>
@@ -1104,20 +1123,28 @@ const s = StyleSheet.create({
   editBtnTxt: { fontSize: 9.5, fontWeight: '700', color: T.indigo },
   seeAllTxt: { fontSize: 10.5, fontWeight: '700', color: T.indigo },
 
-  // Actions grid (4-column modernized layout)
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
-  actionItem: { width: (W - 32 - 28 - 30) / 4, alignItems: 'center', marginBottom: 8 },
+  // Actions grid — clean 4-column layout
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-start' },
+  actionItem: { width: (W - 32 - 24 - 24) / 4, alignItems: 'center', marginBottom: 6 },
   actionIconBox: {
-    width: 48, height: 48, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 6, position: 'relative',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1,
+    width: 52, height: 52, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 6, position: 'relative',
+    backgroundColor: T.white,
+    borderWidth: 1.2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  actionLabel: { fontSize: 9, fontWeight: '700', color: T.navy, textAlign: 'center' },
+  actionLabel: { fontSize: 9.5, fontWeight: '700', color: T.navy, textAlign: 'center', lineHeight: 13 },
   badgeOverlay: {
-    position: 'absolute', top: -4, right: -4, borderRadius: 6,
-    paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: '#FFFFFF',
+    position: 'absolute', top: -5, right: -6, borderRadius: 7,
+    paddingHorizontal: 4, paddingVertical: 1.5,
+    borderWidth: 1.5, borderColor: T.white,
   },
-  badgeText: { fontSize: 6.5, fontWeight: '900', color: '#FFFFFF', textTransform: 'uppercase' },
+  badgeText: { fontSize: 6, fontWeight: '900', color: T.white, textTransform: 'uppercase', letterSpacing: 0.3 },
 
   // Promo Banner
   promoContainer: {
