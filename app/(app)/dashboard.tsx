@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import GlobalAnnouncementModal from '../../components/GlobalAnnouncementModal';
+import CelebrationConfetti, { CelebrationSettings, triggerGlobalConfetti } from '../../components/CelebrationConfetti';
 
 const { width: W } = Dimensions.get('window');
 
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [activeBanners, setActiveBanners] = useState<any[]>([]);
   const [activePartners, setActivePartners] = useState<any[]>([]);
   const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>({});
+  const [celebrationSettings, setCelebrationSettings] = useState<CelebrationSettings | null>(null);
   const bannerRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
@@ -125,6 +127,7 @@ export default function Dashboard() {
           if (cached.logoUrl) setLogoUrl(cached.logoUrl);
           if (cached.unreadCount !== undefined) setUnreadCount(cached.unreadCount);
           if (cached.activePartners) setActivePartners(cached.activePartners);
+          if (cached.celebrationSettings) setCelebrationSettings(cached.celebrationSettings);
         } else {
           console.log("Cached feature flags are stale (older than 1 hour). Skipping cache load for flags.");
         }
@@ -203,7 +206,9 @@ export default function Dashboard() {
 
   const fetchAppSettings = async () => {
     try {
-      const { data } = await supabase.from('app_settings').select('key, value').in('key', ['app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations']);
+      const { data } = await supabase.from('app_settings').select('key, value').in('key', [
+        'app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations', 'celebration_event_settings'
+      ]);
       if (data) {
         data.forEach(setting => {
           if (setting.key === 'app_logo' && setting.value) {
@@ -220,6 +225,15 @@ export default function Dashboard() {
               if (parsed && typeof parsed === 'object') {
                 setServiceCustoms(parsed);
                 saveCache({ serviceCustoms: parsed });
+              }
+            } catch (e) {}
+          }
+          if (setting.key === 'celebration_event_settings') {
+            try {
+              const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+              if (parsed && typeof parsed === 'object') {
+                setCelebrationSettings(parsed);
+                saveCache({ celebrationSettings: parsed });
               }
             } catch (e) {}
           }
@@ -329,7 +343,14 @@ export default function Dashboard() {
     '/social-boost': 'feature_social', '/bulk-sms': 'feature_bulk_sms'
   };
 
-  const handleActionPress = (action: any) => {
+  const handleActionPress = (action: any, e?: any) => {
+    if (celebrationSettings?.is_enabled && celebrationSettings?.confetti_on_tap) {
+      if (e?.nativeEvent?.pageX && e?.nativeEvent?.pageY) {
+        triggerGlobalConfetti(e.nativeEvent.pageX, e.nativeEvent.pageY);
+      } else {
+        triggerGlobalConfetti();
+      }
+    }
     const featureKey = featureMap[action.route];
     if (featureKey) {
       const flag = featureFlags[featureKey];
@@ -417,6 +438,9 @@ export default function Dashboard() {
   return (
     <View style={s.container}>
       <StatusBar style="light" />
+
+      {/* ── Festive Confetti Engine & Floating Particles ── */}
+      <CelebrationConfetti settings={celebrationSettings} />
 
       <ScrollView 
         style={s.scrollView}
@@ -528,7 +552,7 @@ export default function Dashboard() {
             {/* Right: Action buttons */}
             <View style={s.cardRight}>
               <TouchableOpacity
-                onPress={() => handleActionPress({ route: '/(app)/wallet', label: 'Top Up' })}
+                onPress={(e) => handleActionPress({ route: '/(app)/wallet', label: 'Top Up' }, e)}
                 style={s.fundBtn} activeOpacity={0.85}
               >
                 <LinearGradient colors={[T.gold, T.goldDk]} style={s.fundBtnInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
@@ -537,7 +561,7 @@ export default function Dashboard() {
                 </LinearGradient>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => router.push('/history')} style={s.historyBtn} activeOpacity={0.85}>
+              <TouchableOpacity onPress={(e) => handleActionPress({ route: '/history', label: 'Tx History' }, e)} style={s.historyBtn} activeOpacity={0.85}>
                 <Ionicons name="receipt-outline" size={12} color="rgba(255,255,255,0.75)" style={{ marginRight: 4 }} />
                 <Text style={s.historyBtnTxt}>Tx History</Text>
               </TouchableOpacity>
@@ -615,10 +639,10 @@ export default function Dashboard() {
                 <TouchableOpacity
                   key={act.id || index}
                   style={s.actionItem}
-                  onPress={() => {
+                  onPress={(e) => {
                     if (act.route === 'more') setShowAllActions(true);
                     else if (act.route === 'less') setShowAllActions(false);
-                    else handleActionPress(act);
+                    else handleActionPress(act, e);
                   }}
                   activeOpacity={0.75}
                 >
