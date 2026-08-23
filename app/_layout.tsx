@@ -34,7 +34,7 @@ import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import CelebrationConfetti from '../components/CelebrationConfetti';
+import CelebrationConfetti, { triggerGlobalConfetti } from '../components/CelebrationConfetti';
 import '../global.css';
 
 // Suppress browser focus outlines & set up PWA manifest globally across web app
@@ -348,18 +348,36 @@ export default function RootLayout() {
         return <MaintenanceScreen />;
     }
 
+    const lastTouchTime = useRef(0);
+
+    const handleGlobalTouchCapture = (e: any) => {
+        const now = Date.now();
+        if (now - lastTouchTime.current > 380) {
+            lastTouchTime.current = now;
+            const pageX = e?.nativeEvent?.pageX;
+            const pageY = e?.nativeEvent?.pageY;
+            triggerGlobalConfetti(pageX, pageY);
+        }
+        return false;
+    };
+
     return (
         <SafeAreaProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" options={{ headerShown: false }} />
-                    <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                    <Stack.Screen name="privacy" options={{ headerShown: false }} />
-                    <Stack.Screen name="terms" options={{ headerShown: false }} />
-                    <Stack.Screen name="manage" options={{ headerShown: false }} />
-                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(app)" options={{ headerShown: false }} />
-                </Stack>
+                <View
+                    style={{ flex: 1 }}
+                    onStartShouldSetResponderCapture={handleGlobalTouchCapture}
+                >
+                    <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
+                        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                        <Stack.Screen name="privacy" options={{ headerShown: false }} />
+                        <Stack.Screen name="terms" options={{ headerShown: false }} />
+                        <Stack.Screen name="manage" options={{ headerShown: false }} />
+                        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+                    </Stack>
+                </View>
                 <CelebrationConfetti autoListenSupabase={true} />
                 <StatusBar style="auto" />
             </ThemeProvider>

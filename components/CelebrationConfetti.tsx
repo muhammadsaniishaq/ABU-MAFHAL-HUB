@@ -242,7 +242,10 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
   const activeSettings = liveSettings || propSettings;
   const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
 
-  const burst = (originX?: number, originY?: number) => {
+  const burst = (originX?: number, originY?: number, force?: boolean) => {
+    if (!force && activeSettings && (!activeSettings.is_enabled || activeSettings.confetti_on_tap === false)) {
+      return;
+    }
     const startX = originX !== undefined ? originX : SCREEN_WIDTH / 2;
     const startY = originY !== undefined ? originY : SCREEN_HEIGHT * 0.35;
 
