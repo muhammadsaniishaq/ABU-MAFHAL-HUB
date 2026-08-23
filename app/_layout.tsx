@@ -34,6 +34,7 @@ import { supabase, forceSignOut } from '../services/supabase';
 import { Session } from '@supabase/supabase-js';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import CelebrationConfetti from '../components/CelebrationConfetti';
 import '../global.css';
 
 // Suppress browser focus outlines & set up PWA manifest globally across web app
@@ -359,6 +360,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                     <Stack.Screen name="(app)" options={{ headerShown: false }} />
                 </Stack>
+                <CelebrationConfetti autoListenSupabase={true} />
                 <StatusBar style="auto" />
             </ThemeProvider>
         </SafeAreaProvider>

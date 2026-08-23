@@ -34,12 +34,17 @@ const T = {
 };
 
 const EVENT_TYPES = [
-  { id: 'eid',          label: 'Eid Mubarak',       icon: 'moon',             desc: 'Crescent, stars & emerald gold ribbons' },
-  { id: 'new_year',     label: 'New Year',          icon: 'sparkles',         desc: 'Fireworks, gold & crimson confetti' },
-  { id: 'independence', label: 'Independence Day',  icon: 'flag',             desc: 'Green & white patriotic celebration' },
-  { id: 'ramadan',      label: 'Ramadan Kareem',    icon: 'moon-outline',     desc: 'Golden lanterns & peaceful crescent' },
-  { id: 'holiday',      label: 'Holiday Festival',  icon: 'gift',             desc: 'Festive season ribbons & sparkles' },
-  { id: 'custom',       label: 'Special Promo',     icon: 'ribbon',           desc: 'Custom title, subtitle & confetti' },
+  { id: 'milestone',           label: 'User Milestone',     icon: 'trophy',           desc: 'Hit 50k+ users, transaction records' },
+  { id: 'company_anniversary', label: 'Company Anniversary',icon: 'ribbon',           desc: 'Celebrating years of success' },
+  { id: 'maulid',              label: 'Maulud Nabiyy',      icon: 'heart',            desc: 'Green & golden Islamic celebration' },
+  { id: 'eid',                 label: 'Eid Mubarak',        icon: 'moon',             desc: 'Crescent, stars & emerald gold ribbons' },
+  { id: 'jummah',              label: 'Jumu\'at Mubarak',   icon: 'sunny',            desc: 'Friday blessings celebration' },
+  { id: 'new_year',            label: 'New Year',           icon: 'sparkles',         desc: 'Fireworks, gold & crimson confetti' },
+  { id: 'independence',        label: 'Independence Day',   icon: 'flag',             desc: 'Green & white patriotic celebration' },
+  { id: 'ramadan',             label: 'Ramadan Kareem',     icon: 'moon-outline',     desc: 'Golden lanterns & peaceful crescent' },
+  { id: 'black_friday',        label: 'Mega Promo / Sale',  icon: 'flash',            desc: 'Special discount frenzy & bonuses' },
+  { id: 'holiday',             label: 'Holiday Festival',   icon: 'gift',             desc: 'Festive season ribbons & sparkles' },
+  { id: 'custom',              label: 'Special Custom',     icon: 'rocket',           desc: 'Custom title, subtitle & confetti' },
 ];
 
 export default function AppDesigner() {

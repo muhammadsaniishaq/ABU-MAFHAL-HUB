@@ -4,14 +4,16 @@ import {
   Platform, TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../services/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export interface CelebrationSettings {
   is_enabled: boolean;
-  event_type: 'eid' | 'new_year' | 'independence' | 'ramadan' | 'holiday' | 'custom';
+  event_type: string;
   event_title: string;
   event_subtitle: string;
+  milestone_count?: string;
   confetti_on_tap: boolean;
   show_banner: boolean;
   theme_color?: string;
@@ -21,7 +23,7 @@ export interface CelebrationConfettiRef {
   burst: (x?: number, y?: number) => void;
 }
 
-// Event themes preset
+// ─── Rich Event Presets ────────────────────────────────────────────────────────
 export const EVENT_PRESETS: Record<string, {
   name: string;
   badge: string;
@@ -32,15 +34,55 @@ export const EVENT_PRESETS: Record<string, {
   particleColors: string[];
   particleEmojis: string[];
 }> = {
+  milestone: {
+    name: 'User Milestone / Target',
+    badge: 'MILESTONE REACHED',
+    icon: 'trophy',
+    defaultTitle: 'Celebration! 50,000+ Active Users 🏆🥳',
+    defaultSubtitle: 'Thank you for trusting us! Celebrating this massive milestone with exclusive rewards for everyone.',
+    primaryColor: '#D97706',
+    particleColors: ['#D97706', '#F59E0B', '#10B981', '#3B82F6', '#EC4899', '#FCD34D', '#FFFFFF'],
+    particleEmojis: ['🏆', '🎉', '⭐', '💎', '🚀', '🥳'],
+  },
+  company_anniversary: {
+    name: 'Company Anniversary',
+    badge: 'ANNIVERSARY',
+    icon: 'ribbon',
+    defaultTitle: 'Happy Company Anniversary! 🎂💎',
+    defaultSubtitle: 'Celebrating years of seamless digital finance, excellence, and unwavering user trust.',
+    primaryColor: '#D97706',
+    particleColors: ['#D97706', '#0F172A', '#F59E0B', '#8B5CF6', '#FCD34D', '#FFFFFF'],
+    particleEmojis: ['🎂', '💎', '✨', '🎉', '🌟', '🥂'],
+  },
+  maulid: {
+    name: 'Maulud Nabiyy',
+    badge: 'MAULID NABIYY',
+    icon: 'heart',
+    defaultTitle: 'Maulud Mubarak! 🕌💚',
+    defaultSubtitle: 'Wishing all our Muslim brothers and sisters a peaceful, joyous and blessed Maulud celebration.',
+    primaryColor: '#16A34A',
+    particleColors: ['#16A34A', '#22C55E', '#10B981', '#D97706', '#FCD34D', '#FFFFFF'],
+    particleEmojis: ['🕌', '💚', '⭐', '✨', '🌙'],
+  },
   eid: {
     name: 'Eid Mubarak',
     badge: 'EID SPECIAL',
     icon: 'moon',
     defaultTitle: 'Eid Mubarak! 🌙✨',
-    defaultSubtitle: 'May this blessed season bring joy, peace and prosperity to you and your family.',
+    defaultSubtitle: 'May this blessed season bring peace, bountiful blessings, and joy to you and your loved ones.',
     primaryColor: '#D97706',
     particleColors: ['#D97706', '#F59E0B', '#10B981', '#047857', '#FCD34D', '#FFFFFF'],
     particleEmojis: ['🌙', '⭐', '✨', '🕌', '💫'],
+  },
+  jummah: {
+    name: 'Jumu\'at Mubarak',
+    badge: 'JUMU\'AT MUBARAK',
+    icon: 'sunny',
+    defaultTitle: 'Jumu\'at Mubarak! 🕌✨',
+    defaultSubtitle: 'May Allah accept our supplications and grant you a weekend filled with barakah.',
+    primaryColor: '#059669',
+    particleColors: ['#059669', '#10B981', '#D97706', '#FCD34D', '#FEF3C7'],
+    particleEmojis: ['🕌', '✨', '⭐', '🌙', '🤲'],
   },
   new_year: {
     name: 'New Year Celebration',
@@ -50,40 +92,50 @@ export const EVENT_PRESETS: Record<string, {
     defaultSubtitle: 'Wishing you a prosperous new year filled with breakthrough and seamless transactions!',
     primaryColor: '#EF4444',
     particleColors: ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#EC4899', '#FCD34D'],
-    particleEmojis: ['🎉', '🎆', '✨', '⭐', '🎊'],
+    particleEmojis: ['🎉', '🎆', '✨', '⭐', '🎊', '🥳'],
   },
   independence: {
     name: 'Independence Day',
     badge: 'NATIONAL DAY',
     icon: 'flag',
     defaultTitle: 'Happy Independence Day! 🇳🇬',
-    defaultSubtitle: 'Celebrating our nation with pride, unity, and financial empowerment.',
+    defaultSubtitle: 'Celebrating our nation with pride, unity, and financial empowerment for all.',
     primaryColor: '#16A34A',
     particleColors: ['#16A34A', '#22C55E', '#FFFFFF', '#86EFAC', '#15803D'],
-    particleEmojis: ['🇳🇬', '✨', '⭐', '🎉'],
+    particleEmojis: ['🇳🇬', '✨', '⭐', '🎉', '🦅'],
   },
   ramadan: {
     name: 'Ramadan Kareem',
-    badge: 'RAMADAN',
+    badge: 'RAMADAN KAREEM',
     icon: 'moon-outline',
     defaultTitle: 'Ramadan Kareem! 🕌⭐',
-    defaultSubtitle: 'May the blessings of this holy month enlighten your heart and home.',
+    defaultSubtitle: 'May the blessings of this holy month enlighten your heart and bring boundless ease.',
     primaryColor: '#059669',
     particleColors: ['#059669', '#D97706', '#10B981', '#FCD34D', '#FEF3C7'],
     particleEmojis: ['🕌', '🌙', '⭐', '✨'],
+  },
+  black_friday: {
+    name: 'Mega Promo / Sale',
+    badge: 'MEGA SALE',
+    icon: 'flash',
+    defaultTitle: 'Mega Discount Splash! 💥🛍️',
+    defaultSubtitle: 'Enjoy the lowest rates on data, airtime and bills all day long!',
+    primaryColor: '#DC2626',
+    particleColors: ['#DC2626', '#D97706', '#0F172A', '#F59E0B', '#FFFFFF'],
+    particleEmojis: ['💥', '🛍️', '🔥', '🎁', '⚡'],
   },
   holiday: {
     name: 'Holiday Festival',
     badge: 'SEASON GREETINGS',
     icon: 'gift',
     defaultTitle: 'Happy Holidays! 🎁✨',
-    defaultSubtitle: 'Spread love, celebrate joy, and enjoy exclusive festive rewards.',
+    defaultSubtitle: 'Spread love, celebrate joy, and enjoy exclusive festive bonus cashback.',
     primaryColor: '#DC2626',
     particleColors: ['#DC2626', '#16A34A', '#F59E0B', '#FCD34D', '#FFFFFF'],
     particleEmojis: ['🎁', '⭐', '✨', '🎉', '🌟'],
   },
   custom: {
-    name: 'Special Promo / Custom',
+    name: 'Custom Celebration',
     badge: 'SPECIAL EVENT',
     icon: 'ribbon',
     defaultTitle: 'Special Celebration! 🚀',
@@ -122,13 +174,73 @@ interface Particle {
 interface Props {
   settings?: CelebrationSettings | null;
   onPressBanner?: () => void;
+  autoListenSupabase?: boolean;
 }
 
-const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ settings, onPressBanner }, ref) => {
+const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ settings: propSettings, onPressBanner, autoListenSupabase = true }, ref) => {
+  const [liveSettings, setLiveSettings] = useState<CelebrationSettings | null>(propSettings || null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const nextParticleId = useRef(1);
 
-  const preset = EVENT_PRESETS[settings?.event_type || 'eid'] || EVENT_PRESETS.eid;
+  // Sync prop changes
+  useEffect(() => {
+    if (propSettings !== undefined) {
+      setLiveSettings(propSettings);
+    }
+  }, [propSettings]);
+
+  // Real-time Supabase sync across the entire app
+  useEffect(() => {
+    if (!autoListenSupabase) return;
+
+    // Fetch initial
+    const loadSettings = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'celebration_event_settings')
+          .single();
+
+        if (data?.value) {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          if (parsed && typeof parsed === 'object') {
+            setLiveSettings(parsed);
+          }
+        }
+      } catch (e) {
+        // quiet fallback
+      }
+    };
+    loadSettings();
+
+    // Subscribe to live instant changes
+    const channel = supabase
+      .channel('realtime_celebration_settings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.celebration_event_settings' },
+        (payload: any) => {
+          if (payload.new?.value) {
+            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (parsed && typeof parsed === 'object') {
+              setLiveSettings(parsed);
+              if (parsed.is_enabled) {
+                burst(SCREEN_WIDTH / 2, 80);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [autoListenSupabase]);
+
+  const activeSettings = liveSettings || propSettings;
+  const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
 
   const burst = (originX?: number, originY?: number) => {
     const startX = originX !== undefined ? originX : SCREEN_WIDTH / 2;
@@ -136,7 +248,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
 
     const colors = preset.particleColors;
     const emojis = preset.particleEmojis;
-    const particleCount = 28; // high particle density without lag
+    const particleCount = 30; // crisp particle density
     const newBatch: Particle[] = [];
 
     for (let i = 0; i < particleCount; i++) {
@@ -146,10 +258,10 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
       const isRibbon = !isEmoji && i % 2 === 0;
 
       const angle = (Math.PI * 2 * i) / particleCount + (Math.random() * 0.4 - 0.2);
-      const velocity = 80 + Math.random() * 160;
+      const velocity = 90 + Math.random() * 170;
       const targetX = Math.cos(angle) * velocity;
-      const targetY = Math.sin(angle) * velocity - (60 + Math.random() * 80);
-      const fallDistance = 250 + Math.random() * 300;
+      const targetY = Math.sin(angle) * velocity - (70 + Math.random() * 90);
+      const fallDistance = 260 + Math.random() * 320;
 
       const animX = new Animated.Value(0);
       const animY = new Animated.Value(0);
@@ -162,7 +274,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         startX,
         startY,
         color: colors[i % colors.length],
-        size: isEmoji ? 20 : isRibbon ? 8 : 7,
+        size: isEmoji ? 22 : isRibbon ? 9 : 7.5,
         isEmoji,
         emojiText,
         isRibbon,
@@ -173,42 +285,37 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         animScale,
       });
 
-      // Particle physics animation
       const duration = 1200 + Math.random() * 600;
       Animated.parallel([
         Animated.timing(animScale, {
           toValue: 1,
-          duration: 200,
+          duration: 180,
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.sequence([
-          // Pop outward
           Animated.timing(animX, {
             toValue: targetX,
-            duration: 350,
+            duration: 340,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
-          // Float drift
           Animated.timing(animX, {
             toValue: targetX + (Math.random() * 60 - 30),
-            duration: duration - 350,
+            duration: duration - 340,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.inOut(Easing.sin),
           }),
         ]),
         Animated.sequence([
-          // Jump up
           Animated.timing(animY, {
             toValue: targetY,
-            duration: 350,
+            duration: 340,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
-          // Fall down with gravity
           Animated.timing(animY, {
             toValue: targetY + fallDistance,
-            duration: duration - 350,
+            duration: duration - 340,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.in(Easing.quad),
           }),
@@ -228,12 +335,11 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
           }),
         ]),
       ]).start(() => {
-        // Cleanup particle when finished
         setParticles(prev => prev.filter(p => p.id !== id));
       });
     }
 
-    setParticles(prev => [...prev.slice(-40), ...newBatch]);
+    setParticles(prev => [...prev.slice(-45), ...newBatch]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -245,16 +351,52 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
     return () => {
       globalBurstHandler = null;
     };
-  }, [settings?.event_type]);
+  }, [activeSettings?.event_type]);
 
-  if (!settings?.is_enabled) {
-    return null;
+  if (!activeSettings?.is_enabled) {
+    return (
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        {particles.map(p => {
+          const rotateStr = p.animRotate.interpolate({
+            inputRange: [-720, 720],
+            outputRange: ['-720deg', '720deg'],
+          });
+          return (
+            <Animated.View
+              key={p.id}
+              style={[
+                styles.particle,
+                {
+                  left: p.startX,
+                  top: p.startY,
+                  opacity: p.animOpacity,
+                  transform: [
+                    { translateX: p.animX },
+                    { translateY: p.animY },
+                    { rotate: rotateStr },
+                    { scale: p.animScale },
+                  ],
+                },
+              ]}
+            >
+              {p.isEmoji ? (
+                <Text style={{ fontSize: p.size }}>{p.emojiText}</Text>
+              ) : p.isRibbon ? (
+                <View style={{ width: p.size * 1.8, height: p.size * 0.7, backgroundColor: p.color, borderRadius: 2 }} />
+              ) : (
+                <View style={{ width: p.size, height: p.size, backgroundColor: p.color, borderRadius: p.size / 2 }} />
+              )}
+            </Animated.View>
+          );
+        })}
+      </View>
+    );
   }
 
   return (
     <>
       {/* ── Optional Festive Greeting Banner on Screen Top ── */}
-      {settings.show_banner && (
+      {activeSettings.show_banner && (
         <TouchableOpacity
           style={[styles.bannerContainer, { borderColor: preset.primaryColor + '50' }]}
           onPress={() => {
@@ -270,10 +412,10 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
 
           <View style={styles.bannerTextCol}>
             <Text style={[styles.bannerTitle, { color: preset.primaryColor }]}>
-              {settings.event_title || preset.defaultTitle}
+              {activeSettings.event_title || preset.defaultTitle}
             </Text>
             <Text style={styles.bannerSubtitle} numberOfLines={1}>
-              {settings.event_subtitle || preset.defaultSubtitle}
+              {activeSettings.event_subtitle || preset.defaultSubtitle}
             </Text>
           </View>
 
