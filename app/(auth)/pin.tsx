@@ -91,7 +91,6 @@ export default function PinUnlockScreen() {
     };
 
     const initPinScreen = async () => {
-        setLoading(true);
         try {
             // Check for saved PIN in local storage first for instant rendering
             let localPin: string | null = null;
@@ -101,47 +100,59 @@ export default function PinUnlockScreen() {
                 localPin = await SecureStore.getItemAsync(PIN_KEY);
             }
 
-            // Get active session
-            let { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) session = { user } as any;
-            }
-
-            if (session?.user) {
-                setUserEmail(session.user.email || '');
-
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('full_name, avatar_url, transaction_pin, role')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
-
-                if (profile?.full_name) {
-                    setUserName(profile.full_name);
-                }
-                if (profile?.avatar_url) {
-                    setUserAvatar(profile.avatar_url);
-                }
-
-                if (!localPin && profile?.transaction_pin) {
-                    const fetchedPin = profile.transaction_pin;
-                    localPin = fetchedPin;
-                    if (Platform.OS === 'web') {
-                        await AsyncStorage.setItem(PIN_KEY, fetchedPin);
-                    } else {
-                        await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
-                    }
-                }
-            }
-
             if (localPin) {
                 setSavedPin(localPin);
-            } else {
-                // If user has no PIN configured yet, show Create PIN screen
-                router.replace('/(auth)/pin-setup?action=create' as any);
-                return;
             }
+
+            // Load cached profile
+            AsyncStorage.getItem('user_profile_cache').then((cachedProf) => {
+                if (cachedProf) {
+                    try {
+                        const parsed = JSON.parse(cachedProf);
+                        if (parsed.full_name) setUserName(parsed.full_name);
+                        if (parsed.avatar_url) setUserAvatar(parsed.avatar_url);
+                    } catch (_) {}
+                }
+            }).catch(() => {});
+
+            // Get active session non-blockingly
+            supabase.auth.getSession().then(async ({ data: { session } }) => {
+                if (session?.user) {
+                    setUserEmail(session.user.email || '');
+
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('full_name, avatar_url, transaction_pin, role')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
+
+                    if (profile?.full_name) {
+                        setUserName(profile.full_name);
+                    }
+                    if (profile?.avatar_url) {
+                        setUserAvatar(profile.avatar_url);
+                    }
+                    if (profile) {
+                        AsyncStorage.setItem('user_profile_cache', JSON.stringify(profile)).catch(() => {});
+                    }
+
+                    if (!localPin && profile?.transaction_pin) {
+                        const fetchedPin = profile.transaction_pin;
+                        setSavedPin(fetchedPin);
+                        if (Platform.OS === 'web') {
+                            await AsyncStorage.setItem(PIN_KEY, fetchedPin);
+                        } else {
+                            await SecureStore.setItemAsync(PIN_KEY, fetchedPin);
+                        }
+                        localPin = fetchedPin;
+                    }
+                }
+
+                if (!localPin && !savedPin) {
+                    // If user has no PIN configured yet, show Create PIN screen
+                    router.replace('/(auth)/pin-setup?action=create' as any);
+                }
+            }).catch(() => {});
 
             // Check biometric availability on native mobile
             if (Platform.OS !== 'web') {
@@ -152,13 +163,11 @@ export default function PinUnlockScreen() {
                     setBiometricAvailable(true);
                     setTimeout(() => {
                         triggerBiometricAuth(localPin);
-                    }, 300);
+                    }, 200);
                 }
             }
         } catch (e) {
             console.error('PinUnlockScreen init error:', e);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -356,16 +365,6 @@ export default function PinUnlockScreen() {
         }
         return 'U';
     };
-
-    if (loading) {
-        return (
-            <View style={s.centerContainer}>
-                <StatusBar style="light" />
-                <ActivityIndicator size="large" color="#F59E0B" />
-                <Text style={s.loadingText}>Securing Session...</Text>
-            </View>
-        );
-    }
 
     return (
         <View style={s.container}>

@@ -222,27 +222,28 @@ export default function RootLayout() {
         };
     }, []);
 
-    const backgroundTimeRef = useRef<number | null>(null);
-
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState) => {
             if (nextAppState === 'background' || nextAppState === 'inactive') {
-                if (!backgroundTimeRef.current) {
-                    backgroundTimeRef.current = Date.now();
-                }
+                // Immediately lock session on app exit or minimize
+                AsyncStorage.removeItem('app_unlocked').catch(() => {});
             } else if (nextAppState === 'active') {
-                if (backgroundTimeRef.current) {
-                    const elapsedMinutes = (Date.now() - backgroundTimeRef.current) / (1000 * 60);
-                    // Lock session ONLY if away in background for more than 10 minutes!
-                    if (elapsedMinutes >= 10) {
-                        AsyncStorage.removeItem('app_unlocked').catch(() => {});
+                // When returning to app, instantly ensure PIN unlock is shown
+                AsyncStorage.getItem('has_active_session').then(async (hasActive) => {
+                    if (hasActive === 'true') {
+                        const unlocked = await AsyncStorage.getItem('app_unlocked');
+                        if (unlocked !== 'true') {
+                            const currentScreen = segments[segments.length - 1] || 'index';
+                            if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login' && currentScreen !== 'signup') {
+                                router.replace('/pin' as any);
+                            }
+                        }
                     }
-                    backgroundTimeRef.current = null;
-                }
+                }).catch(() => {});
             }
         });
         return () => subscription.remove();
-    }, []);
+    }, [segments]);
 
     // High performance route guard with local caching (no blocking network calls)
     useEffect(() => {
@@ -270,17 +271,20 @@ export default function RootLayout() {
                 // 1. User has NO PIN configured -> Must complete PIN Setup first!
                 if (!localPin) {
                     // Check DB in background once
-                    supabase.from('profiles').select('transaction_pin').eq('id', userId).maybeSingle().then(async ({ data }) => {
-                        if (data?.transaction_pin) {
-                            const validPin = String(data.transaction_pin);
-                            if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
-                            else await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
-                        } else {
-                            if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
-                                router.replace('/pin-setup' as any);
+                    (async () => {
+                        try {
+                            const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', userId).maybeSingle();
+                            if (data?.transaction_pin) {
+                                const validPin = String(data.transaction_pin);
+                                if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
+                                else await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
+                            } else {
+                                if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
+                                    router.replace('/pin-setup' as any);
+                                }
                             }
-                        }
-                    }).catch(() => {});
+                        } catch (err) {}
+                    })();
                     return;
                 }
 
