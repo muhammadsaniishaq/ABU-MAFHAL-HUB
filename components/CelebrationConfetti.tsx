@@ -146,12 +146,18 @@ export const EVENT_PRESETS: Record<string, {
   },
 };
 
-// Internal global burst dispatcher
-let globalBurstHandler: ((x?: number, y?: number) => void) | null = null;
+// Global lightweight burst handler
+let activeBurstHandler: ((x?: number, y?: number, force?: boolean) => void) | null = null;
+let lastBurstTimestamp = 0;
 
-export const triggerGlobalConfetti = (x?: number, y?: number) => {
-  if (globalBurstHandler) {
-    globalBurstHandler(x, y);
+export const triggerGlobalConfetti = (x?: number, y?: number, force?: boolean) => {
+  const now = Date.now();
+  // Throttle to 300ms to guarantee ultra-high performance & prevent CPU spikes
+  if (now - lastBurstTimestamp > 300) {
+    lastBurstTimestamp = now;
+    if (activeBurstHandler) {
+      activeBurstHandler(x, y, force);
+    }
   }
 };
 
@@ -168,7 +174,6 @@ interface Particle {
   animY: Animated.Value;
   animRotate: Animated.Value;
   animOpacity: Animated.Value;
-  animScale: Animated.Value;
 }
 
 interface Props {
@@ -182,19 +187,16 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
   const [particles, setParticles] = useState<Particle[]>([]);
   const nextParticleId = useRef(1);
 
-  // Sync prop changes
   useEffect(() => {
     if (propSettings !== undefined) {
       setLiveSettings(propSettings);
     }
   }, [propSettings]);
 
-  // Real-time Supabase sync across the entire app
   useEffect(() => {
     if (!autoListenSupabase) return;
 
-    // Fetch initial
-    const loadSettings = async () => {
+    const loadInitial = async () => {
       try {
         const { data } = await supabase
           .from('app_settings')
@@ -208,27 +210,23 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
             setLiveSettings(parsed);
           }
         }
-      } catch (e) {
-        // quiet fallback
-      }
+      } catch (e) {}
     };
-    loadSettings();
+    loadInitial();
 
-    // Subscribe to live instant changes
     const channel = supabase
-      .channel('realtime_celebration_settings')
+      .channel('realtime_confetti_sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.celebration_event_settings' },
         (payload: any) => {
           if (payload.new?.value) {
-            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
-            if (parsed && typeof parsed === 'object') {
-              setLiveSettings(parsed);
-              if (parsed.is_enabled) {
-                burst(SCREEN_WIDTH / 2, 80);
+            try {
+              const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+              if (parsed && typeof parsed === 'object') {
+                setLiveSettings(parsed);
               }
-            }
+            } catch (e) {}
           }
         }
       )
@@ -243,15 +241,17 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
   const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
 
   const burst = (originX?: number, originY?: number, force?: boolean) => {
+    // Only fire if enabled or explicitly forced (e.g. test button)
     if (!force && activeSettings && (!activeSettings.is_enabled || activeSettings.confetti_on_tap === false)) {
       return;
     }
+
     const startX = originX !== undefined ? originX : SCREEN_WIDTH / 2;
     const startY = originY !== undefined ? originY : SCREEN_HEIGHT * 0.35;
 
     const colors = preset.particleColors;
     const emojis = preset.particleEmojis;
-    const particleCount = 30; // crisp particle density
+    const particleCount = 18; // lightweight, fast, lag-free count
     const newBatch: Particle[] = [];
 
     for (let i = 0; i < particleCount; i++) {
@@ -261,23 +261,22 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
       const isRibbon = !isEmoji && i % 2 === 0;
 
       const angle = (Math.PI * 2 * i) / particleCount + (Math.random() * 0.4 - 0.2);
-      const velocity = 90 + Math.random() * 170;
+      const velocity = 70 + Math.random() * 120;
       const targetX = Math.cos(angle) * velocity;
-      const targetY = Math.sin(angle) * velocity - (70 + Math.random() * 90);
-      const fallDistance = 260 + Math.random() * 320;
+      const targetY = Math.sin(angle) * velocity - (50 + Math.random() * 70);
+      const fallDistance = 200 + Math.random() * 220;
 
       const animX = new Animated.Value(0);
       const animY = new Animated.Value(0);
       const animRotate = new Animated.Value(0);
       const animOpacity = new Animated.Value(1);
-      const animScale = new Animated.Value(0.4);
 
       newBatch.push({
         id,
         startX,
         startY,
         color: colors[i % colors.length],
-        size: isEmoji ? 22 : isRibbon ? 9 : 7.5,
+        size: isEmoji ? 18 : isRibbon ? 8 : 6.5,
         isEmoji,
         emojiText,
         isRibbon,
@@ -285,26 +284,20 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         animY,
         animRotate,
         animOpacity,
-        animScale,
       });
 
-      const duration = 1200 + Math.random() * 600;
+      const duration = 900 + Math.random() * 400;
       Animated.parallel([
-        Animated.timing(animScale, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
         Animated.sequence([
           Animated.timing(animX, {
             toValue: targetX,
-            duration: 340,
+            duration: 280,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
           Animated.timing(animX, {
-            toValue: targetX + (Math.random() * 60 - 30),
-            duration: duration - 340,
+            toValue: targetX + (Math.random() * 40 - 20),
+            duration: duration - 280,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.inOut(Easing.sin),
           }),
@@ -312,28 +305,28 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         Animated.sequence([
           Animated.timing(animY, {
             toValue: targetY,
-            duration: 340,
+            duration: 280,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
           Animated.timing(animY, {
             toValue: targetY + fallDistance,
-            duration: duration - 340,
+            duration: duration - 280,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.in(Easing.quad),
           }),
         ]),
         Animated.timing(animRotate, {
-          toValue: (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 720),
+          toValue: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
           duration,
           useNativeDriver: Platform.OS !== 'web',
           easing: Easing.linear,
         }),
         Animated.sequence([
-          Animated.delay(duration * 0.6),
+          Animated.delay(duration * 0.55),
           Animated.timing(animOpacity, {
             toValue: 0,
-            duration: duration * 0.4,
+            duration: duration * 0.45,
             useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
@@ -342,7 +335,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
       });
     }
 
-    setParticles(prev => [...prev.slice(-45), ...newBatch]);
+    setParticles(prev => [...prev.slice(-30), ...newBatch]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -350,60 +343,20 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
   }));
 
   useEffect(() => {
-    globalBurstHandler = burst;
+    activeBurstHandler = burst;
     return () => {
-      globalBurstHandler = null;
+      activeBurstHandler = null;
     };
-  }, [activeSettings?.event_type]);
-
-  if (!activeSettings?.is_enabled) {
-    return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {particles.map(p => {
-          const rotateStr = p.animRotate.interpolate({
-            inputRange: [-720, 720],
-            outputRange: ['-720deg', '720deg'],
-          });
-          return (
-            <Animated.View
-              key={p.id}
-              style={[
-                styles.particle,
-                {
-                  left: p.startX,
-                  top: p.startY,
-                  opacity: p.animOpacity,
-                  transform: [
-                    { translateX: p.animX },
-                    { translateY: p.animY },
-                    { rotate: rotateStr },
-                    { scale: p.animScale },
-                  ],
-                },
-              ]}
-            >
-              {p.isEmoji ? (
-                <Text style={{ fontSize: p.size }}>{p.emojiText}</Text>
-              ) : p.isRibbon ? (
-                <View style={{ width: p.size * 1.8, height: p.size * 0.7, backgroundColor: p.color, borderRadius: 2 }} />
-              ) : (
-                <View style={{ width: p.size, height: p.size, backgroundColor: p.color, borderRadius: p.size / 2 }} />
-              )}
-            </Animated.View>
-          );
-        })}
-      </View>
-    );
-  }
+  });
 
   return (
     <>
-      {/* ── Optional Festive Greeting Banner on Screen Top ── */}
-      {activeSettings.show_banner && (
+      {/* Optional Top Greeting Banner */}
+      {activeSettings?.is_enabled && activeSettings?.show_banner && (
         <TouchableOpacity
           style={[styles.bannerContainer, { borderColor: preset.primaryColor + '50' }]}
           onPress={() => {
-            burst(SCREEN_WIDTH / 2, 80);
+            burst(SCREEN_WIDTH / 2, 80, true);
             if (onPressBanner) onPressBanner();
           }}
           activeOpacity={0.88}
@@ -428,57 +381,44 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         </TouchableOpacity>
       )}
 
-      {/* ── Confetti Particles Canvas Overlay (Non-blocking) ── */}
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {particles.map(p => {
-          const rotateStr = p.animRotate.interpolate({
-            inputRange: [-720, 720],
-            outputRange: ['-720deg', '720deg'],
-          });
+      {/* Lightweight Non-blocking Overlay */}
+      {particles.length > 0 && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {particles.map(p => {
+            const rotateStr = p.animRotate.interpolate({
+              inputRange: [-360, 360],
+              outputRange: ['-360deg', '360deg'],
+            });
 
-          return (
-            <Animated.View
-              key={p.id}
-              style={[
-                styles.particle,
-                {
-                  left: p.startX,
-                  top: p.startY,
-                  opacity: p.animOpacity,
-                  transform: [
-                    { translateX: p.animX },
-                    { translateY: p.animY },
-                    { rotate: rotateStr },
-                    { scale: p.animScale },
-                  ],
-                },
-              ]}
-            >
-              {p.isEmoji ? (
-                <Text style={{ fontSize: p.size }}>{p.emojiText}</Text>
-              ) : p.isRibbon ? (
-                <View
-                  style={{
-                    width: p.size * 1.8,
-                    height: p.size * 0.7,
-                    backgroundColor: p.color,
-                    borderRadius: 2,
-                  }}
-                />
-              ) : (
-                <View
-                  style={{
-                    width: p.size,
-                    height: p.size,
-                    backgroundColor: p.color,
-                    borderRadius: p.size / 2,
-                  }}
-                />
-              )}
-            </Animated.View>
-          );
-        })}
-      </View>
+            return (
+              <Animated.View
+                key={p.id}
+                style={[
+                  styles.particle,
+                  {
+                    left: p.startX,
+                    top: p.startY,
+                    opacity: p.animOpacity,
+                    transform: [
+                      { translateX: p.animX },
+                      { translateY: p.animY },
+                      { rotate: rotateStr },
+                    ],
+                  },
+                ]}
+              >
+                {p.isEmoji ? (
+                  <Text style={{ fontSize: p.size }}>{p.emojiText}</Text>
+                ) : p.isRibbon ? (
+                  <View style={{ width: p.size * 1.8, height: p.size * 0.7, backgroundColor: p.color, borderRadius: 2 }} />
+                ) : (
+                  <View style={{ width: p.size, height: p.size, backgroundColor: p.color, borderRadius: p.size / 2 }} />
+                )}
+              </Animated.View>
+            );
+          })}
+        </View>
+      )}
     </>
   );
 });
@@ -497,9 +437,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowRadius: 5,
     elevation: 2,
   },
   badgePill: {

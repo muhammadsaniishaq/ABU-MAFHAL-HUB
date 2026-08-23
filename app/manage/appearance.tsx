@@ -121,16 +121,17 @@ export default function AppDesigner() {
   const saveCelebrationSettings = async () => {
     setSavingCelebration(true);
     try {
+      const payload = JSON.stringify(celebrationSettings);
       const { error } = await supabase
         .from('app_settings')
         .upsert({
           key: 'celebration_event_settings',
-          value: celebrationSettings,
+          value: payload,
           description: 'Active holiday celebration and button confetti configuration'
         }, { onConflict: 'key' });
 
       if (error) throw error;
-      triggerGlobalConfetti(W / 2, 100);
+      triggerGlobalConfetti(W / 2, 100, true);
       Alert.alert('Celebration Mode Published! 🎉', 'Event settings and button confetti are now live for all app users.');
     } catch (e: any) {
       Alert.alert('Error', e.message);
