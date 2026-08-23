@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator, Alert, Image, StyleSheet, Dimensions, StatusBar
+  Platform, ScrollView, ActivityIndicator, Alert, Image, StyleSheet, Dimensions, StatusBar,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +22,13 @@ type TicketMessage = {
   created_at: string;
 };
 
+const QUICK_RESPONSES = [
+  "Payment proof uploaded 📄",
+  "Checking my bank app now ⏳",
+  "Issue resolved, thank you! 👍",
+  "Please verify my transaction 🔍",
+];
+
 export default function UserTicketChatScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -30,15 +38,20 @@ export default function UserTicketChatScreen() {
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [ticketDetails, setTicketDetails] = useState<any>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     setupChat();
 
-    // Realtime Subscription for Live Messages
+    // Realtime Subscription for Live Messages & Status Updates
     if (id) {
-      const channel = supabase
-        .channel(`ticket:${id}`)
+      const msgChannel = supabase
+        .channel(`ticket_chat:${id}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
@@ -53,8 +66,23 @@ export default function UserTicketChatScreen() {
         })
         .subscribe();
 
+      const ticketChannel = supabase
+        .channel(`ticket_status:${id}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tickets',
+          filter: `id=eq.${id}`
+        }, (payload) => {
+          if (payload.new) {
+            setTicketDetails(payload.new);
+          }
+        })
+        .subscribe();
+
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(msgChannel);
+        supabase.removeChannel(ticketChannel);
       };
     }
   }, [id]);
@@ -119,6 +147,36 @@ export default function UserTicketChatScreen() {
     }
   };
 
+  const handleMarkResolved = async () => {
+    Alert.alert(
+      "Mark Ticket as Resolved",
+      "Are you satisfied with the resolution and wish to close this ticket?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Yes, Resolve & Rate", 
+          onPress: async () => {
+            try {
+              await supabase.from('tickets').update({ status: 'resolved' }).eq('id', id);
+              await sendMessage("✅ User marked this ticket as Resolved.");
+              fetchTicketDetails();
+              setShowRatingModal(true);
+            } catch (e) {}
+          }
+        }
+      ]
+    );
+  };
+
+  const submitRating = async () => {
+    setRatingSubmitted(true);
+    try {
+      await sendMessage(`⭐ User Satisfaction Rating: ${rating}/5 Stars. ${feedbackComment.trim() ? `Feedback: "${feedbackComment.trim()}"` : ''}`);
+      setShowRatingModal(false);
+      Alert.alert("Thank You! 🎉", "Your feedback helps us continuously improve our service.");
+    } catch (e) {}
+  };
+
   const pickImage = async () => {
     if (!userId || !id) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -160,6 +218,8 @@ export default function UserTicketChatScreen() {
     Alert.alert("Copied", "Message copied to clipboard!");
   };
 
+  const isResolved = ticketDetails?.status === 'resolved';
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
@@ -173,9 +233,17 @@ export default function UserTicketChatScreen() {
         headerTintColor: '#f5a623',
         headerTitleStyle: { fontWeight: '900', fontSize: 15 },
         headerRight: () => (
-          <View style={s.headerLiveBadge}>
-            <View style={s.liveGreenDot} />
-            <Text style={s.liveGreenText}>Live Agent</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {isResolved ? (
+              <View style={[s.headerLiveBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10b981' }]}>
+                <Text style={[s.liveGreenText, { color: '#10b981' }]}>Resolved</Text>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleMarkResolved} style={s.resolveBtn} activeOpacity={0.8}>
+                <Ionicons name="checkmark-circle" size={13} color="#10b981" />
+                <Text style={s.resolveBtnText}>Close Ticket</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )
       }} />
@@ -183,7 +251,7 @@ export default function UserTicketChatScreen() {
       {loading ? (
         <View style={s.loadingBox}>
           <ActivityIndicator size="large" color="#f5a623" />
-          <Text style={s.loadingText}>Loading conversation...</Text>
+          <Text style={s.loadingText}>Connecting to Live Support Desk...</Text>
         </View>
       ) : (
         <>
@@ -193,12 +261,17 @@ export default function UserTicketChatScreen() {
               <View style={s.ticketIconCircle}>
                 <Ionicons name="headset" size={13} color="#f5a623" />
               </View>
-              <Text style={s.ticketBannerTitle} numberOfLines={1}>
-                #{id ? (id as string).split('-')[0].toUpperCase() : ''} • {ticketDetails?.subject || 'Live Ticket'}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.ticketBannerTitle} numberOfLines={1}>
+                  #{id ? (id as string).split('-')[0].toUpperCase() : ''} • {ticketDetails?.subject || 'Live Ticket'}
+                </Text>
+                <Text style={s.ticketBannerSub}>
+                  Priority: <Text style={{ color: '#f5a623', fontWeight: '800' }}>{(ticketDetails?.priority || 'High').toUpperCase()}</Text> • Status: <Text style={{ color: isResolved ? '#10b981' : '#60a5fa', fontWeight: '800' }}>{(ticketDetails?.status || 'Open').toUpperCase()}</Text>
+                </Text>
+              </View>
             </View>
             <TouchableOpacity onPress={fetchMessages} style={s.refreshBtn}>
-              <Ionicons name="refresh-outline" size={15} color="#94a3b8" />
+              <Ionicons name="refresh-outline" size={16} color="#94a3b8" />
             </TouchableOpacity>
           </View>
 
@@ -227,17 +300,27 @@ export default function UserTicketChatScreen() {
                       {!isUser && (
                         <View style={s.agentHeaderLine}>
                           <Ionicons name="headset" size={11} color="#f5a623" style={{ marginRight: 4 }} />
-                          <Text style={s.agentLabel}>Customer Support Agent</Text>
+                          <Text style={s.agentLabel}>Official Support Agent</Text>
                         </View>
                       )}
 
-                      <TouchableOpacity onLongPress={() => handleCopy(m.message)} activeOpacity={0.9}>
+                      <TouchableOpacity 
+                        onLongPress={() => handleCopy(m.message)} 
+                        onPress={() => isImage && imageUrl && setPreviewImage(imageUrl)}
+                        activeOpacity={0.9}
+                      >
                         {isImage && imageUrl ? (
-                          <Image 
-                            source={{ uri: imageUrl }} 
-                            style={s.msgImage}
-                            resizeMode="cover" 
-                          />
+                          <View style={s.imageWrap}>
+                            <Image 
+                              source={{ uri: imageUrl }} 
+                              style={s.msgImage}
+                              resizeMode="cover" 
+                            />
+                            <View style={s.zoomOverlay}>
+                              <Ionicons name="scan-outline" size={14} color="#ffffff" />
+                              <Text style={s.zoomText}>Tap to enlarge</Text>
+                            </View>
+                          </View>
                         ) : (
                           <Text style={[s.msgText, isUser ? s.msgTextUser : s.msgTextAgent]}>
                             {m.message}
@@ -262,58 +345,131 @@ export default function UserTicketChatScreen() {
                 <View style={s.emptyChatIconCircle}>
                   <Ionicons name="chatbubbles-outline" size={30} color="#f5a623" />
                 </View>
-                <Text style={s.emptyChatTitle}>Support Chat Ready</Text>
+                <Text style={s.emptyChatTitle}>Support Chat Initialized</Text>
                 <Text style={s.emptyChatDesc}>
-                  Type your message below. A customer support agent will reply to your ticket in real-time.
+                  Type your message or upload payment receipts below. An active agent will attend to your query shortly.
                 </Text>
               </View>
             )}
           </ScrollView>
 
-          {/* COMPACT INPUT BAR */}
-          <View style={s.inputContainer}>
-            <View style={s.inputWrapper}>
-              <TouchableOpacity 
-                onPress={pickImage} 
-                style={s.attachBtn}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="attach" size={18} color="#f5a623" />
-              </TouchableOpacity>
-
-              <TextInput
-                placeholder="Type your message..."
-                placeholderTextColor="#64748b"
-                style={s.textInput}
-                value={reply}
-                onChangeText={setReply}
-                multiline
-                selectionColor="#f5a623"
-              />
-
-              <TouchableOpacity
-                onPress={() => sendMessage()}
-                disabled={sending || !reply.trim()}
-                style={s.sendBtn}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={sending || !reply.trim() ? ['#334155', '#1e293b'] : ['#f5a623', '#d97706']}
-                  style={s.sendBtnGrad}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  {sending ? (
-                    <ActivityIndicator color="#060d21" size="small" />
-                  ) : (
-                    <Ionicons name="paper-plane" size={15} color={!reply.trim() ? '#94a3b8' : '#060d21'} style={{ marginLeft: 2 }} />
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
+          {/* QUICK ACTION CHIPS */}
+          {!isResolved && (
+            <View style={s.quickResponsesWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickResponsesContent}>
+                {QUICK_RESPONSES.map((chip, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => sendMessage(chip)}
+                    style={s.quickChip}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.quickChipText}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          </View>
+          )}
+
+          {/* COMPACT INPUT BAR */}
+          {isResolved ? (
+            <View style={s.resolvedNoticeBar}>
+              <Ionicons name="checkmark-circle" size={18} color="#10b981" style={{ marginRight: 8 }} />
+              <Text style={s.resolvedNoticeText}>This support ticket has been resolved and closed.</Text>
+            </View>
+          ) : (
+            <View style={s.inputContainer}>
+              <View style={s.inputWrapper}>
+                <TouchableOpacity 
+                  onPress={pickImage} 
+                  style={s.attachBtn}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="attach" size={18} color="#f5a623" />
+                </TouchableOpacity>
+
+                <TextInput
+                  placeholder="Type message to support..."
+                  placeholderTextColor="#64748b"
+                  style={s.textInput}
+                  value={reply}
+                  onChangeText={setReply}
+                  multiline
+                  selectionColor="#f5a623"
+                />
+
+                <TouchableOpacity
+                  onPress={() => sendMessage()}
+                  disabled={sending || !reply.trim()}
+                  style={s.sendBtn}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={sending || !reply.trim() ? ['#334155', '#1e293b'] : ['#f5a623', '#d97706']}
+                    style={s.sendBtnGrad}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    {sending ? (
+                      <ActivityIndicator color="#060d21" size="small" />
+                    ) : (
+                      <Ionicons name="paper-plane" size={15} color={!reply.trim() ? '#94a3b8' : '#060d21'} style={{ marginLeft: 2 }} />
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </>
       )}
+
+      {/* FULLSCREEN IMAGE PREVIEW MODAL */}
+      <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+        <View style={s.imageModalOverlay}>
+          <TouchableOpacity onPress={() => setPreviewImage(null)} style={s.imageModalCloseBtn}>
+            <Ionicons name="close" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image source={{ uri: previewImage }} style={s.imageModalImg} resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
+
+      {/* RATING & FEEDBACK MODAL */}
+      <Modal visible={showRatingModal} transparent animationType="slide" onRequestClose={() => setShowRatingModal(false)}>
+        <View style={s.ratingModalOverlay}>
+          <View style={s.ratingModalCard}>
+            <View style={s.ratingIconCircle}>
+              <Ionicons name="star" size={28} color="#f5a623" />
+            </View>
+            <Text style={s.ratingTitle}>Rate Support Experience</Text>
+            <Text style={s.ratingSubtitle}>How satisfied are you with our agent's assistance on this ticket?</Text>
+
+            <View style={s.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)} activeOpacity={0.75} style={{ padding: 4 }}>
+                  <Ionicons name={star <= rating ? "star" : "star-outline"} size={32} color="#f5a623" />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={s.feedbackInput}
+              placeholder="Leave an optional comment or feedback..."
+              placeholderTextColor="#64748b"
+              value={feedbackComment}
+              onChangeText={setFeedbackComment}
+              multiline
+            />
+
+            <TouchableOpacity onPress={submitRating} style={s.submitRatingBtn} activeOpacity={0.85}>
+              <LinearGradient colors={['#f5a623', '#d97706']} style={s.submitRatingGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={s.submitRatingText}>Submit Review</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -326,25 +482,30 @@ const s = StyleSheet.create({
   headerLiveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  liveGreenText: {
+    fontWeight: '800',
+    fontSize: 10.5,
+  },
+  resolveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.35)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 12,
-    marginRight: 6,
+    gap: 4,
   },
-  liveGreenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10b981',
-    marginRight: 5,
-  },
-  liveGreenText: {
+  resolveBtnText: {
     color: '#10b981',
     fontWeight: '800',
-    fontSize: 10.5,
+    fontSize: 11,
   },
   loadingBox: {
     flex: 1,
@@ -361,8 +522,8 @@ const s = StyleSheet.create({
     backgroundColor: '#060d21',
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -374,9 +535,9 @@ const s = StyleSheet.create({
     marginRight: 10,
   },
   ticketIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'rgba(245, 166, 35, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -386,10 +547,14 @@ const s = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 12.5,
     fontWeight: '800',
-    flex: 1,
+  },
+  ticketBannerSub: {
+    color: '#64748b',
+    fontSize: 10,
+    marginTop: 1,
   },
   refreshBtn: {
-    padding: 4,
+    padding: 6,
   },
   messagesScroll: {
     flex: 1,
@@ -397,7 +562,7 @@ const s = StyleSheet.create({
   messagesContent: {
     paddingHorizontal: 12,
     paddingVertical: 14,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   msgRow: {
     flexDirection: 'row',
@@ -470,12 +635,33 @@ const s = StyleSheet.create({
   msgTextAgent: {
     color: '#f1f5f9',
   },
-  msgImage: {
-    width: 200,
-    height: 200,
+  imageWrap: {
+    position: 'relative',
     borderRadius: 12,
-    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  msgImage: {
+    width: 210,
+    height: 210,
+    borderRadius: 12,
     backgroundColor: '#1e293b',
+  },
+  zoomOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  zoomText: {
+    color: '#ffffff',
+    fontSize: 9.5,
+    fontWeight: '600',
   },
   msgFooter: {
     flexDirection: 'row',
@@ -516,6 +702,44 @@ const s = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  quickResponsesWrap: {
+    backgroundColor: '#060d21',
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#1e293b',
+  },
+  quickResponsesContent: {
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  quickChip: {
+    backgroundColor: '#0c1633',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  quickChipText: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  resolvedNoticeBar: {
+    backgroundColor: '#060d21',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#1e293b',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resolvedNoticeText: {
+    color: '#10b981',
+    fontWeight: '800',
+    fontSize: 12.5,
   },
   inputContainer: {
     backgroundColor: '#060d21',
@@ -562,5 +786,101 @@ const s = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  imageModalCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModalImg: {
+    width: W * 0.9,
+    height: W * 0.9,
+  },
+  ratingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  ratingModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#060d21',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+    padding: 20,
+    alignItems: 'center',
+  },
+  ratingIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  ratingTitle: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 17,
+    marginBottom: 4,
+  },
+  ratingSubtitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 16,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  feedbackInput: {
+    width: '100%',
+    backgroundColor: '#0c1633',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    padding: 12,
+    color: '#ffffff',
+    fontSize: 12.5,
+    minHeight: 60,
+    marginBottom: 18,
+  },
+  submitRatingBtn: {
+    width: '100%',
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  submitRatingGrad: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitRatingText: {
+    color: '#060d21',
+    fontWeight: '900',
+    fontSize: 13.5,
   },
 });

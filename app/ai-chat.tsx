@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, Alert, Dimensions, StyleSheet, StatusBar,
-  Image, ActivityIndicator
+  Image, ActivityIndicator, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,134 +12,158 @@ import * as Clipboard from 'expo-clipboard';
 import * as Speech from 'expo-speech';
 import { supabase } from '../services/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
 
 const { width: W } = Dimensions.get('window');
 
-// ─── BILINGUAL & SMART KNOWLEDGE BASE FOR USERS ────────────────────────────────
-const KNOWLEDGE_BASE = [
-  { 
-    keywords: ['hello', 'hi', 'hey', 'start', 'sannu', 'slm', 'yaya', 'barka', 'inawuni', 'ina kwana', 'ina wuni'], 
-    response: "Barka da zuwa, {{name}}! 👋 Welcome!\nI am **Cotex AI**, your personal Virtual Customer Assistant for Abu Mafhal Sub.\n\n💰 Your Wallet Balance: **{{balance}}**\n\nHow can I help you today?\n• 💳 **Wallet Funding / Sa Kudi A Wallet**\n• 📶 **Data & Airtime / Siyan Data da Kati**\n• 📄 **Receipts & History / Samun Shaida da Tarihi**\n• ⚡ **NEPA & Cable TV / Biya Wuta da Cable**\n• 💳 **Virtual Dollar Card / Katin Dollar**\n• 🎓 **WAEC/NECO Pins / Pins din Karatu**\n• 🆔 **NIN & BVN Verification**",
-    action: undefined 
-  },
-  { 
-    keywords: ['fund', 'deposit', 'money', 'wallet', 'add', 'kudi', 'sa kudi', 'sanya kudi', 'yaya ake sa kudi', 'ya zanyi fund', 'turasawa', 'transfer', 'monnify', 'payvessel'], 
-    response: "To fund your wallet (Domin Sanya Kudi A Wallet):\n\n1️⃣ Open **Wallet** tab.\n2️⃣ Copy your dedicated Bank Account Number (Monnify / Payvessel).\n3️⃣ Transfer money from any bank app & your wallet will be credited instantly!\n\nCurrent Balance: **{{balance}}**.",
-    action: { label: "Fund Wallet / Sa Kudi", route: "/(app)/wallet" }
-  },
-  { 
-    keywords: ['data', 'bundle', 'internet', 'browsing', 'mtn', 'glo', 'siyan data', 'sayan data', 'airtel', '9mobile', 'megabyte', 'gigabyte', 'gb', 'mb'], 
-    response: "Muna sayar da Data a araha ga duk hanyoyin sadarwa (MTN, Airtel, Glo, 9mobile)! 🌐\n\nClick below to buy instant high-speed data now.",
-    action: { label: "Buy Data / Siyan Data", route: "/data" }
-  },
-  {
-    keywords: ['airtime', 'recharge', 'card', 'kati', 'siyan kati', 'sayan kati', 'vtu'],
-    response: "Kuna buƙatar Airtime? Muna ba da cikon VTU na take tare da ragi mai ban mamaki a duk hanyoyin sadarwa. 📱",
-    action: { label: "Buy Airtime / Siyan Kati", route: "/airtime" }
-  },
-  { 
-    keywords: ['receipt', 'evidence', 'biya', 'transaction', 'shaida', 'print', 'history', 'risiti', 'tarihi'], 
-    response: "Zaka iya samun da kuma fitar da Shaida (Receipt) na kowane ciniki da ka yi a baya cikin sauki! 📄\n\nClick below to view your Transaction History & Print Receipts.",
-    action: { label: "Get Receipts / Samun Shaida", route: "/history" }
-  },
-  { 
-    keywords: ['pending', 'wait', 'hold', 'fail', 'matsala', 'balance not added', 'delay', 'kudi basu shiga ba', 'ba a bani ba', 'network error'], 
-    response: "Sanyi mu hakuri game da jinkirin transaction ɗinka. 🔄\n\nDa fatan zaka duba **Transaction History** dinka ko ka buɗe **Support Ticket** idan kudi suka fita amma basu isa ba. Muna gyarawa cikin mintuna kadan!",
-    action: { label: "Open Ticket / Bude Ticket", route: "/(app)/tickets" }
-  },
-  { 
-    keywords: ['waec', 'neco', 'jamb', 'result', 'pin', 'checker', 'exam', 'karatu', 'nortification'], 
-    response: "Kuna buƙatar Result Checker Pin na WAEC, NECO ko JAMB? 🎓 Muna da su a shirye na take.\n\nClick below to buy your exam pin.",
-    action: { label: "Buy Edu Pins / Pins din Karatu", route: "/education" }
-  },
-  { 
-    keywords: ['cac', 'registration', 'business name', 'company', 'sajilar kamfani', 'sajila', 'sunan kamfani', 'incorporation', 'bn', 'rc'], 
-    response: "Kuna buƙatar Yin Rajistar Kamfani ko Sunan Kasuwanci a hukumar CAC (Corporate Affairs Commission)? 📜\n\nMuna taimaka muku yin rajistar Business Name ko Limited Company cikin sauki da sauri abun alfahari!\n\nClick below to start your CAC Registration.",
-    action: { label: "CAC Registration / Rajistar CAC", route: "/kyc" }
-  },
-  { 
-    keywords: ['crypto', 'bitcoin', 'usdt', 'trading', 'deriv', 'coin', 'trade', 'siyan crypto', 'sayar da crypto', 'ethereum', 'binance'], 
-    response: "Kuna son siyan ko sayar da Crypto (USDT, Bitcoin, Ethereum) ko yin Trading a Deriv? 🪙\n\nMuna ba da hanzari wajen siyan Crypto da biyan kudi cikin sakanni.\n\nClick below to access Crypto Trading.",
-    action: { label: "Crypto Trading / Kasuwancin Crypto", route: "/crypto" }
-  },
-  { 
-    keywords: ['boost', 'social', 'followers', 'likes', 'views', 'tiktok', 'instagram', 'facebook', 'youtube', '9boost', 'shafuka'], 
-    response: "Kuna son haɓaka shafukan sadarwa (Increase Instagram/TikTok Followers, Likes, Views & Engagement)? 🚀\n\nMuna ba da sabis na Social Boost na take!",
-    action: { label: "Social Boost / Boost Shafuka", route: "/social-boost" }
-  },
-  { 
-    keywords: ['save', 'savings', 'invest', 'investment', 'ajiye kudi', 'ribar kudi', 'interest'], 
-    response: "Kuna son ajiye kuɗi (Savings) domin samun riba mai yawa a kowace rana? 💰\n\nAjiye kuɗinku cikin aminci tare da tsarin Savings ɗinmu.",
-    action: { label: "Savings & Investment", route: "/savings" }
-  },
-  { 
-    keywords: ['airtime to cash', 'kati zuwa kudi', 'mayar da kati', 'convert airtime'], 
-    response: "Kuna da katin waya (Airtime) da kuke son maidawa kudi a asusunku na banki? 📲\n\nMuna maida Airtime zuwa Cash cikin mintuna biyar!",
-    action: { label: "Airtime to Cash / Kati Zuwa Kudi", route: "/airtime-to-cash" }
-  },
-  { 
-    keywords: ['dollar', 'usd', 'virtual card', 'mastercard', 'visa', 'siyan kayan waje', 'online shopping'], 
-    response: "Kuna son Katin Dollar (Virtual Dollar Card) domin siyan kayayyaki a yanar gizo (AliExpress, Facebook Ads, Netflix, ChatGPT)? 💳\n\nClick below to create your instant Virtual Dollar Card.",
-    action: { label: "Virtual Card / Katin Dollar", route: "/virtual-cards" }
-  },
-  { 
-    keywords: ['nin', 'bvn', 'slip', 'identity', 'verification', 'tattace', 'katartattace', 'sunan nin'], 
-    response: "Kuna buƙatar Tantance NIN, BVN ko Buga NIN Slip? 🆔 Muna ba da ingantaccen sabis na gaggawa.",
-    action: { label: "NIN/BVN Verification", route: "/nin-services" }
-  },
-  { 
-    keywords: ['loan', 'borrow', 'credit', 'bashi', 'aro'], 
-    response: "Kuna buƙatar bashi na gaggawa, {{name}}? 💸 Duba cancantar ku don samun rance na take yanzu.",
-    action: { label: "Check Loans", route: "/loans" }
-  },
-  {
-    keywords: ['balance', 'how much', 'nawa', 'kudi na', 'check balance', 'raga'],
-    response: "Asusunka na dauke da **{{balance}}** a yanzu. 💰 Shin kuna son sanya kudi?",
-    action: { label: "View Wallet / Kalli Wallet", route: "/(app)/wallet" }
-  },
-  {
-    keywords: ['electricity', 'wuta', 'nepa', 'meter', 'token', 'kedco', 'aedc', 'ikedc', 'phcn'],
-    response: "Biya kudin wutar lantarki na gaggawa! ⚡ Muna goyon bayan AEDC, KEDCO, IKEDC da sauransu. Samun Meter Token cikin dakika biyu.",
-    action: { label: "Pay Electricity / Biya Wuta", route: "/bills" }
-  },
-  {
-    keywords: ['cable', 'tv', 'dstv', 'gotv', 'startimes', 'kallo'],
-    response: "Biya kallo na DSTV, GOtv, da StarTimes nan take! 📺 Samun kallo ba tare da tsayawa ba.",
-    action: { label: "Pay Cable TV", route: "/bills" }
-  },
-  {
-    keywords: ['help', 'support', 'taimako', 'admin', 'human', 'magana'],
-    response: "Zan iya taimaka muku wajen:\n• 💳 **Wallet Funding (Sa Kudi)**\n• 📶 **Data/Airtime (Kati & Data)**\n• 📄 **Receipts (Shaida)**\n• 🎓 **WAEC/NECO Pins**\n• 🆔 **NIN & BVN**\n\nKuna son buɗe Support Ticket don magana da Admin kai tsaye? 👩‍💻",
-    action: { label: "Open Ticket / Bude Ticket", route: "/(app)/tickets" }
-  }
-];
+type Language = 'hausa' | 'english' | 'pidgin';
 
-const QUICK_PROMPTS = [
-  "💳 Sa Kudi A Wallet", 
-  "📶 Siyan Data", 
-  "📱 Siyan Kati", 
-  "📄 Shaida / Receipts", 
-  "⚡ NEPA / Wuta", 
-  "📺 Cable TV", 
-  "🎓 WAEC/NECO Pin",
-  "💳 Dollar Card",
-  "📜 CAC Rajista",
-  "🪙 Crypto Trade",
-  "🚀 Social Boost",
-  "🆔 NIN / BVN", 
-  "👨‍💻 Support Ticket"
-];
+// ─── BILINGUAL & SMART KNOWLEDGE BASE FOR USERS ────────────────────────────────
+const KNOWLEDGE_BASE_DATA: Record<Language, Array<{ keywords: string[]; response: string; action?: { label: string; route: string } }>> = {
+  hausa: [
+    { 
+      keywords: ['hello', 'hi', 'hey', 'start', 'sannu', 'slm', 'yaya', 'barka', 'inawuni', 'ina kwana', 'ina wuni'], 
+      response: "Barka da zuwa, {{name}}! 👋\nNi ne **Cotex AI**, Mataimakin Abokan Ciniki na Abu Mafhal Sub.\n\n💰 Kudin Wallet ɗinka: **{{balance}}**\n\nTa yaya zan iya taimaka maka a yau?\n• 💳 **Sa Kudi A Wallet (Wallet Funding)**\n• 📶 **Siyan Data & Kati (Airtime)**\n• 📄 **Samun Shaida da Tarihi (Receipts)**\n• ⚡ **Biya NEPA & Cable TV**\n• 💳 **Katin Dollar (Virtual Card)**\n• 🎓 **WAEC/NECO Pins**\n• 🆔 **NIN & BVN Services**",
+      action: undefined 
+    },
+    { 
+      keywords: ['fund', 'deposit', 'money', 'wallet', 'add', 'kudi', 'sa kudi', 'sanya kudi', 'yaya ake sa kudi', 'ya zanyi fund', 'turasawa', 'transfer', 'monnify', 'payvessel'], 
+      response: "Domin Sanya Kudi a Wallet dinka (Wallet Funding):\n\n1️⃣ Shiga shafin **Wallet**.\n2️⃣ Kwafi lambar asusunka na banki (Monnify / Payvessel).\n3️⃣ Tura kudin daga kowane bank app; wallet dinka za ta karu nan take!\n\nKudin Wallet na yanzu: **{{balance}}**.",
+      action: { label: "Bude Wallet / Sa Kudi", route: "/(app)/wallet" }
+    },
+    { 
+      keywords: ['data', 'bundle', 'internet', 'browsing', 'mtn', 'glo', 'siyan data', 'sayan data', 'airtel', '9mobile', 'megabyte', 'gigabyte', 'gb', 'mb'], 
+      response: "Muna sayar da Data a araha ga duk hanyoyin sadarwa (MTN, Airtel, Glo, 9mobile)! 🌐\n\nDanna maɓallin da ke ƙasa domin siyan Data cikin sauƙi.",
+      action: { label: "Siyan Data Yanzu", route: "/data" }
+    },
+    {
+      keywords: ['airtime', 'recharge', 'card', 'kati', 'siyan kati', 'sayan kati', 'vtu'],
+      response: "Kuna buƙatar Airtime? Muna ba da cikon VTU na take tare da ragi mai ban mamaki a duk hanyoyin sadarwa. 📱",
+      action: { label: "Siyan Kati Yanzu", route: "/airtime" }
+    },
+    { 
+      keywords: ['receipt', 'evidence', 'biya', 'transaction', 'shaida', 'print', 'history', 'risiti', 'tarihi'], 
+      response: "Zaka iya samun da kuma fitar da Shaida (Receipt) na kowane ciniki da ka yi a baya cikin sauki! 📄\n\nDanna ƙasa don duba Tarihin Ciniki da Buga Shaida.",
+      action: { label: "Duba Tarihi & Shaida", route: "/history" }
+    },
+    { 
+      keywords: ['pending', 'wait', 'hold', 'fail', 'matsala', 'balance not added', 'delay', 'kudi basu shiga ba', 'ba a bani ba', 'network error'], 
+      response: "Kayi hakuri game da jinkirin transaction ɗinka. 🔄\n\nZaka iya buɗe **Support Ticket** nan take domin wakilanmu na Live Support su duba tare da warware matsalar cikin mintuna!",
+      action: { label: "Bude Support Ticket", route: "/(app)/tickets" }
+    },
+    { 
+      keywords: ['waec', 'neco', 'jamb', 'result', 'pin', 'checker', 'exam', 'karatu'], 
+      response: "Kuna buƙatar Result Checker Pin na WAEC, NECO ko JAMB? 🎓 Muna da su a shirye na take.\n\nDanna ƙasa domin siyan Result Pin.",
+      action: { label: "Siyan Pins din Karatu", route: "/education" }
+    },
+    { 
+      keywords: ['cac', 'registration', 'business name', 'company', 'sajilar kamfani', 'sajila', 'sunan kamfani', 'incorporation'], 
+      response: "Kuna buƙatar Yin Rajistar Kamfani ko Sunan Kasuwanci a hukumar CAC? 📜\n\nMuna taimaka muku yin rajistar Business Name ko Limited Company cikin sauki da sauri abun alfahari!\n\nDanna ƙasa don fara Rajistar CAC.",
+      action: { label: "Rajistar CAC Yanzu", route: "/kyc" }
+    },
+    { 
+      keywords: ['dollar', 'usd', 'virtual card', 'mastercard', 'visa', 'siyan kayan waje', 'online shopping'], 
+      response: "Kuna son Katin Dollar (Virtual Dollar Card) domin siyan kayayyaki a yanar gizo (AliExpress, Facebook Ads, Netflix, ChatGPT)? 💳\n\nDanna ƙasa don buɗe Katin Dollar nan take.",
+      action: { label: "Bude Virtual Dollar Card", route: "/virtual-cards" }
+    },
+  ],
+  english: [
+    { 
+      keywords: ['hello', 'hi', 'hey', 'start', 'welcome', 'good morning', 'good afternoon', 'good evening'], 
+      response: "Welcome, {{name}}! 👋\nI am **Cotex AI**, your 24/7 Smart Virtual Customer Assistant for Abu Mafhal Sub.\n\n💰 Current Wallet Balance: **{{balance}}**\n\nHow can I help you today?\n• 💳 **Wallet Funding** (Bank Transfer / Cards)\n• 📶 **Data & Airtime Purchase**\n• 📄 **Transaction History & Receipts**\n• ⚡ **Electricity (NEPA) & Cable TV**\n• 💳 **Virtual Dollar Card**\n• 🎓 **WAEC/NECO/NABTEB Pins**\n• 🆔 **NIN & BVN Verification**",
+      action: undefined 
+    },
+    { 
+      keywords: ['fund', 'deposit', 'money', 'wallet', 'add money', 'transfer', 'monnify', 'payvessel', 'topup'], 
+      response: "To fund your wallet instantly:\n\n1️⃣ Navigate to the **Wallet** tab.\n2️⃣ Copy your dedicated Virtual Bank Account Number (Monnify / Payvessel).\n3️⃣ Send funds from any bank app — your wallet will credit in seconds!\n\nCurrent Balance: **{{balance}}**.",
+      action: { label: "Go to Wallet", route: "/(app)/wallet" }
+    },
+    { 
+      keywords: ['data', 'bundle', 'internet', 'browsing', 'mtn', 'glo', 'airtel', '9mobile', 'sme', 'gifting', 'corporate'], 
+      response: "We offer the cheapest, highest speed data plans across all Nigerian networks (MTN, Airtel, Glo, 9mobile)! 🌐\n\nClick below to buy instant data.",
+      action: { label: "Buy Cheap Data", route: "/data" }
+    },
+    { 
+      keywords: ['airtime', 'recharge', 'card', 'vtu', 'topup airtime'], 
+      response: "Need instant airtime? Enjoy instant VTU top-up with exclusive discounts on all networks. 📱",
+      action: { label: "Recharge Airtime", route: "/airtime" }
+    },
+    { 
+      keywords: ['receipt', 'evidence', 'transaction', 'statement', 'history', 'invoice', 'proof'], 
+      response: "You can download, view, and share clean official receipts for any previous transactions! 📄\n\nClick below to access your transaction history.",
+      action: { label: "View Receipts", route: "/history" }
+    },
+    { 
+      keywords: ['pending', 'failed', 'issue', 'not received', 'delay', 'debited', 'network error'], 
+      response: "We apologize for any transaction delay. 🔄\n\nYou can open an official **Support Ticket** right away to chat directly with our live human support agents.",
+      action: { label: "Open Support Ticket", route: "/(app)/tickets" }
+    },
+  ],
+  pidgin: [
+    { 
+      keywords: ['hello', 'hi', 'how far', 'wetin dey', 'bro', 'start'], 
+      response: "How far {{name}}! 👋 Welcome!\nNa me be **Cotex AI**, your personal sharp assistant for Abu Mafhal Sub.\n\n💰 Your Wallet Balance: **{{balance}}**\n\nWetin you wan do today?\n• 💳 **Put Money for Wallet**\n• 📶 **Buy Cheap Data & Card**\n• 📄 **Check Transaction Receipts**\n• ⚡ **Pay NEPA & Cable TV**\n• 💳 **Get Virtual Dollar Card**",
+      action: undefined 
+    },
+    { 
+      keywords: ['fund', 'deposit', 'wallet', 'money', 'put money'], 
+      response: "To put money for your wallet sharp-sharp:\n\n1️⃣ Open your **Wallet** tab.\n2️⃣ Copy your dedicated Bank Account number.\n3️⃣ Transfer money from your bank app, e go enter your wallet instantly!\n\nYour Balance: **{{balance}}**.",
+      action: { label: "Fund Wallet Now", route: "/(app)/wallet" }
+    },
+    { 
+      keywords: ['data', 'internet', 'bundle', 'mtn', 'glo', 'airtel'], 
+      response: "We get the cheapest data bundle for MTN, Airtel, Glo and 9mobile! 🌐\n\nClick below to buy sharp-sharp.",
+      action: { label: "Buy Data", route: "/data" }
+    },
+  ]
+};
+
+const QUICK_PROMPTS_BY_LANG: Record<Language, string[]> = {
+  hausa: [
+    "💳 Sa Kudi A Wallet", 
+    "📶 Siyan Data", 
+    "📱 Siyan Kati", 
+    "📄 Shaida / Receipts", 
+    "⚡ NEPA / Wuta", 
+    "📺 Cable TV", 
+    "🎓 WAEC/NECO Pin",
+    "💳 Dollar Card",
+    "📜 CAC Rajista",
+    "🪙 Crypto Trade",
+    "👨‍💻 Support Ticket"
+  ],
+  english: [
+    "💳 Fund Wallet",
+    "📶 Buy Data Bundle",
+    "📱 Recharge Airtime",
+    "📄 Transaction Receipts",
+    "⚡ Pay Electricity",
+    "📺 Cable TV Sub",
+    "💳 Dollar Card",
+    "🎓 Exam Pins",
+    "📜 CAC Registration",
+    "👨‍💻 Open Support Ticket"
+  ],
+  pidgin: [
+    "💳 Put Money for Wallet",
+    "📶 Buy Cheap Data",
+    "📱 Buy Card",
+    "📄 Check Receipts",
+    "⚡ Pay NEPA Light",
+    "📺 Cable TV",
+    "👨‍💻 Talk to Agent"
+  ]
+};
 
 export default function CotexAIChat() {
   const router = useRouter(); 
   const navigation = useNavigation(); 
   const [userData, setUserData] = useState({ name: 'User', balance: '0.00' });
+  const [language, setLanguage] = useState<Language>('hausa');
 
   const [messages, setMessages] = useState<any[]>([
     { 
       id: '1', 
-      text: "Barka da zuwa! I am Cotex AI, your Customer Support Assistant for Abu Mafhal Sub. Zan iya taimaka maka wajen **Siyan Data**, **Sa Kudi (Funding)**, ko **Samun Shaida (Receipts)**.", 
+      text: "Barka da zuwa! I am Cotex AI, your Smart Virtual Support Assistant. Zan iya taimaka maka wajen **Siyan Data**, **Sa Kudi (Funding)**, ko **Samun Shaida (Receipts)**.", 
       sender: 'bot', 
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     }
@@ -211,16 +235,31 @@ export default function CotexAIChat() {
     ]);
   };
 
+  const handleEscalateToTicket = () => {
+    Alert.alert(
+      "Connect with Human Agent",
+      "Do you want to transfer this conversation to an official Live Support Ticket?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Open Ticket", 
+          onPress: () => router.push('/(app)/tickets') 
+        }
+      ]
+    );
+  };
+
   const processResponseText = (text: string) => {
     return text.replace(/{{name}}/g, userData.name).replace(/{{balance}}/g, userData.balance);
   };
 
   const generateResponse = (text: string) => {
     const lowerText = text.toLowerCase();
+    const currentKnowledge = KNOWLEDGE_BASE_DATA[language] || KNOWLEDGE_BASE_DATA.hausa;
     let bestMatch: any = null;
     let maxScore = 0;
 
-    KNOWLEDGE_BASE.forEach(item => {
+    currentKnowledge.forEach(item => {
       let score = 0;
       item.keywords.forEach(word => {
         if (lowerText.includes(word)) score += 2;
@@ -238,9 +277,15 @@ export default function CotexAIChat() {
       };
     }
 
+    const defaultFallback: Record<Language, string> = {
+      hausa: `Na fahimci tambayarka game da "${text}". Don samun cikakken bayani na musamman, zaka iya danna maɓallin da ke ƙasa domin buɗe Support Ticket ga wakilanmu na Live Support!`,
+      english: `I understand your question regarding "${text}". For personalized resolution, you can click below to connect with a Live Human Support Agent!`,
+      pidgin: `I hear your matter about "${text}". Make you click below to open Live Support Ticket make our agent attend to you sharp-sharp!`
+    };
+
     return {
-      text: `Na fahimci tambayarka game da "${text}". Don samun cikakken taimako na musamman, zaka iya danna maɓallin da ke ƙasa domin buɗe Support Ticket ga wakilanmu na Live Support!`,
-      action: { label: "Open Support Ticket", route: "/(app)/tickets" }
+      text: defaultFallback[language],
+      action: { label: language === 'hausa' ? "Bude Support Ticket" : language === 'pidgin' ? "Open Support Ticket" : "Connect with Live Agent", route: "/(app)/tickets" }
     };
   };
 
@@ -276,8 +321,10 @@ export default function CotexAIChat() {
 
       setIsTyping(false);
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 700);
+    }, 600);
   };
+
+  const quickPrompts = QUICK_PROMPTS_BY_LANG[language];
 
   return (
     <SafeAreaView style={s.safeArea} edges={['top']}>
@@ -298,21 +345,46 @@ export default function CotexAIChat() {
               <Text style={s.aiTitleText}>Cotex AI</Text>
               <View style={s.onlineRow}>
                 <View style={s.onlineDot} />
-                <Text style={s.onlineText}>Smart Assistant • Live</Text>
+                <Text style={s.onlineText}>24/7 Smart Assistant</Text>
               </View>
             </View>
           </View>
 
           <View style={s.headerRightBox}>
-            <View style={s.walletPill}>
-              <Ionicons name="wallet-outline" size={11} color="#f5a623" style={{ marginRight: 3 }} />
-              <Text style={s.walletPillText}>{userData.balance}</Text>
-            </View>
+            <TouchableOpacity onPress={handleEscalateToTicket} style={s.escalateBtn} activeOpacity={0.8}>
+              <Ionicons name="headset" size={12} color="#060d21" />
+              <Text style={s.escalateBtnText}>Human Agent</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={handleClearChat} style={s.trashBtn} activeOpacity={0.75}>
               <Ionicons name="trash-outline" size={15} color="#ef4444" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
+
+        {/* LANGUAGE SWITCHER BAR */}
+        <View style={s.langBar}>
+          <Text style={s.langLabel}>Language:</Text>
+          <View style={s.langPillsRow}>
+            {[
+              { id: 'hausa', label: '🇳🇬 Hausa' },
+              { id: 'english', label: '🇬🇧 English' },
+              { id: 'pidgin', label: '⚡ Pidgin' },
+            ].map((l) => {
+              const isLangActive = language === l.id;
+              return (
+                <TouchableOpacity
+                  key={l.id}
+                  onPress={() => setLanguage(l.id as Language)}
+                  style={[s.langPill, isLangActive && s.langPillActive]}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[s.langPillText, isLangActive && s.langPillTextActive]}>{l.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </View>
 
       {/* CHAT AREA */}
@@ -411,7 +483,7 @@ export default function CotexAIChat() {
               </View>
               <View style={s.typingBubble}>
                 <ActivityIndicator size="small" color="#f5a623" />
-                <Text style={s.typingText}>Cotex AI is thinking...</Text>
+                <Text style={s.typingText}>Cotex AI is responding...</Text>
               </View>
             </View>
           )}
@@ -420,7 +492,7 @@ export default function CotexAIChat() {
         {/* QUICK PROMPTS CAROUSEL */}
         <View style={s.quickPromptsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickPromptsContent}>
-            {QUICK_PROMPTS.map((prompt, i) => (
+            {quickPrompts.map((prompt, i) => (
               <TouchableOpacity 
                 key={i} 
                 onPress={() => handleSend(prompt)}
@@ -439,7 +511,7 @@ export default function CotexAIChat() {
           <View style={s.inputWrapper}>
             <TextInput 
               style={s.textInput}
-              placeholder="Ask Cotex AI in Hausa or English..."
+              placeholder={language === 'hausa' ? "Rubuta tambayarka ga Cotex AI..." : language === 'pidgin' ? "Ask Cotex AI any question..." : "Ask Cotex AI anything..."}
               placeholderTextColor="#64748b"
               multiline
               value={inputText}
@@ -454,7 +526,7 @@ export default function CotexAIChat() {
               activeOpacity={0.85}
             >
               <LinearGradient 
-                colors={inputText.trim() ? ['#f5a623', '#d97706'] : ['#334155', '#1e293b']} 
+                colors={inputText.trim() ? ['#f5a623', '#d97706']} 
                 style={s.sendBtnGrad}
                 start={{ x: 0, y: 0 }} 
                 end={{ x: 1, y: 1 }} 
@@ -535,22 +607,21 @@ const s = StyleSheet.create({
   headerRightBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
-  walletPill: {
-    backgroundColor: '#0c1633',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    paddingHorizontal: 8,
+  escalateBtn: {
+    backgroundColor: '#f5a623',
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
   },
-  walletPillText: {
-    color: '#f5a623',
-    fontWeight: '800',
-    fontSize: 11,
+  escalateBtnText: {
+    color: '#060d21',
+    fontWeight: '900',
+    fontSize: 10.5,
   },
   trashBtn: {
     width: 30,
@@ -561,6 +632,45 @@ const s = StyleSheet.create({
     borderColor: '#1e293b',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  langBar: {
+    backgroundColor: '#060d21',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(30, 41, 59, 0.6)',
+  },
+  langLabel: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  langPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  langPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#0c1633',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  langPillActive: {
+    backgroundColor: 'rgba(245, 166, 35, 0.18)',
+    borderColor: '#f5a623',
+  },
+  langPillText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  langPillTextActive: {
+    color: '#f5a623',
   },
   chatArea: {
     flex: 1,
@@ -605,11 +715,6 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(96, 165, 250, 0.3)',
-    shadowColor: '#1d4ed8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
   userMsgText: {
     fontSize: 13.5,
@@ -653,11 +758,6 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderBottomLeftRadius: 4,
     padding: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
   },
   botMsgText: {
     fontSize: 13.5,
