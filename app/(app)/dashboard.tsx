@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, Platform, Image, Dimensions, StyleSheet, RefreshControl, FlatList, Linking, Animated, Easing, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -426,44 +426,52 @@ export default function Dashboard() {
   ];
 
   // Apply admin customizations on top of base catalog
-  const ALL_ACTIONS_CATALOG = BASE_CATALOG
-    .filter(item => {
-      const cust = serviceCustoms[item.id];
-      return !cust || cust.is_visible !== false;  // hide if admin set is_visible=false
-    })
-    .map(item => {
-      const cust = serviceCustoms[item.id];
-      if (!cust) return item;
-      return {
-        ...item,
-        icon: cust.custom_icon || item.icon,
-        label: cust.custom_label || item.label,
-        color: cust.custom_color || item.color,
-        badge: cust.custom_badge !== undefined ? cust.custom_badge : item.badge,
-        bgStyle: cust.custom_bg_style || 'tint',
-      };
-    });
+  const ALL_ACTIONS_CATALOG = useMemo(() => {
+    return BASE_CATALOG
+      .filter(item => {
+        const cust = serviceCustoms[item.id];
+        return !cust || cust.is_visible !== false;
+      })
+      .map(item => {
+        const cust = serviceCustoms[item.id];
+        if (!cust) return item;
+        return {
+          ...item,
+          icon: cust.custom_icon || item.icon,
+          label: cust.custom_label || item.label,
+          color: cust.custom_color || item.color,
+          badge: cust.custom_badge !== undefined ? cust.custom_badge : item.badge,
+          bgStyle: cust.custom_bg_style || 'tint',
+        };
+      });
+  }, [serviceCustoms]);
 
-  const catalogMap = new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a]));
+  const catalogMap = useMemo(() => new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a])), [ALL_ACTIONS_CATALOG]);
 
-  const pinnedActions = pinnedActionIds
-    .map(id => catalogMap.get(id))
-    .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a))
-    .filter(action => {
-      const featureKey = featureMap[action.route];
-      return !(featureKey && hiddenFeatures.includes(featureKey));
-    });
+  const pinnedActions = useMemo(() => {
+    return pinnedActionIds
+      .map(id => catalogMap.get(id))
+      .filter((a): a is typeof ALL_ACTIONS_CATALOG[0] => Boolean(a))
+      .filter(action => {
+        const featureKey = featureMap[action.route];
+        return !(featureKey && hiddenFeatures.includes(featureKey));
+      });
+  }, [pinnedActionIds, catalogMap, hiddenFeatures]);
 
-  const unpinnedActions = ALL_ACTIONS_CATALOG
-    .filter(a => !pinnedActionIds.includes(a.id))
-    .filter(action => {
-      const featureKey = featureMap[action.route];
-      return !(featureKey && hiddenFeatures.includes(featureKey));
-    });
+  const unpinnedActions = useMemo(() => {
+    return ALL_ACTIONS_CATALOG
+      .filter(a => !pinnedActionIds.includes(a.id))
+      .filter(action => {
+        const featureKey = featureMap[action.route];
+        return !(featureKey && hiddenFeatures.includes(featureKey));
+      });
+  }, [ALL_ACTIONS_CATALOG, pinnedActionIds, hiddenFeatures]);
 
-  const displayedActions = showAllActions 
-    ? [...pinnedActions, ...unpinnedActions, { id: 'less', icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less', badge: null }]
-    : [...pinnedActions.slice(0, 7), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
+  const displayedActions = useMemo(() => {
+    return showAllActions 
+      ? [...pinnedActions, ...unpinnedActions, { id: 'less', icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less', badge: null }]
+      : [...pinnedActions.slice(0, 7), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
+  }, [showAllActions, pinnedActions, unpinnedActions]);
 
   const isVerified = userData?.kyc_tier && userData.kyc_tier > 1;
   const companyName = settings?.company_name || 'MAFHAL SUB';

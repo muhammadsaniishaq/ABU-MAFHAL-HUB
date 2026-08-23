@@ -109,35 +109,40 @@ export default function Splash() {
 
     const checkSessionAndNavigate = async () => {
       try {
-        await processOAuthReturn();
+        processOAuthReturn().catch(() => {});
+
+        const hasActive = await AsyncStorage.getItem('has_active_session');
+        const unlocked = await AsyncStorage.getItem('app_unlocked');
 
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && isSubscribed) {
           await AsyncStorage.setItem('has_active_session', 'true');
           
           let localPin = Platform.OS === 'web'
-            ? await AsyncStorage.getItem('user_transaction_pin')
-            : await SecureStore.getItemAsync('user_transaction_pin');
+            ? await AsyncStorage.getItem(`user_transaction_pin_${session.user.id}`) || await AsyncStorage.getItem('user_transaction_pin')
+            : await SecureStore.getItemAsync(`user_transaction_pin_${session.user.id}`) || await SecureStore.getItemAsync('user_transaction_pin');
 
           if (!localPin) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('transaction_pin')
-              .eq('id', session.user.id)
-              .maybeSingle();
-
-            if (data?.transaction_pin) {
-              localPin = data.transaction_pin;
-              if (Platform.OS === 'web') await AsyncStorage.setItem('user_transaction_pin', localPin as string);
-              else await SecureStore.setItemAsync('user_transaction_pin', localPin as string);
-            }
+            (async () => {
+              try {
+                const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', session.user.id).maybeSingle();
+                if (data?.transaction_pin) {
+                  const validPin = String(data.transaction_pin);
+                  if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${session.user.id}`, validPin);
+                  else await SecureStore.setItemAsync(`user_transaction_pin_${session.user.id}`, validPin);
+                  if (unlocked === 'true') router.replace('/dashboard' as any);
+                  else router.replace('/pin' as any);
+                } else {
+                  router.replace('/pin-setup' as any);
+                }
+              } catch (err) {
+                router.replace('/dashboard' as any);
+              }
+            })();
+            return;
           }
 
-          const unlocked = await AsyncStorage.getItem('app_unlocked');
-
-          if (!localPin) {
-            router.replace('/pin-setup' as any);
-          } else if (unlocked === 'true') {
+          if (unlocked === 'true') {
             router.replace('/dashboard' as any);
           } else {
             router.replace('/pin' as any);
@@ -464,7 +469,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 12,
     paddingBottom: 20, 
-    justify: 'space-between', 
+    justifyContent: 'space-between', 
     zIndex: 10 
   },
 
