@@ -406,7 +406,7 @@ export default function Dashboard() {
 
   const displayedActions = showAllActions 
     ? [...pinnedActions, ...unpinnedActions, { id: 'less', icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less', badge: null }]
-    : [...pinnedActions.slice(0, 8), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
+    : [...pinnedActions.slice(0, 7), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
 
   const isVerified = userData?.kyc_tier && userData.kyc_tier > 1;
   const companyName = settings?.company_name || 'MAFHAL SUB';
@@ -1133,22 +1133,22 @@ const s = StyleSheet.create({
   editBtnTxt: { fontSize: 9.5, fontWeight: '700', color: T.indigo },
   seeAllTxt: { fontSize: 10.5, fontWeight: '700', color: T.indigo },
 
-  // Actions grid — 3-column modernized layout
+  // Actions grid — 4-column modernized layout
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
+    justifyContent: 'flex-start',
+    gap: 8,
   },
   actionItem: {
-    width: '31%',
+    width: (W - 32 - 28 - 24) / 4,
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   actionIconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
@@ -1157,24 +1157,24 @@ const s = StyleSheet.create({
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowRadius: 5,
     elevation: 2,
   },
   actionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 9.5,
+    fontWeight: '700',
     color: T.navy,
     textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 14,
+    marginTop: 4,
+    lineHeight: 12,
   },
   badgeOverlay: {
     position: 'absolute',
-    top: -6,
+    top: -5,
     right: -6,
-    borderRadius: 7,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1.5,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
@@ -1184,11 +1184,11 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   badgeText: {
-    fontSize: 7,
+    fontSize: 6.5,
     fontWeight: '900',
     color: '#FFFFFF',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
 
   // Promo Banner
