@@ -110,7 +110,43 @@ export default function Dashboard() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, 
         () => setUnreadCount(prev => prev + 1))
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    const settingsChannel = supabase.channel('dashboard-settings-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload: any) => {
+        if (payload.new?.key === 'dashboard_service_customizations') {
+          try {
+            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (parsed && typeof parsed === 'object') {
+              setServiceCustoms(parsed);
+              saveCache({ serviceCustoms: parsed });
+            }
+          } catch (e) {}
+        }
+        if (payload.new?.key === 'hidden_features') {
+          try {
+            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (parsed) {
+              setHiddenFeatures(parsed);
+              saveCache({ hiddenFeatures: parsed });
+            }
+          } catch (e) {}
+        }
+        if (payload.new?.key === 'celebration_event_settings') {
+          try {
+            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (parsed) {
+              setCelebrationSettings(parsed);
+              saveCache({ celebrationSettings: parsed });
+            }
+          } catch (e) {}
+        }
+      })
+      .subscribe();
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      supabase.removeChannel(settingsChannel);
+    };
   }, []);
 
   const loadCachedData = async () => {

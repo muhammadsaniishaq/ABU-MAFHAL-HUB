@@ -161,6 +161,21 @@ export default function AdminDashboard() {
       if(s) try{setProfile(JSON.parse(s));}catch{}
     });
     load();
+
+    const channel = supabase.channel('manage-hidden-modules-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.hidden_admin_modules' }, (payload: any) => {
+        if (payload.new?.value) {
+          try {
+            const a = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            if (Array.isArray(a)) setHidden(a);
+          } catch {}
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const load = async () => {
@@ -198,7 +213,7 @@ export default function AdminDashboard() {
 
   const getItems = (key:keyof typeof MODS) => {
     let items = MODS[key] as any[];
-    if(!isAdmin) items=items.filter(it=>!hidden.includes(it.r.split('/').pop()?.replace(/-/g,'_')||''));
+    if(!isSuper) items=items.filter(it=>!hidden.includes(it.r.split('/').pop()?.replace(/-/g,'_')||''));
     if(query.trim()) items=items.filter(it=>it.t.toLowerCase().includes(query.toLowerCase()));
     return items;
   };
