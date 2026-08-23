@@ -526,7 +526,7 @@ export default function CotexAIChat() {
               activeOpacity={0.85}
             >
               <LinearGradient 
-                colors={inputText.trim() ? ['#f5a623', '#d97706']} 
+                colors={inputText.trim() ? ['#f5a623', '#d97706'] : ['#334155', '#1e293b']} 
                 style={s.sendBtnGrad}
                 start={{ x: 0, y: 0 }} 
                 end={{ x: 1, y: 1 }} 
