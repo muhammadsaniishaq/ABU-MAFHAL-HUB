@@ -34,10 +34,10 @@ export default function SupportScreen() {
   };
 
   const FAQs = [
-    { q: "How do I fund my wallet?", a: "You can fund your wallet via Bank Transfer or Card Payment in the 'Fund Wallet' section." },
-    { q: "What if my transaction fails?", a: "If a transaction fails but you are debited, the amount will be refunded to your wallet automatically within 24 hours." },
-    { q: "Is my card information safe?", a: "Yes, we use Paystack for payment processing. We do not store your card details." },
-    { q: "How do I upgrade my account?", a: "Navigate to the settings menu and provide your KYC details to upgrade your account limit." },
+    { q: "How do I fund my wallet?", a: "You can fund your wallet via Dedicated Virtual Bank Transfer (Monnify / Payvessel) in the 'Wallet' tab." },
+    { q: "What if my transaction fails or delays?", a: "If a transaction is delayed or fails while you are debited, simply open a Support Ticket or chat with Cotex AI to resolve it instantly." },
+    { q: "Is my card and NIN/BVN information safe?", a: "Yes, we use bank-grade end-to-end encryption. Your sensitive financial data is completely secure." },
+    { q: "How do I upgrade my account or limits?", a: "Navigate to KYC Verification in your Profile to upgrade your daily transaction limits." },
   ];
 
   const filteredFAQs = searchQuery.trim()
@@ -50,23 +50,23 @@ export default function SupportScreen() {
       <StatusBar barStyle="light-content" />
 
       {/* HEADER HERO BANNER */}
-      <LinearGradient colors={['#06112b', '#0d1f4a', '#112660']} style={s.headerHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <LinearGradient colors={['#0d1b3e', '#142258']} style={s.headerHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <SafeAreaView edges={['top']}>
           <View style={s.headerTopRow}>
             <TouchableOpacity onPress={() => router.back()} style={s.headerBackBtn} activeOpacity={0.75}>
-              <Ionicons name="arrow-back" size={18} color="#ffffff" />
+              <Ionicons name="arrow-back" size={16} color="#ffffff" />
             </TouchableOpacity>
-            <Text style={s.headerTitle}>Help & Support Center</Text>
-            <View style={{ width: 36 }} />
+            <Text style={s.headerTitle}>Help & Support Desk</Text>
+            <View style={{ width: 28 }} />
           </View>
 
-          {/* SEARCH BAR */}
+          {/* COMPACT SEARCH BAR */}
           <View style={s.searchBarWrapper}>
-            <Ionicons name="search" size={16} color="#f5a623" />
+            <Ionicons name="search" size={14} color="#f5a623" />
             <TextInput 
               style={s.searchInput}
               placeholder="Search help topics or questions..."
-              placeholderTextColor="rgba(255, 255, 255, 0.55)"
+              placeholderTextColor="rgba(255, 255, 255, 0.6)"
               value={searchQuery}
               onChangeText={setSearchQuery}
               selectionColor="#f5a623"
@@ -83,7 +83,7 @@ export default function SupportScreen() {
         {/* COTEX AI ASSISTANT CARD */}
         <TouchableOpacity activeOpacity={0.88} onPress={() => router.push('/ai-chat')} style={s.aiCardWrapper}>
           <LinearGradient
-            colors={['#09132e', '#11224d']}
+            colors={['#ffffff', '#f8fafc']}
             style={s.aiCard}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -91,14 +91,14 @@ export default function SupportScreen() {
             <View style={s.aiCardLeft}>
               <View style={s.aiBadgeRow}>
                 <View style={s.aiBadgeDot} />
-                <Text style={s.aiBadgeText}>SMART AI ASSISTANT</Text>
+                <Text style={s.aiBadgeText}>24/7 VIRTUAL ASSISTANT</Text>
               </View>
               <Text style={s.aiCardTitle}>Chat with Cotex AI</Text>
-              <Text style={s.aiCardDesc}>Get instant, intelligent answers to your transactions & queries in Hausa or English.</Text>
+              <Text style={s.aiCardDesc}>Get instant, intelligent answers in Hausa, English or Pidgin.</Text>
             </View>
 
             <View style={s.aiIconCircle}>
-              <Ionicons name="sparkles" size={22} color="#060d21" />
+              <Ionicons name="sparkles" size={18} color="#0d1b3e" />
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -106,16 +106,16 @@ export default function SupportScreen() {
         {/* SUPPORT TICKETS & TELEGRAM GRID */}
         <View style={s.twoGridRow}>
           <TouchableOpacity style={s.gridCard} onPress={() => router.push('/(app)/tickets')} activeOpacity={0.75}>
-            <View style={[s.gridIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-              <Ionicons name="ticket" size={18} color="#ef4444" />
+            <View style={[s.gridIconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+              <Ionicons name="ticket-outline" size={16} color="#ef4444" />
             </View>
             <Text style={s.gridCardTitle}>My Tickets</Text>
             <Text style={s.gridCardSub}>Live Support Chats</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.gridCard} onPress={() => handleContact('telegram')} activeOpacity={0.75}>
-            <View style={[s.gridIconCircle, { backgroundColor: 'rgba(14, 165, 233, 0.12)', borderColor: 'rgba(14, 165, 233, 0.3)' }]}>
-              <Ionicons name="paper-plane" size={18} color="#0ea5e9" />
+            <View style={[s.gridIconCircle, { backgroundColor: 'rgba(14, 165, 233, 0.1)' }]}>
+              <Ionicons name="paper-plane-outline" size={16} color="#0ea5e9" />
             </View>
             <Text style={s.gridCardTitle}>Community</Text>
             <Text style={s.gridCardSub}>Join Telegram Group</Text>
@@ -134,7 +134,7 @@ export default function SupportScreen() {
           <View style={s.channelsCard}>
             <TouchableOpacity style={s.channelBtn} onPress={() => handleContact('whatsapp')} activeOpacity={0.75}>
               <View style={[s.channelIconBox, { backgroundColor: 'rgba(37, 211, 102, 0.12)' }]}>
-                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
               </View>
               <Text style={s.channelBtnText}>WhatsApp</Text>
             </TouchableOpacity>
@@ -143,7 +143,7 @@ export default function SupportScreen() {
 
             <TouchableOpacity style={s.channelBtn} onPress={() => handleContact('email')} activeOpacity={0.75}>
               <View style={[s.channelIconBox, { backgroundColor: 'rgba(245, 166, 35, 0.12)' }]}>
-                <Ionicons name="mail" size={20} color="#f5a623" />
+                <Ionicons name="mail" size={18} color="#d97706" />
               </View>
               <Text style={s.channelBtnText}>Email</Text>
             </TouchableOpacity>
@@ -152,16 +152,17 @@ export default function SupportScreen() {
 
             <TouchableOpacity style={s.channelBtn} onPress={() => handleContact('phone')} activeOpacity={0.75}>
               <View style={[s.channelIconBox, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-                <Ionicons name="call" size={20} color="#3b82f6" />
+                <Ionicons name="call" size={18} color="#2563eb" />
               </View>
-              <Text style={s.channelBtnText}>Phone Call</Text>
+              <Text style={s.channelBtnText}>Call Us</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* FREQUENTLY ASKED QUESTIONS */}
+        {/* FAQ ACCORDION */}
         <View style={s.sectionBox}>
           <Text style={s.sectionHeading}>Frequently Asked Questions</Text>
+          
           <View style={s.faqContainer}>
             {filteredFAQs.map((faq, index) => (
               <View key={index} style={[s.faqItem, index !== filteredFAQs.length - 1 && s.faqItemBorder]}>
@@ -179,31 +180,18 @@ export default function SupportScreen() {
           </View>
         </View>
 
-        {/* HEAD OFFICE LOCATION BANNER */}
-        <View style={s.sectionBox}>
-          <LinearGradient colors={['#060d21', '#0b1638']} style={s.officeCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <View style={s.officeIconCircle}>
-              <Ionicons name="location" size={20} color="#060d21" />
-            </View>
-            <View style={s.officeTextBox}>
-              <Text style={s.officeTitle}>HEAD OFFICE</Text>
-              <Text style={s.officeAddress}>No 1. Abu Mafhal Ltd, Goni Aji Street,{"\n"}Gashua, Yobe State, Nigeria.</Text>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* SOCIAL MEDIA CHANNELS */}
+        {/* SOCIAL LINKS */}
         <View style={s.socialSection}>
           <Text style={s.socialTitle}>CONNECT WITH US</Text>
           <View style={s.socialRow}>
-            <TouchableOpacity onPress={() => handleContact('facebook')} style={[s.socialCircle, { backgroundColor: 'rgba(24, 119, 242, 0.12)' }]}>
+            <TouchableOpacity onPress={() => handleContact('facebook')} style={[s.socialCircle, { backgroundColor: 'rgba(24, 119, 242, 0.08)' }]}>
               <Ionicons name="logo-facebook" size={16} color="#1877F2" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleContact('twitter')} style={[s.socialCircle, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]}>
-              <Ionicons name="logo-twitter" size={16} color="#ffffff" />
+            <TouchableOpacity onPress={() => handleContact('twitter')} style={[s.socialCircle, { backgroundColor: 'rgba(29, 155, 240, 0.08)' }]}>
+              <Ionicons name="logo-twitter" size={16} color="#1D9BF0" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleContact('instagram')} style={[s.socialCircle, { backgroundColor: 'rgba(228, 64, 95, 0.12)' }]}>
-              <Ionicons name="logo-instagram" size={16} color="#E4405F" />
+            <TouchableOpacity onPress={() => handleContact('instagram')} style={[s.socialCircle, { backgroundColor: 'rgba(225, 48, 108, 0.08)' }]}>
+              <Ionicons name="logo-instagram" size={16} color="#E1306C" />
             </TouchableOpacity>
           </View>
         </View>
@@ -215,341 +203,302 @@ export default function SupportScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#040814',
+    backgroundColor: '#f8fafc',
   },
   headerHero: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    marginTop: 6,
+    paddingVertical: 6,
   },
   headerBackBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     color: '#ffffff',
-    fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 0.3,
+    fontSize: 14.5,
   },
   searchBarWrapper: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
-    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    height: 36,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   searchInput: {
     flex: 1,
     color: '#ffffff',
-    fontSize: 12.5,
-    marginLeft: 8,
+    fontSize: 12,
+    marginLeft: 6,
     fontWeight: '500',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 60,
+    padding: 12,
+    paddingBottom: 40,
   },
   aiCardWrapper: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 10,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   aiCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   aiCardLeft: {
     flex: 1,
-    paddingRight: 12,
+    marginRight: 10,
   },
   aiBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    marginBottom: 6,
+    gap: 4,
+    marginBottom: 2,
   },
   aiBadgeDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#f5a623',
-    marginRight: 5,
+    backgroundColor: '#10b981',
   },
   aiBadgeText: {
-    color: '#f5a623',
-    fontWeight: '900',
+    color: '#059669',
     fontSize: 8.5,
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   aiCardTitle: {
-    color: '#ffffff',
+    color: '#0d1b3e',
     fontWeight: '900',
-    fontSize: 16,
-    marginBottom: 4,
+    fontSize: 13.5,
+    marginBottom: 2,
   },
   aiCardDesc: {
-    color: '#94a3b8',
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: '500',
+    color: '#64748b',
+    fontSize: 10.5,
+    lineHeight: 15,
   },
   aiIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f5a623',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(245, 166, 35, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#f5a623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
   },
   twoGridRow: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    gap: 12,
-    marginBottom: 18,
+    gap: 8,
+    marginBottom: 12,
   },
   gridCard: {
     flex: 1,
-    backgroundColor: '#09132e',
-    borderRadius: 18,
-    padding: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 10,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   gridIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   gridCardTitle: {
-    color: '#ffffff',
-    fontWeight: '900',
-    fontSize: 13,
-    marginBottom: 2,
+    color: '#0d1b3e',
+    fontWeight: '800',
+    fontSize: 12,
   },
   gridCardSub: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '600',
+    color: '#64748b',
+    fontSize: 9.5,
+    marginTop: 1,
   },
   sectionBox: {
-    marginHorizontal: 16,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 6,
+    paddingHorizontal: 2,
   },
   sectionHeading: {
-    color: '#cbd5e1',
-    fontWeight: '900',
-    fontSize: 11,
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 10,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginLeft: 2,
   },
   humanBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   humanBadgeText: {
-    color: '#94a3b8',
-    fontSize: 8.5,
+    color: '#64748b',
+    fontSize: 8,
     fontWeight: '800',
-    letterSpacing: 0.4,
   },
   channelsCard: {
     flexDirection: 'row',
-    backgroundColor: '#09132e',
-    borderRadius: 20,
-    padding: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   channelBtn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   channelIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   channelBtnText: {
-    color: '#ffffff',
+    color: '#0d1b3e',
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   channelDivider: {
     width: 1,
-    height: 36,
-    backgroundColor: '#1e293b',
+    height: 28,
+    backgroundColor: '#e2e8f0',
   },
   faqContainer: {
-    backgroundColor: '#09132e',
-    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#e2e8f0',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   faqItem: {
-    padding: 14,
+    padding: 10,
   },
   faqItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#f1f5f9',
   },
   faqRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   faqQBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'rgba(245, 166, 35, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    marginTop: 2,
+    marginRight: 8,
+    marginTop: 1,
   },
   faqQText: {
-    color: '#f5a623',
+    color: '#d97706',
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 9.5,
   },
   faqContent: {
     flex: 1,
   },
   faqQuestion: {
-    color: '#ffffff',
+    color: '#0d1b3e',
     fontWeight: '800',
-    fontSize: 12.5,
-    marginBottom: 4,
-    lineHeight: 17,
+    fontSize: 11.5,
+    marginBottom: 2,
+    lineHeight: 16,
   },
   faqAnswer: {
-    color: '#94a3b8',
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '500',
-  },
-  officeCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  officeIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f5a623',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  officeTextBox: {
-    flex: 1,
-  },
-  officeTitle: {
-    color: '#f5a623',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    marginBottom: 3,
-  },
-  officeAddress: {
-    color: '#cbd5e1',
-    fontSize: 11,
-    lineHeight: 16,
+    color: '#64748b',
+    fontSize: 10.5,
+    lineHeight: 15,
     fontWeight: '500',
   },
   socialSection: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: 6,
+    marginBottom: 10,
   },
   socialTitle: {
-    color: '#64748b',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    marginBottom: 10,
+    color: '#94a3b8',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
   socialRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   socialCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#e2e8f0',
   },
 });
