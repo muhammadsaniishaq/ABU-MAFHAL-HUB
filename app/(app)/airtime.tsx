@@ -237,28 +237,44 @@ export default function AirtimeScreen() {
 
                 {/* Recent Top-ups */}
                 {recents.length > 0 && (
-                    <View className="mb-6">
-                        <Text className="text-gray-500 font-medium mb-3 text-sm ml-1">Recent Top-ups</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                    <View style={{ marginBottom: 16 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 }}>Recent Top-ups</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}>
                             {recents.map((item) => (
                                 <TouchableOpacity
                                     key={item.id}
                                     onPress={() => {
                                         setPhoneNumber(item.phone);
-                                        detectNetwork(item.phone); // Auto-set network
+                                        detectNetwork(item.phone);
                                     }}
-                                    className="bg-white border border-gray-100 rounded-2xl p-3 mr-3 shadow-sm flex-row items-center space-x-2"
+                                    style={{
+                                        backgroundColor: '#ffffff',
+                                        borderWidth: 1,
+                                        borderColor: '#e2e8f0',
+                                        borderRadius: 14,
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 7,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.04,
+                                        shadowRadius: 3,
+                                        elevation: 1,
+                                    }}
+                                    activeOpacity={0.75}
                                 >
-                                    <View className="w-8 h-8 rounded-full bg-gray-50 items-center justify-center border border-gray-200 overflow-hidden">
+                                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' }}>
                                         {NETWORK_LOGOS[item.network] ? (
-                                            <Image source={NETWORK_LOGOS[item.network]} className="w-full h-full" resizeMode="cover" />
+                                            <Image source={NETWORK_LOGOS[item.network]} style={{ width: 24, height: 24 }} resizeMode="contain" />
                                         ) : (
-                                            <Ionicons name="person" size={14} color="#9CA3AF" />
+                                            <Ionicons name="person" size={14} color="#94a3b8" />
                                         )}
                                     </View>
                                     <View>
-                                        <Text className="text-gray-800 font-bold text-xs">{item.phone}</Text>
-                                        <Text className="text-gray-400 text-[10px] capitalize">{item.network}</Text>
+                                        <Text style={{ color: '#0f172a', fontWeight: '800', fontSize: 11.5 }}>{item.phone}</Text>
+                                        <Text style={{ color: '#64748b', fontSize: 9.5, fontWeight: '600', textTransform: 'capitalize' }}>{item.network}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}
@@ -391,21 +407,20 @@ export default function AirtimeScreen() {
                 </View>
 
                 {/* Save Beneficiary Toggle */}
-                {/* Only show if phone is valid and NOT already in beneficiaries (simple check) */}
                 {phoneNumber.length >= 10 && !beneficiaries.find(b => b.account_number === phoneNumber) && (
-                    <View className="flex-row items-center justify-between mb-8 bg-gray-50 border border-gray-100 p-4 rounded-xl">
-                        <View className="flex-row items-center">
-                            <View className="bg-green-100 p-2 rounded-full mr-3">
-                                <Ionicons name="save-outline" size={18} color="#166534" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', padding: 12, borderRadius: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{ backgroundColor: 'rgba(22, 163, 74, 0.12)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                                <Ionicons name="save-outline" size={16} color="#16a34a" />
                             </View>
                             <View>
-                                <Text className="font-semibold text-gray-700">Save Contact</Text>
-                                <Text className="text-xs text-gray-500">Save for next time</Text>
+                                <Text style={{ fontWeight: '800', color: '#0f172a', fontSize: 12 }}>Save Contact</Text>
+                                <Text style={{ fontSize: 10.5, color: '#64748b', fontWeight: '500' }}>Save for faster top-ups next time</Text>
                             </View>
                         </View>
                         <Switch
-                            trackColor={{ false: "#E2E8F0", true: "#BBF7D0" }}
-                            thumbColor={saveBeneficiary ? "#22C55E" : "#f4f3f4"}
+                            trackColor={{ false: "#CBD5E1", true: "#86EFAC" }}
+                            thumbColor={saveBeneficiary ? "#16A34A" : "#FFFFFF"}
                             onValueChange={setSaveBeneficiary}
                             value={saveBeneficiary}
                         />
