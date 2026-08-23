@@ -1,17 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  TextInput,
-  StyleSheet,
-  Platform,
-  Image,
-  Alert,
-  StatusBar,
-  Animated,
+  View, Text, ScrollView, TouchableOpacity,
+  Dimensions, TextInput, StyleSheet, Platform,
+  Image, Alert, StatusBar, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,294 +12,253 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: W } = Dimensions.get('window');
 
-// ─── Premium Design Tokens (Light Edition) ─────────────────────────────────────
+// ── Brand: Navy #0F172A  Gold #D97706 ──────────────────────────────────────
 const C = {
-  bg:        '#F0F4F8',
-  white:     '#FFFFFF',
-  card:      '#FFFFFF',
-  navy:      '#0F172A',
-  navyMid:   '#1E293B',
-  navySoft:  '#334155',
-  gold:      '#D97706',
-  goldLight: '#FEF3C7',
-  goldMid:   '#F59E0B',
-  goldBorder:'#FCD34D',
-  border:    '#E2E8F0',
-  borderSoft:'#F1F5F9',
-  textPrimary:'#0F172A',
-  textSub:   '#64748B',
-  textMuted: '#94A3B8',
-  blue:      '#2563EB',
-  blueLight: '#EFF6FF',
-  teal:      '#0D9488',
-  tealLight: '#F0FDFA',
-  emerald:   '#059669',
-  emeraldLight:'#ECFDF5',
-  purple:    '#7C3AED',
-  purpleLight:'#F5F3FF',
-  rose:      '#DC2626',
-  roseLight: '#FEF2F2',
-  orange:    '#EA580C',
-  orangeLight:'#FFF7ED',
-  cyan:      '#0891B2',
-  cyanLight: '#ECFEFF',
+  bg:          '#F5F3EE',       // warm off-white — friendly, not cold gray
+  white:       '#FFFFFF',
+  card:        '#FFFFFF',
+  navy:        '#0F172A',       // PRIMARY
+  navyMid:     '#1E293B',
+  navyLight:   '#EFF2F7',       // very light navy tint for card BGs
+  navySoft:    '#334155',
+  gold:        '#D97706',       // SECONDARY
+  goldMid:     '#F59E0B',
+  goldLight:   '#FEF3C7',       // soft gold background
+  goldBorder:  '#FCD34D',
+  border:      '#E2E8F2',
+  soft:        '#F8F9FC',
+  text:        '#0F172A',
+  sub:         '#475569',
+  muted:       '#94A3B8',
+  // Status only (not for module cards)
+  red:         '#DC2626',  redL:  '#FEF2F2',
+  green:       '#16A34A',  greenL:'#F0FDF4',
 };
 
-// ─── Module Config ─────────────────────────────────────────────────────────────
-const modules = {
+// All modules use Navy or Gold brand palette only
+const G = C.gold;     // gold
+const GL= C.goldLight;// gold light bg
+const N = C.navy;     // navy
+const NL= C.navyLight;// navy light bg
+
+const MODS = {
   operations: [
-    { title: 'Users Control',  icon: 'people',         route: '/manage/users',          color: C.blue,    bg: C.blueLight,    badge: 0,  tag: 'Core' },
-    { title: 'Mail Center',    icon: 'mail-unread',    route: '/manage/mail-center',    color: C.gold,    bg: C.goldLight },
-    { title: 'KYC Requests',   icon: 'id-card',        route: '/manage/kyc',            color: C.emerald, bg: C.emeraldLight, badge: 0 },
-    { title: 'NIN Pricing',    icon: 'pricetag',       route: '/manage/nin-pricing',    color: C.teal,    bg: C.tealLight },
-    { title: 'SMM Pricing',    icon: 'thumbs-up',      route: '/manage/smm-pricing',    color: C.purple,  bg: C.purpleLight },
-    { title: 'Bills Pricing',  icon: 'flash',          route: '/manage/bills-pricing',  color: C.orange,  bg: C.orangeLight },
-    { title: 'CAC Management', icon: 'briefcase',      route: '/manage/cac',            color: C.emerald, bg: C.emeraldLight },
-    { title: 'Help Desk',      icon: 'chatbubbles',    route: '/manage/tickets',        color: C.rose,    bg: C.roseLight,    badge: 0 },
-    { title: 'Content CMS',    icon: 'images',         route: '/manage/cms',            color: C.purple,  bg: C.purpleLight },
-    { title: 'Data Plans',     icon: 'wifi',           route: '/manage/data-plans',     color: C.cyan,    bg: C.cyanLight,    tag: 'API' },
-    { title: 'Airtime',        icon: 'call',           route: '/manage/airtime',        color: C.emerald, bg: C.emeraldLight },
-    { title: 'Localization',   icon: 'language',       route: '/manage/localization',   color: C.purple,  bg: C.purpleLight },
-    { title: 'Bulk SMS',       icon: 'chatbubbles',    route: '/manage/bulk-sms',       color: C.blue,    bg: C.blueLight },
-    { title: 'Reviews',        icon: 'star',           route: '/manage/reviews',        color: C.gold,    bg: C.goldLight },
+    { t:'Users Control',   i:'people',          r:'/manage/users',          c:N,  b:NL,  badge:0, tag:'Core' },
+    { t:'Mail Center',     i:'mail-unread',      r:'/manage/mail-center',    c:G,  b:GL },
+    { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:N,  b:NL,  badge:0 },
+    { t:'NIN Pricing',     i:'pricetag',         r:'/manage/nin-pricing',    c:G,  b:GL },
+    { t:'SMM Pricing',     i:'thumbs-up',        r:'/manage/smm-pricing',    c:N,  b:NL },
+    { t:'Bills Pricing',   i:'flash',            r:'/manage/bills-pricing',  c:G,  b:GL },
+    { t:'CAC Mgmt',        i:'briefcase',        r:'/manage/cac',            c:N,  b:NL },
+    { t:'Help Desk',       i:'chatbubbles',      r:'/manage/tickets',        c:G,  b:GL,  badge:0 },
+    { t:'Content CMS',     i:'images',           r:'/manage/cms',            c:N,  b:NL },
+    { t:'Data Plans',      i:'wifi',             r:'/manage/data-plans',     c:G,  b:GL,  tag:'API' },
+    { t:'Airtime',         i:'call',             r:'/manage/airtime',        c:N,  b:NL },
+    { t:'Localization',    i:'language',         r:'/manage/localization',   c:G,  b:GL },
+    { t:'Bulk SMS',        i:'chatbubbles',      r:'/manage/bulk-sms',       c:N,  b:NL },
+    { t:'Reviews',         i:'star',             r:'/manage/reviews',        c:G,  b:GL },
   ],
   banking: [
-    { title: 'API Liquidity',  icon: 'wallet',         route: '/manage/liquidity',      color: C.emerald, bg: C.emeraldLight, tag: 'Live' },
-    { title: 'Cards',          icon: 'card',           route: '/manage/cards',          color: C.rose,    bg: C.roseLight },
-    { title: 'Lending',        icon: 'cash',           route: '/manage/lending',        color: C.teal,    bg: C.tealLight,    badge: 0 },
-    { title: 'Wealth',         icon: 'trending-up',    route: '/manage/wealth',         color: C.purple,  bg: C.purpleLight },
-    { title: 'Rates',          icon: 'stats-chart',    route: '/manage/rates',          color: C.gold,    bg: C.goldLight,    tag: 'Live' },
+    { t:'API Liquidity',   i:'wallet',           r:'/manage/liquidity',      c:G,  b:GL,  tag:'Live' },
+    { t:'Cards',           i:'card',             r:'/manage/cards',          c:N,  b:NL },
+    { t:'Lending',         i:'cash',             r:'/manage/lending',        c:G,  b:GL,  badge:0 },
+    { t:'Wealth',          i:'trending-up',      r:'/manage/wealth',         c:N,  b:NL },
+    { t:'Rates',           i:'stats-chart',      r:'/manage/rates',          c:G,  b:GL,  tag:'Live' },
   ],
   finance: [
-    { title: 'Risk Control',   icon: 'alert-circle',   route: '/manage/risk',           color: C.rose,    bg: C.roseLight },
-    { title: 'Analytics',      icon: 'bar-chart',      route: '/manage/reports',        color: C.gold,    bg: C.goldLight },
-    { title: 'Comms Center',   icon: 'megaphone',      route: '/manage/communications', color: C.purple,  bg: C.purpleLight },
-    { title: 'Cortex AI',      icon: 'sparkles',       route: '/manage/ai',             color: C.cyan,    bg: C.cyanLight,    tag: 'AI' },
-    { title: 'Crypto Mgmt',    icon: 'logo-bitcoin',   route: '/manage/crypto',         color: C.orange,  bg: C.orangeLight },
+    { t:'Risk Control',    i:'alert-circle',     r:'/manage/risk',           c:N,  b:NL },
+    { t:'Analytics',       i:'bar-chart',        r:'/manage/reports',        c:G,  b:GL },
+    { t:'Comms Center',    i:'megaphone',        r:'/manage/communications', c:N,  b:NL },
+    { t:'Cortex AI',       i:'sparkles',         r:'/manage/ai',             c:G,  b:GL,  tag:'AI' },
+    { t:'Crypto Mgmt',     i:'logo-bitcoin',     r:'/manage/crypto',         c:N,  b:NL },
   ],
   technical: [
-    { title: 'Infrastructure', icon: 'server',         route: '/manage/infrastructure', color: C.navySoft,bg: C.borderSoft },
-    { title: 'Database',       icon: 'server',         route: '/manage/db',             color: C.emerald, bg: C.emeraldLight },
-    { title: 'API Vault',      icon: 'code-working',   route: '/manage/api',            color: C.purple,  bg: C.purpleLight },
-    { title: 'Cinema',         icon: 'videocam',       route: '/manage/cinema',         color: C.rose,    bg: C.roseLight },
-    { title: 'Terminal',       icon: 'terminal',       route: '/manage/terminal',       color: C.emerald, bg: C.emeraldLight },
-    { title: 'Feature Flags',  icon: 'toggle',         route: '/manage/features',       color: C.orange,  bg: C.orangeLight },
-    { title: 'App Store',      icon: 'logo-apple',     route: '/manage/stores',         color: C.navy,    bg: C.borderSoft,   badge: 1 },
-    { title: 'Files',          icon: 'folder-open',    route: '/manage/files',          color: C.cyan,    bg: C.cyanLight },
+    { t:'Infrastructure',  i:'server',           r:'/manage/infrastructure', c:N,  b:NL },
+    { t:'Database',        i:'server',           r:'/manage/db',             c:G,  b:GL },
+    { t:'API Vault',       i:'code-working',     r:'/manage/api',            c:N,  b:NL },
+    { t:'Cinema',          i:'videocam',         r:'/manage/cinema',         c:G,  b:GL },
+    { t:'Terminal',        i:'terminal',         r:'/manage/terminal',       c:N,  b:NL },
+    { t:'Feature Flags',   i:'toggle',           r:'/manage/features',       c:G,  b:GL },
+    { t:'App Store',       i:'logo-apple',       r:'/manage/stores',         c:N,  b:NL,  badge:1 },
+    { t:'Files',           i:'folder-open',      r:'/manage/files',          c:G,  b:GL },
   ],
   internal: [
-    { title: 'Staff HR',       icon: 'briefcase',      route: '/manage/staff',          color: C.navySoft,bg: C.borderSoft },
-    { title: 'Voice OS',       icon: 'mic',            route: '/manage/voice',          color: C.purple,  bg: C.purpleLight },
-    { title: 'Legal',          icon: 'document-text',  route: '/manage/legal',          color: C.navySoft,bg: C.borderSoft },
-    { title: 'Team Chat',      icon: 'people-circle',  route: '/manage/team',           color: C.rose,    bg: C.roseLight,    badge: 0 },
-    { title: 'Academy',        icon: 'school',         route: '/manage/academy',        color: C.gold,    bg: C.goldLight },
-    { title: 'Theme & UX',     icon: 'color-palette',  route: '/manage/appearance',     color: C.purple,  bg: C.purpleLight },
-    { title: 'Automation',     icon: 'flash',          route: '/manage/automation',     color: C.blue,    bg: C.blueLight },
-    { title: 'Kanban',         icon: 'grid',           route: '/manage/kanban',         color: C.orange,  bg: C.orangeLight },
+    { t:'Staff HR',        i:'briefcase',        r:'/manage/staff',          c:N,  b:NL },
+    { t:'Voice OS',        i:'mic',              r:'/manage/voice',          c:G,  b:GL },
+    { t:'Legal',           i:'document-text',    r:'/manage/legal',          c:N,  b:NL },
+    { t:'Team Chat',       i:'people-circle',    r:'/manage/team',           c:G,  b:GL,  badge:0 },
+    { t:'Academy',         i:'school',           r:'/manage/academy',        c:N,  b:NL },
+    { t:'Theme & UX',      i:'color-palette',    r:'/manage/appearance',     c:G,  b:GL },
+    { t:'Automation',      i:'flash',            r:'/manage/automation',     c:N,  b:NL },
+    { t:'Kanban',          i:'grid',             r:'/manage/kanban',         c:G,  b:GL },
   ],
   redZone: [
-    { title: 'Security Hub',   icon: 'shield-checkmark',route: '/manage/security',      color: C.blue,    bg: C.blueLight },
-    { title: 'Forensics',      icon: 'finger-print',   route: '/manage/forensics',      color: C.purple,  bg: C.purpleLight },
-    { title: 'API Keys',       icon: 'key',            route: '/manage/api',            color: C.gold,    bg: C.goldLight },
-    { title: 'System Logs',    icon: 'list',           route: '/manage/logs',           color: C.navySoft,bg: C.borderSoft },
-    { title: 'Geo Map',        icon: 'earth',          route: '/manage/map',            color: C.cyan,    bg: C.cyanLight },
-    { title: 'Settings',       icon: 'settings',       route: '/manage/settings',       color: C.navySoft,bg: C.borderSoft },
-    { title: 'PANIC ROOM',     icon: 'warning',        route: '/manage/panic',          color: C.rose,    bg: C.roseLight },
+    { t:'Security Hub',    i:'shield-checkmark', r:'/manage/security',       c:N,  b:NL },
+    { t:'Forensics',       i:'finger-print',     r:'/manage/forensics',      c:G,  b:GL },
+    { t:'API Keys',        i:'key',              r:'/manage/api',            c:N,  b:NL },
+    { t:'System Logs',     i:'list',             r:'/manage/logs',           c:G,  b:GL },
+    { t:'Geo Map',         i:'earth',            r:'/manage/map',            c:N,  b:NL },
+    { t:'Settings',        i:'settings',         r:'/manage/settings',       c:G,  b:GL },
+    { t:'PANIC ROOM',      i:'warning',          r:'/manage/panic',          c:C.red, b:C.redL },
   ],
 };
 
-const quickActions = [
-  { label: 'Master Hub',  icon: 'ribbon',        route: '/manage/super-admin',    color: C.gold,    bg: C.goldLight,    superOnly: true },
-  { label: 'Users',       icon: 'people',        route: '/manage/users',          color: C.blue,    bg: C.blueLight },
-  { label: 'Liquidity',   icon: 'wallet',        route: '/manage/liquidity',      color: C.emerald, bg: C.emeraldLight },
-  { label: 'Data Plans',  icon: 'wifi',          route: '/manage/data-plans',     color: C.cyan,    bg: C.cyanLight },
-  { label: 'Help Desk',   icon: 'chatbubbles',   route: '/manage/tickets',        color: C.rose,    bg: C.roseLight },
-  { label: 'Broadcast',   icon: 'megaphone',     route: '/manage/communications', color: C.purple,  bg: C.purpleLight },
-  { label: 'KYC Queue',   icon: 'scan',          route: '/manage/kyc',            color: C.teal,    bg: C.tealLight },
-  { label: 'Panic Room',  icon: 'warning',       route: '/manage/panic',          color: C.rose,    bg: C.roseLight,    superOnly: true },
+const QUICK = [
+  { l:'Master Hub',  i:'ribbon',        r:'/manage/super-admin',    c:N,  b:NL,  sup:true },
+  { l:'Users',       i:'people',        r:'/manage/users',          c:G,  b:GL },
+  { l:'Liquidity',   i:'wallet',        r:'/manage/liquidity',      c:N,  b:NL },
+  { l:'Data Plans',  i:'wifi',          r:'/manage/data-plans',     c:G,  b:GL },
+  { l:'Help Desk',   i:'chatbubbles',   r:'/manage/tickets',        c:N,  b:NL },
+  { l:'Broadcast',   i:'megaphone',     r:'/manage/communications', c:G,  b:GL },
+  { l:'KYC Queue',   i:'scan',          r:'/manage/kyc',            c:N,  b:NL },
+  { l:'Panic Room',  i:'warning',       r:'/manage/panic',          c:C.red, b:C.redL, sup:true },
 ];
 
-const dockItems = [
-  { icon: 'grid',         route: '/manage',             label: 'Home' },
-  { icon: 'people',       route: '/manage/users',       label: 'Users' },
-  { icon: 'wallet',       route: '/manage/liquidity',   label: 'Funds' },
-  { icon: 'chatbubbles',  route: '/manage/tickets',     label: 'Support' },
-  { icon: 'settings',     route: '/manage/settings',    label: 'Settings' },
+const DOCK = [
+  { i:'grid',        r:'/manage',              l:'Home' },
+  { i:'people',      r:'/manage/users',        l:'Users' },
+  { i:'wallet',      r:'/manage/liquidity',    l:'Funds' },
+  { i:'chatbubbles', r:'/manage/tickets',      l:'Tickets' },
+  { i:'settings',    r:'/manage/settings',     l:'Settings' },
 ];
 
-const categoryMeta: Record<string, { title: string; icon: string; color: string; bg: string }> = {
-  operations: { title: 'Operations & Core Services', icon: 'options',          color: C.gold,    bg: C.goldLight },
-  banking:    { title: 'Banking, Liquidity & Assets', icon: 'wallet',          color: C.emerald, bg: C.emeraldLight },
-  finance:    { title: 'Finance, Crypto & Analytics', icon: 'stats-chart',     color: C.blue,    bg: C.blueLight },
-  technical:  { title: 'Technical Infrastructure',    icon: 'terminal',        color: C.purple,  bg: C.purpleLight },
-  internal:   { title: 'Internal Affairs & HR',       icon: 'business',        color: C.teal,    bg: C.tealLight },
-  redZone:    { title: 'Security, Forensics & RedZone',icon: 'shield-checkmark',color: C.rose,   bg: C.roseLight },
+const CAT: Record<string,{title:string;icon:string;c:string;b:string}> = {
+  operations: { title:'Operations & Core Services',  icon:'options',           c:G, b:GL },
+  banking:    { title:'Banking, Liquidity & Assets', icon:'wallet',            c:N, b:NL },
+  finance:    { title:'Finance, Crypto & Analytics', icon:'stats-chart',       c:G, b:GL },
+  technical:  { title:'Technical Infrastructure',   icon:'terminal',          c:N, b:NL },
+  internal:   { title:'Internal Affairs & HR',       icon:'business',          c:G, b:GL },
+  redZone:    { title:'Security, Forensics & RedZone',icon:'shield-checkmark', c:C.red, b:C.redL },
 };
 
-const tabs = [
-  { id: 'all',        label: 'All',        icon: 'grid-outline' },
-  { id: 'operations', label: 'Operations', icon: 'options-outline' },
-  { id: 'banking',    label: 'Banking',    icon: 'wallet-outline' },
-  { id: 'finance',    label: 'Finance',    icon: 'stats-chart-outline' },
-  { id: 'technical',  label: 'Technical',  icon: 'terminal-outline',         superOnly: true },
-  { id: 'internal',   label: 'Internal',   icon: 'business-outline' },
-  { id: 'redZone',    label: 'Security',   icon: 'shield-checkmark-outline', superOnly: true },
+const TABS = [
+  { id:'all',        l:'All',         i:'grid-outline' },
+  { id:'operations', l:'Operations',  i:'options-outline' },
+  { id:'banking',    l:'Banking',     i:'wallet-outline' },
+  { id:'finance',    l:'Finance',     i:'stats-chart-outline' },
+  { id:'technical',  l:'Technical',   i:'terminal-outline',         sup:true },
+  { id:'internal',   l:'Internal',    i:'business-outline' },
+  { id:'redZone',    l:'Security',    i:'shield-checkmark-outline', sup:true },
 ];
 
-// ─── Component ─────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const router = useRouter();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  const [profile, setProfile]     = useState<any>(null);
-  const [loading, setLoading]     = useState(true);
-  const [logoUrl, setLogoUrl]     = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('all');
-  const [hidden, setHidden]       = useState<string[]>([]);
-  const [query, setQuery]         = useState('');
-  const [counts, setCounts]       = useState({ users: 0, kyc: 0, tickets: 0, loans: 0, chats: 0 });
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 1000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
+  const router    = useRouter();
+  const pulse     = useRef(new Animated.Value(1)).current;
+  const [profile, setProfile]   = useState<any>(null);
+  const [loading, setLoading]   = useState(true);
+  const [logo, setLogo]         = useState<string|null>(null);
+  const [tab, setTab]           = useState('all');
+  const [hidden, setHidden]     = useState<string[]>([]);
+  const [query, setQuery]       = useState('');
+  const [counts, setCounts]     = useState({users:0,kyc:0,tickets:0,loans:0});
 
   useEffect(() => {
-    AsyncStorage.getItem('@cached_admin_profile').then(s => {
-      if (s) { try { setProfile(JSON.parse(s)); } catch {} }
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse,{toValue:0.2,duration:900,useNativeDriver:true}),
+      Animated.timing(pulse,{toValue:1,duration:900,useNativeDriver:true}),
+    ])).start();
+    AsyncStorage.getItem('@cached_admin_profile').then(s=>{
+      if(s) try{setProfile(JSON.parse(s));}catch{}
     });
     load();
   }, []);
 
   const load = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {data:{session}} = await supabase.auth.getSession();
       const user = session?.user || (await supabase.auth.getUser()).data.user;
-
-      if (user) {
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-        const prof = p || { id: user.id, full_name: user.user_metadata?.full_name || 'Admin', email: user.email, role: 'admin', avatar_url: user.user_metadata?.avatar_url };
+      if(user){
+        const {data:p} = await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
+        const prof = p||{id:user.id,full_name:user.user_metadata?.full_name||'Admin',email:user.email,role:'admin',avatar_url:user.user_metadata?.avatar_url};
         setProfile(prof);
-        AsyncStorage.setItem('@cached_admin_profile', JSON.stringify(prof));
+        AsyncStorage.setItem('@cached_admin_profile',JSON.stringify(prof));
       }
-
-      const [logo, hid, uc, kc, tc, lc] = await Promise.all([
-        supabase.from('app_settings').select('value').eq('key', 'app_logo_icon').single(),
-        supabase.from('app_settings').select('value').eq('key', 'hidden_admin_modules').single(),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('kyc_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('loans').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      const [lg,hd,uc,kc,tc,lc] = await Promise.all([
+        supabase.from('app_settings').select('value').eq('key','app_logo_icon').single(),
+        supabase.from('app_settings').select('value').eq('key','hidden_admin_modules').single(),
+        supabase.from('profiles').select('*',{count:'exact',head:true}),
+        supabase.from('kyc_requests').select('*',{count:'exact',head:true}).eq('status','pending'),
+        supabase.from('tickets').select('*',{count:'exact',head:true}).eq('status','open'),
+        supabase.from('loans').select('*',{count:'exact',head:true}).eq('status','pending'),
       ]);
-
-      if (logo.data?.value?.url) setLogoUrl(logo.data.value.url);
-      if (hid.data?.value) {
-        const arr = typeof hid.data.value === 'string' ? JSON.parse(hid.data.value) : hid.data.value;
-        if (Array.isArray(arr)) setHidden(arr);
-      }
-      setCounts({ users: uc.count || 0, kyc: kc.count || 0, tickets: tc.count || 0, loans: lc.count || 0, chats: 0 });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+      if(lg.data?.value?.url) setLogo(lg.data.value.url);
+      if(hd.data?.value){const a=typeof hd.data.value==='string'?JSON.parse(hd.data.value):hd.data.value;if(Array.isArray(a))setHidden(a);}
+      setCounts({users:uc.count||0,kyc:kc.count||0,tickets:tc.count||0,loans:lc.count||0});
+    } catch(e){console.error(e);}
+    finally{setLoading(false);}
   };
 
-  modules.operations[2].badge = counts.kyc;
-  modules.operations[7].badge = counts.tickets;
-  modules.banking[2].badge    = counts.loans;
+  MODS.operations[2].badge = counts.kyc;
+  MODS.operations[7].badge = counts.tickets;
+  MODS.banking[2].badge    = counts.loans;
 
-  const isSuper = profile?.role === 'super_admin';
-  const isAdmin = isSuper || profile?.role === 'admin';
+  const isSuper = profile?.role==='super_admin';
+  const isAdmin = isSuper || profile?.role==='admin';
+  const visibleTabs = TABS.filter(t=>!t.sup||isSuper);
 
-  const visibleTabs = tabs.filter(t => !t.superOnly || isSuper);
-
-  const getItems = (key: keyof typeof modules) => {
-    let items = modules[key] as any[];
-    if (!isAdmin) items = items.filter(it => !hidden.includes(it.route.split('/').pop()?.replace(/-/g, '_') || ''));
-    if (query.trim()) items = items.filter(it => it.title.toLowerCase().includes(query.toLowerCase()));
+  const getItems = (key:keyof typeof MODS) => {
+    let items = MODS[key] as any[];
+    if(!isAdmin) items=items.filter(it=>!hidden.includes(it.r.split('/').pop()?.replace(/-/g,'_')||''));
+    if(query.trim()) items=items.filter(it=>it.t.toLowerCase().includes(query.toLowerCase()));
     return items;
   };
 
-  const renderSection = (key: keyof typeof modules) => {
-    const meta  = categoryMeta[key];
+  const renderSection = (key:keyof typeof MODS) => {
+    const meta  = CAT[key];
     const items = getItems(key);
-    if (!items.length) return null;
-    const totalBadge = items.reduce((s, it) => s + (it.badge || 0), 0);
+    if(!items.length) return null;
+    const totalBadge = items.reduce((s:number,it:any)=>s+(it.badge||0),0);
 
     return (
       <View key={key} style={s.section}>
-        {/* Section Header */}
-        <View style={s.sectionHead}>
-          <View style={s.sectionHeadLeft}>
-            <View style={[s.sectionIconBox, { backgroundColor: meta.bg }]}>
-              <Ionicons name={meta.icon as any} size={18} color={meta.color} />
-            </View>
-            <View style={{ marginLeft: 10 }}>
-              <Text style={s.sectionTitle}>{meta.title}</Text>
-              <Text style={s.sectionSub}>{items.length} modules available</Text>
-            </View>
+        {/* Section header strip */}
+        <LinearGradient colors={[`${meta.c}18`,`${meta.c}06`]} start={{x:0,y:0}} end={{x:1,y:0}} style={s.secHeadGrad}>
+          <View style={[s.secHeadDot,{backgroundColor:meta.c}]}/>
+          <View style={[s.secHeadIcon,{backgroundColor:meta.b}]}>
+            <Ionicons name={meta.icon as any} size={14} color={meta.c}/>
           </View>
-          {totalBadge > 0 && (
-            <View style={s.pendingBadge}>
-              <Text style={s.pendingBadgeText}>{totalBadge} PENDING</Text>
+          <View style={{flex:1,marginLeft:8}}>
+            <Text style={s.secTitle}>{meta.title}</Text>
+            <Text style={s.secSub}>{items.length} modules</Text>
+          </View>
+          {totalBadge>0 && (
+            <View style={s.secBadge}>
+              <Text style={s.secBadgeText}>{totalBadge}</Text>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
-        {/* 2-Column Grid */}
+        {/* Grid */}
         <View style={s.grid}>
-          {items.map((item: any, i: number) => {
-            const locked = (key === 'redZone' || item.route === '/manage/staff' || item.route === '/manage/features') && !isSuper;
+          {items.map((item:any,i:number)=>{
+            const locked=(key==='redZone'||item.r==='/manage/staff'||item.r==='/manage/features')&&!isSuper;
             return (
               <TouchableOpacity
                 key={i}
-                style={[s.moduleCard, locked && { opacity: 0.5 }]}
+                style={s.modCard}
                 activeOpacity={0.72}
-                onPress={() => {
-                  if (locked) {
-                    Alert.alert('Access Restricted 🔒', 'Only Super Admin can access this section.');
-                    return;
-                  }
-                  router.push(item.route);
+                onPress={()=>{
+                  if(locked){Alert.alert('Access Restricted 🔒','Only Super Admin can access this.');return;}
+                  router.push(item.r);
                 }}
               >
-                {/* Color accent top strip */}
-                <View style={[s.cardTopStrip, { backgroundColor: item.color }]} />
-
-                <View style={s.cardBody}>
-                  {/* Icon + badges row */}
-                  <View style={s.cardTopRow}>
-                    <View style={[s.cardIconBox, { backgroundColor: item.bg }]}>
-                      <Ionicons
-                        name={locked ? 'lock-closed' : (item.icon as any)}
-                        size={20}
-                        color={locked ? C.rose : item.color}
-                      />
-                    </View>
-                    <View style={s.cardBadgeCol}>
-                      {item.badge > 0 && (
-                        <View style={s.numBadge}>
-                          <Text style={s.numBadgeText}>{item.badge}</Text>
-                        </View>
-                      )}
-                      {item.tag && (
-                        <View style={[s.tagChip, { backgroundColor: `${item.color}18`, borderColor: `${item.color}55` }]}>
-                          <Text style={[s.tagChipText, { color: item.color }]}>{item.tag}</Text>
-                        </View>
-                      )}
-                    </View>
+                {/* Left color bar */}
+                <View style={[s.modBar,{backgroundColor:item.c}]}/>
+                <View style={s.modInner}>
+                  <View style={[s.modIcon,{backgroundColor:item.b}]}>
+                    <Ionicons name={locked?'lock-closed':(item.i as any)} size={15} color={locked?C.red:item.c}/>
                   </View>
-
-                  {/* Title + sub */}
-                  <Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
-                  <View style={s.cardFooter}>
-                    <Text style={s.cardSubtext}>Manage</Text>
-                    <Ionicons name="chevron-forward" size={11} color={C.textMuted} />
+                  <Text style={s.modTitle} numberOfLines={1}>{item.t}</Text>
+                  <View style={s.modFooter}>
+                    {item.badge>0
+                      ? <View style={s.redDot}><Text style={s.redDotText}>{item.badge}</Text></View>
+                      : item.tag
+                      ? <View style={[s.modTag,{backgroundColor:`${item.c}18`,borderColor:`${item.c}40`}]}>
+                          <Text style={[s.modTagText,{color:item.c}]}>{item.tag}</Text>
+                        </View>
+                      : <Text style={s.modOpenText}>Open</Text>
+                    }
+                    <Ionicons name="chevron-forward" size={10} color={C.muted}/>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -319,213 +269,165 @@ export default function AdminDashboard() {
     );
   };
 
-  const statCards = [
-    { label: 'Total Users',  value: loading ? '—' : counts.users.toLocaleString(), icon: 'people',      color: C.blue,    bg: C.blueLight,    route: '/manage/users' },
-    { label: 'Pending KYC',  value: loading ? '—' : String(counts.kyc),            icon: 'scan',        color: counts.kyc > 0 ? C.rose : C.emerald, bg: counts.kyc > 0 ? C.roseLight : C.emeraldLight, route: '/manage/kyc' },
-    { label: 'Open Tickets', value: loading ? '—' : String(counts.tickets),        icon: 'chatbubbles', color: C.gold,    bg: C.goldLight,    route: '/manage/tickets' },
-    { label: 'Server',       value: '99.9%',                                        icon: 'server',      color: C.emerald, bg: C.emeraldLight, route: '/manage/infrastructure' },
+  const stats = [
+    {l:'Total Users',  v:loading?'…':counts.users.toLocaleString(), i:'people',       c:N, b:NL, r:'/manage/users'},
+    {l:'Pending KYC',  v:loading?'…':String(counts.kyc),            i:'scan',         c:counts.kyc>0?C.red:N, b:counts.kyc>0?C.redL:NL, r:'/manage/kyc'},
+    {l:'Open Tickets', v:loading?'…':String(counts.tickets),        i:'chatbubbles',  c:G, b:GL, r:'/manage/tickets'},
+    {l:'Server',       v:'99.9%',                                    i:'server',       c:N, b:NL, r:'/manage/infrastructure'},
   ];
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+      <StatusBar barStyle="light-content" backgroundColor={C.navy}/>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 110 }}
-        showsVerticalScrollIndicator={false}
-        bounces={Platform.OS === 'ios'}
-      >
-        {/* ── HEADER ─────────────────────────────── */}
-        <LinearGradient
-          colors={[C.navy, C.navyMid]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.header}
-        >
-          {/* Subtle decorative shapes */}
-          <View style={s.headerCircle1} />
-          <View style={s.headerCircle2} />
+      <ScrollView style={{flex:1}} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} bounces={Platform.OS==='ios'}>
+
+        {/* ── HEADER ── */}
+        <LinearGradient colors={[C.navy,C.navyMid]} start={{x:0,y:0}} end={{x:1,y:1}} style={s.header}>
+          {/* Subtle orb accents */}
+          <View style={s.orb1}/>
+          <View style={s.orb2}/>
 
           {/* Top Row */}
           <View style={s.topRow}>
-            <View style={s.brandGroup}>
+            <View style={s.brand}>
               <View style={s.logoBox}>
-                <Image
-                  source={logoUrl ? { uri: logoUrl } : require('../../assets/images/logo-icon.png')}
-                  style={s.logoImg as any}
-                  resizeMode="contain"
-                />
+                <Image source={logo?{uri:logo}:require('../../assets/images/logo-icon.png')} style={s.logoImg as any} resizeMode="contain"/>
               </View>
               <View>
                 <Text style={s.brandName}>ABU MAFHAL</Text>
-                <Text style={s.brandSub}>ADMIN COMMAND CENTRE</Text>
+                <Text style={s.brandTag}>ADMIN CONTROL CENTRE</Text>
               </View>
             </View>
-
-            <View style={s.topActions}>
-              <TouchableOpacity
-                style={s.switchBtn}
-                onPress={() => router.replace('/(app)/dashboard')}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="apps-outline" size={13} color={C.gold} />
-                <Text style={s.switchBtnText}>User App</Text>
+            <View style={s.topRight}>
+              <TouchableOpacity style={s.switchBtn} onPress={()=>router.replace('/(app)/dashboard')} activeOpacity={0.8}>
+                <Ionicons name="swap-horizontal" size={12} color={C.gold}/>
+                <Text style={s.switchText}>App</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => router.push('/manage/profile')}
-                activeOpacity={0.85}
-                style={s.avatarWrap}
-              >
+              <TouchableOpacity style={s.avatarWrap} onPress={()=>router.push('/manage/profile')} activeOpacity={0.85}>
                 <View style={s.avatarRing}>
                   <View style={s.avatarCircle}>
-                    {profile?.avatar_url ? (
-                      <Image source={{ uri: profile.avatar_url }} style={s.avatarImg} />
-                    ) : (
-                      <Text style={s.avatarInit}>{profile?.full_name?.[0]?.toUpperCase() || 'A'}</Text>
-                    )}
+                    {profile?.avatar_url
+                      ? <Image source={{uri:profile.avatar_url}} style={s.avatarImg}/>
+                      : <Text style={s.avatarInit}>{profile?.full_name?.[0]?.toUpperCase()||'A'}</Text>
+                    }
                   </View>
                 </View>
-                <Animated.View style={[s.onlineDot, { opacity: pulseAnim }]} />
+                <Animated.View style={[s.onlineDot,{opacity:pulse}]}/>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Greeting Row */}
-          <View style={s.greetBlock}>
-            <Text style={s.greetName}>Welcome back, {profile?.full_name?.split(' ')[0] || 'Admin'} 👋</Text>
-            <View style={s.greetRow2}>
-              <View style={[s.roleBadge, isSuper && s.roleBadgeSuper]}>
-                <Text style={[s.roleBadgeText, isSuper && s.roleBadgeTextSuper]}>
-                  {isSuper ? '👑 MASTER KEY — SUPER ADMIN' : '🛡️ STAFF ADMIN'}
-                </Text>
-              </View>
+          {/* Greeting */}
+          <View style={s.greetRow}>
+            <Text style={s.greetName}>Welcome back, {profile?.full_name?.split(' ')[0]||'Admin'} 👋</Text>
+            <View style={[s.rolePill,isSuper&&s.rolePillGold]}>
+              <Text style={[s.rolePillText,isSuper&&{color:C.gold}]}>
+                {isSuper?'👑 MASTER KEY':'🛡️ ADMIN'}
+              </Text>
             </View>
             <View style={s.statusRow}>
-              <Animated.View style={[s.statusDot, { opacity: pulseAnim }]} />
-              <Text style={s.statusText}>All Systems Online · Encrypted · Secured</Text>
+              <Animated.View style={[s.statusDot,{opacity:pulse}]}/>
+              <Text style={s.statusText}>All Systems Online · Secured</Text>
             </View>
           </View>
 
           {/* Search */}
-          <View style={s.searchBar}>
-            <Ionicons name="search" size={16} color={C.gold} />
+          <View style={s.searchBox}>
+            <Ionicons name="search" size={15} color={C.gold}/>
             <TextInput
-              placeholder="Search modules, users, reports..."
-              placeholderTextColor="rgba(255,255,255,0.35)"
+              placeholder="Search admin modules..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
               style={s.searchInput}
               value={query}
               onChangeText={setQuery}
               selectionColor={C.gold}
               returnKeyType="search"
             />
-            {query.length > 0 ? (
-              <TouchableOpacity onPress={() => setQuery('')}>
-                <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.5)" />
-              </TouchableOpacity>
-            ) : (
-              <View style={s.kbdTag}>
-                <Text style={s.kbdTagText}>Search</Text>
-              </View>
-            )}
+            {query.length>0
+              ? <TouchableOpacity onPress={()=>setQuery('')}><Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.4)"/></TouchableOpacity>
+              : <View style={s.kbdHint}><Text style={s.kbdText}>⌘K</Text></View>
+            }
           </View>
+
+          {/* Gold bottom trim */}
+          <View style={s.headerTrim}/>
         </LinearGradient>
 
-        {/* ── STATS ──────────────────────────────── */}
-        <View style={s.statsSection}>
+        {/* ── STATS ── */}
+        <View style={s.statsSec}>
           <View style={s.statsGrid}>
-            {statCards.map((sc, i) => (
-              <TouchableOpacity
-                key={i}
-                style={s.statCard}
-                activeOpacity={0.78}
-                onPress={() => router.push(sc.route as any)}
-              >
-                <View style={[s.statIconBox, { backgroundColor: sc.bg }]}>
-                  <Ionicons name={sc.icon as any} size={18} color={sc.color} />
+            {stats.map((sc,i)=>(
+              <TouchableOpacity key={i} style={s.statCard} activeOpacity={0.78} onPress={()=>router.push(sc.r as any)}>
+                <View style={[s.statIcon,{backgroundColor:sc.b}]}>
+                  <Ionicons name={sc.i as any} size={16} color={sc.c}/>
                 </View>
-                <Text style={[s.statValue, { color: sc.color }]}>{sc.value}</Text>
-                <Text style={s.statLabel}>{sc.label}</Text>
-                <View style={[s.statBar, { backgroundColor: `${sc.color}22` }]}>
-                  <View style={[s.statBarFill, { backgroundColor: sc.color, width: '75%' }]} />
+                <Text style={[s.statVal,{color:sc.c}]}>{sc.v}</Text>
+                <Text style={s.statLbl}>{sc.l}</Text>
+                <View style={[s.statProg,{backgroundColor:`${sc.c}15`}]}>
+                  <View style={[s.statProgFill,{backgroundColor:sc.c,width:'70%'}]}/>
                 </View>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* ── QUICK ACTIONS ──────────────────────── */}
+        {/* ── QUICK ACTIONS ── */}
         <View style={s.qaSec}>
-          <View style={s.rowBetween}>
-            <Text style={s.blockLabel}>⚡ Quick Actions</Text>
-            <View style={s.goldPill}>
-              <Text style={s.goldPillText}>SHORTCUTS</Text>
+          <View style={s.rowBtw}>
+            <View style={s.blockHead}>
+              <View style={s.blockHeadDot}/>
+              <Text style={s.blockLabel}>Quick Actions</Text>
             </View>
+            <View style={s.goldTag}><Text style={s.goldTagText}>SHORTCUTS</Text></View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.qaScroll}>
-            {quickActions
-              .filter(a => !a.superOnly || isSuper)
-              .map((a, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={s.qaCard}
-                  activeOpacity={0.75}
-                  onPress={() => router.push(a.route as any)}
-                >
-                  <View style={[s.qaIconBox, { backgroundColor: a.bg }]}>
-                    <Ionicons name={a.icon as any} size={22} color={a.color} />
-                  </View>
-                  <Text style={s.qaLabel}>{a.label}</Text>
-                </TouchableOpacity>
-              ))}
+            {QUICK.filter(a=>!a.sup||isSuper).map((a,i)=>(
+              <TouchableOpacity key={i} style={s.qaCard} activeOpacity={0.75} onPress={()=>router.push(a.r as any)}>
+                <View style={[s.qaIcon,{backgroundColor:a.b}]}>
+                  <Ionicons name={a.i as any} size={18} color={a.c}/>
+                </View>
+                <Text style={s.qaLabel}>{a.l}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
 
-        {/* ── CATEGORY TABS ──────────────────────── */}
+        {/* ── TABS ── */}
         <View style={s.tabsSec}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsScroll}>
-            {visibleTabs.map(tab => {
-              const sel = activeTab === tab.id;
+            {visibleTabs.map(t=>{
+              const sel=tab===t.id;
               return (
-                <TouchableOpacity
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  activeOpacity={0.75}
-                  style={[s.tabPill, sel && s.tabPillSel]}
-                >
-                  <Ionicons name={tab.icon as any} size={13} color={sel ? C.white : C.textSub} />
-                  <Text style={[s.tabText, sel && s.tabTextSel]}>{tab.label}</Text>
+                <TouchableOpacity key={t.id} onPress={()=>setTab(t.id)} activeOpacity={0.75}
+                  style={[s.tabPill,sel&&s.tabPillSel]}>
+                  <Ionicons name={t.i as any} size={12} color={sel?C.white:C.sub}/>
+                  <Text style={[s.tabText,sel&&s.tabTextSel]}>{t.l}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        {/* ── MODULE GRIDS ───────────────────────── */}
-        <View style={s.sectionsWrap}>
-          {(activeTab === 'all' || activeTab === 'operations') && renderSection('operations')}
-          {(activeTab === 'all' || activeTab === 'banking')    && renderSection('banking')}
-          {(activeTab === 'all' || activeTab === 'finance')    && renderSection('finance')}
-          {isSuper && (activeTab === 'all' || activeTab === 'technical')  && renderSection('technical')}
-          {(activeTab === 'all' || activeTab === 'internal')   && renderSection('internal')}
-          {isSuper && (activeTab === 'all' || activeTab === 'redZone')    && renderSection('redZone')}
+        {/* ── MODULE SECTIONS ── */}
+        <View style={s.sections}>
+          {(tab==='all'||tab==='operations') && renderSection('operations')}
+          {(tab==='all'||tab==='banking')    && renderSection('banking')}
+          {(tab==='all'||tab==='finance')    && renderSection('finance')}
+          {isSuper&&(tab==='all'||tab==='technical')  && renderSection('technical')}
+          {(tab==='all'||tab==='internal')   && renderSection('internal')}
+          {isSuper&&(tab==='all'||tab==='redZone')    && renderSection('redZone')}
         </View>
       </ScrollView>
 
-      {/* ── FLOATING DOCK ──────────────────────── */}
+      {/* ── BOTTOM DOCK ── */}
       <View style={s.dock}>
-        {dockItems.map((d, i) => (
-          <TouchableOpacity
-            key={i}
-            style={s.dockItem}
-            onPress={() => router.push(d.route as any)}
-            activeOpacity={0.75}
-          >
+        {DOCK.map((d,i)=>(
+          <TouchableOpacity key={i} style={s.dockItem} onPress={()=>router.push(d.r as any)} activeOpacity={0.75}>
             <View style={s.dockIconBox}>
-              <Ionicons name={d.icon as any} size={20} color={C.navy} />
+              <Ionicons name={d.i as any} size={18} color={C.navy}/>
             </View>
-            <Text style={s.dockLabel}>{d.label}</Text>
+            <Text style={s.dockLabel}>{d.l}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -534,420 +436,219 @@ export default function AdminDashboard() {
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
-const STAT_W = (W - 32 - 10) / 2;
-const MOD_W  = (W - 32 - 28 - 10) / 2;
+const STAT_W  = (W - 32 - 10) / 2;
+const MOD_W   = (W - 32 - 28 - 10) / 2;
 
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.bg,
+  root: { flex:1, backgroundColor:C.bg },
+
+  // ── Body background with subtle gold tint ─────────────────────────────────
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  header: {
+    paddingTop: Platform.OS==='ios'?54:34,
+    paddingHorizontal:16, paddingBottom:22,
+    borderBottomLeftRadius:26, borderBottomRightRadius:26,
+    overflow:'hidden', position:'relative',
+  },
+  orb1: {
+    position:'absolute',top:-50,right:-40,
+    width:200,height:200,borderRadius:100,
+    backgroundColor:'rgba(217,119,6,0.12)',   // gold orb
+  },
+  orb2: {
+    position:'absolute',bottom:-30,left:-50,
+    width:160,height:160,borderRadius:80,
+    backgroundColor:'rgba(245,158,11,0.07)',  // gold orb 2
+  },
+  headerTrim: {
+    position:'absolute',bottom:0,left:0,right:0,
+    height:3,borderRadius:2,
+    backgroundColor:C.goldMid,  // solid gold trim
   },
 
-  // ── Header ────────────────────────────
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 36,
-    paddingHorizontal: 18,
-    paddingBottom: 26,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  headerCircle1: {
-    position: 'absolute', top: -60, right: -40,
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: 'rgba(245,158,11,0.1)',
-  },
-  headerCircle2: {
-    position: 'absolute', bottom: -40, left: -60,
-    width: 160, height: 160, borderRadius: 80,
-    backgroundColor: 'rgba(59,130,246,0.08)',
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  // Top row
+  topRow: {flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:16},
+  brand: {flexDirection:'row',alignItems:'center',gap:9},
   logoBox: {
-    width: 40, height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.4)',
-    padding: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width:34,height:34,borderRadius:10,
+    backgroundColor:'rgba(255,255,255,0.08)',
+    borderWidth:1,borderColor:'rgba(245,158,11,0.35)',
+    padding:4,alignItems:'center',justifyContent:'center',
   },
-  logoImg: { width: '100%', height: '100%' },
-  brandName: {
-    color: C.white,
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  brandSub: {
-    color: 'rgba(245,158,11,0.9)',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    marginTop: 1,
-  },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  logoImg: {width:'100%',height:'100%'},
+  brandName: {color:C.white,fontSize:13,fontWeight:'900',letterSpacing:0.5},
+  brandTag:  {color:'rgba(245,158,11,0.85)',fontSize:8,fontWeight:'800',letterSpacing:1.1,marginTop:1},
+  topRight: {flexDirection:'row',alignItems:'center',gap:8},
   switchBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.35)',
+    flexDirection:'row',alignItems:'center',gap:4,
+    paddingHorizontal:9,paddingVertical:5,
+    borderRadius:18,backgroundColor:'rgba(245,158,11,0.12)',
+    borderWidth:1,borderColor:'rgba(245,158,11,0.3)',
   },
-  switchBtnText: { color: C.gold, fontSize: 11, fontWeight: '800' },
-  avatarWrap: { position: 'relative' },
+  switchText: {color:C.gold,fontSize:10,fontWeight:'800'},
+  avatarWrap: {position:'relative'},
   avatarRing: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: 2, borderColor: C.gold,
-    padding: 2,
-    alignItems: 'center', justifyContent: 'center',
+    width:36,height:36,borderRadius:18,
+    borderWidth:1.5,borderColor:C.gold,
+    padding:2,alignItems:'center',justifyContent:'center',
   },
   avatarCircle: {
-    width: '100%', height: '100%',
-    borderRadius: 16, overflow: 'hidden',
-    backgroundColor: C.navyMid,
-    alignItems: 'center', justifyContent: 'center',
+    width:'100%',height:'100%',borderRadius:14,
+    backgroundColor:C.navyMid,overflow:'hidden',
+    alignItems:'center',justifyContent:'center',
   },
-  avatarImg: { width: '100%', height: '100%' },
-  avatarInit: { color: C.gold, fontSize: 15, fontWeight: '900' },
+  avatarImg: {width:'100%',height:'100%'},
+  avatarInit: {color:C.gold,fontSize:14,fontWeight:'900'},
   onlineDot: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#22C55E',
-    borderWidth: 1.5, borderColor: C.navy,
+    position:'absolute',bottom:0,right:0,
+    width:8,height:8,borderRadius:4,
+    backgroundColor:'#22C55E',borderWidth:1.5,borderColor:C.navy,
   },
-  greetBlock: { marginBottom: 18 },
-  greetName: {
-    color: C.white,
-    fontSize: 19,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  greetRow2: { marginBottom: 6 },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  roleBadgeSuper: {
-    backgroundColor: 'rgba(245,158,11,0.2)',
-    borderColor: 'rgba(245,158,11,0.5)',
-  },
-  roleBadgeText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  roleBadgeTextSuper: { color: C.gold },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusDot: {
-    width: 7, height: 7, borderRadius: 3.5,
-    backgroundColor: '#22C55E',
-  },
-  statusText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.3)',
-  },
-  searchInput: {
-    flex: 1,
-    color: C.white,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  kbdTag: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  kbdTagText: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '700' },
 
-  // ── Stats Section ─────────────────────
-  statsSection: {
-    paddingHorizontal: 16,
-    marginTop: 20,
+  // Greeting
+  greetRow: {marginBottom:14},
+  greetName: {color:C.white,fontSize:17,fontWeight:'800',marginBottom:7},
+  rolePill: {
+    alignSelf:'flex-start',marginBottom:7,
+    paddingHorizontal:9,paddingVertical:3,borderRadius:7,
+    backgroundColor:'rgba(255,255,255,0.1)',
+    borderWidth:1,borderColor:'rgba(255,255,255,0.12)',
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  rolePillGold: {backgroundColor:'rgba(245,158,11,0.18)',borderColor:'rgba(245,158,11,0.4)'},
+  rolePillText: {color:'rgba(255,255,255,0.7)',fontSize:10,fontWeight:'800'},
+  statusRow: {flexDirection:'row',alignItems:'center',gap:5},
+  statusDot: {width:6,height:6,borderRadius:3,backgroundColor:'#22C55E'},
+  statusText: {color:'rgba(255,255,255,0.45)',fontSize:10,fontWeight:'500'},
+
+  // Search
+  searchBox: {
+    flexDirection:'row',alignItems:'center',gap:9,
+    backgroundColor:'rgba(255,255,255,0.08)',
+    borderRadius:14,paddingHorizontal:13,
+    paddingVertical:Platform.OS==='ios'?10:7,
+    borderWidth:1,borderColor:'rgba(245,158,11,0.25)',
   },
+  searchInput: {flex:1,color:C.white,fontSize:13,fontWeight:'500'},
+  kbdHint: {backgroundColor:'rgba(255,255,255,0.1)',paddingHorizontal:5,paddingVertical:2,borderRadius:4},
+  kbdText: {color:'rgba(255,255,255,0.4)',fontSize:9,fontWeight:'700'},
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  statsSec: {paddingHorizontal:16,marginTop:18},
+  statsGrid: {flexDirection:'row',flexWrap:'wrap',gap:10},
   statCard: {
-    width: STAT_W,
-    backgroundColor: C.card,
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    width:STAT_W,backgroundColor:C.white,
+    borderRadius:18,padding:12,
+    borderWidth:1,borderColor:C.border,
+    shadowColor:'#94A3B8',shadowOffset:{width:0,height:2},
+    shadowOpacity:0.08,shadowRadius:8,elevation:3,
   },
-  statIconBox: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 10,
-  },
-  statValue: { fontSize: 22, fontWeight: '900', marginBottom: 2 },
-  statLabel: { color: C.textSub, fontSize: 11, fontWeight: '600', marginBottom: 10 },
-  statBar: {
-    height: 4, borderRadius: 2, overflow: 'hidden',
-  },
-  statBarFill: { height: '100%', borderRadius: 2 },
+  statIcon: {width:36,height:36,borderRadius:10,alignItems:'center',justifyContent:'center',marginBottom:8},
+  statVal:  {fontSize:20,fontWeight:'900',marginBottom:2},
+  statLbl:  {color:C.sub,fontSize:10,fontWeight:'600',marginBottom:8},
+  statProg: {height:3,borderRadius:2,overflow:'hidden'},
+  statProgFill: {height:'100%',borderRadius:2},
 
-  // ── Quick Actions ─────────────────────
-  qaSec: { marginTop: 24 },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+  // ── Quick Actions ──────────────────────────────────────────────────────────
+  qaSec: {marginTop:20},
+  rowBtw: {flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:16,marginBottom:10},
+  blockHead: {flexDirection:'row',alignItems:'center',gap:6},
+  blockHeadDot: {width:3,height:14,borderRadius:2,backgroundColor:C.gold},
+  blockLabel: {fontSize:13,fontWeight:'900',color:C.text},
+  goldTag: {
+    backgroundColor:C.goldLight,borderWidth:1,borderColor:C.goldBorder,
+    paddingHorizontal:7,paddingVertical:2,borderRadius:6,
   },
-  blockLabel: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: C.textPrimary,
-  },
-  goldPill: {
-    backgroundColor: C.goldLight,
-    borderWidth: 1,
-    borderColor: C.goldBorder,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  goldPillText: { color: C.gold, fontSize: 9, fontWeight: '900' },
-  qaScroll: { paddingHorizontal: 16, gap: 12 },
+  goldTagText: {color:C.gold,fontSize:8,fontWeight:'900'},
+  qaScroll: {paddingHorizontal:16,gap:10},
   qaCard: {
-    backgroundColor: C.card,
-    borderRadius: 18,
-    padding: 14,
-    alignItems: 'center',
-    width: 86,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor:C.white,borderRadius:16,
+    padding:11,alignItems:'center',width:78,
+    borderWidth:1,borderColor:C.border,
+    shadowColor:'#94A3B8',shadowOffset:{width:0,height:2},
+    shadowOpacity:0.06,shadowRadius:6,elevation:2,
   },
-  qaIconBox: {
-    width: 46, height: 46, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 8,
-  },
-  qaLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: C.textPrimary,
-    textAlign: 'center',
-  },
+  qaIcon: {width:38,height:38,borderRadius:11,alignItems:'center',justifyContent:'center',marginBottom:6},
+  qaLabel: {fontSize:9,fontWeight:'800',color:C.text,textAlign:'center'},
 
-  // ── Category Tabs ─────────────────────
-  tabsSec: { marginTop: 22, paddingLeft: 16 },
-  tabsScroll: { gap: 8, paddingRight: 16 },
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+  tabsSec: {marginTop:20,paddingLeft:16},
+  tabsScroll: {gap:7,paddingRight:16},
   tabPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
+    flexDirection:'row',alignItems:'center',gap:5,
+    paddingHorizontal:11,paddingVertical:7,borderRadius:12,
+    backgroundColor:C.white,borderWidth:1,borderColor:C.border,
   },
-  tabPillSel: {
-    backgroundColor: C.navy,
-    borderColor: C.navy,
-  },
-  tabText: { fontSize: 11, fontWeight: '700', color: C.textSub },
-  tabTextSel: { color: C.white },
+  tabPillSel: {backgroundColor:C.navy,borderColor:C.navy},
+  tabText: {fontSize:11,fontWeight:'700',color:C.sub},
+  tabTextSel: {color:C.white},
 
-  // ── Modules ───────────────────────────
-  sectionsWrap: {
-    paddingHorizontal: 16,
-    marginTop: 16,
-    gap: 16,
-  },
+  // ── Section ────────────────────────────────────────────────────────────────
+  sections: {paddingHorizontal:16,marginTop:16,gap:14},
   section: {
-    backgroundColor: C.card,
-    borderRadius: 22,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    backgroundColor:C.white,borderRadius:20,
+    overflow:'hidden',borderWidth:1,borderColor:C.border,
+    shadowColor:'#94A3B8',shadowOffset:{width:0,height:3},
+    shadowOpacity:0.07,shadowRadius:10,elevation:3,
   },
-  sectionHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderSoft,
+  secHeadGrad: {
+    flexDirection:'row',alignItems:'center',
+    paddingHorizontal:12,paddingVertical:10,
+    position:'relative',overflow:'hidden',
   },
-  sectionHeadLeft: { flexDirection: 'row', alignItems: 'center' },
-  sectionIconBox: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
+  secHeadDot: {width:3,height:30,borderRadius:2,marginRight:10},
+  secHeadIcon: {
+    width:28,height:28,borderRadius:8,
+    alignItems:'center',justifyContent:'center',
   },
-  sectionTitle: { color: C.textPrimary, fontSize: 13, fontWeight: '900' },
-  sectionSub: { color: C.textSub, fontSize: 10, fontWeight: '600' },
-  pendingBadge: {
-    backgroundColor: C.roseLight,
-    borderColor: '#FCA5A5',
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+  secTitle: {color:C.text,fontSize:12,fontWeight:'900'},
+  secSub:   {color:C.sub,fontSize:9,fontWeight:'600'},
+  secBadge: {
+    backgroundColor:C.red,paddingHorizontal:7,paddingVertical:2,
+    borderRadius:7,marginLeft:'auto',
   },
-  pendingBadgeText: { color: C.rose, fontSize: 9, fontWeight: '900' },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  moduleCard: {
-    width: MOD_W,
-    backgroundColor: C.bg,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: C.border,
-    minHeight: 96,
-  },
-  cardTopStrip: { height: 4, width: '100%' },
-  cardBody: {
-    padding: 10,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  cardIconBox: {
-    width: 34, height: 34, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cardBadgeCol: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 3,
-  },
-  numBadge: {
-    backgroundColor: C.rose,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 5,
-  },
-  numBadgeText: { color: C.white, fontSize: 8, fontWeight: '900' },
-  tagChip: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    borderWidth: 0.5,
-  },
-  tagChipText: { fontSize: 8, fontWeight: '900' },
-  cardTitle: {
-    color: C.textPrimary,
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  cardSubtext: { color: C.textMuted, fontSize: 9, fontWeight: '500' },
+  secBadgeText: {color:C.white,fontSize:9,fontWeight:'900'},
 
-  // ── Dock ──────────────────────────────
+  // Grid of module cards
+  grid: {
+    flexDirection:'row',flexWrap:'wrap',
+    padding:10,gap:8,
+    borderTopWidth:1,borderTopColor:C.bg,
+  },
+  modCard: {
+    width:MOD_W,backgroundColor:C.white,
+    borderRadius:14,overflow:'hidden',
+    borderWidth:1,borderColor:C.border,
+    flexDirection:'row',minHeight:70,
+    shadowColor:'#94A3B8',shadowOffset:{width:0,height:1},
+    shadowOpacity:0.05,shadowRadius:4,elevation:1,
+  },
+  modBar: {width:3},
+  modInner: {flex:1,padding:9,justifyContent:'space-between'},
+  modIcon: {width:28,height:28,borderRadius:8,alignItems:'center',justifyContent:'center',marginBottom:5},
+  modTitle: {fontSize:11,fontWeight:'800',color:C.text,marginBottom:4},
+  modFooter: {flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+  redDot: {backgroundColor:C.red,paddingHorizontal:5,paddingVertical:1,borderRadius:5},
+  redDotText: {color:C.white,fontSize:8,fontWeight:'900'},
+  modTag: {paddingHorizontal:4,paddingVertical:1,borderRadius:4,borderWidth:0.5},
+  modTagText: {fontSize:8,fontWeight:'900'},
+  modOpenText: {color:C.muted,fontSize:9,fontWeight:'500'},
+
+  // ── Dock ───────────────────────────────────────────────────────────────────
   dock: {
-    position: 'absolute',
-    bottom: 14,
-    left: 14,
-    right: 14,
-    backgroundColor: C.white,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 26,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: C.goldBorder,
-    shadowColor: C.navy,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 12,
+    position:'absolute',bottom:12,left:12,right:12,
+    backgroundColor:C.white,
+    paddingVertical:9,paddingHorizontal:8,
+    borderRadius:24,flexDirection:'row',justifyContent:'space-around',
+    borderWidth:1.5,borderColor:C.goldBorder,
+    shadowColor:'#0F172A',shadowOffset:{width:0,height:5},
+    shadowOpacity:0.1,shadowRadius:14,elevation:10,
   },
-  dockItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    gap: 3,
-  },
+  dockItem: {alignItems:'center',justifyContent:'center',flex:1,gap:2},
   dockIconBox: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: C.goldLight,
-    alignItems: 'center', justifyContent: 'center',
+    width:32,height:32,borderRadius:9,
+    backgroundColor:C.goldLight,
+    alignItems:'center',justifyContent:'center',
   },
-  dockLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: C.navy,
-  },
+  dockLabel: {fontSize:8,fontWeight:'800',color:C.navy},
 });

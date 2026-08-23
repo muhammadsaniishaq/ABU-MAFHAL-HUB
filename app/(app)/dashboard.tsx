@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeBanners, setActiveBanners] = useState<any[]>([]);
   const [activePartners, setActivePartners] = useState<any[]>([]);
+  const [serviceCustoms, setServiceCustoms] = useState<Record<string, any>>({});
   const bannerRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
@@ -182,7 +183,7 @@ export default function Dashboard() {
 
   const fetchAppSettings = async () => {
     try {
-      const { data } = await supabase.from('app_settings').select('key, value').in('key', ['app_logo', 'hidden_features', 'company_name']);
+      const { data } = await supabase.from('app_settings').select('key, value').in('key', ['app_logo', 'hidden_features', 'company_name', 'dashboard_service_customizations']);
       if (data) {
         data.forEach(setting => {
           if (setting.key === 'app_logo' && setting.value) {
@@ -192,6 +193,15 @@ export default function Dashboard() {
           }
           if (setting.key === 'hidden_features') {
             try { const parsed = JSON.parse(setting.value); setHiddenFeatures(parsed); saveCache({ hiddenFeatures: parsed }); } catch (e) {}
+          }
+          if (setting.key === 'dashboard_service_customizations') {
+            try {
+              const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+              if (parsed && typeof parsed === 'object') {
+                setServiceCustoms(parsed);
+                saveCache({ serviceCustoms: parsed });
+              }
+            } catch (e) {}
           }
         });
       }
@@ -308,34 +318,52 @@ export default function Dashboard() {
     if (action.route) router.push(action.route as any);
   };
 
-  const ALL_ACTIONS_CATALOG = [
-    { id: 'airtime',      icon: 'phone-portrait-outline', label: 'Airtime',      color: '#f97316', route: '/airtime', badge: null },
-    { id: 'data',         icon: 'wifi-outline',           label: 'Data',         color: '#22c55e', route: '/data', badge: null },
-    { id: 'transfer',     icon: 'swap-horizontal-outline',label: 'Transfer',     color: '#2563eb', route: '/transfer', badge: null },
-    { id: 'recharge_pin', icon: 'key-outline',            label: 'Recharge PIN', color: '#10b981', route: '/recharge-pin', badge: 'HOT' },
-    { id: 'airtime_cash', icon: 'cash-outline',           label: 'Airtime ➔ Cash', color: '#16a34a', route: '/airtime-to-cash', badge: 'NEW' },
-    { id: 'bills',        icon: 'receipt-outline',        label: 'Bills',        color: '#eab308', route: '/bills', badge: null },
-    { id: 'nin',          icon: 'person-add-outline',     label: 'NIN',          color: '#10b981', route: '/nin-services', badge: null },
-    { id: 'tickets',      icon: 'ticket-outline',         label: 'Tickets',      color: '#e11d48', route: '/(app)/tickets', badge: null },
-    { id: 'bulk_sms',     icon: 'chatbubbles-outline',    label: 'Bulk SMS',     color: '#3B82F6', route: '/bulk-sms', badge: null },
-    { id: 'cable',        icon: 'tv-outline',             label: 'Cable TV',     color: '#8b5cf6', route: '/bills', badge: null },
-    { id: 'electricity',  icon: 'flash-outline',          label: 'PHCN',         color: '#f5a623', route: '/bills', badge: null },
-    { id: 'smile',        icon: 'globe-outline',          label: 'Smile',        color: '#ec4899', route: '/smile', badge: null },
-    { id: 'education',    icon: 'school-outline',         label: 'Education',    color: '#06b6d4', route: '/education', badge: null },
-    { id: 'cac',          icon: 'briefcase-outline',      label: 'CAC Reg',      color: '#8b5cf6', route: '/cac-services', badge: 'POPULAR' },
-    { id: 'social',       icon: 'rocket-outline',         label: 'Social',       color: '#ec4899', route: '/social-boost', badge: 'BOOST' },
-    { id: 'reviews',      icon: 'star-outline',           label: 'Reviews',      color: '#f5a623', route: '/reviews', badge: null },
-    { id: 'cards',        icon: 'card-outline',           label: 'Cards',        color: '#8B5CF6', route: '/virtual-cards', badge: null },
-    { id: 'savings',      icon: 'wallet-outline',         label: 'Savings',      color: '#107C10', route: '/savings', badge: null },
-    { id: 'loans',        icon: 'cash-outline',           label: 'Loans',        color: '#EA580C', route: '/loans', badge: null },
-    { id: 'crypto',       icon: 'logo-bitcoin',           label: 'Crypto',       color: '#F7931A', route: '/crypto', badge: 'WEB3' },
-    { id: 'analytics',    icon: 'pie-chart-outline',      label: 'Insights',     color: '#DB2777', route: '/analytics', badge: null },
-    { id: 'rewards',      icon: 'gift-outline',           label: 'Rewards',      color: '#9333EA', route: '/rewards', badge: null },
-    { id: 'qr',           icon: 'qr-code-outline',        label: 'QR Pay',       color: '#10B981', route: '/qr-pay', badge: null },
-    { id: 'investments',  icon: 'trending-up-outline',    label: 'Invest',       color: '#3B82F6', route: '/investments', badge: null },
-    { id: 'insurance',    icon: 'shield-checkmark-outline', label: 'Insurance',  color: '#107C10', route: '/insurance', badge: null },
-    { id: 'bvn',          icon: 'finger-print-outline',   label: 'BVN',          color: '#0056D2', route: '/bvn-services', badge: null },
+  // Base catalog (always the same structure; customizations applied on top)
+  const BASE_CATALOG = [
+    { id: 'airtime',      icon: 'phone-portrait-outline', label: 'Airtime',         color: '#f97316', route: '/airtime',        badge: null },
+    { id: 'data',         icon: 'wifi-outline',           label: 'Data',            color: '#22c55e', route: '/data',           badge: null },
+    { id: 'transfer',     icon: 'swap-horizontal-outline',label: 'Transfer',        color: '#2563eb', route: '/transfer',       badge: null },
+    { id: 'recharge_pin', icon: 'key-outline',            label: 'Recharge PIN',   color: '#10b981', route: '/recharge-pin',   badge: 'HOT' },
+    { id: 'airtime_cash', icon: 'cash-outline',           label: 'Airtime ➤ Cash',color: '#16a34a', route: '/airtime-to-cash',badge: 'NEW' },
+    { id: 'bills',        icon: 'receipt-outline',        label: 'Bills',           color: '#eab308', route: '/bills',          badge: null },
+    { id: 'nin',          icon: 'person-add-outline',     label: 'NIN',             color: '#10b981', route: '/nin-services',   badge: null },
+    { id: 'tickets',      icon: 'ticket-outline',         label: 'Tickets',         color: '#e11d48', route: '/(app)/tickets', badge: null },
+    { id: 'bulk_sms',     icon: 'chatbubbles-outline',    label: 'Bulk SMS',        color: '#3B82F6', route: '/bulk-sms',       badge: null },
+    { id: 'cable',        icon: 'tv-outline',             label: 'Cable TV',        color: '#8b5cf6', route: '/bills',          badge: null },
+    { id: 'electricity',  icon: 'flash-outline',          label: 'PHCN',            color: '#f5a623', route: '/bills',          badge: null },
+    { id: 'smile',        icon: 'globe-outline',          label: 'Smile',           color: '#ec4899', route: '/smile',          badge: null },
+    { id: 'education',    icon: 'school-outline',         label: 'Education',       color: '#06b6d4', route: '/education',      badge: null },
+    { id: 'cac',          icon: 'briefcase-outline',      label: 'CAC Reg',         color: '#8b5cf6', route: '/cac-services',   badge: 'POPULAR' },
+    { id: 'social',       icon: 'rocket-outline',         label: 'Social',          color: '#ec4899', route: '/social-boost',   badge: 'BOOST' },
+    { id: 'reviews',      icon: 'star-outline',           label: 'Reviews',         color: '#f5a623', route: '/reviews',        badge: null },
+    { id: 'cards',        icon: 'card-outline',           label: 'Cards',           color: '#8B5CF6', route: '/virtual-cards',  badge: null },
+    { id: 'savings',      icon: 'wallet-outline',         label: 'Savings',         color: '#107C10', route: '/savings',        badge: null },
+    { id: 'loans',        icon: 'cash-outline',           label: 'Loans',           color: '#EA580C', route: '/loans',          badge: null },
+    { id: 'crypto',       icon: 'logo-bitcoin',           label: 'Crypto',          color: '#F7931A', route: '/crypto',         badge: 'WEB3' },
+    { id: 'analytics',   icon: 'pie-chart-outline',      label: 'Insights',        color: '#DB2777', route: '/analytics',      badge: null },
+    { id: 'rewards',      icon: 'gift-outline',           label: 'Rewards',         color: '#9333EA', route: '/rewards',        badge: null },
+    { id: 'qr',           icon: 'qr-code-outline',        label: 'QR Pay',          color: '#10B981', route: '/qr-pay',         badge: null },
+    { id: 'investments',  icon: 'trending-up-outline',    label: 'Invest',          color: '#3B82F6', route: '/investments',    badge: null },
+    { id: 'insurance',    icon: 'shield-checkmark-outline',label: 'Insurance',      color: '#107C10', route: '/insurance',      badge: null },
+    { id: 'bvn',          icon: 'finger-print-outline',   label: 'BVN',             color: '#0056D2', route: '/bvn-services',   badge: null },
   ];
+
+  // Apply admin customizations on top of base catalog
+  const ALL_ACTIONS_CATALOG = BASE_CATALOG
+    .filter(item => {
+      const cust = serviceCustoms[item.id];
+      return !cust || cust.is_visible !== false;  // hide if admin set is_visible=false
+    })
+    .map(item => {
+      const cust = serviceCustoms[item.id];
+      if (!cust) return item;
+      return {
+        ...item,
+        label: cust.custom_label  || item.label,
+        color: cust.custom_color  || item.color,
+        badge: cust.custom_badge !== undefined ? cust.custom_badge : item.badge,
+      };
+    });
 
   const catalogMap = new Map(ALL_ACTIONS_CATALOG.map(a => [a.id, a]));
 
