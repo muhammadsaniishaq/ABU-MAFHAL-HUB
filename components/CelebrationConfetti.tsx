@@ -20,7 +20,7 @@ export interface CelebrationSettings {
 }
 
 export interface CelebrationConfettiRef {
-  burst: (x?: number, y?: number) => void;
+  burst: (x?: number, y?: number, force?: boolean) => void;
 }
 
 // ─── Rich Event Presets ────────────────────────────────────────────────────────
@@ -152,7 +152,6 @@ let lastBurstTimestamp = 0;
 
 export const triggerGlobalConfetti = (x?: number, y?: number, force?: boolean) => {
   const now = Date.now();
-  // Throttle to 300ms to guarantee ultra-high performance & prevent CPU spikes
   if (now - lastBurstTimestamp > 300) {
     lastBurstTimestamp = now;
     if (activeBurstHandler) {
@@ -225,6 +224,10 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
               const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
               if (parsed && typeof parsed === 'object') {
                 setLiveSettings(parsed);
+                // Clear any existing active particles immediately if turned off!
+                if (!parsed.is_enabled) {
+                  setParticles([]);
+                }
               }
             } catch (e) {}
           }
@@ -237,21 +240,23 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
     };
   }, [autoListenSupabase]);
 
-  const activeSettings = liveSettings || propSettings;
-  const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
+  const activeSettings = liveSettings !== null ? liveSettings : propSettings;
+  const isEnabled = Boolean(activeSettings && activeSettings.is_enabled === true);
 
   const burst = (originX?: number, originY?: number, force?: boolean) => {
-    // Only fire if enabled or explicitly forced (e.g. test button)
-    if (!force && activeSettings && (!activeSettings.is_enabled || activeSettings.confetti_on_tap === false)) {
-      return;
+    // STRICT CHECK: Never fire if disabled unless explicitly forced from admin preview
+    if (!force) {
+      if (!isEnabled) return;
+      if (activeSettings && activeSettings.confetti_on_tap === false) return;
     }
 
+    const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
     const startX = originX !== undefined ? originX : SCREEN_WIDTH / 2;
     const startY = originY !== undefined ? originY : SCREEN_HEIGHT * 0.35;
 
     const colors = preset.particleColors;
     const emojis = preset.particleEmojis;
-    const particleCount = 18; // lightweight, fast, lag-free count
+    const particleCount = 16; // ultra-lightweight
     const newBatch: Particle[] = [];
 
     for (let i = 0; i < particleCount; i++) {
@@ -261,10 +266,10 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
       const isRibbon = !isEmoji && i % 2 === 0;
 
       const angle = (Math.PI * 2 * i) / particleCount + (Math.random() * 0.4 - 0.2);
-      const velocity = 70 + Math.random() * 120;
+      const velocity = 65 + Math.random() * 110;
       const targetX = Math.cos(angle) * velocity;
-      const targetY = Math.sin(angle) * velocity - (50 + Math.random() * 70);
-      const fallDistance = 200 + Math.random() * 220;
+      const targetY = Math.sin(angle) * velocity - (45 + Math.random() * 65);
+      const fallDistance = 180 + Math.random() * 200;
 
       const animX = new Animated.Value(0);
       const animY = new Animated.Value(0);
@@ -276,7 +281,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         startX,
         startY,
         color: colors[i % colors.length],
-        size: isEmoji ? 18 : isRibbon ? 8 : 6.5,
+        size: isEmoji ? 16 : isRibbon ? 7 : 6,
         isEmoji,
         emojiText,
         isRibbon,
@@ -286,18 +291,18 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         animOpacity,
       });
 
-      const duration = 900 + Math.random() * 400;
+      const duration = 850 + Math.random() * 350;
       Animated.parallel([
         Animated.sequence([
           Animated.timing(animX, {
             toValue: targetX,
-            duration: 280,
+            duration: 260,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
           Animated.timing(animX, {
-            toValue: targetX + (Math.random() * 40 - 20),
-            duration: duration - 280,
+            toValue: targetX + (Math.random() * 30 - 15),
+            duration: duration - 260,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.inOut(Easing.sin),
           }),
@@ -305,13 +310,13 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         Animated.sequence([
           Animated.timing(animY, {
             toValue: targetY,
-            duration: 280,
+            duration: 260,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.out(Easing.quad),
           }),
           Animated.timing(animY, {
             toValue: targetY + fallDistance,
-            duration: duration - 280,
+            duration: duration - 260,
             useNativeDriver: Platform.OS !== 'web',
             easing: Easing.in(Easing.quad),
           }),
@@ -335,7 +340,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
       });
     }
 
-    setParticles(prev => [...prev.slice(-30), ...newBatch]);
+    setParticles(prev => [...prev.slice(-25), ...newBatch]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -349,10 +354,12 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
     };
   });
 
+  const preset = EVENT_PRESETS[activeSettings?.event_type || 'eid'] || EVENT_PRESETS.eid;
+
   return (
     <>
-      {/* Optional Top Greeting Banner */}
-      {activeSettings?.is_enabled && activeSettings?.show_banner && (
+      {/* ── Optional Festive Greeting Banner on Screen Top ── */}
+      {isEnabled && activeSettings?.show_banner && (
         <TouchableOpacity
           style={[styles.bannerContainer, { borderColor: preset.primaryColor + '50' }]}
           onPress={() => {
@@ -381,7 +388,7 @@ const CelebrationConfetti = forwardRef<CelebrationConfettiRef, Props>(({ setting
         </TouchableOpacity>
       )}
 
-      {/* Lightweight Non-blocking Overlay */}
+      {/* ── Non-blocking Particles Canvas (Only renders when particles exist) ── */}
       {particles.length > 0 && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           {particles.map(p => {

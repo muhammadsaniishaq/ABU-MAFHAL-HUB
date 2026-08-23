@@ -118,6 +118,50 @@ export default function AppDesigner() {
     }
   };
 
+  const toggleCelebrationEnabled = async (val: boolean) => {
+    const updated = { ...celebrationSettings, is_enabled: val };
+    setCelebrationSettings(updated);
+    try {
+      await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'celebration_event_settings',
+          value: JSON.stringify(updated),
+          description: 'Active holiday celebration and button confetti configuration'
+        }, { onConflict: 'key' });
+    } catch (e) {
+      console.error('Error saving celebration toggle:', e);
+    }
+  };
+
+  const toggleConfettiOnTap = async (val: boolean) => {
+    const updated = { ...celebrationSettings, confetti_on_tap: val };
+    setCelebrationSettings(updated);
+    try {
+      await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'celebration_event_settings',
+          value: JSON.stringify(updated),
+          description: 'Active holiday celebration and button confetti configuration'
+        }, { onConflict: 'key' });
+    } catch (e) {}
+  };
+
+  const toggleShowBanner = async (val: boolean) => {
+    const updated = { ...celebrationSettings, show_banner: val };
+    setCelebrationSettings(updated);
+    try {
+      await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'celebration_event_settings',
+          value: JSON.stringify(updated),
+          description: 'Active holiday celebration and button confetti configuration'
+        }, { onConflict: 'key' });
+    } catch (e) {}
+  };
+
   const saveCelebrationSettings = async () => {
     setSavingCelebration(true);
     try {
@@ -291,7 +335,7 @@ export default function AppDesigner() {
                 </View>
                 <Switch
                   value={celebrationSettings.is_enabled}
-                  onValueChange={(val) => setCelebrationSettings(p => ({ ...p, is_enabled: val }))}
+                  onValueChange={toggleCelebrationEnabled}
                   trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
                   thumbColor="#FFFFFF"
                 />
@@ -337,7 +381,7 @@ export default function AppDesigner() {
                 </View>
                 <Switch
                   value={celebrationSettings.confetti_on_tap}
-                  onValueChange={(val) => setCelebrationSettings(p => ({ ...p, confetti_on_tap: val }))}
+                  onValueChange={toggleConfettiOnTap}
                   trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
                   thumbColor="#FFFFFF"
                 />
@@ -350,7 +394,7 @@ export default function AppDesigner() {
                 </View>
                 <Switch
                   value={celebrationSettings.show_banner}
-                  onValueChange={(val) => setCelebrationSettings(p => ({ ...p, show_banner: val }))}
+                  onValueChange={toggleShowBanner}
                   trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
                   thumbColor="#FFFFFF"
                 />
@@ -390,7 +434,7 @@ export default function AppDesigner() {
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <TouchableOpacity
                 style={s.testBtn}
-                onPress={() => triggerGlobalConfetti(W / 2, 200)}
+                onPress={() => triggerGlobalConfetti(W / 2, 200, true)}
                 activeOpacity={0.8}
               >
                 <Ionicons name="sparkles" size={16} color={T.navy} />
