@@ -10,13 +10,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-// Configure Reanimated Logger to be less chatty
+// Configure Reanimated Logger
 configureReanimatedLogger({
     strict: false,
     level: ReanimatedLogLevel.warn,
 });
 
-// Suppress other noisy warnings
+// Suppress noisy logs
 LogBox.ignoreLogs([
     'SafeAreaView has been deprecated',
     '[Reanimated] Reading from `value`',
@@ -32,7 +32,7 @@ import { Session } from '@supabase/supabase-js';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import '../global.css';
 
-// Suppress browser focus outlines & set up PWA manifest globally across web app
+// Web setup
 if (typeof document !== 'undefined') {
   try {
     const styleId = 'global-outline-suppress';
@@ -51,49 +51,12 @@ if (typeof document !== 'undefined') {
       `;
       document.head.appendChild(style);
     }
-
-    // PWA Manifest and Mobile App Meta Tags Setup
-    const manifestId = 'pwa-manifest-link';
-    if (!document.getElementById(manifestId)) {
-      const manifestLink = document.createElement('link');
-      manifestLink.id = manifestId;
-      manifestLink.rel = 'manifest';
-      manifestLink.href = '/manifest.json';
-      document.head.appendChild(manifestLink);
-
-      const metaTheme = document.createElement('meta');
-      metaTheme.name = 'theme-color';
-      metaTheme.content = '#0F172A';
-      document.head.appendChild(metaTheme);
-
-      const metaMobile = document.createElement('meta');
-      metaMobile.name = 'mobile-web-app-capable';
-      metaMobile.content = 'yes';
-      document.head.appendChild(metaMobile);
-
-      const metaApple = document.createElement('meta');
-      metaApple.name = 'apple-mobile-web-app-capable';
-      metaApple.content = 'yes';
-      document.head.appendChild(metaApple);
-
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (let reg of registrations) {
-            reg.unregister();
-          }
-        }).catch(() => {});
-      }
-    }
   } catch (e) {}
 }
 
-// Ultra-fast Native Splash dismiss to eliminate any splash freezing
+// Auto-hide native splash immediately so screen never stays blank or frozen
 if (Platform.OS !== 'web') {
-  SplashScreen.preventAutoHideAsync().catch(() => {});
-  // Failsafe auto-hide timeout: guarantees screen never stays stuck on native splash
-  setTimeout(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, 350);
+  SplashScreen.hideAsync().catch(() => {});
 }
 
 import { useAppSettings } from '../hooks/useAppSettings';
@@ -118,8 +81,7 @@ export default function RootLayout() {
     const colorScheme = useColorScheme();
     const [session, setSession] = useState<Session | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
-    const [initialized, setInitialized] = useState(true);
-    const [authChecked, setAuthChecked] = useState(true);
+    const [authChecked, setAuthChecked] = useState(false);
     const router = useRouter();
     const segments = useSegments();
     const { settings } = useAppSettings();
@@ -131,7 +93,6 @@ export default function RootLayout() {
             const lowerEmail = userEmail ? userEmail.toLowerCase().trim() : '';
             const isAdminEmail = lowerEmail && KNOWN_ADMIN_EMAILS.includes(lowerEmail);
 
-            // Load from cache first
             const cachedRole = await AsyncStorage.getItem(`user_role_${userId}`);
             if (cachedRole && !userRole) {
                 setUserRole(cachedRole);
@@ -149,33 +110,16 @@ export default function RootLayout() {
 
             if (isConfirmedAdmin) {
                 roleToSet = 'admin';
-                if (data && data.role !== 'admin') {
-                    try { await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId); } catch (err) {}
-                }
-            } else {
-                if (data && data.role === 'admin' && !isConfirmedAdmin) {
-                    roleToSet = 'user';
-                    try { await supabase.from('profiles').update({ role: 'user' }).eq('id', userId); } catch (err) {}
-                } else if (!roleToSet) {
-                    roleToSet = 'user';
-                }
+            } else if (!roleToSet) {
+                roleToSet = 'user';
             }
 
             setUserRole(roleToSet);
             await AsyncStorage.setItem(`user_role_${userId}`, roleToSet);
-        } catch (e) {
-            console.log('Error fetching role in layout:', e);
-        }
+        } catch (e) {}
     };
 
     useEffect(() => {
-        // Fast synchronous check of cached session
-        AsyncStorage.getItem('has_active_session').then((hasSession) => {
-            if (hasSession === 'true') {
-                setInitialized(true);
-            }
-        }).catch(() => {});
-
         supabase.auth.getSession().then(async ({ data: { session }, error }) => {
             if (error) {
                 if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
@@ -195,12 +139,10 @@ export default function RootLayout() {
                 }
             }
             setAuthChecked(true);
-            setInitialized(true);
-            SplashScreen.hideAsync().catch(() => {});
+            if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
         }).catch(async () => {
             setAuthChecked(true);
-            setInitialized(true);
-            SplashScreen.hideAsync().catch(() => {});
+            if (Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -222,13 +164,14 @@ export default function RootLayout() {
         };
     }, []);
 
+    // Strict Security PIN Lock on native app exit/minimize
     useEffect(() => {
+        if (Platform.OS === 'web') return;
+
         const subscription = AppState.addEventListener('change', (nextAppState) => {
             if (nextAppState === 'background' || nextAppState === 'inactive') {
-                // Immediately lock session on app exit or minimize
                 AsyncStorage.removeItem('app_unlocked').catch(() => {});
             } else if (nextAppState === 'active') {
-                // When returning to app, instantly ensure PIN unlock is shown
                 AsyncStorage.getItem('has_active_session').then(async (hasActive) => {
                     if (hasActive === 'true') {
                         const unlocked = await AsyncStorage.getItem('app_unlocked');
@@ -245,32 +188,30 @@ export default function RootLayout() {
         return () => subscription.remove();
     }, [segments]);
 
-    // High performance route guard with local caching (no blocking network calls)
+    // Rock-solid Route Guard
     useEffect(() => {
-        if (!initialized || !authChecked) return;
+        if (!authChecked) return;
 
         const currentScreen = segments[segments.length - 1] || 'index';
-        const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp'];
+        const authScreens = ['login', 'signup', 'pin', 'pin-setup', 'otp', 'reset-password'];
         const isAuthGroup = segments.includes('(auth)') || authScreens.includes(currentScreen);
         const isManagementGroup = segments.includes('manage') || segments[0] === 'manage' || segments[0] === '(manage)';
-        const publicScreens = ['index', 'onboarding', 'privacy', 'terms', 'signup'];
+        const publicScreens = ['index', 'onboarding', 'privacy', 'terms', 'signup', 'login'];
         const isPublicScreen = publicScreens.includes(currentScreen);
 
-        if (session) {
+        if (session?.user) {
             const isAdmin = isUserAdmin(userRole, session.user?.email);
 
             (async () => {
                 const userId = session.user.id;
                 const unlocked = await AsyncStorage.getItem('app_unlocked');
                 
-                // Read PIN locally from secure cache instantly
                 let localPin = Platform.OS === 'web'
                     ? await AsyncStorage.getItem(`user_transaction_pin_${userId}`) || await AsyncStorage.getItem('user_transaction_pin')
                     : await SecureStore.getItemAsync(`user_transaction_pin_${userId}`) || await SecureStore.getItemAsync('user_transaction_pin');
 
-                // 1. User has NO PIN configured -> Must complete PIN Setup first!
+                // 1. User has NO PIN configured -> Must complete PIN Setup
                 if (!localPin) {
-                    // Check DB in background once
                     (async () => {
                         try {
                             const { data } = await supabase.from('profiles').select('transaction_pin').eq('id', userId).maybeSingle();
@@ -278,6 +219,8 @@ export default function RootLayout() {
                                 const validPin = String(data.transaction_pin);
                                 if (Platform.OS === 'web') await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
                                 else await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
+                                if (unlocked !== 'true') router.replace('/pin' as any);
+                                else router.replace('/dashboard' as any);
                             } else {
                                 if (currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
                                     router.replace('/pin-setup' as any);
@@ -290,7 +233,7 @@ export default function RootLayout() {
 
                 // 2. User has PIN, but app is LOCKED -> Prompt PIN unlock
                 if (unlocked !== 'true') {
-                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp') {
+                    if (currentScreen !== 'pin' && currentScreen !== 'pin-setup' && currentScreen !== 'otp' && currentScreen !== 'login') {
                         router.replace('/pin' as any);
                     }
                     return;
@@ -310,7 +253,7 @@ export default function RootLayout() {
                 router.replace('/');
             }
         }
-    }, [session, userRole, initialized, segments, authChecked]);
+    }, [session, userRole, authChecked, segments]);
 
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 

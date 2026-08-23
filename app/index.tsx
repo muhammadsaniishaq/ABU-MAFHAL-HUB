@@ -132,10 +132,6 @@ export default function Splash() {
           } else {
             router.replace('/pin' as any);
           }
-        } else if (Platform.OS === 'web' && typeof window !== 'undefined' && isSubscribed) {
-          if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-            window.location.replace('/landing.html');
-          }
         }
       } catch (e) {
         console.log('Splash session check notice:', e);
