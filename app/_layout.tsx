@@ -280,13 +280,14 @@ export default function RootLayout() {
 
                 if (profileData) {
                     if (profileData.transaction_pin) {
-                        localPin = profileData.transaction_pin;
+                        const validPin = String(profileData.transaction_pin);
+                        localPin = validPin;
                         if (Platform.OS === 'web') {
-                            await AsyncStorage.setItem(`user_transaction_pin_${userId}`, localPin);
-                            await AsyncStorage.setItem('user_transaction_pin', localPin);
+                            await AsyncStorage.setItem(`user_transaction_pin_${userId}`, validPin);
+                            await AsyncStorage.setItem('user_transaction_pin', validPin);
                         } else {
-                            await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, localPin);
-                            await SecureStore.setItemAsync('user_transaction_pin', localPin);
+                            await SecureStore.setItemAsync(`user_transaction_pin_${userId}`, validPin);
+                            await SecureStore.setItemAsync('user_transaction_pin', validPin);
                         }
                     } else {
                         // User has no transaction_pin in DB -> Clear stale cached PIN
