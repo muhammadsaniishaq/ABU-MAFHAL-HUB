@@ -53,37 +53,37 @@ const BG_STYLES = [
 
 // ─── Default Dashboard Services Catalog ──────────────────────────────────────
 const DASHBOARD_SERVICES = [
-  { id: 'airtime',      defaultIcon: 'phone-portrait-outline', defaultLabel: 'Airtime',         defaultColor: '#f97316', route: '/airtime' },
-  { id: 'data',         defaultIcon: 'wifi-outline',           defaultLabel: 'Data Bundles',    defaultColor: '#22c55e', route: '/data' },
-  { id: 'transfer',     defaultIcon: 'swap-horizontal-outline',defaultLabel: 'Transfer',        defaultColor: '#2563eb', route: '/transfer' },
-  { id: 'recharge_pin', defaultIcon: 'key-outline',            defaultLabel: 'Recharge PIN',    defaultColor: '#10b981', route: '/recharge-pin' },
-  { id: 'airtime_cash', defaultIcon: 'cash-outline',           defaultLabel: 'Airtime to Cash', defaultColor: '#16a34a', route: '/airtime-to-cash' },
-  { id: 'bills',        defaultIcon: 'receipt-outline',        defaultLabel: 'Bills Payment',   defaultColor: '#eab308', route: '/bills' },
-  { id: 'nin',          defaultIcon: 'person-add-outline',     defaultLabel: 'NIN Services',    defaultColor: '#10b981', route: '/nin-services' },
-  { id: 'tickets',      defaultIcon: 'ticket-outline',         defaultLabel: 'Help Tickets',    defaultColor: '#e11d48', route: '/(app)/tickets' },
-  { id: 'bulk_sms',     defaultIcon: 'chatbubbles-outline',    defaultLabel: 'Bulk SMS',        defaultColor: '#3B82F6', route: '/bulk-sms' },
-  { id: 'cable',        defaultIcon: 'tv-outline',             defaultLabel: 'Cable TV',        defaultColor: '#8b5cf6', route: '/bills' },
-  { id: 'electricity',  defaultIcon: 'flash-outline',          defaultLabel: 'Electricity',     defaultColor: '#f5a623', route: '/bills' },
-  { id: 'smile',        defaultIcon: 'globe-outline',          defaultLabel: 'Smile Data',      defaultColor: '#ec4899', route: '/smile' },
-  { id: 'education',    defaultIcon: 'school-outline',         defaultLabel: 'Education',       defaultColor: '#06b6d4', route: '/education' },
-  { id: 'cac',          defaultIcon: 'briefcase-outline',      defaultLabel: 'CAC Reg',         defaultColor: '#8b5cf6', route: '/cac-services' },
-  { id: 'social',       defaultIcon: 'rocket-outline',         defaultLabel: 'Social Boost',    defaultColor: '#ec4899', route: '/social-boost' },
-  { id: 'reviews',      defaultIcon: 'star-outline',           defaultLabel: 'Reviews',         defaultColor: '#f5a623', route: '/reviews' },
-  { id: 'cards',        defaultIcon: 'card-outline',           defaultLabel: 'Virtual Cards',   defaultColor: '#8B5CF6', route: '/virtual-cards' },
-  { id: 'savings',      defaultIcon: 'wallet-outline',         defaultLabel: 'Savings',         defaultColor: '#107C10', route: '/savings' },
-  { id: 'loans',        defaultIcon: 'cash-outline',           defaultLabel: 'Quick Loans',     defaultColor: '#EA580C', route: '/loans' },
-  { id: 'crypto',       defaultIcon: 'logo-bitcoin',           defaultLabel: 'Crypto Trading',  defaultColor: '#F7931A', route: '/crypto' },
-  { id: 'analytics',   defaultIcon: 'pie-chart-outline',      defaultLabel: 'Insights',        defaultColor: '#DB2777', route: '/analytics' },
-  { id: 'rewards',      defaultIcon: 'gift-outline',           defaultLabel: 'Reward Points',   defaultColor: '#9333EA', route: '/rewards' },
-  { id: 'qr',           defaultIcon: 'qr-code-outline',        defaultLabel: 'QR Pay',          defaultColor: '#10B981', route: '/qr-pay' },
-  { id: 'investments',  defaultIcon: 'trending-up-outline',    defaultLabel: 'Investments',     defaultColor: '#3B82F6', route: '/investments' },
-  { id: 'insurance',    defaultIcon: 'shield-checkmark-outline',defaultLabel: 'Insurance',      defaultColor: '#107C10', route: '/insurance' },
-  { id: 'bvn',          defaultIcon: 'finger-print-outline',   defaultLabel: 'BVN Services',    defaultColor: '#0056D2', route: '/bvn-services' },
+  { id: 'airtime',      defaultIcon: 'phone-portrait-outline', defaultLabel: 'Airtime',         defaultColor: '#f97316', defaultBadge: null, route: '/airtime' },
+  { id: 'data',         defaultIcon: 'wifi-outline',           defaultLabel: 'Data Bundles',    defaultColor: '#22c55e', defaultBadge: null, route: '/data' },
+  { id: 'transfer',     defaultIcon: 'swap-horizontal-outline',defaultLabel: 'Transfer',        defaultColor: '#2563eb', defaultBadge: null, route: '/transfer' },
+  { id: 'recharge_pin', defaultIcon: 'key-outline',            defaultLabel: 'Recharge PIN',    defaultColor: '#10b981', defaultBadge: 'HOT', route: '/recharge-pin' },
+  { id: 'airtime_cash', defaultIcon: 'cash-outline',           defaultLabel: 'Airtime to Cash', defaultColor: '#16a34a', defaultBadge: 'NEW', route: '/airtime-to-cash' },
+  { id: 'bills',        defaultIcon: 'receipt-outline',        defaultLabel: 'Bills Payment',   defaultColor: '#eab308', defaultBadge: null, route: '/bills' },
+  { id: 'nin',          defaultIcon: 'person-add-outline',     defaultLabel: 'NIN Services',    defaultColor: '#10b981', defaultBadge: null, route: '/nin-services' },
+  { id: 'tickets',      defaultIcon: 'ticket-outline',         defaultLabel: 'Help Tickets',    defaultColor: '#e11d48', defaultBadge: null, route: '/(app)/tickets' },
+  { id: 'bulk_sms',     defaultIcon: 'chatbubbles-outline',    defaultLabel: 'Bulk SMS',        defaultColor: '#3B82F6', defaultBadge: null, route: '/bulk-sms' },
+  { id: 'cable',        defaultIcon: 'tv-outline',             defaultLabel: 'Cable TV',        defaultColor: '#8b5cf6', defaultBadge: null, route: '/bills' },
+  { id: 'electricity',  defaultIcon: 'flash-outline',          defaultLabel: 'Electricity',     defaultColor: '#f5a623', defaultBadge: null, route: '/bills' },
+  { id: 'smile',        defaultIcon: 'globe-outline',          defaultLabel: 'Smile Data',      defaultColor: '#ec4899', defaultBadge: null, route: '/smile' },
+  { id: 'education',    defaultIcon: 'school-outline',         defaultLabel: 'Education',       defaultColor: '#06b6d4', defaultBadge: null, route: '/education' },
+  { id: 'cac',          defaultIcon: 'briefcase-outline',      defaultLabel: 'CAC Reg',         defaultColor: '#8b5cf6', defaultBadge: 'POPULAR', route: '/cac-services' },
+  { id: 'social',       defaultIcon: 'rocket-outline',         defaultLabel: 'Social Boost',    defaultColor: '#ec4899', defaultBadge: 'BOOST', route: '/social-boost' },
+  { id: 'reviews',      defaultIcon: 'star-outline',           defaultLabel: 'Reviews',         defaultColor: '#f5a623', defaultBadge: null, route: '/reviews' },
+  { id: 'cards',        defaultIcon: 'card-outline',           defaultLabel: 'Virtual Cards',   defaultColor: '#8B5CF6', defaultBadge: null, route: '/virtual-cards' },
+  { id: 'savings',      defaultIcon: 'wallet-outline',         defaultLabel: 'Savings',         defaultColor: '#107C10', defaultBadge: null, route: '/savings' },
+  { id: 'loans',        defaultIcon: 'cash-outline',           defaultLabel: 'Quick Loans',     defaultColor: '#EA580C', defaultBadge: null, route: '/loans' },
+  { id: 'crypto',       defaultIcon: 'logo-bitcoin',           defaultLabel: 'Crypto Trading',  defaultColor: '#F7931A', defaultBadge: 'WEB3', route: '/crypto' },
+  { id: 'analytics',   defaultIcon: 'pie-chart-outline',      defaultLabel: 'Insights',        defaultColor: '#DB2777', defaultBadge: null, route: '/analytics' },
+  { id: 'rewards',      defaultIcon: 'gift-outline',           defaultLabel: 'Reward Points',   defaultColor: '#9333EA', defaultBadge: null, route: '/rewards' },
+  { id: 'qr',           defaultIcon: 'qr-code-outline',        defaultLabel: 'QR Pay',          defaultColor: '#10B981', defaultBadge: null, route: '/qr-pay' },
+  { id: 'investments',  defaultIcon: 'trending-up-outline',    defaultLabel: 'Investments',     defaultColor: '#3B82F6', defaultBadge: null, route: '/investments' },
+  { id: 'insurance',    defaultIcon: 'shield-checkmark-outline',defaultLabel: 'Insurance',      defaultColor: '#107C10', defaultBadge: null, route: '/insurance' },
+  { id: 'bvn',          defaultIcon: 'finger-print-outline',   defaultLabel: 'BVN Services',    defaultColor: '#0056D2', defaultBadge: null, route: '/bvn-services' },
 ];
 
 // Clean Badge presets
 const BADGE_PRESETS = [
-  'NONE', 'HOT', 'NEW', 'POPULAR', 'PROMO', 'SALE', 'PRO', 'CASHBACK', '24/7', 'FAST'
+  'NONE', 'BOOST', 'HOT', 'POPULAR', 'NEW', 'WEB3', 'PROMO', 'SALE', 'PRO', 'CASHBACK', '24/7', 'FAST'
 ];
 
 // 18 Curated Theme Colors
@@ -276,8 +276,8 @@ export default function ManageFeaturesScreen() {
     setEditLabel(cust.custom_label ?? svc.defaultLabel);
     setEditIcon(cust.custom_icon ?? svc.defaultIcon);
     setEditColor(cust.custom_color ?? svc.defaultColor);
-    setEditBadge(cust.custom_badge ?? null);
-    setEditBgStyle(cust.custom_bg_style ?? 'tint');
+    setEditBadge(cust.custom_badge !== undefined ? cust.custom_badge : (svc.defaultBadge ?? null));
+    setEditBgStyle(cust.custom_bg_style ?? 'white');
   };
 
   const saveServiceEdit = async () => {
@@ -421,8 +421,8 @@ export default function ManageFeaturesScreen() {
               <View style={m.field}>
                 <Text style={m.fieldLabel}>Dashboard Appearance Preview</Text>
                 <View style={m.previewCard}>
-                  <View style={[m.previewIconBox, { backgroundColor: previewBoxBg, borderColor: previewBoxBorder }]}>
-                    <Ionicons name={editIcon as any} size={24} color={previewIconColor} />
+                  <View style={[m.previewIconBox, { backgroundColor: '#FFFFFF', borderColor: editColor + '45' }]}>
+                    <Ionicons name={editIcon as any} size={26} color={editColor} />
                     {editBadge ? (
                       <View style={[m.previewBadge, { backgroundColor: editColor }]}>
                         <Text style={m.previewBadgeText}>{editBadge}</Text>

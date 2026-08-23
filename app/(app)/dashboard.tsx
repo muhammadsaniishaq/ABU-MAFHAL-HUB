@@ -51,6 +51,26 @@ export default function Dashboard() {
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   const partnerAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.08,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== 'web',
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== 'web',
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     if (activePartners.length > 0) {
@@ -386,7 +406,7 @@ export default function Dashboard() {
 
   const displayedActions = showAllActions 
     ? [...pinnedActions, ...unpinnedActions, { id: 'less', icon: 'chevron-up-outline', label: 'Less', color: '#64748b', route: 'less', badge: null }]
-    : [...pinnedActions.slice(0, 7), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
+    : [...pinnedActions.slice(0, 8), { id: 'more', icon: 'grid-outline', label: 'More', color: T.indigo, route: 'more', badge: null }];
 
   const isVerified = userData?.kyc_tier && userData.kyc_tier > 1;
   const companyName = settings?.company_name || 'MAFHAL SUB';
@@ -590,23 +610,7 @@ export default function Dashboard() {
 
           <View style={s.actionsGrid}>
             {displayedActions.map((act, index) => {
-              const bgStyle = (act as any).bgStyle || 'tint';
-              let boxBg = act.color + '14';
-              let boxBorder = act.color + '28';
-              let iconColor = act.color;
-
-              if (bgStyle === 'white') {
-                boxBg = '#FFFFFF';
-                boxBorder = '#E2E8F0';
-              } else if (bgStyle === 'gold') {
-                boxBg = '#FEF3C7';
-                boxBorder = '#FCD34D';
-              } else if (bgStyle === 'navy') {
-                boxBg = '#0F172A';
-                boxBorder = '#1E293B';
-                iconColor = '#F59E0B';
-              }
-
+              const isBadged = Boolean(act.badge);
               return (
                 <TouchableOpacity
                   key={act.id || index}
@@ -618,14 +622,20 @@ export default function Dashboard() {
                   }}
                   activeOpacity={0.75}
                 >
-                  <View style={[s.actionIconBox, { backgroundColor: boxBg, borderColor: boxBorder }]}>
-                    <Ionicons name={act.icon as any} size={21} color={iconColor} />
+                  <Animated.View
+                    style={[
+                      s.actionIconBox,
+                      { borderColor: act.color + '45' },
+                      isBadged && { transform: [{ scale: pulseAnim }] },
+                    ]}
+                  >
+                    <Ionicons name={act.icon as any} size={24} color={act.color} />
                     {act.badge ? (
                       <View style={[s.badgeOverlay, { backgroundColor: act.color }]}>
                         <Text style={s.badgeText}>{act.badge}</Text>
                       </View>
                     ) : null}
-                  </View>
+                  </Animated.View>
                   <Text style={s.actionLabel} numberOfLines={1}>{act.label}</Text>
                 </TouchableOpacity>
               );
@@ -1123,28 +1133,63 @@ const s = StyleSheet.create({
   editBtnTxt: { fontSize: 9.5, fontWeight: '700', color: T.indigo },
   seeAllTxt: { fontSize: 10.5, fontWeight: '700', color: T.indigo },
 
-  // Actions grid — clean 4-column layout
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-start' },
-  actionItem: { width: (W - 32 - 24 - 24) / 4, alignItems: 'center', marginBottom: 6 },
+  // Actions grid — 3-column modernized layout
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+  },
+  actionItem: {
+    width: '31%',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   actionIconBox: {
-    width: 52, height: 52, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 6, position: 'relative',
-    backgroundColor: T.white,
-    borderWidth: 1.2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    position: 'relative',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
   },
-  actionLabel: { fontSize: 9.5, fontWeight: '700', color: T.navy, textAlign: 'center', lineHeight: 13 },
-  badgeOverlay: {
-    position: 'absolute', top: -5, right: -6, borderRadius: 7,
-    paddingHorizontal: 4, paddingVertical: 1.5,
-    borderWidth: 1.5, borderColor: T.white,
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: T.navy,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 14,
   },
-  badgeText: { fontSize: 6, fontWeight: '900', color: T.white, textTransform: 'uppercase', letterSpacing: 0.3 },
+  badgeOverlay: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  badgeText: {
+    fontSize: 7,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
 
   // Promo Banner
   promoContainer: {
