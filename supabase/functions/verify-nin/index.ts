@@ -107,9 +107,9 @@ serve(async (req: Request) => {
     const isStatusCheck = String(searchType).endsWith('-status');
     let FEE_AMOUNT = 0;
     let description = `Verification Status Check`;
+    let priceId = requestData.priceId || '';
 
     if (!isStatusCheck) {
-      let priceId = requestData.priceId;
       if (!priceId) {
         // Fallback map searchType -> default priceId
         const defaultPriceMap: Record<string, string> = {
@@ -231,7 +231,7 @@ serve(async (req: Request) => {
           else if (priceId === 'nin_info') calculatedSlipType = 'INFO';
           else calculatedSlipType = 'PREMIUM';
         }
-        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
+        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
         bodyPayload = {
           nin: searchValue,
           slip_type: calculatedSlipType,
@@ -241,28 +241,21 @@ serve(async (req: Request) => {
       }
 
       // ── NIN Slip (PDF) ─────────────────────────────────────────────────────
-      // service_code: 401 = Premium, 402 = Standard, 403 = Regular (NIMC layout)
+      // service_code: 401 = Premium, 402 = Standard, 403 = Regular (NIMC layout), 404 = Info
       case 'nin-slip':
+      case 'nin-slip-v2': {
+        let serviceCode = service_code || requestData.service_code;
+        if (!serviceCode) {
+          if (priceId === 'nin_premium') serviceCode = '401';
+          else if (priceId === 'nin_standard') serviceCode = '402';
+          else if (priceId === 'nin_regular') serviceCode = '403';
+          else if (priceId === 'nin_info') serviceCode = '404';
+          else serviceCode = '403';
+        }
         endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
         bodyPayload = {
           nin: searchValue,
-          service_code: service_code || requestData.service_code || '403',
-        };
-        break;
-
-      // ── NIN Slip V2 (PDF) ──────────────────────────────────────────────────
-      case 'nin-slip-v2': {
-        let calculatedSlipTypeV2 = (requestData.slip_type || requestData.layout || '').toUpperCase();
-        if (!calculatedSlipTypeV2) {
-          if (priceId === 'nin_standard') calculatedSlipTypeV2 = 'STANDARD';
-          else if (priceId === 'nin_regular') calculatedSlipTypeV2 = 'REGULAR';
-          else if (priceId === 'nin_info') calculatedSlipTypeV2 = 'INFO';
-          else calculatedSlipTypeV2 = 'PREMIUM';
-        }
-        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
-        bodyPayload = {
-          nin: searchValue,
-          slip_type: calculatedSlipTypeV2,
+          service_code: serviceCode,
           reference: requestData.reference || `REF-${Date.now()}`
         };
         break;
