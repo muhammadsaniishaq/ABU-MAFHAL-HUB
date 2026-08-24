@@ -292,15 +292,20 @@ export default function BVNVerificationScreen() {
                 res = await api.identity.validateBVN(cleanVal, priceId);
             }
 
-            if (res.isValid || res.status === 'success' || res.status === true) {
-                const finalData = res.data || res.rawData || res;
+            const isSuccess = res?.isValid || 
+                              res?.status === 'success' || 
+                              res?.status === true || 
+                              res?.success === true ||
+                              (res?.data && (res.data.bvn || res.data.firstName || res.data.lastName || res.data.first_name || res.data.last_name || res.data.pdf_base64));
+
+            if (isSuccess) {
+                const finalData = (res.data && typeof res.data === 'object') ? { ...res.data, pdf_base64: res.pdf_base64 || res.data.pdf_base64 } : res;
                 
                 // Note: Deduction and Transaction Logging are now securely handled by the backend Edge Function
                 
                 const { data: authData } = await supabase.auth.getUser();
                 if (authData?.user) {
                     const userId = authData.user.id;
-
 
                     // Send Notification
                     await createAppNotification(
@@ -317,8 +322,8 @@ export default function BVNVerificationScreen() {
                 await saveHistoryItem(finalData);
                 await fetchWalletBalance();
             } else {
-                const msg = res.message || 'Could not verify BVN details.';
-                const lowerMsg = msg.toLowerCase();
+                const msg = res?.error || res?.message || 'Could not verify BVN details.';
+                const lowerMsg = String(msg).toLowerCase();
                 if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('wallet')) {
                     showAlert('Service Unavailable', 'The BVN verification service is temporarily unavailable. Please try again later.', 'warning');
                 } else {

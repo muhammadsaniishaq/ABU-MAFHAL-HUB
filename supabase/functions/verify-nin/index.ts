@@ -357,65 +357,73 @@ serve(async (req: Request) => {
         break;
 
       // ── BVN Verification ───────────────────────────────────────────────────
-      // ── BVN Verification ───────────────────────────────────────────────────
       case 'bvn':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn`;
-        bodyPayload = { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` };
+        endpoint = `${AGENTHUB_BASE}/bvn/verification`;
+        bodyPayload = { bvn: searchValue };
         break;
 
       // ── BVN by Phone / Retrieval ───────────────────────────────────────────
       case 'bvn-phone':
       case 'bvn-retrieval':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`;
+        endpoint = `${AGENTHUB_BASE}/bvn/retrieval`;
         bodyPayload = { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` };
         break;
 
-      // ── BVN Card / Slip ───────────────────────────────────────────────────
+      // ── BVN Card / Premium Slip ───────────────────────────────────────────
       case 'bvn-card':
       case 'bvn-slip':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/slip`;
-        bodyPayload = { bvn: searchValue, reference: requestData.reference || `REF-CARD-${Date.now()}` };
+        endpoint = `${AGENTHUB_BASE}/bvn/premium-slip`;
+        bodyPayload = { bvn: searchValue };
         break;
 
       // ── VNIN to NIBSS ──────────────────────────────────────────────────────
       case 'vnin-to-nibss':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`;
+        endpoint = `${AGENTHUB_BASE}/bvn/vnin-to-nibss`;
         bodyPayload = {
-          vnin: searchValue || requestData.vnin,
-          bvn: requestData.bvn,
-          reference: requestData.reference || `VNIN-NIBSS-${Date.now()}`
+          reference: requestData.reference || `REF-VNIN-${Date.now()}`,
+          ticket_id: requestData.ticket_id || `TICKET-${Date.now()}`,
+          full_name: requestData.full_name || requestData.name || 'BVN Holder',
+          nin: requestData.nin || searchValue,
+          bvn: requestData.bvn || searchValue,
+          vnin: searchValue || requestData.vnin
         };
         break;
 
       // ── Check VNIN to NIBSS Status ─────────────────────────────────────────
       case 'vnin-to-nibss-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        endpoint = `${AGENTHUB_BASE}/bvn/vnin-to-nibss/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
         bodyPayload = null;
         break;
 
       // ── BVN Modification ───────────────────────────────────────────────────
       case 'bvn-modification':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/modification`;
+        endpoint = `${AGENTHUB_BASE}/bvn/modification`;
         bodyPayload = {
+          service_code: service_code || requestData.service_code || '620',
+          bank_code: requestData.bank_code || '706',
+          reference: requestData.reference || `REF-MOD-${Date.now()}`,
+          nin: requestData.nin,
           bvn: searchValue || requestData.bvn,
-          service_code: service_code || requestData.service_code || '601',
-          phone: requestData.phone_number || requestData.phone,
-          firstname: requestData.firstname,
-          lastname: requestData.lastname,
-          dob: requestData.dob,
-          reference: requestData.reference || `BVN-MOD-${Date.now()}`
+          old_first_name: requestData.old_first_name,
+          old_surname: requestData.old_surname,
+          old_middle_name: requestData.old_middle_name,
+          new_first_name: requestData.new_first_name || requestData.firstname,
+          new_surname: requestData.new_surname || requestData.lastname,
+          new_middle_name: requestData.new_middle_name,
+          phone_number: requestData.phone_number || requestData.phone,
+          dob: requestData.dob
         };
         break;
 
       // ── Check BVN Modification Status ───────────────────────────────────────
       case 'bvn-modification-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/modification/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        endpoint = `${AGENTHUB_BASE}/bvn/modification/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
         bodyPayload = null;
         break;
 
       // ── BVN User Enrollment ─────────────────────────────────────────────────
       case 'bvn-enrollment':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/enrollment`;
+        endpoint = `${AGENTHUB_BASE}/bvn/enrollment`;
         bodyPayload = {
           ...requestData,
           reference: requestData.reference || `BVN-ENROLL-${Date.now()}`
@@ -424,39 +432,41 @@ serve(async (req: Request) => {
 
       // ── Check BVN Enrollment Status ────────────────────────────────────────
       case 'bvn-enrollment-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/enrollment/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        endpoint = `${AGENTHUB_BASE}/bvn/enrollment/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
         bodyPayload = null;
         break;
 
       // ── Check BVN Retrieval Status ─────────────────────────────────────────
       case 'bvn-retrieval-status':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/retrieval/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        endpoint = `${AGENTHUB_BASE}/bvn/retrieval/status?request_id=${encodeURIComponent(searchValue || requestData.request_id || requestData.reference || '')}`;
         bodyPayload = null;
         break;
 
       // ── NIN Tracking / Personalization ─────────────────────────────────────
       case 'tracking-id':
+      case 'nin-personalization':
         endpoint = `${AGENTHUB_BASE}/v1/identity/nin-personalization`;
         bodyPayload = { trackingId: searchValue };
         break;
 
       // ── IPE Clearance ──────────────────────────────────────────────────────
-      // AgentHub does not have a separate IPE endpoint; use NIN verification
       case 'ipe':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = { nin: searchValue };
+      case 'ipe-clearance':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/ipe-clearance`;
+        bodyPayload = { trackingId: searchValue, reference: requestData.reference || `IPE-${Date.now()}` };
         break;
 
       // ── Identity Validation ────────────────────────────────────────────────
       case 'val':
+      case 'nin-validation':
         endpoint = `${AGENTHUB_BASE}/v1/identity/nin-validation`;
-        bodyPayload = { nin: searchValue, service_code: service_code || '329' };
+        bodyPayload = { nin: searchValue, service_code: service_code || '329', reference: requestData.reference || `VAL-${Date.now()}` };
         break;
 
-      // ── Delink (no direct AgentHub equivalent, use NIN) ────────────────────
+      // ── Delink ─────────────────────────────────────────────────────────────
       case 'delink':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = { nin: searchValue };
+        endpoint = `${AGENTHUB_BASE}/identity/nin/slip-v2`;
+        bodyPayload = { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` };
         break;
 
       default:
@@ -467,44 +477,44 @@ serve(async (req: Request) => {
     const candidateRequests: { url: string; body: any; method: string }[] = [];
 
     if (searchType === 'bvn') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue, service_code: '501' }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-verify`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-verify`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn`, body: { bvn: searchValue }, method: 'POST' });
     } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`, body: { phone: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/retrieval`, body: { phone: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-phone`, body: { phone: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-phone`, body: { phone: searchValue }, method: 'POST' });
     } else if (searchType === 'bvn-card' || searchType === 'bvn-slip') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/slip`, body: { bvn: searchValue, reference: requestData.reference || `REF-CARD-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-card`, body: { bvn: searchValue }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-card`, body: { bvn: searchValue }, method: 'POST' });
     } else if (searchType === 'vnin-to-nibss') {
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn, reference: requestData.reference || `REF-VNIN-${Date.now()}` }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`, body: bodyPayload, method: 'POST' });
     } else if (searchType === 'bvn-modification') {
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/modification`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/modification`, body: bodyPayload, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/modification`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/modification`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-modification`, body: bodyPayload, method: 'POST' });
     } else if (searchType === 'bvn-enrollment') {
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/enrollment`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/enrollment`, body: bodyPayload, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/enrollment`, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/enrollment`, body: bodyPayload, method: 'POST' });
     } else if (searchType === 'nin') {
-      candidateRequests.push({ url: endpoint, body: bodyPayload, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin`, body: { nin: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: { nin: searchValue, service_code: '403' }, method: 'POST' });
-      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: 'REGULAR' }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/nin`, body: { nin: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin`, body: { nin: searchValue }, method: 'POST' });
     } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
-      candidateRequests.push({ url: endpoint, body: bodyPayload, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: bodyPayload, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/slip`, body: bodyPayload, method: 'POST' });
     } else {
       candidateRequests.push({ url: endpoint, body: bodyPayload, method: bodyPayload !== null ? 'POST' : 'GET' });

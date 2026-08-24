@@ -185,57 +185,51 @@ export const AgentHubIdentityVerifier = {
 
       if (searchType === 'nin') {
         if (slipType === 'REGULAR') {
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR' } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
         } else if (slipType === 'STANDARD') {
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '402' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'STANDARD' } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
         } else if (slipType === 'PREMIUM') {
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'PREMIUM', reference: `REF-${Date.now()}` } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '401' } });
-          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'PREMIUM' } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
         } else {
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR', reference: `REF-${Date.now()}` } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
           candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
         }
       } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: slipType, reference: `REF-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: serviceCode } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: slipType } });
       } else if (searchType === 'phone') {
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2-phone', body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
       } else if (searchType === 'bvn') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue, service_code: '501' } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-verify', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn-verify', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/verification', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
       } else if (searchType === 'bvn-phone') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/retrieval', body: { phone: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-phone', body: { phone: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn-phone', body: { phone: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/retrieval', body: { phone: searchValue } });
       } else if (searchType === 'bvn-card') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/slip', body: { bvn: searchValue, reference: extra?.reference || `REF-CARD-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-card', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn-card', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/premium-slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/slip', body: { bvn: searchValue } });
       } else if (searchType === 'vnin-to-nibss') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn, reference: extra?.reference || `REF-VNIN-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss', body: { reference: extra?.reference || `REF-VNIN-${Date.now()}`, ticket_id: extra?.ticket_id || `TICKET-${Date.now()}`, full_name: extra?.full_name || 'BVN Holder', nin: extra?.nin || searchValue, bvn: extra?.bvn || searchValue, vnin: searchValue || extra?.vnin } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
       } else if (searchType === 'bvn-modification') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob, reference: extra?.reference || `REF-MOD-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone_number: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/modification', body: { service_code: extra?.service_code || '620', bank_code: extra?.bank_code || '706', reference: extra?.reference || `REF-MOD-${Date.now()}`, nin: extra?.nin, bvn: searchValue || extra?.bvn, new_first_name: extra?.new_first_name || extra?.firstname, new_surname: extra?.new_surname || extra?.lastname, phone_number: extra?.phone_number || extra?.phone, dob: extra?.dob } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/modification', body: { bvn: searchValue || extra?.bvn } });
       } else if (searchType === 'bvn-enrollment') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/enrollment', body: { ...extra } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/enrollment', body: { ...extra } });
       } else {
         candidateList.push({ url: endpoint, body: payload });
       }
