@@ -206,12 +206,30 @@ export const AgentHubIdentityVerifier = {
       } else if (searchType === 'phone') {
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
       } else if (searchType === 'bvn') {
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-verify', body: { bvn: searchValue } });
       } else if (searchType === 'bvn-phone') {
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/retrieval', body: { phone: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-phone', body: { phone: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn-phone', body: { phone: searchValue } });
       } else if (searchType === 'bvn-card') {
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/slip', body: { bvn: searchValue, reference: extra?.reference || `REF-CARD-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/premium-slip', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-card', body: { bvn: searchValue } });
+      } else if (searchType === 'vnin-to-nibss') {
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn, reference: extra?.reference || `REF-VNIN-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
+      } else if (searchType === 'bvn-modification') {
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob, reference: extra?.reference || `REF-MOD-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-modification', body: { bvn: searchValue || extra?.bvn, service_code: extra?.service_code || '601', phone_number: extra?.phone_number || extra?.phone, firstname: extra?.firstname, lastname: extra?.lastname, dob: extra?.dob } });
+      } else if (searchType === 'bvn-enrollment') {
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn/enrollment', body: { ...extra } });
       } else {
         candidateList.push({ url: endpoint, body: payload });
       }

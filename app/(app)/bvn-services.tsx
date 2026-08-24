@@ -223,6 +223,17 @@ export default function BVNVerificationScreen() {
             const updated = [newItem, ...historyList.filter((item: any) => item.target !== newItem.target)].slice(0, 5000);
             await AsyncStorage.setItem('recent_bvn_requests', JSON.stringify(updated));
             setHistoryList(updated);
+
+            // Also save to verification history database
+            const fullName = [verifiedData.lastName || verifiedData.last_name, verifiedData.firstName || verifiedData.first_name, verifiedData.middleName || verifiedData.middle_name].filter(Boolean).join(' ') || 'BVN Holder';
+            const bvnNum = verifiedData.number || verifiedData.bvn || inputValue || 'N/A';
+            await verificationHistory.save({
+                service_category: 'bvn',
+                service_type: searchType,
+                search_number: bvnNum,
+                holder_name: fullName,
+                details: dataToSave
+            }).catch(() => {});
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
@@ -237,23 +248,7 @@ export default function BVNVerificationScreen() {
         const cleanVal = inputValue.trim();
         if (searchType === 'vnin_nibss') {
             const targetVnin = vninValue.trim() || cleanVal;
-    const saveHistoryItem = async (data: any) => {
-        try {
-            const fullName = [data.lastName || data.last_name, data.firstName || data.first_name, data.middleName || data.middle_name].filter(Boolean).join(' ') || 'BVN Holder';
-            const bvnNum = data.number || data.bvn || inputValue || 'N/A';
-            await verificationHistory.save({
-                service_category: 'bvn',
-                service_type: searchType,
-                search_number: bvnNum,
-                holder_name: fullName,
-                details: data
-            });
-        } catch (e) {
-            console.warn('Failed to save BVN history to DB', e);
-        }
-    };
-
-    if (targetVnin.length < 11) {
+            if (targetVnin.length < 11) {
                 return showAlert('Invalid Input', 'Please enter a valid 11 or 16-digit VNIN number.', 'warning');
             }
         } else if (searchType === 'modification') {
@@ -415,6 +410,39 @@ export default function BVNVerificationScreen() {
         if (!result) return;
         try {
             setIsSaving(true);
+            const pdfBase64 = result.pdf_base64 || result.data?.pdf_base64 || result.slip || result.pdf || result.file;
+            if (pdfBase64 && typeof pdfBase64 === 'string' && pdfBase64.length > 50) {
+                if (Platform.OS === 'web') {
+                    const byteCharacters = atob(pdfBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `bvn_slip_${inputValue || 'official'}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                    showAlert("Download Complete", "Official BVN Slip PDF downloaded.", "success");
+                    return;
+                } else {
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}bvn_slip_${inputValue || 'official'}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, pdfBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official BVN Slip (PDF)', UTI: 'com.adobe.pdf' });
+                    } else {
+                        showAlert("Downloaded", `PDF saved to ${fileUri}`, "success");
+                    }
+                    return;
+                }
+            }
+
             const photoUrl = getPhotoUrl(result);
             const fingerprintUrl = getFingerprintUrl(result);
             const surName = result.lastName || result.last_name || '—';

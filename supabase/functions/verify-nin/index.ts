@@ -357,26 +357,29 @@ serve(async (req: Request) => {
         break;
 
       // ── BVN Verification ───────────────────────────────────────────────────
+      // ── BVN Verification ───────────────────────────────────────────────────
       case 'bvn':
         endpoint = `${AGENTHUB_BASE}/v1/identity/bvn`;
-        bodyPayload = { bvn: searchValue };
+        bodyPayload = { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` };
         break;
 
-      // ── BVN by Phone ───────────────────────────────────────────────────────
+      // ── BVN by Phone / Retrieval ───────────────────────────────────────────
       case 'bvn-phone':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-phone`;
-        bodyPayload = { phone: searchValue };
+      case 'bvn-retrieval':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`;
+        bodyPayload = { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` };
         break;
 
-      // ── BVN Card ───────────────────────────────────────────────────────────
+      // ── BVN Card / Slip ───────────────────────────────────────────────────
       case 'bvn-card':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-card`;
-        bodyPayload = { bvn: searchValue };
+      case 'bvn-slip':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/slip`;
+        bodyPayload = { bvn: searchValue, reference: requestData.reference || `REF-CARD-${Date.now()}` };
         break;
 
       // ── VNIN to NIBSS ──────────────────────────────────────────────────────
       case 'vnin-to-nibss':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`;
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`;
         bodyPayload = {
           vnin: searchValue || requestData.vnin,
           bvn: requestData.bvn,
@@ -384,18 +387,51 @@ serve(async (req: Request) => {
         };
         break;
 
+      // ── Check VNIN to NIBSS Status ─────────────────────────────────────────
+      case 'vnin-to-nibss-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        bodyPayload = null;
+        break;
+
       // ── BVN Modification ───────────────────────────────────────────────────
       case 'bvn-modification':
-        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn-modification`;
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/modification`;
         bodyPayload = {
           bvn: searchValue || requestData.bvn,
           service_code: service_code || requestData.service_code || '601',
-          phone_number: requestData.phone_number || requestData.phone,
+          phone: requestData.phone_number || requestData.phone,
           firstname: requestData.firstname,
           lastname: requestData.lastname,
           dob: requestData.dob,
           reference: requestData.reference || `BVN-MOD-${Date.now()}`
         };
+        break;
+
+      // ── Check BVN Modification Status ───────────────────────────────────────
+      case 'bvn-modification-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/modification/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        bodyPayload = null;
+        break;
+
+      // ── BVN User Enrollment ─────────────────────────────────────────────────
+      case 'bvn-enrollment':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/enrollment`;
+        bodyPayload = {
+          ...requestData,
+          reference: requestData.reference || `BVN-ENROLL-${Date.now()}`
+        };
+        break;
+
+      // ── Check BVN Enrollment Status ────────────────────────────────────────
+      case 'bvn-enrollment-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/enrollment/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        bodyPayload = null;
+        break;
+
+      // ── Check BVN Retrieval Status ─────────────────────────────────────────
+      case 'bvn-retrieval-status':
+        endpoint = `${AGENTHUB_BASE}/v1/identity/bvn/retrieval/status?reference=${encodeURIComponent(searchValue || requestData.reference || '')}`;
+        bodyPayload = null;
         break;
 
       // ── NIN Tracking / Personalization ─────────────────────────────────────
@@ -434,12 +470,23 @@ serve(async (req: Request) => {
       candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn`);
       candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-verify`);
       candidateEndpoints.push(`${AGENTHUB_BASE}/v1/bvn`);
-    } else if (searchType === 'bvn-phone') {
+    } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/retrieval`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-phone`);
       candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-phone`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/phone-bvn`);
-    } else if (searchType === 'bvn-card') {
+    } else if (searchType === 'bvn-card' || searchType === 'bvn-slip') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/slip`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/premium-slip`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-card`);
       candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-card`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-slip`);
+    } else if (searchType === 'vnin-to-nibss') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`);
+    } else if (searchType === 'bvn-modification') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/modification`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-modification`);
+    } else if (searchType === 'bvn-enrollment') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/enrollment`);
     } else if (searchType === 'nin') {
       candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin`);
       candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/slip`);
