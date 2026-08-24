@@ -113,7 +113,7 @@ export default function SplashScreen() {
             <View style={s.logoGlowRing}>
               <View style={s.logoCard}>
                 <Image
-                  source={require('../assets/images/icon.png')}
+                  source={require('../assets/images/logo.png')}
                   style={s.logoImg}
                   resizeMode="contain"
                 />
