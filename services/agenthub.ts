@@ -34,92 +34,224 @@ export const NIN_SLIP_CODES: Record<NINSlipServiceCode, string> = {
 };
 
 export const AgentHubIdentityVerifier = {
-  // ── Core helper: invoke the verify-nin Edge Function ─────────────────────
+  // ── Core helper: invoke the verify-nin Edge Function with automatic direct fallback ─────────────────────
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
       const body = { searchType, searchValue, ...extra };
-      const { data, error } = await supabase.functions.invoke('verify-nin', { body });
+      let edgeFailed = false;
+      let edgeErrorMessage = '';
 
-      // ── Handle Edge Function HTTP errors ─────────────────────────────────
-      if (error) {
-        let realMessage = error.message || 'Verification Error';
-        try {
-          if (error.context && typeof error.context.json === 'function') {
-            const errBody = await error.context.json();
-            if (errBody?.error) realMessage = errBody.error;
-            else if (errBody?.message) realMessage = errBody.message;
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-nin', { body });
+
+        if (error) {
+          edgeFailed = true;
+          let realMessage = error.message || 'Verification Error';
+          try {
+            if (error.context && typeof error.context.json === 'function') {
+              const errBody = await error.context.json();
+              if (errBody?.error) realMessage = errBody.error;
+              else if (errBody?.message) realMessage = errBody.message;
+            }
+          } catch (_) {}
+          edgeErrorMessage = realMessage;
+        } else if (data) {
+          if (data.error) {
+            const msg: string = data.error;
+            if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+              return { isValid: false, message: 'Insufficient wallet balance. Please fund your wallet and try again.' };
+            }
+            if (msg.toLowerCase().includes('unauthorized')) {
+              return { isValid: false, message: 'Session expired. Please log out and log in again.' };
+            }
+            // If it is an internal error or missing config, try direct fallback
+            if (msg.toLowerCase().includes('server error') || msg.toLowerCase().includes('unexpected error') || msg.toLowerCase().includes('not configured')) {
+              edgeFailed = true;
+              edgeErrorMessage = msg;
+            } else {
+              return { isValid: false, message: msg, data: data.details };
+            }
+          } else {
+            const agentHubResponse = data.data;
+            if (agentHubResponse) {
+              const rawStatus = agentHubResponse.status;
+              const agentHubStatus = String(rawStatus || '').toLowerCase();
+              const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(agentHubStatus);
+
+              if (isSuccessStatus) {
+                if (agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64) {
+                  return {
+                    isValid: true,
+                    message: agentHubResponse.message || 'Slip Generated Successfully',
+                    data: agentHubResponse.data || { pdf_base64: agentHubResponse.pdf_base64 },
+                  };
+                }
+
+                const personData = agentHubResponse.data ?? agentHubResponse;
+                return {
+                  isValid: true,
+                  message: agentHubResponse.message || 'Verification Successful',
+                  data: personData,
+                };
+              }
+
+              if (agentHubResponse.firstname || agentHubResponse.surname || agentHubResponse.nin) {
+                return { isValid: true, message: 'Verification Successful', data: agentHubResponse };
+              }
+
+              return {
+                isValid: false,
+                message: agentHubResponse.message || 'Verification failed. The record may be invalid or not found.',
+              };
+            }
           }
-        } catch (_) { /* keep generic message if body can't be parsed */ }
-
-        if (realMessage.toLowerCase().includes('insufficient') || realMessage.toLowerCase().includes('balance')) {
-          return { isValid: false, message: 'Insufficient wallet balance. Please fund your wallet and try again.' };
         }
-        if (realMessage.toLowerCase().includes('unauthorized') || realMessage.toLowerCase().includes('jwt')) {
-          return { isValid: false, message: 'Session expired. Please log out and log in again.' };
-        }
-        if (realMessage.toLowerCase().includes('configuration') || realMessage.toLowerCase().includes('api key')) {
-          return { isValid: false, message: 'Service is temporarily unavailable. Please try again later.' };
-        }
-        return { isValid: false, message: realMessage };
+      } catch (invokeErr: any) {
+        edgeFailed = true;
+        edgeErrorMessage = invokeErr.message || 'Edge function error';
       }
 
-      if (!data) {
-        return { isValid: false, message: 'No response received from server' };
+      // If Edge Function failed, perform seamless direct fallback
+      if (edgeFailed) {
+        console.warn(`[AgentHub] Edge Function failed (${edgeErrorMessage}), falling back to direct verification...`);
+        return await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
       }
 
-      // ── Handle explicit error payload ─────────────────────────────────────
-      if (data.error) {
-        const msg: string = data.error;
-        if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
-          return { isValid: false, message: 'Insufficient wallet balance. Please fund your wallet and try again.' };
-        }
-        if (msg.toLowerCase().includes('unauthorized')) {
-          return { isValid: false, message: 'Session expired. Please log out and log in again.' };
-        }
-        return { isValid: false, message: msg, data: data.details };
+      return { isValid: false, message: 'No response received from server' };
+
+    } catch (e: any) {
+      return await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
+    }
+  },
+
+  // ── Direct Fallback Provider ─────────────────────────────────────────────
+  async invokeDirect(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { isValid: false, message: 'Please log in to continue.' };
+
+      // 1. Get AgentHub API Key
+      let apiKey = '';
+      const { data: secret } = await supabase
+        .from('system_secrets')
+        .select('value')
+        .eq('key', 'AGENTHUB_API_KEY')
+        .maybeSingle();
+      if (secret?.value) apiKey = secret.value;
+
+      if (!apiKey) {
+        return { isValid: false, message: 'Verification service key is not configured.' };
       }
 
-      // ── Parse AgentHub success response ───────────────────────────────────
-      // Edge Function wraps AgentHub response in: { data: { status: "success", message, data/pdf_base64 } }
-      const agentHubResponse = data.data;
-      if (!agentHubResponse) {
-        return { isValid: false, message: 'Invalid response from verification provider' };
+      // 2. Determine price and verify balance
+      const priceId = extra?.priceId || (searchType === 'bvn' ? 'bvn_num_advanced' : 'nin_regular');
+      let fee = 100;
+      const { data: pricing } = await supabase
+        .from('service_pricing')
+        .select('*')
+        .eq('id', priceId)
+        .maybeSingle();
+      if (pricing) {
+        const cost = Number(pricing.cost_price || 0);
+        const markup = Number(pricing.markup_price || 0);
+        fee = pricing.selling_price ? Number(pricing.selling_price) : (cost + markup);
       }
 
-      const rawStatus = agentHubResponse.status;
-      const agentHubStatus = String(rawStatus || '').toLowerCase();
-      const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(agentHubStatus);
+      // 3. Deduct balance
+      if (fee > 0) {
+        const { error: deductErr } = await supabase.rpc('deduct_balance', {
+          user_id: user.id,
+          amount: fee
+        });
+        if (deductErr) {
+          if (deductErr.message?.toLowerCase().includes('insufficient')) {
+            return { isValid: false, message: `Insufficient wallet balance. You need ₦${fee.toLocaleString()}.` };
+          }
+          return { isValid: false, message: 'Failed to process payment for verification.' };
+        }
+      }
 
-      if (isSuccessStatus) {
-        // For NIN slip: return pdf_base64 in data
-        if (agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64) {
-          return {
-            isValid: true,
-            message: agentHubResponse.message || 'Slip Generated Successfully',
-            data: agentHubResponse.data || { pdf_base64: agentHubResponse.pdf_base64 },
-          };
+      // 4. Build AgentHub endpoint & payload
+      let endpoint = 'https://agenthub.ng/api/v1/identity/nin';
+      let payload: any = { nin: searchValue };
+      const slipType = (extra?.slip_type || extra?.layout || 'REGULAR').toUpperCase();
+      let serviceCode = '403';
+      if (slipType === 'PREMIUM') serviceCode = '401';
+      else if (slipType === 'STANDARD') serviceCode = '402';
+      else if (slipType === 'REGULAR') serviceCode = '403';
+      else if (slipType === 'INFO') serviceCode = '404';
+
+      if (searchType === 'nin') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/nin';
+        payload = { nin: searchValue, service_code: serviceCode, slip_type: slipType };
+      } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/slip';
+        payload = { nin: searchValue, service_code: serviceCode };
+      } else if (searchType === 'phone') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/phone-verify';
+        payload = { phone: searchValue };
+      } else if (searchType === 'bvn') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/bvn';
+        payload = { bvn: searchValue };
+      } else if (searchType === 'bvn-phone') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/bvn-phone';
+        payload = { phone: searchValue };
+      } else if (searchType === 'bvn-card') {
+        endpoint = 'https://agenthub.ng/api/v1/identity/bvn-card';
+        payload = { bvn: searchValue };
+      }
+
+      // 5. Call AgentHub
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resData = await res.json().catch(() => null);
+
+      if (resData && (resData.status === true || resData.status === 'success' || resData.success === true)) {
+        const personData = resData.data ?? resData;
+        const pdfBase64 = resData.pdf_base64 || personData?.pdf_base64;
+        if (pdfBase64 && typeof personData === 'object') {
+          personData.pdf_base64 = pdfBase64;
         }
 
-        const personData = agentHubResponse.data ?? agentHubResponse;
+        // Record successful transaction
+        await supabase.from('transactions').insert({
+          user_id: user.id,
+          amount: fee,
+          type: 'payment',
+          status: 'success',
+          reference: `id_verify_${searchType}_${Date.now()}`,
+          description: `Verification: ${pricing?.name || priceId}`
+        });
+
         return {
           isValid: true,
-          message: agentHubResponse.message || 'Verification Successful',
-          data: personData,
+          message: resData.message || 'Verification Successful',
+          data: personData
         };
       }
 
-      // Fallback: response has person fields at top level
-      if (agentHubResponse.firstname || agentHubResponse.surname || agentHubResponse.nin) {
-        return { isValid: true, message: 'Verification Successful', data: agentHubResponse };
+      // If failed, refund user balance
+      if (fee > 0) {
+        await supabase.rpc('refund_balance', { user_id: user.id, amount: fee }).catch(async () => {
+          const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
+          if (p) {
+            await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
+          }
+        });
       }
 
-      return {
-        isValid: false,
-        message: agentHubResponse.message || 'Verification failed. The record may be invalid or not found.',
-      };
-
-    } catch (e: any) {
-      return { isValid: false, message: e.message || 'A network error occurred. Check your connection.' };
+      const errMsg = resData?.error || resData?.message || 'Verification failed. Record not found.';
+      return { isValid: false, message: errMsg };
+    } catch (err: any) {
+      return { isValid: false, message: err.message || 'An error occurred during verification.' };
     }
   },
 
