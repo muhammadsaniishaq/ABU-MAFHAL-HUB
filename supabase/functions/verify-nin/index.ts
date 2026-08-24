@@ -231,12 +231,42 @@ serve(async (req: Request) => {
           else if (priceId === 'nin_info') calculatedSlipType = 'INFO';
           else calculatedSlipType = 'PREMIUM';
         }
-        endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
-        bodyPayload = {
-          nin: searchValue,
-          slip_type: calculatedSlipType,
-          reference: requestData.reference || `REF-NIN-${Date.now()}`
-        };
+        let serviceCode = '403';
+        if (calculatedSlipType === 'PREMIUM' || priceId === 'nin_premium') serviceCode = '401';
+        else if (calculatedSlipType === 'STANDARD' || priceId === 'nin_standard') serviceCode = '402';
+        else if (calculatedSlipType === 'REGULAR' || priceId === 'nin_regular') serviceCode = '403';
+        else if (calculatedSlipType === 'INFO' || priceId === 'nin_info') serviceCode = '404';
+
+        if (calculatedSlipType === 'REGULAR') {
+          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
+          bodyPayload = {
+            nin: searchValue,
+            service_code: '403',
+            reference: requestData.reference || `REF-SLIP-${Date.now()}`
+          };
+        } else if (calculatedSlipType === 'STANDARD') {
+          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
+          bodyPayload = {
+            nin: searchValue,
+            service_code: '402',
+            reference: requestData.reference || `REF-SLIP-${Date.now()}`
+          };
+        } else if (calculatedSlipType === 'PREMIUM') {
+          endpoint = `${AGENTHUB_BASE}/v1/identity/slip`;
+          bodyPayload = {
+            nin: searchValue,
+            service_code: '401',
+            reference: requestData.reference || `REF-SLIP-${Date.now()}`
+          };
+        } else {
+          endpoint = `${AGENTHUB_BASE}/v1/identity/nin`;
+          bodyPayload = {
+            nin: searchValue,
+            service_code: serviceCode,
+            slip_type: calculatedSlipType,
+            reference: requestData.reference || `REF-NIN-${Date.now()}`
+          };
+        }
         break;
       }
 

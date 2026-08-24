@@ -181,43 +181,74 @@ export const AgentHubIdentityVerifier = {
       else if (slipType === 'REGULAR') serviceCode = '403';
       else if (slipType === 'INFO') serviceCode = '404';
 
+      const candidateList: { url: string; body: any }[] = [];
+
       if (searchType === 'nin') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/nin';
-        payload = { nin: searchValue, service_code: serviceCode, slip_type: slipType };
+        if (slipType === 'REGULAR') {
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'REGULAR' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
+        } else if (slipType === 'STANDARD') {
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '402' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'STANDARD' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
+        } else if (slipType === 'PREMIUM') {
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '401' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: 'PREMIUM' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
+        } else {
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: '403' } });
+          candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/nin', body: { nin: searchValue } });
+        }
       } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/slip';
-        payload = { nin: searchValue, service_code: serviceCode };
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/slip', body: { nin: searchValue, service_code: serviceCode } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2', body: { nin: searchValue, slip_type: slipType } });
       } else if (searchType === 'phone') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/phone-verify';
-        payload = { phone: searchValue };
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
       } else if (searchType === 'bvn') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/bvn';
-        payload = { bvn: searchValue };
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/identity/bvn', body: { bvn: searchValue } });
       } else if (searchType === 'bvn-phone') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/bvn-phone';
-        payload = { phone: searchValue };
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-phone', body: { phone: searchValue } });
       } else if (searchType === 'bvn-card') {
-        endpoint = 'https://agenthub.ng/api/v1/identity/bvn-card';
-        payload = { bvn: searchValue };
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn-card', body: { bvn: searchValue } });
+      } else {
+        candidateList.push({ url: endpoint, body: payload });
       }
 
-      // 5. Call AgentHub
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      // 5. Call AgentHub across candidates
+      let resData: any = null;
 
-      const resData = await res.json().catch(() => null);
+      for (const item of candidateList) {
+        try {
+          const res = await fetch(item.url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(item.body)
+          });
+
+          if (res.status === 404 && candidateList.length > 1) {
+            continue;
+          }
+
+          const parsed = await res.json().catch(() => null);
+          if (parsed && (parsed.status === true || parsed.status === 'success' || parsed.success === true)) {
+            resData = parsed;
+            break;
+          } else if (parsed) {
+            resData = parsed;
+          }
+        } catch (_) {}
+      }
 
       if (resData && (resData.status === true || resData.status === 'success' || resData.success === true)) {
-        const personData = resData.data ?? resData;
-        const pdfBase64 = resData.pdf_base64 || personData?.pdf_base64;
-        if (pdfBase64 && typeof personData === 'object') {
+        const personData = typeof (resData.data) === 'object' && resData.data !== null ? { ...resData.data } : { ...resData };
+        const pdfBase64 = resData.pdf_base64 || resData.slip || resData.pdf || resData.file || personData?.pdf_base64 || personData?.slip || personData?.pdf;
+        if (pdfBase64) {
           personData.pdf_base64 = pdfBase64;
         }
 
