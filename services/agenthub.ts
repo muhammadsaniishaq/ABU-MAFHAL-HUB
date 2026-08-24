@@ -233,15 +233,31 @@ export const AgentHubIdentityVerifier = {
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
       } else if (searchType === 'bvn') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/verification', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
-      } else if (searchType === 'bvn-phone') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/retrieval', body: { phone: searchValue, reference: extra?.reference || `REF-RET-${Date.now()}` } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/retrieval', body: { phone: searchValue } });
-      } else if (searchType === 'bvn-card') {
+      } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
+        const ref = extra?.reference || `REF-RET-${Date.now()}`;
+        const sCode = extra?.service_code || '630';
+        const pNum = extra?.phone_number || searchValue;
+        const fName = extra?.full_name || extra?.name || 'Account Holder';
+
+        candidateList.push({ 
+          url: 'https://agenthub.ng/api/bvn/retrieval', 
+          body: { service_code: sCode, reference: ref, phone_number: pNum, full_name: fName } 
+        });
+        candidateList.push({ 
+          url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
+          body: { service_code: sCode, reference: ref, phone_number: pNum, full_name: fName } 
+        });
+        candidateList.push({ 
+          url: 'https://agenthub.ng/api/bvn/retrieval', 
+          body: { phone: pNum, reference: ref } 
+        });
+      } else if (searchType === 'bvn-card' || searchType === 'card' || searchType === 'bvn-slip') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/premium-slip', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/slip', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn/slip', body: { bvn: searchValue } });
@@ -249,7 +265,23 @@ export const AgentHubIdentityVerifier = {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss', body: { reference: extra?.reference || `REF-VNIN-${Date.now()}`, ticket_id: extra?.ticket_id || `TICKET-${Date.now()}`, full_name: extra?.full_name || 'BVN Holder', nin: extra?.nin || searchValue, bvn: extra?.bvn || searchValue, vnin: searchValue || extra?.vnin } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
       } else if (searchType === 'bvn-modification') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/modification', body: { service_code: extra?.service_code || '620', bank_code: extra?.bank_code || '706', reference: extra?.reference || `REF-MOD-${Date.now()}`, nin: extra?.nin, bvn: searchValue || extra?.bvn, new_first_name: extra?.new_first_name || extra?.firstname, new_surname: extra?.new_surname || extra?.lastname, phone_number: extra?.phone_number || extra?.phone, dob: extra?.dob } });
+        candidateList.push({ 
+          url: 'https://agenthub.ng/api/bvn/modification', 
+          body: { 
+            service_code: extra?.service_code || '620', 
+            bank_code: extra?.bank_code || '706', 
+            reference: extra?.reference || `REF-MOD-${Date.now()}`, 
+            nin: extra?.nin, 
+            bvn: searchValue || extra?.bvn, 
+            old_first_name: extra?.old_first_name || extra?.old_firstname,
+            old_surname: extra?.old_surname || extra?.old_lastname,
+            new_first_name: extra?.new_first_name || extra?.firstname, 
+            new_surname: extra?.new_surname || extra?.lastname, 
+            new_middle_name: extra?.new_middle_name || extra?.middlename,
+            phone_number: extra?.phone_number || extra?.phone, 
+            dob: extra?.dob || extra?.date_of_birth 
+          } 
+        });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/modification', body: { bvn: searchValue || extra?.bvn } });
       } else if (searchType === 'bvn-enrollment') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
@@ -281,7 +313,15 @@ export const AgentHubIdentityVerifier = {
                               parsed.status === 'success' || 
                               parsed.success === true ||
                               parsed.current_status === 'COMPLETED' ||
-                              (parsed.data && (parsed.data.bvn || parsed.data.firstName || parsed.data.firstname || parsed.data.nin || parsed.data.pdf_base64));
+                              Boolean(parsed.data && (
+                                parsed.data.bvn || 
+                                parsed.data.firstName || 
+                                parsed.data.firstname || 
+                                parsed.data.nin || 
+                                parsed.data.pdf_base64 || 
+                                parsed.data.user_details || 
+                                parsed.data.data
+                              ));
             if (isSuccess) {
               successfulData = parsed;
               break;
@@ -294,28 +334,83 @@ export const AgentHubIdentityVerifier = {
         resData = successfulData;
       }
 
-      if (resData && (resData.status === true || resData.status === 'success' || resData.success === true)) {
-        const personData = typeof (resData.data) === 'object' && resData.data !== null ? { ...resData.data } : { ...resData };
-        const pdfBase64 = resData.pdf_base64 || resData.slip || resData.pdf || resData.file || personData?.pdf_base64 || personData?.slip || personData?.pdf;
+      if (resData) {
+        // Deeply unwrap personData across all AgentHub formats
+        let personData: any = {};
+        
+        if (resData.data && typeof resData.data === 'object') {
+          personData = { ...resData.data };
+          if (resData.data.data && typeof resData.data.data === 'object') {
+            personData = { ...personData, ...resData.data.data };
+          }
+          if (resData.data.user_details) {
+            if (typeof resData.data.user_details === 'object') {
+              personData = { ...personData, ...resData.data.user_details };
+              if (resData.data.user_details.data && typeof resData.data.user_details.data === 'object') {
+                personData = { ...personData, ...resData.data.user_details.data };
+              }
+            }
+          }
+        } else {
+          personData = { ...resData };
+        }
+
+        const firstName = personData.firstName || personData.firstname || personData.first_name || '';
+        const lastName = personData.lastName || personData.surname || personData.lastname || personData.last_name || '';
+        const middleName = personData.middleName || personData.middlename || personData.middle_name || '';
+        const bvn = personData.bvn || personData.number || searchValue || '';
+        const phone = personData.phoneNumber || personData.phoneNumber1 || personData.phone || personData.phone_number || '';
+        const dob = personData.dateOfBirth || personData.dob || personData.birthdate || '';
+        const gender = personData.gender || '';
+        const photo = personData.image || personData.base64Image || personData.photo || personData.face || '';
+        const pdfBase64 = resData.pdf_base64 || resData.data?.pdf_base64 || personData.pdf_base64 || resData.slip || personData.slip;
+
+        personData.firstName = firstName;
+        personData.first_name = firstName;
+        personData.lastName = lastName;
+        personData.last_name = lastName;
+        personData.surname = lastName;
+        personData.middleName = middleName;
+        personData.middle_name = middleName;
+        personData.bvn = bvn;
+        personData.phone = phone;
+        personData.phoneNumber = phone;
+        personData.phoneNumber1 = phone;
+        personData.dateOfBirth = dob;
+        personData.dob = dob;
+        personData.gender = gender;
+        if (photo) {
+          personData.image = photo;
+          personData.base64Image = photo;
+          personData.photo = photo;
+        }
         if (pdfBase64) {
           personData.pdf_base64 = pdfBase64;
         }
 
-        // Record successful transaction
-        await supabase.from('transactions').insert({
-          user_id: user.id,
-          amount: fee,
-          type: 'payment',
-          status: 'success',
-          reference: `id_verify_${searchType}_${Date.now()}`,
-          description: `Verification: ${pricing?.name || priceId}`
-        });
+        const isSuccess = resData.status === true || 
+                          resData.status === 'success' || 
+                          resData.success === true || 
+                          resData.current_status === 'COMPLETED' ||
+                          Boolean(firstName || lastName || (bvn && bvn.length >= 10) || pdfBase64);
 
-        return {
-          isValid: true,
-          message: resData.message || 'Verification Successful',
-          data: personData
-        };
+        if (isSuccess) {
+          // Record successful transaction
+          await supabase.from('transactions').insert({
+            user_id: user.id,
+            amount: fee,
+            type: 'payment',
+            status: 'success',
+            reference: `id_verify_${searchType}_${Date.now()}`,
+            description: `Verification: ${pricing?.name || priceId}`
+          });
+
+          return {
+            isValid: true,
+            message: resData.message || 'Verification Successful',
+            data: personData
+          };
+        }
       }
 
       // If failed, refund user balance

@@ -51,7 +51,7 @@ export interface IdentityVerifier {
     runIPEClearance?(number: string, priceId?: string, addonPriceId?: string): Promise<VerificationResult>;
     validateIdentity?(number: string, type?: string, priceId?: string, addonPriceId?: string): Promise<VerificationResult>;
     delinkAndRetrieve?(number: string, phone?: string, priceId?: string): Promise<VerificationResult>;
-    retrieveBVN?(number: string, priceId?: string): Promise<VerificationResult>;
+    retrieveBVN?(number: string, priceId?: string, extra?: any): Promise<VerificationResult>;
     getPersonalization?(number: string, priceId?: string): Promise<VerificationResult>;
     submitNINValidation?(nin: string, serviceCode?: string, reference?: string, priceId?: string): Promise<VerificationResult>;
     checkNINValidationStatus?(requestId: string): Promise<VerificationResult>;

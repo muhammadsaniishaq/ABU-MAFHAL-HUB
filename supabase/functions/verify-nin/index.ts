@@ -557,7 +557,15 @@ serve(async (req: Request) => {
                                           parsed.status === 'success' || 
                                           parsed.success === true ||
                                           parsed.current_status === 'COMPLETED' ||
-                                          (parsed.data && (parsed.data.bvn || parsed.data.firstName || parsed.data.firstname || parsed.data.nin || parsed.data.pdf_base64));
+                                          Boolean(parsed.data && (
+                                              parsed.data.bvn || 
+                                              parsed.data.firstName || 
+                                              parsed.data.firstname || 
+                                              parsed.data.nin || 
+                                              parsed.data.pdf_base64 || 
+                                              parsed.data.user_details || 
+                                              parsed.data.data
+                                          ));
                         if (isSuccess) {
                             successfulResponse = parsed;
                             break; // Success! Stop trying candidate fallbacks
@@ -582,16 +590,65 @@ serve(async (req: Request) => {
             return jsonOk({ error: `Verification provider error: ${cleanText || 'Service temporarily unavailable. Please try again later.'}` });
         }
 
-        // ── AgentHub response format ───────────────────────────────────────────
-        // Success: { status: true, message: "...", data: {...} } or { success: true, ... }
-        if (responseData.status === true || responseData.status === 'success' || responseData.success === true) {
-            const innerData = responseData.data ?? responseData;
-            const pdfBase64 = responseData.pdf_base64 || innerData?.pdf_base64 || responseData.data?.pdf_base64;
-
-            if (pdfBase64 && typeof innerData === 'object') {
-                innerData.pdf_base64 = pdfBase64;
+        // ── Deeply unwrap and normalize AgentHub response ───────────────────────
+        let innerData: any = {};
+        if (responseData.data && typeof responseData.data === 'object') {
+            innerData = { ...responseData.data };
+            if (responseData.data.data && typeof responseData.data.data === 'object') {
+                innerData = { ...innerData, ...responseData.data.data };
             }
+            if (responseData.data.user_details) {
+                if (typeof responseData.data.user_details === 'object') {
+                    innerData = { ...innerData, ...responseData.data.user_details };
+                    if (responseData.data.user_details.data && typeof responseData.data.user_details.data === 'object') {
+                        innerData = { ...innerData, ...responseData.data.user_details.data };
+                    }
+                }
+            }
+        } else {
+            innerData = { ...responseData };
+        }
 
+        const firstName = innerData.firstName || innerData.firstname || innerData.first_name || '';
+        const lastName = innerData.lastName || innerData.surname || innerData.lastname || innerData.last_name || '';
+        const middleName = innerData.middleName || innerData.middlename || innerData.middle_name || '';
+        const bvn = innerData.bvn || innerData.number || searchValue || '';
+        const phone = innerData.phoneNumber || innerData.phoneNumber1 || innerData.phone || innerData.phone_number || '';
+        const dob = innerData.dateOfBirth || innerData.dob || innerData.birthdate || '';
+        const gender = innerData.gender || '';
+        const photo = innerData.image || innerData.base64Image || innerData.photo || innerData.face || '';
+        const pdfBase64 = responseData.pdf_base64 || responseData.data?.pdf_base64 || innerData.pdf_base64 || responseData.slip || innerData.slip;
+
+        innerData.firstName = firstName;
+        innerData.first_name = firstName;
+        innerData.lastName = lastName;
+        innerData.last_name = lastName;
+        innerData.surname = lastName;
+        innerData.middleName = middleName;
+        innerData.middle_name = middleName;
+        innerData.bvn = bvn;
+        innerData.phone = phone;
+        innerData.phoneNumber = phone;
+        innerData.phoneNumber1 = phone;
+        innerData.dateOfBirth = dob;
+        innerData.dob = dob;
+        innerData.gender = gender;
+        if (photo) {
+            innerData.image = photo;
+            innerData.base64Image = photo;
+            innerData.photo = photo;
+        }
+        if (pdfBase64) {
+            innerData.pdf_base64 = pdfBase64;
+        }
+
+        const isSuccess = responseData.status === true || 
+                          responseData.status === 'success' || 
+                          responseData.success === true ||
+                          responseData.current_status === 'COMPLETED' ||
+                          Boolean(firstName || lastName || (bvn && bvn.length >= 10) || pdfBase64);
+
+        if (isSuccess) {
             return jsonOk({
                 data: {
                     status: 'success',
