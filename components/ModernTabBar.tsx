@@ -20,25 +20,24 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
     const router = useRouter();
 
     const activeRoute = state.routes[state.index];
-    const { options: activeOptions } = descriptors[activeRoute.key];
+    const { options: activeOptions } = descriptors[activeRoute?.key || ''];
 
     if (activeOptions?.tabBarStyle?.display === 'none') {
         return null;
     }
 
+    const allowedTabs = ['dashboard', 'wallet', 'qr-pay', 'history', 'profile'];
+
     return (
         <View style={s.tabBarContainer}>
             {Platform.OS === 'ios' ? (
-                <BlurView intensity={100} tint="light" style={s.absoluteBlur} />
+                <BlurView intensity={90} tint="light" style={s.absoluteBlur} />
             ) : (
-                <View style={[s.absoluteBlur, { backgroundColor: 'rgba(255, 255, 255, 0.95)' }]} />
+                <View style={[s.absoluteBlur, { backgroundColor: '#ffffff' }]} />
             )}
             
             <View style={s.tabBarInner}>
                 {state.routes.map((route: any, index: number) => {
-                    const { options } = descriptors[route.key];
-
-                    const allowedTabs = ['dashboard', 'wallet', 'pay', 'history', 'profile'];
                     if (!allowedTabs.includes(route.name)) return null;
 
                     const isFocused = state.index === index;
@@ -55,28 +54,36 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
                         }
                     };
 
-                    if (route.name === 'pay') {
+                    if (route.name === 'qr-pay') {
                         return (
                             <PayButton key={route.key} isFocused={isFocused} onPress={onPress} />
                         );
                     }
 
-                    const getIcon = (name: string, focused: boolean) => {
+                    const getTabInfo = (name: string, focused: boolean) => {
                         switch (name) {
-                            case 'dashboard': return focused ? 'grid' : 'grid-outline';
-                            case 'wallet': return focused ? 'wallet' : 'wallet-outline';
-                            case 'history': return focused ? 'time' : 'time-outline';
-                            case 'profile': return focused ? 'person' : 'person-outline';
-                            default: return 'help-outline';
+                            case 'dashboard': 
+                                return { icon: focused ? 'grid' : 'grid-outline', label: 'Home' };
+                            case 'wallet': 
+                                return { icon: focused ? 'wallet' : 'wallet-outline', label: 'Wallet' };
+                            case 'history': 
+                                return { icon: focused ? 'receipt' : 'receipt-outline', label: 'History' };
+                            case 'profile': 
+                                return { icon: focused ? 'person' : 'person-outline', label: 'Profile' };
+                            default: 
+                                return { icon: 'help-outline', label: 'More' };
                         }
                     };
+
+                    const { icon, label } = getTabInfo(route.name, isFocused);
 
                     return (
                         <TabItem 
                             key={route.key} 
                             isFocused={isFocused} 
                             onPress={onPress} 
-                            icon={getIcon(route.name, isFocused)} 
+                            icon={icon} 
+                            label={label}
                         />
                     );
                 })}
@@ -87,90 +94,39 @@ export default function ModernTabBar({ state, descriptors, navigation }: any) {
 
 function PayButton({ isFocused, onPress }: { isFocused: boolean, onPress: () => void }) {
     const scale = useSharedValue(1);
-    const rotate = useSharedValue(0);
-    const pulse = useSharedValue(1);
 
     useEffect(() => {
-        if (isFocused) {
-            scale.value = withSpring(1.1, { damping: 10 });
-            rotate.value = withSequence(
-                withTiming(15, { duration: 100 }),
-                withTiming(-15, { duration: 100 }),
-                withSpring(0)
-            );
-        } else {
-            scale.value = withSpring(1);
-        }
+        scale.value = withSpring(isFocused ? 1.08 : 1, { damping: 12 });
     }, [isFocused]);
 
-    useEffect(() => {
-        pulse.value = withRepeat(
-            withSequence(
-                withTiming(1.08, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-                withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-            ),
-            -1,
-            true
-        );
-    }, []);
-
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [
-            { scale: scale.value },
-            { rotate: `${rotate.value}deg` }
-        ],
-    }));
-
-    const pulseStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pulse.value }],
+        transform: [{ scale: scale.value }],
     }));
 
     return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={s.payButtonWrapper}>
-            <Animated.View style={[s.payOuterPulse, pulseStyle]} />
+        <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={s.payButtonWrapper}>
             <Animated.View style={animatedStyle}>
                 <LinearGradient
-                    colors={['#0d1b3e', '#142258', '#f5a623']}
-                    locations={[0, 0.5, 1]}
+                    colors={['#0d1b3e', '#142258']}
                     style={s.payButtonGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 >
-                    <Ionicons name="qr-code" size={22} color="#ffffff" />
+                    <Ionicons name="qr-code" size={20} color="#f5a623" />
                 </LinearGradient>
             </Animated.View>
+            <Text style={[s.payLabel, isFocused && s.payLabelActive]}>QR Pay</Text>
         </TouchableOpacity>
     );
 }
 
-function TabItem({ isFocused, onPress, icon }: { isFocused: boolean, onPress: () => void, icon: string }) {
-    const scale = useSharedValue(1);
-    const translateY = useSharedValue(0);
-    const dotScale = useSharedValue(0);
-    const dotOpacity = useSharedValue(0);
-
-    useEffect(() => {
-        scale.value = withSpring(isFocused ? 1.25 : 0.9, { damping: 10, stiffness: 200 });
-        translateY.value = withSpring(isFocused ? -8 : 0, { damping: 12 });
-        dotScale.value = withSpring(isFocused ? 1 : 0.5, { damping: 10 });
-        dotOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
-    }, [isFocused]);
-
-    const animatedIconStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }, { translateY: translateY.value }],
-    }));
-
-    const animatedDotStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: dotScale.value }],
-        opacity: dotOpacity.value,
-    }));
-
+function TabItem({ isFocused, onPress, icon, label }: { isFocused: boolean, onPress: () => void, icon: string, label: string }) {
     return (
-        <TouchableOpacity onPress={onPress} style={s.tabItem} activeOpacity={0.6}>
-            <Animated.View style={animatedIconStyle}>
-                <Ionicons name={icon as any} size={20} color={isFocused ? '#f5a623' : '#a0aec0'} />
-            </Animated.View>
-            <Animated.View style={[s.dotIndicator, animatedDotStyle]} />
+        <TouchableOpacity onPress={onPress} style={s.tabItem} activeOpacity={0.7}>
+            <View style={[s.iconBox, isFocused && s.iconBoxActive]}>
+                <Ionicons name={icon as any} size={18} color={isFocused ? '#0d1b3e' : '#94a3b8'} />
+            </View>
+            <Text style={[s.tabLabel, isFocused && s.tabLabelActive]}>{label}</Text>
         </TouchableOpacity>
     );
 }
@@ -178,29 +134,30 @@ function TabItem({ isFocused, onPress, icon }: { isFocused: boolean, onPress: ()
 const s = StyleSheet.create({
     tabBarContainer: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 24 : 16,
-        alignSelf: 'center',
-        width: Math.min(width * 0.85, 340), // Very compact capsule
-        height: 56, // Smaller height
-        borderRadius: 28, // Perfect pill
+        bottom: Platform.OS === 'ios' ? 20 : 12,
+        left: 16,
+        right: 16,
+        height: 60,
+        borderRadius: 20,
+        backgroundColor: '#ffffff',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.9)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
-        overflow: Platform.OS === 'ios' ? 'hidden' : 'visible',
+        borderColor: '#e2e8f0',
+        shadowColor: '#0d1b3e',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 50,
     },
     absoluteBlur: {
         ...StyleSheet.absoluteFillObject,
-        borderRadius: 28,
+        borderRadius: 20,
     },
     tabBarInner: {
         flexDirection: 'row',
         height: '100%',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'space-around',
         paddingHorizontal: 8,
     },
     tabItem: {
@@ -208,47 +165,56 @@ const s = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         height: '100%',
+        paddingVertical: 4,
     },
-    dotIndicator: {
-        position: 'absolute',
-        bottom: 10,
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#f5a623',
-        shadowColor: '#f5a623',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    payButtonWrapper: {
-        top: -18,
+    iconBox: {
+        width: 32,
+        height: 28,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        width: 60,
-        height: 60,
-        zIndex: 20,
     },
-    payOuterPulse: {
-        position: 'absolute',
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: 'rgba(245, 166, 35, 0.25)', // Glowing aura
+    iconBoxActive: {
+        backgroundColor: 'rgba(245, 166, 35, 0.18)',
+    },
+    tabLabel: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#94a3b8',
+        marginTop: 2,
+    },
+    tabLabelActive: {
+        color: '#0d1b3e',
+        fontWeight: '800',
+    },
+    payButtonWrapper: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: -16,
+        width: 54,
     },
     payButtonGradient: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        borderWidth: 2,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 2.5,
         borderColor: '#ffffff',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#f5a623',
+        shadowColor: '#0d1b3e',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 10,
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 6,
+    },
+    payLabel: {
+        fontSize: 9.5,
+        fontWeight: '600',
+        color: '#94a3b8',
+        marginTop: 2,
+    },
+    payLabelActive: {
+        color: '#0d1b3e',
+        fontWeight: '800',
     },
 });

@@ -50,7 +50,7 @@ export default function AppLayout() {
             >
                 <Tabs.Screen name="dashboard" options={{ title: 'Home' }} />
                 <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
-                <Tabs.Screen name="pay" options={{ title: 'Pay' }} />
+                <Tabs.Screen name="qr-pay" options={{ title: 'QR Pay' }} />
                 <Tabs.Screen name="history" options={{ title: 'History' }} />
                 <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
                 
