@@ -271,15 +271,25 @@ export const AgentHubIdentityVerifier = {
 
       // If failed, refund user balance
       if (fee > 0) {
-        await supabase.rpc('refund_balance', { user_id: user.id, amount: fee }).catch(async () => {
-          const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-          if (p) {
-            await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
+        try {
+          const { error: refundErr } = await supabase.rpc('refund_balance', { user_id: user.id, amount: fee });
+          if (refundErr) {
+            const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
+            if (p) {
+              await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
+            }
           }
-        });
+        } catch (_) {
+          try {
+            const { data: p } = await supabase.from('profiles').select('balance').eq('id', user.id).maybeSingle();
+            if (p) {
+              await supabase.from('profiles').update({ balance: Number(p.balance) + fee }).eq('id', user.id);
+            }
+          } catch (_) {}
+        }
       }
 
-      const errMsg = resData?.error || resData?.message || 'Verification failed. Record not found.';
+      const errMsg = resData?.error || resData?.message || resData?.msg || 'Verification failed. Record not found.';
       return { isValid: false, message: errMsg };
     } catch (err: any) {
       return { isValid: false, message: err.message || 'An error occurred during verification.' };
