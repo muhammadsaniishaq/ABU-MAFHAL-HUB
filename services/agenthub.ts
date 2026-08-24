@@ -15,6 +15,7 @@
  *  - Demographic Verification
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import {
   VerificationResult,
@@ -33,111 +34,134 @@ export const NIN_SLIP_CODES: Record<NINSlipServiceCode, string> = {
   '403': 'Regular — Standard NIMC layout',
 };
 
+const extractStringValue = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('"')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'string') return parsed;
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed.key || parsed.token || parsed.api_key || parsed.apiKey || parsed.value || JSON.stringify(parsed);
+        }
+      } catch (e) {}
+    }
+    return trimmed;
+  }
+  if (typeof val === 'object' && val !== null) {
+    return val.key || val.token || val.api_key || val.apiKey || val.value || JSON.stringify(val);
+  }
+  return String(val);
+};
+
 export const AgentHubIdentityVerifier = {
-  // ── Core helper: invoke the verify-nin Edge Function with automatic direct fallback ─────────────────────
+  // ── Core helper: invoke verification directly with fallback to Edge Function ─────────────────────
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
-      const body = { searchType, searchValue, ...extra };
-      let edgeFailed = false;
-      let edgeErrorMessage = '';
-
-      try {
-        const { data, error } = await supabase.functions.invoke('verify-nin', { body });
-
-        if (error) {
-          edgeFailed = true;
-          let realMessage = error.message || 'Verification Error';
-          try {
-            if (error.context && typeof error.context.json === 'function') {
-              const errBody = await error.context.json();
-              if (errBody?.error) realMessage = errBody.error;
-              else if (errBody?.message) realMessage = errBody.message;
-            }
-          } catch (_) {}
-          edgeErrorMessage = realMessage;
-        } else if (data) {
-          if (data.error) {
-            const msg: string = data.error;
-            if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
-              return { isValid: false, message: 'Insufficient wallet balance. Please fund your wallet and try again.' };
-            }
-            if (msg.toLowerCase().includes('unauthorized')) {
-              return { isValid: false, message: 'Session expired. Please log out and log in again.' };
-            }
-            // If it is an internal error or missing config, try direct fallback
-            if (msg.toLowerCase().includes('server error') || msg.toLowerCase().includes('unexpected error') || msg.toLowerCase().includes('not configured')) {
-              edgeFailed = true;
-              edgeErrorMessage = msg;
-            } else {
-              return { isValid: false, message: msg, data: data.details };
-            }
-          } else {
-            const agentHubResponse = data.data;
-            if (agentHubResponse) {
-              const rawStatus = agentHubResponse.status;
-              const agentHubStatus = String(rawStatus || '').toLowerCase();
-              const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(agentHubStatus);
-
-              if (isSuccessStatus) {
-                if (agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64) {
-                  return {
-                    isValid: true,
-                    message: agentHubResponse.message || 'Slip Generated Successfully',
-                    data: agentHubResponse.data || { pdf_base64: agentHubResponse.pdf_base64 },
-                  };
-                }
-
-                const personData = agentHubResponse.data ?? agentHubResponse;
-                return {
-                  isValid: true,
-                  message: agentHubResponse.message || 'Verification Successful',
-                  data: personData,
-                };
-              }
-
-              if (agentHubResponse.firstname || agentHubResponse.surname || agentHubResponse.nin) {
-                return { isValid: true, message: 'Verification Successful', data: agentHubResponse };
-              }
-
-              return {
-                isValid: false,
-                message: agentHubResponse.message || 'Verification failed. The record may be invalid or not found.',
-              };
-            }
-          }
+      // 1. Prioritize Direct Client Execution with official AgentHub endpoints
+      const directRes = await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
+      if (directRes && (directRes.isValid || (directRes.data && (directRes.data.bvn || directRes.data.firstName || directRes.data.pdf_base64)))) {
+        return directRes;
+      }
+      
+      // If direct response indicated an intentional user error (like insufficient funds), return it immediately
+      if (directRes && !directRes.isValid && directRes.message) {
+        const m = directRes.message.toLowerCase();
+        if (m.includes('insufficient') || m.includes('balance') || m.includes('please log in')) {
+          return directRes;
         }
-      } catch (invokeErr: any) {
-        edgeFailed = true;
-        edgeErrorMessage = invokeErr.message || 'Edge function error';
       }
 
-      // If Edge Function failed, perform seamless direct fallback
-      if (edgeFailed) {
-        console.warn(`[AgentHub] Edge Function failed (${edgeErrorMessage}), falling back to direct verification...`);
-        return await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
+      // If direct verification did not return success, try the Edge Function as fallback
+      const body = { searchType, searchValue, ...extra };
+      const { data, error } = await supabase.functions.invoke('verify-nin', { body });
+
+      if (error) {
+        return directRes || { isValid: false, message: error.message || 'Verification failed' };
       }
 
-      return { isValid: false, message: 'No response received from server' };
+      if (data?.error) {
+        return directRes || { isValid: false, message: data.error };
+      }
+
+      if (data?.data) {
+        const agentHubResponse = data.data;
+        const rawStatus = agentHubResponse.status;
+        const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(String(rawStatus || '').toLowerCase());
+
+        if (isSuccessStatus) {
+          const personData = agentHubResponse.data ?? agentHubResponse;
+          return {
+            isValid: true,
+            message: agentHubResponse.message || 'Verification Successful',
+            data: personData,
+            pdf_base64: agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64
+          };
+        }
+      }
+
+      return directRes || { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
 
     } catch (e: any) {
       return await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
     }
   },
 
-  // ── Direct Fallback Provider ─────────────────────────────────────────────
+  // ── Direct Execution Provider ─────────────────────────────────────────────
   async invokeDirect(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { isValid: false, message: 'Please log in to continue.' };
 
-      // 1. Get AgentHub API Key
+      // 1. Get AgentHub API Key from all secret stores
       let apiKey = '';
-      const { data: secret } = await supabase
+
+      // A. Try system_secrets
+      const { data: secretList } = await supabase
         .from('system_secrets')
-        .select('value')
-        .eq('key', 'AGENTHUB_API_KEY')
-        .maybeSingle();
-      if (secret?.value) apiKey = secret.value;
+        .select('*');
+      if (secretList) {
+        for (const s of secretList) {
+          const k = String(s.key || '').toUpperCase();
+          if (['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY'].includes(k)) {
+            const v = extractStringValue(s.value);
+            if (v) { apiKey = v; break; }
+          }
+        }
+      }
+
+      // B. Try app_settings
+      if (!apiKey) {
+        const { data: settingsList } = await supabase
+          .from('app_settings')
+          .select('*');
+        if (settingsList) {
+          for (const s of settingsList) {
+            const k = String(s.key || '').toUpperCase();
+            if (['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY'].includes(k)) {
+              const v = extractStringValue(s.value);
+              if (v) { apiKey = v; break; }
+            }
+          }
+        }
+      }
+
+      // C. Try AsyncStorage (Local Vault Cache)
+      if (!apiKey) {
+        for (const k of ['AGENTHUB_API_KEY', 'AGENTHUB_KEY', 'AGENTS_HUB_KEY', 'AH_API_KEY']) {
+          const cached = await AsyncStorage.getItem(`@vault_${k}`).catch(() => null);
+          if (cached && cached.trim()) {
+            apiKey = cached.trim();
+            break;
+          }
+        }
+      }
+
+      // D. Try process.env
+      if (!apiKey) {
+        apiKey = (process.env.AGENTHUB_API_KEY || (process.env as any).EXPO_PUBLIC_AGENTHUB_API_KEY || '').trim();
+      }
 
       if (!apiKey) {
         return { isValid: false, message: 'Verification service key is not configured.' };
