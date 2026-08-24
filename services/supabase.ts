@@ -82,8 +82,18 @@ export const forceSignOut = async () => {
 
     if (Platform.OS === 'web') {
         if (typeof localStorage !== 'undefined') {
-            localStorage.clear();
-            // window.location.href = '/'; // Disable full reload, let Router handle it
+            try {
+                const keysToRemove: string[] = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && (k.startsWith('sb-') || k.includes('auth') || k === 'has_active_session' || k === 'app_unlocked')) {
+                        keysToRemove.push(k);
+                    }
+                }
+                keysToRemove.forEach(k => localStorage.removeItem(k));
+            } catch (e) {
+                console.warn('Web storage selective clear notice:', e);
+            }
         }
     }
 };

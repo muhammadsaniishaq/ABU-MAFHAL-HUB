@@ -255,6 +255,13 @@ Deno.serve(async (req: Request) => {
         console.log(`[Bills] Charging: ₦${amountToCharge} for ${type} to ${data.phone || 'N/A'}`);
 
         if (type !== 'get_plans' && type !== 'recharge_pin_plans') {
+            if (!amountToCharge || isNaN(amountToCharge) || amountToCharge <= 0) {
+                return new Response(JSON.stringify({ success: false, error: "Invalid transaction amount" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200
+                });
+            }
+
             const { data: newBalance, error: deductError } = await rpcClient.rpc('deduct_balance', {
                 user_id: userId,
                 amount: amountToCharge

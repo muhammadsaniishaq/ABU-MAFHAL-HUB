@@ -20,6 +20,10 @@ const cryptoExchange: CryptoExchange = BinanceCryptoExchange; // Fixed Demo API 
 import { AgentHubIdentityVerifier } from './agenthub';
 const identityVerifier = AgentHubIdentityVerifier; // AgentHub Edge Function (replaces IDPro)
 
+// --- High-Concurrency In-Memory Plan Cache ---
+const _dataPlanMemoryCache: Record<string, { data: any[]; timestamp: number }> = {};
+const DATA_PLAN_CACHE_TTL = 30000; // 30 seconds
+
 export const api = {
     // --- GENERIC HTTP ---
     get: async (endpoint: string, token?: string) => {
@@ -82,11 +86,6 @@ export const api = {
                 body: {
                     type: 'airtime',
                     network: params.network, // '01', '02' mapping might be needed if ClubKonnect uses diff codes, but let's assume UI IDs match or we map them here.
-                    // Actually ClubKonnect needs '01' for MTN.
-                    // MAPPING: mtn->01, glo->02, 9mobile->03, airtel->04
-                    // Let's do a quick map helper or rely on function to handle strings if we updated it.
-                    // Function expects 01/02. FRONTEND sends 'mtn', 'glo'.
-                    // We should map here.
                     phone: params.phone,
                     amount: params.amount
                 }
@@ -109,7 +108,7 @@ export const api = {
     },
 
     data: {
-        getPlans: async (network: string) => {
+        getPlans: async (network: string, forceRefresh = false) => {
             try {
                 // Normalize network (mtn, glo, airtel, 9mobile, vitel)
                 let netLower = (network || 'mtn').toLowerCase();
@@ -118,6 +117,11 @@ export const api = {
                 else if (netLower.includes('airtel')) netLower = 'airtel';
                 else if (netLower.includes('vitel') || netLower.includes('vital')) netLower = 'vitel';
                 else if (netLower.includes('mobile') || netLower.includes('etisalat')) netLower = '9mobile';
+
+                const now = Date.now();
+                if (!forceRefresh && _dataPlanMemoryCache[netLower] && (now - _dataPlanMemoryCache[netLower].timestamp < DATA_PLAN_CACHE_TTL)) {
+                    return _dataPlanMemoryCache[netLower].data;
+                }
 
                 // Check active VTU vendor from app_settings
                 let activeVendor = 'bilalsadasub';
@@ -151,7 +155,7 @@ export const api = {
 
                 let resultPlans = plans || [];
 
-                return resultPlans.map(p => ({
+                const mappedPlans = resultPlans.map(p => ({
                     id: p.plan_id,
                     code: p.plan_id,
                     name: p.name,
@@ -175,6 +179,9 @@ export const api = {
                     })(),
                     icon: ''
                 }));
+
+                _dataPlanMemoryCache[netLower] = { data: mappedPlans, timestamp: Date.now() };
+                return mappedPlans;
             } catch (e) {
                 console.error("Failed to fetch Data plans from database", e);
                 throw new Error("Could not load Data packages. Please try again later.");

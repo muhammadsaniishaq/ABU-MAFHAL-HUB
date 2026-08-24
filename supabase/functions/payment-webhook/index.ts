@@ -459,7 +459,7 @@ async function handleFundWallet(supabaseAdmin: SupabaseClient, provider: string,
 
     // 4. Record Transaction & Log Event (Parallel)
     // We use allSettled so one failure doesn't throw and stop the logic
-    const metadata = finalMetadata; 
+    const metadata = data || {}; 
     
     const transactionsToInsert = [
         {

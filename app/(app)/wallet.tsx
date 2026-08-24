@@ -68,7 +68,7 @@ export default function WalletScreen() {
             const [profileRes, vAccountRes, statsRes, recentRes, settingsRes] = await Promise.all([
                 supabase.from('profiles').select('balance').eq('id', user.id).single(),
                 supabase.from('virtual_accounts').select('bank_name, account_number, account_name').eq('user_id', user.id).maybeSingle(),
-                supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success'),
+                supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success').order('created_at', { ascending: false }).limit(200),
                 supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
             ]);
