@@ -4,9 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 
+import { trackGooglePurchaseConversion } from '../services/googleAds';
+
 export default function SuccessScreen() {
     const router = useRouter();
-    const { amount, type } = useLocalSearchParams();
+    const { amount, type, id } = useLocalSearchParams();
+
+    // Trigger Google Ads conversion tracking on successful purchase
+    useEffect(() => {
+        const numericAmount = amount ? Number(String(amount).replace(/[^0-9.-]+/g, '')) : 0;
+        trackGooglePurchaseConversion(id as string, numericAmount);
+    }, [amount, id]);
 
     // Prevent back button from going back to form
     useEffect(() => {
