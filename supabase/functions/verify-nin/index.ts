@@ -398,44 +398,81 @@ serve(async (req: Request) => {
         return jsonOk({ error: `Invalid verification type: ${searchType}` })
     }
 
+    const candidateEndpoints: string[] = [endpoint];
+
+    if (searchType === 'bvn') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-verify`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/bvn`);
+    } else if (searchType === 'bvn-phone') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-phone`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/phone-bvn`);
+    } else if (searchType === 'bvn-card') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-card`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-slip`);
+    } else if (searchType === 'nin') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/slip`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin/slip-v2`);
+    } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin/slip-v2`);
+      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/slip`);
+    }
+
     try {
-        console.log(`Calling AgentHub API: ${endpoint} (Method: ${bodyPayload ? 'POST' : 'GET'}) with payload:`, bodyPayload);
+        let apiResponse: Response | null = null;
+        let lastErrorText = '';
+        let responseData: any = null;
 
-        const fetchOptions: RequestInit = {
-            method: bodyPayload !== null ? 'POST' : 'GET',
-            headers: {
-                'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        for (const targetUrl of candidateEndpoints) {
+            try {
+                console.log(`Calling AgentHub API: ${targetUrl} (Method: ${bodyPayload !== null ? 'POST' : 'GET'}) with payload:`, bodyPayload);
+
+                const fetchOptions: RequestInit = {
+                    method: bodyPayload !== null ? 'POST' : 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                };
+
+                if (bodyPayload !== null) {
+                    fetchOptions.body = JSON.stringify(bodyPayload);
+                }
+
+                apiResponse = await fetch(targetUrl, fetchOptions);
+
+                if (apiResponse.status === 404 && candidateEndpoints.length > 1) {
+                    console.warn(`Endpoint ${targetUrl} returned 404, attempting next candidate fallback...`);
+                    continue;
+                }
+
+                const rawText = await apiResponse.text();
+                lastErrorText = rawText;
+
+                try {
+                    responseData = JSON.parse(rawText);
+                    if (responseData) break; // successfully parsed JSON
+                } catch (_) {
+                    console.warn(`Non-JSON response from ${targetUrl} (HTTP ${apiResponse.status}):`, rawText.substring(0, 200));
+                }
+            } catch (err: any) {
+                console.warn(`Fetch failed for ${targetUrl}:`, err.message);
             }
-        };
-
-        if (bodyPayload !== null) {
-            fetchOptions.body = JSON.stringify(bodyPayload);
         }
 
-        const apiResponse = await fetch(endpoint, fetchOptions);
-
-        const rawText = await apiResponse.text();
-        let responseData: any = null;
-        try {
-            responseData = JSON.parse(rawText);
-        } catch (_) {
-            console.error(`AgentHub API returned non-JSON (HTTP ${apiResponse.status}):`, rawText.substring(0, 500));
-            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider HTTP ${apiResponse.status}`);
-            const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120);
-            return jsonOk({ error: `Verification provider error (HTTP ${apiResponse.status}): ${cleanText || 'Unexpected response format. Please try again.'}` });
+        if (!responseData) {
+            console.error(`AgentHub API returned unparsable response:`, lastErrorText.substring(0, 500));
+            await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider unreachable`);
+            const cleanText = lastErrorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120);
+            return jsonOk({ error: `Verification provider error: ${cleanText || 'Service temporarily unavailable. Please try again later.'}` });
         }
 
         // ── AgentHub response format ───────────────────────────────────────────
-        // Success: { status: true,  message: "...", data: {...} }
-        // Slip:    { status: true,  message: "Slip Generated Successfully", pdf_base64: "..." }
-        // Failure: { status: false, error:   "...", message: "Refunded" }
-        //
-        // Note: AgentHub uses boolean status (not string like IDPro)
-
-        if (responseData.status === true) {
+        // Success: { status: true, message: "...", data: {...} } or { success: true, ... }
+        if (responseData.status === true || responseData.status === 'success' || responseData.success === true) {
             const innerData = responseData.data ?? responseData;
             const pdfBase64 = responseData.pdf_base64 || innerData?.pdf_base64 || responseData.data?.pdf_base64;
 
