@@ -464,49 +464,64 @@ serve(async (req: Request) => {
         return jsonOk({ error: `Invalid verification type: ${searchType}` })
     }
 
-    const candidateEndpoints: string[] = [endpoint];
+    const candidateRequests: { url: string; body: any; method: string }[] = [];
 
     if (searchType === 'bvn') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-verify`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/bvn`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn`, body: { bvn: searchValue, service_code: '501' }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-verify`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-verify`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn`, body: { bvn: searchValue }, method: 'POST' });
     } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/retrieval`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-phone`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-phone`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/retrieval`, body: { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/retrieval`, body: { phone: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-phone`, body: { phone: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-phone`, body: { phone: searchValue }, method: 'POST' });
     } else if (searchType === 'bvn-card' || searchType === 'bvn-slip') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/slip`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/premium-slip`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-card`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn-card`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/slip`, body: { bvn: searchValue, reference: requestData.reference || `REF-CARD-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-card`, body: { bvn: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn-card`, body: { bvn: searchValue }, method: 'POST' });
     } else if (searchType === 'vnin-to-nibss') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn, reference: requestData.reference || `REF-VNIN-${Date.now()}` }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/vnin-to-nibss`, body: { vnin: searchValue || requestData.vnin, bvn: requestData.bvn }, method: 'POST' });
     } else if (searchType === 'bvn-modification') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/modification`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/bvn-modification`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/modification`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/modification`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn-modification`, body: bodyPayload, method: 'POST' });
     } else if (searchType === 'bvn-enrollment') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/bvn/enrollment`);
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/bvn/enrollment`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/bvn/enrollment`, body: bodyPayload, method: 'POST' });
     } else if (searchType === 'nin') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/v1/identity/slip`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin/slip-v2`);
+      candidateRequests.push({ url: endpoint, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin`, body: { nin: searchValue }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/identity/slip`, body: { nin: searchValue, service_code: '403' }, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: { nin: searchValue, slip_type: 'REGULAR' }, method: 'POST' });
     } else if (searchType === 'nin-slip' || searchType === 'nin-slip-v2') {
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/nin/slip-v2`);
-      candidateEndpoints.push(`${AGENTHUB_BASE}/identity/slip`);
+      candidateRequests.push({ url: endpoint, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/nin/slip-v2`, body: bodyPayload, method: 'POST' });
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/identity/slip`, body: bodyPayload, method: 'POST' });
+    } else {
+      candidateRequests.push({ url: endpoint, body: bodyPayload, method: bodyPayload !== null ? 'POST' : 'GET' });
     }
 
     try {
         let apiResponse: Response | null = null;
         let lastErrorText = '';
         let responseData: any = null;
+        let successfulResponse: any = null;
 
-        for (const targetUrl of candidateEndpoints) {
+        for (const reqItem of candidateRequests) {
             try {
-                console.log(`Calling AgentHub API: ${targetUrl} (Method: ${bodyPayload !== null ? 'POST' : 'GET'}) with payload:`, bodyPayload);
+                console.log(`Calling AgentHub API: ${reqItem.url} (Method: ${reqItem.method}) with payload:`, reqItem.body);
 
                 const fetchOptions: RequestInit = {
-                    method: bodyPayload !== null ? 'POST' : 'GET',
+                    method: reqItem.method,
                     headers: {
                         'Authorization': `Bearer ${AGENTHUB_API_KEY}`,
                         'Content-Type': 'application/json',
@@ -515,29 +530,39 @@ serve(async (req: Request) => {
                     }
                 };
 
-                if (bodyPayload !== null) {
-                    fetchOptions.body = JSON.stringify(bodyPayload);
+                if (reqItem.body !== null && reqItem.method === 'POST') {
+                    fetchOptions.body = JSON.stringify(reqItem.body);
                 }
 
-                apiResponse = await fetch(targetUrl, fetchOptions);
-
-                if (apiResponse.status === 404 && candidateEndpoints.length > 1) {
-                    console.warn(`Endpoint ${targetUrl} returned 404, attempting next candidate fallback...`);
-                    continue;
-                }
+                apiResponse = await fetch(reqItem.url, fetchOptions);
 
                 const rawText = await apiResponse.text();
                 lastErrorText = rawText;
 
                 try {
-                    responseData = JSON.parse(rawText);
-                    if (responseData) break; // successfully parsed JSON
+                    const parsed = JSON.parse(rawText);
+                    if (parsed) {
+                        responseData = parsed;
+                        const isSuccess = parsed.status === true || 
+                                          parsed.status === 'success' || 
+                                          parsed.success === true ||
+                                          parsed.current_status === 'COMPLETED' ||
+                                          (parsed.data && (parsed.data.bvn || parsed.data.firstName || parsed.data.firstname || parsed.data.nin || parsed.data.pdf_base64));
+                        if (isSuccess) {
+                            successfulResponse = parsed;
+                            break; // Success! Stop trying candidate fallbacks
+                        }
+                    }
                 } catch (_) {
-                    console.warn(`Non-JSON response from ${targetUrl} (HTTP ${apiResponse.status}):`, rawText.substring(0, 200));
+                    console.warn(`Non-JSON response from ${reqItem.url} (HTTP ${apiResponse.status}):`, rawText.substring(0, 200));
                 }
             } catch (err: any) {
-                console.warn(`Fetch failed for ${targetUrl}:`, err.message);
+                console.warn(`Fetch failed for ${reqItem.url}:`, err.message);
             }
+        }
+
+        if (successfulResponse) {
+            responseData = successfulResponse;
         }
 
         if (!responseData) {
