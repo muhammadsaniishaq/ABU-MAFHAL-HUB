@@ -232,11 +232,14 @@ export const AgentHubIdentityVerifier = {
         candidateList.push({ url: 'https://agenthub.ng/api/identity/nin/slip-v2-phone', body: { nin: searchValue, slip_type: 'STANDARD', reference: `REF-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/phone-verify', body: { phone: searchValue } });
       } else if (searchType === 'bvn') {
-        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
-        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/verification', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue, reference: extra?.reference || `REF-BVN-${Date.now()}` } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/verification', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
+      } else if (searchType === 'bvn-premium-slip') {
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
+        candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/premium-slip', body: { bvn: searchValue } });
       } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
         const ref = extra?.reference || `REF-RET-${Date.now()}`;
         const sCode = String(extra?.service_code || (extra?.ticket_id || extra?.agent_code ? '631' : '630'));

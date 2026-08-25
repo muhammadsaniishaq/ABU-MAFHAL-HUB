@@ -476,7 +476,8 @@ serve(async (req: Request) => {
 
     const candidateRequests: { url: string; body: any; method: string }[] = [];
 
-    if (searchType === 'bvn') {
+    if (searchType === 'bvn' || searchType === 'bvn-premium-slip') {
+      candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/premium-slip`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/v1/bvn/verification`, body: { bvn: searchValue }, method: 'POST' });
       candidateRequests.push({ url: `${AGENTHUB_BASE}/bvn/verification`, body: { bvn: searchValue, reference: requestData.reference || `REF-BVN-${Date.now()}` }, method: 'POST' });
