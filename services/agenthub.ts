@@ -588,8 +588,17 @@ export const AgentHubIdentityVerifier = {
     AgentHubIdentityVerifier.invokeEdge('nin-personalization', number, { trackingId: number, priceId }),
 
   /** Link VNIN to NIBSS database via AgentHub */
-  linkVNINToNIBSS: async (vnin: string, bvn?: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('vnin-to-nibss', vnin, { vnin, bvn, priceId: priceId || 'bvn_vnin_nibss' }),
+  linkVNINToNIBSS: async (vnin: string, bvn?: string, priceId?: string, extra?: any) =>
+    AgentHubIdentityVerifier.invokeEdge('vnin-to-nibss', vnin, {
+      vnin,
+      bvn,
+      priceId: priceId || 'bvn_vnin_nibss',
+      ...extra
+    }),
+
+  /** Check status of a VNIN to NIBSS linking request */
+  checkVNINStatus: async (referenceOrRequestId: string) =>
+    AgentHubIdentityVerifier.invokeEdge('vnin-to-nibss-status', referenceOrRequestId, { reference: referenceOrRequestId }),
 
   /** Request BVN Modification via AgentHub */
   requestBVNModification: async (params: BVNModificationParams, priceId?: string) =>

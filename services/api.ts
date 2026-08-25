@@ -773,7 +773,9 @@ export const api = {
         /** Attest/verify a birth record */
         attestBirth: (params: BirthAttestationParams) => identityVerifier.attestBirth?.(params),
         /** Link VNIN to NIBSS database */
-        linkVNINToNIBSS: (vnin: string, bvn?: string, priceId?: string) => identityVerifier.linkVNINToNIBSS?.(vnin, bvn, priceId),
+        linkVNINToNIBSS: (vnin: string, bvn?: string, priceId?: string, extra?: any) => identityVerifier.linkVNINToNIBSS?.(vnin, bvn, priceId, extra),
+        /** Check status of VNIN to NIBSS linking request */
+        checkVNINStatus: (referenceOrRequestId: string) => identityVerifier.checkVNINStatus?.(referenceOrRequestId),
         /** Request BVN record modification */
         requestBVNModification: (params: BVNModificationParams, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
 

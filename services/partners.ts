@@ -63,7 +63,8 @@ export interface IdentityVerifier {
     requestModification?(params: ModificationParams, priceId?: string): Promise<VerificationResult>;
     requestDOBModification?(number: string, dob: string): Promise<VerificationResult>;
     attestBirth?(params: BirthAttestationParams): Promise<VerificationResult>;
-    linkVNINToNIBSS?(vnin: string, bvn?: string, priceId?: string): Promise<VerificationResult>;
+    linkVNINToNIBSS?(vnin: string, bvn?: string, priceId?: string, extra?: any): Promise<VerificationResult>;
+    checkVNINStatus?(referenceOrRequestId: string): Promise<VerificationResult>;
     requestBVNModification?(params: BVNModificationParams, priceId?: string): Promise<VerificationResult>;
     getTransactionHistory?(params?: HistoryParams): Promise<VerificationResult>;
     getVerificationHistory?(params?: HistoryParams): Promise<VerificationResult>;
