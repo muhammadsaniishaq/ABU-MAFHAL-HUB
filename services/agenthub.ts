@@ -636,6 +636,14 @@ export const AgentHubIdentityVerifier = {
       reference: requestIdOrReference,
     }),
 
+  /** Generate BVN Premium Slip via AgentHub */
+  generateBVNPremiumSlip: async (bvn: string, priceId?: string, reference?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-premium-slip', bvn, {
+      bvn,
+      reference: reference || `REF-BVN-SLIP-${Date.now()}`,
+      priceId: priceId || 'bvn_premium_slip',
+    }),
+
   // ── DELINK & RECOVERY ────────────────────────────────────────────────────
 
   /** Delink (uses NIN endpoint on AgentHub — no direct counterpart) */

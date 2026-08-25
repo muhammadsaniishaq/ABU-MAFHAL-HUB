@@ -69,6 +69,7 @@ export interface IdentityVerifier {
     checkBVNModificationStatus?(requestIdOrReference: string): Promise<VerificationResult>;
     submitBVNEnrollment?(params: any, priceId?: string): Promise<VerificationResult>;
     checkBVNEnrollmentStatus?(requestIdOrReference: string): Promise<VerificationResult>;
+    generateBVNPremiumSlip?(bvn: string, priceId?: string, reference?: string): Promise<VerificationResult>;
     getTransactionHistory?(params?: HistoryParams): Promise<VerificationResult>;
     getVerificationHistory?(params?: HistoryParams): Promise<VerificationResult>;
 }

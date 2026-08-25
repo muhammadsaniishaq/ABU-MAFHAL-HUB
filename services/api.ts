@@ -784,6 +784,8 @@ export const api = {
         submitBVNEnrollment: (params: any, priceId?: string) => identityVerifier.submitBVNEnrollment?.(params, priceId),
         /** Check BVN user enrollment status */
         checkBVNEnrollmentStatus: (requestIdOrReference: string) => identityVerifier.checkBVNEnrollmentStatus?.(requestIdOrReference),
+        /** Generate BVN Premium Slip (Base64 PDF) */
+        generateBVNPremiumSlip: (bvn: string, priceId?: string, reference?: string) => identityVerifier.generateBVNPremiumSlip?.(bvn, priceId, reference),
 
         // ── History ────────────────────────────────────────────────────
         /** Retrieve transaction/billing history */
