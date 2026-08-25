@@ -612,6 +612,20 @@ export const AgentHubIdentityVerifier = {
       priceId: priceId || 'bvn_modification',
     }),
 
+  /** Submit BVN User Enrollment via AgentHub */
+  submitBVNEnrollment: async (params: any, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-enrollment', params.phone_number || params.bvn || 'enrollment', {
+      priceId: priceId || 'bvn_enrollment',
+      ...params,
+    }),
+
+  /** Check BVN User Enrollment Status via AgentHub */
+  checkBVNEnrollmentStatus: async (requestIdOrReference: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-enrollment-status', requestIdOrReference, {
+      request_id: requestIdOrReference,
+      reference: requestIdOrReference,
+    }),
+
   // ── DELINK & RECOVERY ────────────────────────────────────────────────────
 
   /** Delink (uses NIN endpoint on AgentHub — no direct counterpart) */

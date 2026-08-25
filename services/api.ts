@@ -778,6 +778,10 @@ export const api = {
         checkVNINStatus: (referenceOrRequestId: string) => identityVerifier.checkVNINStatus?.(referenceOrRequestId),
         /** Request BVN record modification */
         requestBVNModification: (params: BVNModificationParams, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
+        /** Submit demographic data for New BVN User / Android Enrollment */
+        submitBVNEnrollment: (params: any, priceId?: string) => identityVerifier.submitBVNEnrollment?.(params, priceId),
+        /** Check BVN user enrollment status */
+        checkBVNEnrollmentStatus: (requestIdOrReference: string) => identityVerifier.checkBVNEnrollmentStatus?.(requestIdOrReference),
 
         // ── History ────────────────────────────────────────────────────
         /** Retrieve transaction/billing history */
