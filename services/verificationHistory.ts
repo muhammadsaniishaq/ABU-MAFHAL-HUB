@@ -13,21 +13,25 @@ export interface VerificationHistoryItem {
 }
 
 export const extractFullName = (details: any, fallbackName?: string): string => {
-  const d = details?.data || details || {};
-  const firstname = d.firstname || d.first_name || '';
-  const middlename = d.middlename || d.middle_name || '';
-  const surname = d.surname || d.last_name || '';
+  const d = details?.data?.data || details?.data || details || {};
+  const firstname = d.firstName || d.firstname || d.first_name || '';
+  const middlename = d.middleName || d.middlename || d.middle_name || '';
+  const surname = d.lastName || d.surname || d.last_name || '';
   
   const constructed = [firstname, middlename, surname].filter(Boolean).join(' ').trim();
   if (constructed.length > 0) {
     return constructed.toUpperCase();
   }
 
-  if (fallbackName && !['NIN Holder', 'Unknown Name', 'RECORD', 'N/A'].includes(fallbackName)) {
+  if (d.fullName || d.name) {
+    return String(d.fullName || d.name).toUpperCase();
+  }
+
+  if (fallbackName && !['NIN Holder', 'BVN Holder', 'Unknown Name', 'RECORD', 'N/A'].includes(fallbackName)) {
     return fallbackName.toUpperCase();
   }
 
-  return 'NIN Holder';
+  return 'BVN / NIN Holder';
 };
 
 export const verificationHistory = {

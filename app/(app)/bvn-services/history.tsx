@@ -7,12 +7,14 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
+import * as Print from 'expo-print';
 
 export default function BVNHistoryScreen() {
     const insets = useSafeAreaInsets();
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [printingId, setPrintingId] = useState<string | null>(null);
 
     const loadHistory = async () => {
         setLoading(true);
@@ -24,28 +26,31 @@ export default function BVNHistoryScreen() {
             const combinedMap = new Map();
 
             for (const item of localList) {
-                const fullName = extractFullName(item.data || item.details, item.name || item.holder_name);
-                const bvnNum = item.bvn || item.search_number || item.id;
+                const raw = item.data || item.details || {};
+                const fullName = extractFullName(raw, item.name || item.holder_name);
+                const bvnNum = item.bvn || raw.idNumber || raw.bvn || item.search_number || item.id;
                 if (bvnNum) {
                     combinedMap.set(bvnNum, {
                         ...item,
                         bvn: bvnNum,
                         name: fullName,
-                        date: item.date || 'Recently'
+                        date: item.date || 'Recently',
+                        data: raw
                     });
                 }
             }
 
             if (dbList && dbList.length > 0) {
                 for (const item of dbList) {
-                    const fullName = extractFullName(item.details, item.holder_name);
-                    const bvnNum = item.search_number || item.details?.bvn || item.details?.data?.bvn || item.id;
+                    const raw = item.details?.data?.data || item.details?.data || item.details || {};
+                    const fullName = extractFullName(raw, item.holder_name);
+                    const bvnNum = item.search_number || raw.idNumber || raw.bvn || item.details?.bvn || item.id;
                     combinedMap.set(bvnNum, {
                         id: item.id,
                         bvn: bvnNum,
                         name: fullName,
                         date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
-                        data: item.details
+                        data: raw
                     });
                 }
             }
@@ -55,6 +60,120 @@ export default function BVNHistoryScreen() {
             console.warn('Failed to load BVN history', e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePrintSlip = async (item: any) => {
+        const raw = item.data || {};
+        const fn = raw.firstName || raw.first_name || '';
+        const mn = raw.middleName || raw.middle_name || '';
+        const ln = raw.lastName || raw.surname || '';
+        const fullName = `${fn} ${mn} ${ln}`.trim() || raw.fullName || raw.name || item.name || 'BVN HOLDER';
+        const bvnNum = raw.idNumber || raw.bvn || item.bvn || 'N/A';
+        const ninNum = raw.nin || 'N/A';
+        const dob = raw.dateOfBirth || raw.dob || raw.birthdate || 'N/A';
+        const phone = raw.mobile || raw.phoneNumber1 || raw.phoneNumber || raw.phone || 'N/A';
+        const gender = raw.gender || 'N/A';
+        const state = raw.stateOfOrigin || raw.state || 'N/A';
+        const lga = raw.lgaOfOrigin || raw.lga || 'N/A';
+        const rawImg = raw.image || raw.photo || '';
+        const photoSrc = rawImg ? (rawImg.startsWith('data:') ? rawImg : `data:image/jpeg;base64,${rawImg}`) : '';
+
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Official BVN Verification Slip - ${bvnNum}</title>
+            <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8fafc; color: #1e293b; }
+                .card { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden; }
+                .header { background: #0f172a; color: white; padding: 20px; text-align: center; }
+                .header h1 { margin: 0 0 4px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+                .header p { margin: 0; font-size: 11px; opacity: 0.8; }
+                .body { padding: 24px; display: flex; gap: 20px; }
+                .photo-box { width: 120px; height: 140px; background: #e2e8f0; border: 1px solid #94a3b8; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+                .info { flex: 1; }
+                .row { margin-bottom: 10px; }
+                .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 2px; }
+                .val { font-size: 14px; font-weight: bold; color: #0f172a; }
+                .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                .footer { background: #f1f5f9; padding: 12px 24px; font-size: 10px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
+                .watermark { font-size: 16px; font-weight: 900; letter-spacing: 2px; color: #059669; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="header">
+                    <h1>Central Bank of Nigeria / NIBSS</h1>
+                    <p>OFFICIAL BIOMETRIC VERIFICATION NUMBER (BVN) RECORD</p>
+                </div>
+                <div class="body">
+                    <div class="photo-box">
+                        ${photoSrc ? `<img src="${photoSrc}" />` : `<div style="font-size:10px;color:#64748b;">PASSPORT</div>`}
+                    </div>
+                    <div class="info">
+                        <div class="row">
+                            <div class="label">Full Name</div>
+                            <div class="val">${fullName}</div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="row">
+                                <div class="label">BVN Number</div>
+                                <div class="val watermark">${bvnNum}</div>
+                            </div>
+                            <div class="row">
+                                <div class="label">NIN Number</div>
+                                <div class="val">${ninNum}</div>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="row">
+                                <div class="label">Date of Birth</div>
+                                <div class="val">${dob}</div>
+                            </div>
+                            <div class="row">
+                                <div class="label">Gender</div>
+                                <div class="val">${gender}</div>
+                            </div>
+                        </div>
+                        <div class="grid-2">
+                            <div class="row">
+                                <div class="label">Phone Number</div>
+                                <div class="val">${phone}</div>
+                            </div>
+                            <div class="row">
+                                <div class="label">State / LGA</div>
+                                <div class="val">${state} / ${lga}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="footer">
+                    Generated securely via Abu-Mafhal Integrated Hub • NIBSS Verified Record
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        setPrintingId(item.id || item.bvn);
+        try {
+            if (Platform.OS === 'web') {
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    printWindow.print();
+                }
+            } else {
+                await Print.printAsync({ html });
+            }
+        } catch (e: any) {
+            Alert.alert("Print Error", e.message);
+        } finally {
+            setPrintingId(null);
         }
     };
 
@@ -155,10 +274,23 @@ export default function BVNHistoryScreen() {
                                     <Text style={styles.holderName}>{item.name || 'BVN Holder'}</Text>
                                     <Text style={styles.bvnNumber}>{item.bvn}</Text>
                                 </View>
-                                <View style={styles.reprintBadge}>
-                                    <Ionicons name="print-outline" size={14} color="#059669" />
-                                    <Text style={styles.reprintText}>Reprint</Text>
-                                </View>
+                                <TouchableOpacity 
+                                    style={styles.reprintBadge}
+                                    activeOpacity={0.7}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        handlePrintSlip(item);
+                                    }}
+                                >
+                                    {printingId === (item.id || item.bvn) ? (
+                                        <ActivityIndicator size="small" color="#059669" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="print-outline" size={14} color="#059669" />
+                                            <Text style={styles.reprintText}>Buga Slip</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
                             </View>
                             <View style={styles.cardFooter}>
                                 <Text style={styles.dateText}>{item.date || 'Recently'}</Text>

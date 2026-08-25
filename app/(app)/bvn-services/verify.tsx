@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Platform, Modal, StyleSheet, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Platform, Modal, StyleSheet, Linking, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Clipboard } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -123,14 +123,15 @@ export default function VerifyBVNScreen() {
             const response = await api.identity.validateBVN(cleanBvn, 'bvn_verification');
             
             if (response && response.isValid && response.data) {
-                const rawData = response.data.data || response.data;
+                const rawData = response.data?.data?.data || response.data?.data || response.data;
                 setResult(rawData);
 
                 // Save to history
                 const fullName = extractFullName(rawData, `${rawData.firstName || rawData.first_name || ''} ${rawData.lastName || rawData.surname || ''}`);
+                const bvnNum = rawData.idNumber || rawData.bvn || cleanBvn;
                 const newItem = {
                     id: `bvn_${Date.now()}`,
-                    bvn: cleanBvn,
+                    bvn: bvnNum,
                     name: fullName,
                     date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     data: rawData
@@ -138,14 +139,14 @@ export default function VerifyBVNScreen() {
 
                 const stored = await AsyncStorage.getItem('recent_bvn_verifications');
                 const localList = stored ? JSON.parse(stored) : [];
-                const updated = [newItem, ...localList.filter((i: any) => i.bvn !== cleanBvn)].slice(0, 100);
+                const updated = [newItem, ...localList.filter((i: any) => i.bvn !== bvnNum)].slice(0, 100);
                 setHistoryList(updated);
                 await AsyncStorage.setItem('recent_bvn_verifications', JSON.stringify(updated));
 
                 await verificationHistory.save({
                     service_category: 'bvn',
                     service_type: 'bvn_verification',
-                    search_number: cleanBvn,
+                    search_number: bvnNum,
                     holder_name: fullName,
                     details: rawData,
                 });
@@ -170,14 +171,16 @@ export default function VerifyBVNScreen() {
             const fn = result.firstName || result.first_name || '';
             const mn = result.middleName || result.middle_name || '';
             const ln = result.lastName || result.surname || '';
-            const fullName = `${fn} ${mn} ${ln}`.trim() || 'BVN HOLDER';
-            const bvnNum = result.bvn || bvn || 'N/A';
+            const fullName = `${fn} ${mn} ${ln}`.trim() || result.fullName || result.name || 'BVN HOLDER';
+            const bvnNum = result.idNumber || result.bvn || bvn || 'N/A';
+            const ninNum = result.nin || 'N/A';
             const dob = result.dateOfBirth || result.dob || result.birthdate || 'N/A';
-            const phone = result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A';
+            const phone = result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A';
             const gender = result.gender || 'N/A';
             const state = result.stateOfOrigin || result.state || 'N/A';
             const lga = result.lgaOfOrigin || result.lga || 'N/A';
-            const photoSrc = result.image || result.photo ? `data:image/jpeg;base64,${result.image || result.photo}` : '';
+            const rawImg = result.image || result.photo || '';
+            const photoSrc = rawImg ? (rawImg.startsWith('data:') ? rawImg : `data:image/jpeg;base64,${rawImg}`) : '';
 
             const html = `
             <!DOCTYPE html>
@@ -195,10 +198,10 @@ export default function VerifyBVNScreen() {
                     .photo-box { width: 120px; height: 140px; background: #e2e8f0; border: 1px solid #94a3b8; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                     .photo-box img { width: 100%; height: 100%; object-fit: cover; }
                     .info { flex: 1; }
-                    .row { margin-bottom: 12px; }
+                    .row { margin-bottom: 10px; }
                     .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 2px; }
                     .val { font-size: 14px; font-weight: bold; color: #0f172a; }
-                    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+                    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
                     .footer { background: #f1f5f9; padding: 12px 24px; font-size: 10px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
                     .watermark { font-size: 16px; font-weight: 900; letter-spacing: 2px; color: #059669; }
                 </style>
@@ -218,9 +221,15 @@ export default function VerifyBVNScreen() {
                                 <div class="label">Full Name</div>
                                 <div class="val">${fullName}</div>
                             </div>
-                            <div class="row">
-                                <div class="label">BVN Number</div>
-                                <div class="val watermark">${bvnNum}</div>
+                            <div class="grid-2">
+                                <div class="row">
+                                    <div class="label">BVN Number</div>
+                                    <div class="val watermark">${bvnNum}</div>
+                                </div>
+                                <div class="row">
+                                    <div class="label">NIN Number</div>
+                                    <div class="val">${ninNum}</div>
+                                </div>
                             </div>
                             <div class="grid-2">
                                 <div class="row">
@@ -350,17 +359,37 @@ export default function VerifyBVNScreen() {
                             <Text style={styles.resultHeaderText}>Ingantattun Bayanan BVN</Text>
                         </View>
 
+                        {/* Photo Display if available */}
+                        {(result.image || result.photo) && (
+                            <View style={{ alignItems: 'center', marginVertical: 12 }}>
+                                <View style={{ width: 90, height: 105, borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: '#0284c7', backgroundColor: '#e2e8f0' }}>
+                                    <Image
+                                        source={{ uri: (result.image || result.photo).startsWith('data:') ? (result.image || result.photo) : `data:image/jpeg;base64,${result.image || result.photo}` }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                </View>
+                            </View>
+                        )}
+
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Cikakken Suna:</Text>
                             <Text style={styles.detailVal}>
-                                {`${result.firstName || result.first_name || ''} ${result.middleName || result.middle_name || ''} ${result.lastName || result.surname || ''}`.trim()}
+                                {`${result.firstName || result.first_name || ''} ${result.middleName || result.middle_name || ''} ${result.lastName || result.surname || ''}`.trim() || result.fullName || result.name || 'BVN Holder'}
                             </Text>
                         </View>
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Lambar BVN:</Text>
-                            <Text style={[styles.detailVal, { color: '#0284c7', fontWeight: '900' }]}>{result.bvn || bvn}</Text>
+                            <Text style={[styles.detailVal, { color: '#0284c7', fontWeight: '900' }]}>{result.idNumber || result.bvn || bvn}</Text>
                         </View>
+
+                        {result.nin && (
+                            <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Lambar NIN:</Text>
+                                <Text style={[styles.detailVal, { color: '#059669', fontWeight: '800' }]}>{result.nin}</Text>
+                            </View>
+                        )}
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Ranar Haihuwa:</Text>
@@ -369,7 +398,7 @@ export default function VerifyBVNScreen() {
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Lambar Waya:</Text>
-                            <Text style={styles.detailVal}>{result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A'}</Text>
+                            <Text style={styles.detailVal}>{result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.detailRow}>
@@ -379,7 +408,7 @@ export default function VerifyBVNScreen() {
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Jiha / LGA:</Text>
-                            <Text style={styles.detailVal}>{`${result.stateOfOrigin || result.state || ''} / ${result.lgaOfOrigin || result.lga || ''}`}</Text>
+                            <Text style={styles.detailVal}>{`${result.stateOfOrigin || result.state || ''} ${result.lgaOfOrigin || result.lga ? `/ ${result.lgaOfOrigin || result.lga}` : ''}`.trim() || 'N/A'}</Text>
                         </View>
 
                         <TouchableOpacity 
