@@ -107,12 +107,12 @@ export default function VerifyBVNScreen() {
     const handleVerify = async () => {
         const cleanBvn = bvn.trim().replace(/\D/g, '');
         if (!cleanBvn || cleanBvn.length !== 11) {
-            showAlert("Error", "Da fatan a shigar da ingantacciyar lambar BVN mai lamba 11.", "error");
+            showAlert("Invalid BVN", "Please enter a valid 11-digit BVN number.", "error");
             return;
         }
 
         if (userBalance !== null && userBalance < 150) {
-            showAlert("Kuɗi Bai Isa Ba", "Asusunka ba shi da isassun kuɗi (₦150) don tantance BVN. Da fatan ka saka kuɗi a asusunka.", "error");
+            showAlert("Insufficient Balance", "Your account balance is insufficient (₦150 required) for BVN verification. Please fund your wallet.", "error");
             return;
         }
 
@@ -152,13 +152,13 @@ export default function VerifyBVNScreen() {
                 });
 
                 fetchWalletBalance();
-                showAlert("Nasarar Tantancewa", "An yi nasarar samo bayanan BVN!", "success");
+                showAlert("Verification Successful", "BVN details retrieved successfully!", "success");
             } else {
-                const errorMsg = response?.message || response?.error || "Ba a samu bayanan BVN ba. Tabbatar da lambar da ka shigar.";
-                showAlert("Tantancewa Ta Faskara", errorMsg, "error");
+                const errorMsg = response?.message || response?.error || "BVN record not found. Please verify the number entered.";
+                showAlert("Verification Failed", errorMsg, "error");
             }
         } catch (err: any) {
-            showAlert("Sabis na Fuskantar Matsala", err.message || "An samu matsala wajen haɗawa da uwar garke.", "error");
+            showAlert("Service Unavailable", err.message || "An error occurred while connecting to the verification server.", "error");
         } finally {
             setLoading(false);
         }
@@ -307,17 +307,17 @@ export default function VerifyBVNScreen() {
                     onPress={() => Linking.openURL('tel:*565*0%23')}
                 >
                     <Ionicons name="phone-portrait" size={18} color="#0284c7" />
-                    <Text style={styles.dialHelperText}>Manta da BVN? Danna nan ka danna <Text style={{ fontWeight: 'bold' }}>*565*0#</Text> a layinka</Text>
+                    <Text style={styles.dialHelperText}>Forgot BVN? Dial <Text style={{ fontWeight: 'bold' }}>*565*0#</Text> from your registered SIM card</Text>
                 </TouchableOpacity>
 
                 {/* Input Card */}
                 <View style={styles.formCard}>
-                    <Text style={styles.inputLabel}>SHIGAR DA LAMBAR BVN (Lamba 11)</Text>
+                    <Text style={styles.inputLabel}>ENTER BVN NUMBER (11 Digits)</Text>
                     <View style={styles.inputRow}>
                         <Ionicons name="finger-print" size={20} color="#64748b" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Misali: 22824107008"
+                            placeholder="Example: 22824107008"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
@@ -330,7 +330,7 @@ export default function VerifyBVNScreen() {
                     </View>
 
                     <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Kudin Tantancewa:</Text>
+                        <Text style={styles.costLabel}>Verification Fee:</Text>
                         <Text style={styles.costVal}>₦150</Text>
                     </View>
 
@@ -345,7 +345,7 @@ export default function VerifyBVNScreen() {
                         ) : (
                             <>
                                 <Ionicons name="shield-checkmark" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                <Text style={styles.verifyBtnText}>Tantance BVN Yanzu</Text>
+                                <Text style={styles.verifyBtnText}>Verify BVN Now</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -356,7 +356,7 @@ export default function VerifyBVNScreen() {
                     <View style={styles.resultCard}>
                         <View style={styles.resultHeader}>
                             <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-                            <Text style={styles.resultHeaderText}>Ingantattun Bayanan BVN</Text>
+                            <Text style={styles.resultHeaderText}>Verified BVN Details</Text>
                         </View>
 
                         {/* Photo Display if available */}
@@ -373,41 +373,41 @@ export default function VerifyBVNScreen() {
                         )}
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Cikakken Suna:</Text>
+                            <Text style={styles.detailLabel}>Full Name:</Text>
                             <Text style={styles.detailVal}>
                                 {`${result.firstName || result.first_name || ''} ${result.middleName || result.middle_name || ''} ${result.lastName || result.surname || ''}`.trim() || result.fullName || result.name || 'BVN Holder'}
                             </Text>
                         </View>
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Lambar BVN:</Text>
+                            <Text style={styles.detailLabel}>BVN Number:</Text>
                             <Text style={[styles.detailVal, { color: '#0284c7', fontWeight: '900' }]}>{result.idNumber || result.bvn || bvn}</Text>
                         </View>
 
                         {result.nin && (
                             <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Lambar NIN:</Text>
+                                <Text style={styles.detailLabel}>NIN Number:</Text>
                                 <Text style={[styles.detailVal, { color: '#059669', fontWeight: '800' }]}>{result.nin}</Text>
                             </View>
                         )}
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Ranar Haihuwa:</Text>
+                            <Text style={styles.detailLabel}>Date of Birth:</Text>
                             <Text style={styles.detailVal}>{result.dateOfBirth || result.dob || result.birthdate || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Lambar Waya:</Text>
+                            <Text style={styles.detailLabel}>Phone Number:</Text>
                             <Text style={styles.detailVal}>{result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Jinsi (Gender):</Text>
+                            <Text style={styles.detailLabel}>Gender:</Text>
                             <Text style={styles.detailVal}>{result.gender || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Jiha / LGA:</Text>
+                            <Text style={styles.detailLabel}>State / LGA:</Text>
                             <Text style={styles.detailVal}>{`${result.stateOfOrigin || result.state || ''} ${result.lgaOfOrigin || result.lga ? `/ ${result.lgaOfOrigin || result.lga}` : ''}`.trim() || 'N/A'}</Text>
                         </View>
 
@@ -422,7 +422,7 @@ export default function VerifyBVNScreen() {
                             ) : (
                                 <>
                                     <Ionicons name="print" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                    <Text style={styles.printBtnText}>Buga Katin BVN / Sauke PDF</Text>
+                                    <Text style={styles.printBtnText}>Print BVN Card / Save PDF</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -432,7 +432,7 @@ export default function VerifyBVNScreen() {
                 {/* History Section */}
                 {historyList.length > 0 && (
                     <View style={styles.historySection}>
-                        <Text style={styles.historyTitle}>Tarihin Tantance BVN na Kusa</Text>
+                        <Text style={styles.historyTitle}>Recent BVN Verifications</Text>
                         {historyList.slice(0, 5).map((item) => (
                             <TouchableOpacity 
                                 key={item.id || item.bvn} 

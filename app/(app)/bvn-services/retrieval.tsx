@@ -46,22 +46,22 @@ export default function BVNRetrievalScreen() {
         const cleanPhone = phoneNumber.trim().replace(/\D/g, '');
         if (method === 'phone') {
             if (!cleanPhone || cleanPhone.length < 10) {
-                showAlert("Error", "Da fatan a shigar da ingantacciyar lambar waya mai lamba 11.");
+                showAlert("Invalid Phone Number", "Please enter a valid 11-digit phone number.");
                 return;
             }
             if (!fullName.trim()) {
-                showAlert("Error", "Da fatan a shigar da cikakken sunan mai BVN.");
+                showAlert("Full Name Required", "Please enter the full name of the BVN holder.");
                 return;
             }
         } else {
             if (!ticketId.trim() || !agentCode.trim()) {
-                showAlert("Error", "Da fatan a shigar da Agent Code da Ticket ID don CRM retrieval.");
+                showAlert("Credentials Required", "Please enter both Agent Code and Ticket ID for CRM retrieval.");
                 return;
             }
         }
 
         if (userBalance !== null && userBalance < 900) {
-            showAlert("Kuɗi Bai Isa Ba", "Asusunka ba shi da isassun kuɗi (₦900) don dawo da BVN. Da fatan ka saka kuɗi a asusunka.");
+            showAlert("Insufficient Balance", "Your account balance is insufficient (₦900 required) for BVN retrieval. Please fund your wallet.");
             return;
         }
 
@@ -87,7 +87,7 @@ export default function BVNRetrievalScreen() {
             if (res && res.isValid && res.data) {
                 const rawData = res.data.data || res.data;
                 setResult(rawData);
-                showAlert("Nasarar Dawo da BVN", "An samu nasarar dawo da bayanan BVN!", "success");
+                showAlert("Retrieval Successful", "BVN details recovered successfully!", "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -98,10 +98,10 @@ export default function BVNRetrievalScreen() {
                 });
                 fetchWalletBalance();
             } else {
-                showAlert("Dawo da BVN Ya Faskara", res?.message || "Ba a samu lambar BVN da ke da alaƙa da wannan bayanin ba.");
+                showAlert("Retrieval Failed", res?.message || "No BVN found matching the provided details.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen haɗawa da uwar garke.");
+            showAlert("Error", e.message || "An error occurred while connecting to server.");
         } finally {
             setLoading(false);
         }
@@ -153,12 +153,12 @@ export default function BVNRetrievalScreen() {
                 <View style={styles.formCard}>
                     {method === 'phone' ? (
                         <>
-                            <Text style={styles.inputLabel}>LAMBAR WAYA (Phone Number)</Text>
+                            <Text style={styles.inputLabel}>PHONE NUMBER (11 Digits)</Text>
                             <View style={styles.inputRow}>
                                 <Ionicons name="call-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Misali: 08012345678"
+                                    placeholder="Example: 08012345678"
                                     placeholderTextColor="#94a3b8"
                                     keyboardType="numeric"
                                     maxLength={11}
@@ -167,12 +167,12 @@ export default function BVNRetrievalScreen() {
                                 />
                             </View>
 
-                            <Text style={[styles.inputLabel, { marginTop: 14 }]}>CIKAKKEN SUNAN MAI BVN (Full Name)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 14 }]}>FULL NAME (BVN Holder)</Text>
                             <View style={styles.inputRow}>
                                 <Ionicons name="person-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Misali: Ibrahim Abubakar"
+                                    placeholder="Example: Ibrahim Abubakar"
                                     placeholderTextColor="#94a3b8"
                                     value={fullName}
                                     onChangeText={setFullName}
@@ -206,7 +206,7 @@ export default function BVNRetrievalScreen() {
                                 />
                             </View>
 
-                            <Text style={[styles.inputLabel, { marginTop: 14 }]}>BMS TICKET (ZABI NE)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 14 }]}>BMS TICKET (OPTIONAL)</Text>
                             <View style={styles.inputRow}>
                                 <Ionicons name="document-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
@@ -221,7 +221,7 @@ export default function BVNRetrievalScreen() {
                     )}
 
                     <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Kudin Sabis:</Text>
+                        <Text style={styles.costLabel}>Service Fee:</Text>
                         <Text style={styles.costVal}>₦900</Text>
                     </View>
 
@@ -236,7 +236,7 @@ export default function BVNRetrievalScreen() {
                         ) : (
                             <>
                                 <Ionicons name="search" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                <Text style={styles.btnText}>Dawo da BVN Yanzu</Text>
+                                <Text style={styles.btnText}>Retrieve BVN Now</Text>
                             </>
                         )}
                     </TouchableOpacity>
@@ -246,7 +246,7 @@ export default function BVNRetrievalScreen() {
                 {result && (
                     <View style={styles.resultCard}>
                         <Ionicons name="checkmark-circle" size={32} color="#10B981" />
-                        <Text style={styles.resultTitle}>An Dawo da BVN!</Text>
+                        <Text style={styles.resultTitle}>BVN Retrieved Successfully!</Text>
                         <View style={styles.bvnBox}>
                             <Text style={styles.bvnText}>{result.bvn || result.BVN || 'N/A'}</Text>
                         </View>

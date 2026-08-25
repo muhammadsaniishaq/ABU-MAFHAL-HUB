@@ -55,24 +55,24 @@ export default function VNINToNIBSSScreen() {
         const cleanTicket = ticketId.trim();
 
         if (!cleanTicket) {
-            showAlert("Ticket ID na Buƙata", "Da fatan a shigar da ingantaccen Ticket ID.");
+            showAlert("Ticket ID Required", "Please enter a valid Ticket ID.");
             return;
         }
         if (!fullName.trim()) {
-            showAlert("Suna na Buƙata", "Da fatan a shigar da cikakken sunan mai NIN/BVN.");
+            showAlert("Full Name Required", "Please enter the exact full name on the NIN/BVN.");
             return;
         }
         if (!cleanNin || cleanNin.length !== 11) {
-            showAlert("Lambar NIN Ba Daidai Ba", "Lambar NIN dole ta kasance lamba 11 cif.");
+            showAlert("Invalid NIN", "NIN must be exactly 11 digits.");
             return;
         }
         if (!cleanBvn || cleanBvn.length !== 11) {
-            showAlert("Lambar BVN Ba Daidai Ba", "Lambar BVN dole ta kasance lamba 11 cif.");
+            showAlert("Invalid BVN", "BVN must be exactly 11 digits.");
             return;
         }
 
         if (userBalance !== null && userBalance < 3000) {
-            showAlert("Kuɗi Bai Isa Ba", "Asusunka ba shi da isassun kuɗi (₦3,000) don aikin VNIN to NIBSS.");
+            showAlert("Insufficient Balance", "Your wallet balance is insufficient (₦3,000 required) for VNIN to NIBSS processing.");
             return;
         }
 
@@ -93,7 +93,7 @@ export default function VNINToNIBSSScreen() {
             if (res && res.isValid) {
                 const responseData = res.data || { status: 'COMPLETED', reference: customReference };
                 setResult(responseData);
-                showAlert("Nasarar Tura Buƙata", "An tura buƙatar haɗa VNIN zuwa NIBSS (Nora) cikin nasara!", "success");
+                showAlert("Submission Successful", "Your VNIN to NIBSS request has been submitted successfully!", "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -112,10 +112,10 @@ export default function VNINToNIBSSScreen() {
                 });
                 fetchWalletBalance();
             } else {
-                showAlert("Aiki Ya Faskara", res?.message || "Ba a samu nasarar tura buƙatar ba.");
+                showAlert("Submission Failed", res?.message || "Unable to submit request. Please try again.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen haɗawa da uwar garke.");
+            showAlert("Error", e.message || "An error occurred while communicating with server.");
         } finally {
             setLoading(false);
         }
@@ -124,7 +124,7 @@ export default function VNINToNIBSSScreen() {
     const handleCheckStatus = async () => {
         const cleanRef = trackingRef.trim();
         if (!cleanRef) {
-            showAlert("Reference / Request ID", "Da fatan a shigar da Reference ko Ticket ID don duba matsayin aikin.");
+            showAlert("Reference Required", "Please enter a Reference or Ticket ID to check status.");
             return;
         }
 
@@ -136,10 +136,10 @@ export default function VNINToNIBSSScreen() {
             if (res && res.isValid && res.data) {
                 setStatusResult(res.data);
             } else {
-                showAlert("Ba a Samu Bayani Ba", res?.message || "Ba a samu bayanan wannan reference ɗin ba tukuna.");
+                showAlert("Record Not Found", res?.message || "No record found for the provided reference.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen duba matsayin aiki.");
+            showAlert("Error", e.message || "An error occurred while tracking request status.");
         } finally {
             setTrackingLoading(false);
         }

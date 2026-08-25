@@ -64,12 +64,12 @@ export default function BVNModificationScreen() {
         const cleanNin = nin.trim().replace(/\D/g, '');
 
         if (!cleanBvn || cleanBvn.length !== 11) {
-            showAlert("Error", "Da fatan a shigar da ingantacciyar lambar BVN mai lamba 11.");
+            showAlert("Invalid BVN", "Please enter a valid 11-digit BVN number.");
             return;
         }
 
         if (userBalance !== null && userBalance < currentOption.price) {
-            showAlert("Kuɗi Bai Isa Ba", `Asusunka ba shi da isassun kuɗi (₦${currentOption.price.toLocaleString()}) don gyaran BVN.`);
+            showAlert("Insufficient Balance", `Your account balance is insufficient (₦${currentOption.price.toLocaleString()} required) for this modification.`);
             return;
         }
 
@@ -101,7 +101,7 @@ export default function BVNModificationScreen() {
 
             if (res && res.isValid) {
                 setResult(res.data || { status: 'SUBMITTED' });
-                showAlert("Nasarar Tura Gyara", "An tura buƙatar gyaran BVN zuwa NIBSS cikin nasara!", "success");
+                showAlert("Submission Successful", "Your BVN modification request has been submitted to NIBSS successfully!", "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -112,10 +112,10 @@ export default function BVNModificationScreen() {
                 });
                 fetchWalletBalance();
             } else {
-                showAlert("Gyara Ya Faskara", res?.message || "Ba a samu nasarar tura buƙatar ba.");
+                showAlert("Submission Failed", res?.message || "Unable to submit modification request.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen haɗawa da uwar garke.");
+            showAlert("Error", e.message || "An error occurred while connecting to server.");
         } finally {
             setLoading(false);
         }
@@ -144,7 +144,7 @@ export default function BVNModificationScreen() {
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
                 {/* Code Selector */}
-                <Text style={styles.sectionHeader}>ZAƁI IRIN GYARAN DA AKE BUƘATA</Text>
+                <Text style={styles.sectionHeader}>SELECT MODIFICATION TYPE</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                     {MOD_OPTIONS.map((opt) => (
                         <TouchableOpacity
@@ -165,12 +165,12 @@ export default function BVNModificationScreen() {
 
                 {/* Form Card */}
                 <View style={styles.formCard}>
-                    <Text style={styles.inputLabel}>LAMBAR BVN (Lamba 11)</Text>
+                    <Text style={styles.inputLabel}>ENTER BVN NUMBER (11 Digits)</Text>
                     <View style={styles.inputRow}>
                         <Ionicons name="finger-print-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Lambar BVN mai lamba 11"
+                            placeholder="Enter 11-digit BVN"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
@@ -179,12 +179,12 @@ export default function BVNModificationScreen() {
                         />
                     </View>
 
-                    <Text style={[styles.inputLabel, { marginTop: 12 }]}>NIN NUMBER (Zabi ne)</Text>
+                    <Text style={[styles.inputLabel, { marginTop: 12 }]}>NIN NUMBER (Optional)</Text>
                     <View style={styles.inputRow}>
                         <Ionicons name="card-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Lambar NIN mai lamba 11"
+                            placeholder="Enter 11-digit NIN"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
@@ -195,12 +195,12 @@ export default function BVNModificationScreen() {
 
                     {(selectedCode === '620' || selectedCode === '623' || selectedCode === '624' || selectedCode === '626') && (
                         <>
-                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>SABUWAR RANAR HAIHUWA (DD-MM-YYYY)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>NEW DATE OF BIRTH (DD-MM-YYYY)</Text>
                             <View style={styles.inputRow}>
                                 <Ionicons name="calendar-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Misali: 15-08-1995"
+                                    placeholder="Example: 15-08-1995"
                                     placeholderTextColor="#94a3b8"
                                     value={dob}
                                     onChangeText={setDob}
@@ -211,12 +211,12 @@ export default function BVNModificationScreen() {
 
                     {(selectedCode === '625' || selectedCode === '622' || selectedCode === '624' || selectedCode === '626') && (
                         <>
-                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>SABUWAR LAMBAR WAYA (New Phone)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>NEW PHONE NUMBER (11 Digits)</Text>
                             <View style={styles.inputRow}>
                                 <Ionicons name="call-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Misali: 08012345678"
+                                    placeholder="Example: 08012345678"
                                     placeholderTextColor="#94a3b8"
                                     keyboardType="numeric"
                                     maxLength={11}
@@ -229,11 +229,11 @@ export default function BVNModificationScreen() {
 
                     {(selectedCode === '621' || selectedCode === '622' || selectedCode === '623' || selectedCode === '626') && (
                         <>
-                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>TSOHON SUNA (Old Full Name)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>OLD FULL NAME</Text>
                             <View style={styles.inputRow}>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Tsohon First Name"
+                                    placeholder="Old First Name"
                                     placeholderTextColor="#94a3b8"
                                     value={oldFirstName}
                                     onChangeText={setOldFirstName}
@@ -242,18 +242,18 @@ export default function BVNModificationScreen() {
                             <View style={[styles.inputRow, { marginTop: 8 }]}>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Tsohon Surname"
+                                    placeholder="Old Surname"
                                     placeholderTextColor="#94a3b8"
                                     value={oldLastName}
                                     onChangeText={setOldLastName}
                                 />
                             </View>
 
-                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>SABON SUNA (New Full Name)</Text>
+                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>NEW FULL NAME</Text>
                             <View style={styles.inputRow}>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Sabon First Name"
+                                    placeholder="New First Name"
                                     placeholderTextColor="#94a3b8"
                                     value={newFirstName}
                                     onChangeText={setNewFirstName}
@@ -262,7 +262,7 @@ export default function BVNModificationScreen() {
                             <View style={[styles.inputRow, { marginTop: 8 }]}>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Sabon Surname"
+                                    placeholder="New Surname"
                                     placeholderTextColor="#94a3b8"
                                     value={newLastName}
                                     onChangeText={setNewLastName}
@@ -272,7 +272,7 @@ export default function BVNModificationScreen() {
                     )}
 
                     <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Kudin Gyara ({currentOption.label}):</Text>
+                        <Text style={styles.costLabel}>Modification Fee ({currentOption.label}):</Text>
                         <Text style={styles.costVal}>₦{currentOption.price.toLocaleString()}</Text>
                     </View>
 
@@ -287,7 +287,7 @@ export default function BVNModificationScreen() {
                         ) : (
                             <>
                                 <Ionicons name="create" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                <Text style={styles.btnText}>Tura Buƙatar Gyara</Text>
+                                <Text style={styles.btnText}>Submit Modification Request</Text>
                             </>
                         )}
                     </TouchableOpacity>

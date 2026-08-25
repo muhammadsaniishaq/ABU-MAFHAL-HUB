@@ -189,12 +189,12 @@ export default function BVNHistoryScreen() {
 
     const handleClearHistory = async () => {
         Alert.alert(
-            "Share Tarihi",
-            "Kana da tabbacin kana son goge dukkan tarihin tantance BVN?",
+            "Clear History",
+            "Are you sure you want to clear all BVN verification history?",
             [
-                { text: "A'a", style: "cancel" },
+                { text: "Cancel", style: "cancel" },
                 {
-                    text: "I, Goge",
+                    text: "Yes, Clear",
                     style: "destructive",
                     onPress: async () => {
                         await AsyncStorage.removeItem('recent_bvn_verifications');
@@ -221,7 +221,7 @@ export default function BVNHistoryScreen() {
                     {history.length > 0 && (
                         <TouchableOpacity onPress={handleClearHistory} style={styles.clearBtn}>
                             <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                            <Text style={styles.clearBtnText}>Share</Text>
+                            <Text style={styles.clearBtnText}>Clear</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -233,7 +233,7 @@ export default function BVNHistoryScreen() {
                     <Ionicons name="search" size={18} color="#64748b" style={{ marginRight: 8 }} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Nemi da Suna ko Lambar BVN..."
+                        placeholder="Search by Name or BVN Number..."
                         placeholderTextColor="#94a3b8"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -252,8 +252,8 @@ export default function BVNHistoryScreen() {
                 ) : filtered.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Ionicons name="folder-open-outline" size={48} color="#cbd5e1" />
-                        <Text style={styles.emptyTitle}>Babu Tarihin Tantancewa</Text>
-                        <Text style={styles.emptyDesc}>Duk BVN da ka tantance zai fito a nan don sake dubawa ko bugawa kyauta.</Text>
+                        <Text style={styles.emptyTitle}>No Verification History</Text>
+                        <Text style={styles.emptyDesc}>All verified BVN records will appear here for review and free reprinting.</Text>
                     </View>
                 ) : (
                     filtered.map((item) => (
@@ -287,7 +287,7 @@ export default function BVNHistoryScreen() {
                                     ) : (
                                         <>
                                             <Ionicons name="print-outline" size={14} color="#059669" />
-                                            <Text style={styles.reprintText}>Buga Slip</Text>
+                                            <Text style={styles.reprintText}>Print Slip</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>

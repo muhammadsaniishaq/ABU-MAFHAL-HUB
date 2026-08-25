@@ -138,7 +138,7 @@ export default function BVNServicesGatewayScreen() {
                     <View style={styles.walletLeft}>
                         <Ionicons name="wallet-outline" size={18} color="#060d21" />
                         <View style={{ marginLeft: 8 }}>
-                            <Text style={styles.walletLabel}>Tantancewa Balance</Text>
+                            <Text style={styles.walletLabel}>Available Balance</Text>
                             <Text style={styles.walletVal}>
                                 {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
                             </Text>

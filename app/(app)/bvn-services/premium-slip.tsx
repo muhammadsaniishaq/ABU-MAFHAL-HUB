@@ -42,12 +42,12 @@ export default function BVNPremiumSlipScreen() {
     const handleGenerateSlip = async () => {
         const cleanBvn = bvn.trim().replace(/\D/g, '');
         if (!cleanBvn || cleanBvn.length !== 11) {
-            showAlert("Error", "Da fatan a shigar da lambar BVN mai lamba 11.");
+            showAlert("Invalid BVN", "Please enter a valid 11-digit BVN number.");
             return;
         }
 
         if (userBalance !== null && userBalance < 150) {
-            showAlert("Kuɗi Bai Isa Ba", "Asusunka ba shi da isassun kuɗi (₦150) don fitar da BVN Premium Slip.");
+            showAlert("Insufficient Balance", "Your account balance is insufficient (₦150 required) to generate BVN Premium Slip.");
             return;
         }
 
@@ -60,7 +60,7 @@ export default function BVNPremiumSlipScreen() {
                 const pdfBase64 = res.data?.pdf_base64 || res.data?.data?.pdf_base64;
                 if (pdfBase64) {
                     setGeneratedPdf(pdfBase64);
-                    showAlert("An Fitar da Slip", "An samu nasarar fitar da BVN Premium Slip!", "success");
+                    showAlert("Slip Generated", "BVN Premium Slip generated successfully!", "success");
                     
                     // Save history
                     await verificationHistory.save({
@@ -72,13 +72,13 @@ export default function BVNPremiumSlipScreen() {
                     });
                     fetchWalletBalance();
                 } else {
-                    showAlert("Fitar da Slip Ya Faskara", res.message || "Uwar garke ba ta dawo da PDF ba.");
+                    showAlert("Generation Failed", res.message || "The server did not return a valid PDF.");
                 }
             } else {
-                showAlert("Tantancewa Ta Faskara", res.message || "Ba a samu bayanan BVN ba.");
+                showAlert("Verification Failed", res.message || "BVN record not found.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen haɗawa da uwar garke.");
+            showAlert("Error", e.message || "An error occurred while connecting to server.");
         } finally {
             setLoading(false);
         }
@@ -139,12 +139,12 @@ export default function BVNPremiumSlipScreen() {
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
                 <View style={styles.formCard}>
-                    <Text style={styles.inputLabel}>SHIGAR DA LAMBAR BVN (Lamba 11)</Text>
+                    <Text style={styles.inputLabel}>ENTER BVN NUMBER (11 Digits)</Text>
                     <View style={styles.inputRow}>
                         <Ionicons name="document-text" size={20} color="#64748b" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Misali: 22824107008"
+                            placeholder="Example: 22824107008"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
@@ -154,7 +154,7 @@ export default function BVNPremiumSlipScreen() {
                     </View>
 
                     <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Kudin Sabis:</Text>
+                        <Text style={styles.costLabel}>Service Fee:</Text>
                         <Text style={styles.costVal}>₦150</Text>
                     </View>
 
@@ -179,10 +179,10 @@ export default function BVNPremiumSlipScreen() {
                     <View style={styles.successCard}>
                         <Ionicons name="checkmark-circle" size={48} color="#059669" />
                         <Text style={styles.successTitle}>BVN Slip Ready!</Text>
-                        <Text style={styles.successDesc}>An yi nasarar fitar da cikakken katin BVN na hukuma.</Text>
+                        <Text style={styles.successDesc}>Official BVN Slip has been successfully generated.</Text>
                         <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadPdf} activeOpacity={0.8}>
                             <Ionicons name="download" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                            <Text style={styles.downloadBtnText}>Sauke PDF Slip Yanzu</Text>
+                            <Text style={styles.downloadBtnText}>Download PDF Slip Now</Text>
                         </TouchableOpacity>
                     </View>
                 )}

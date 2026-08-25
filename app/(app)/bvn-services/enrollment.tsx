@@ -49,7 +49,7 @@ export default function BVNEnrollmentScreen() {
 
     const handleEnroll = async () => {
         if (!firstName.trim() || !lastName.trim() || !phone.trim() || !bankName.trim() || !accountNumber.trim()) {
-            showAlert("Error", "Da fatan a cika dukkan bayanan da ake buƙata (Suna, Waya, Banki, Account Number).");
+            showAlert("Required Fields", "Please fill in all required fields (First Name, Last Name, Phone, Bank, Account Number).");
             return;
         }
 
@@ -80,7 +80,7 @@ export default function BVNEnrollmentScreen() {
 
             if (res && res.isValid) {
                 setResult(res.data || { status: 'SUBMITTED' });
-                showAlert("Nasarar Rajista", "An tura bayanan sabon mai BVN cikin nasara!", "success");
+                showAlert("Enrollment Submitted", "BVN account holder details submitted successfully!", "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -91,10 +91,10 @@ export default function BVNEnrollmentScreen() {
                 });
                 fetchWalletBalance();
             } else {
-                showAlert("Rajista Ta Faskara", res?.message || "Ba a samu nasarar tura bayanan rajista ba.");
+                showAlert("Enrollment Failed", res?.message || "Unable to submit enrollment details.");
             }
         } catch (e: any) {
-            showAlert("Kuskure", e.message || "An samu matsala wajen haɗawa da uwar garke.");
+            showAlert("Error", e.message || "An error occurred while connecting to server.");
         } finally {
             setLoading(false);
         }
@@ -145,7 +145,7 @@ export default function BVNEnrollmentScreen() {
 
                     <Text style={[styles.inputLabel, { marginTop: 10 }]}>BANK NAME</Text>
                     <View style={styles.inputRow}>
-                        <TextInput style={styles.input} placeholder="Misali: First Bank, GTBank, OPay" placeholderTextColor="#94a3b8" value={bankName} onChangeText={setBankName} />
+                        <TextInput style={styles.input} placeholder="Example: First Bank, GTBank, Access Bank" placeholderTextColor="#94a3b8" value={bankName} onChangeText={setBankName} />
                     </View>
 
                     <Text style={[styles.inputLabel, { marginTop: 10 }]}>ACCOUNT NUMBER</Text>
@@ -169,7 +169,7 @@ export default function BVNEnrollmentScreen() {
                         ) : (
                             <>
                                 <Ionicons name="person-add" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                <Text style={styles.btnText}>Tura Bayanan Rajista</Text>
+                                <Text style={styles.btnText}>Submit Enrollment Details</Text>
                             </>
                         )}
                     </TouchableOpacity>
