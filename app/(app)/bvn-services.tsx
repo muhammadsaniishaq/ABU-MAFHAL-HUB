@@ -25,13 +25,14 @@ const getSafeImageUrl = (url: string) => {
 };
 
 const DEFAULT_PRICES = {
-    bvn_num_basic: 200,
-    bvn_num_advanced: 250,
-    bvn_phone_basic: 250,
-    bvn_phone_advanced: 300,
-    bvn_card: 250,
+    bvn_verification: 150,
+    bvn_phone: 900,
     bvn_vnin_nibss: 2500,
-    bvn_modification: 5500
+    bvn_mod_dob: 5000,
+    bvn_mod_name: 5000,
+    bvn_mod_phone: 5000,
+    bvn_mod_combo: 7000,
+    bvn_mod_all: 9000,
 };
 
 export default function BVNVerificationScreen() {
@@ -40,17 +41,14 @@ export default function BVNVerificationScreen() {
     const viewShotRef = useRef<any>(null);
     const [isSaving, setIsSaving] = useState(false);
     
-    // Step 1: SEARCH TYPE - 'number' | 'phone' | 'card' | 'vnin_nibss' | 'modification'
-    const [searchType, setSearchType] = useState<'number' | 'phone' | 'card' | 'vnin_nibss' | 'modification'>('number');
+    // Official AgentHub Services: 'verification' | 'phone' | 'vnin_nibss' | 'modification'
+    const [searchType, setSearchType] = useState<'verification' | 'phone' | 'vnin_nibss' | 'modification'>('verification');
     
-    // Step 2: DETAILS NEEDED - 'basic' | 'advanced'
-    const [detailsNeeded, setDetailsNeeded] = useState<'basic' | 'advanced'>('advanced');
-    
-    // Step 3: SUPPLY INPUT NUMBER / FIELDS
+    // Input Fields
     const [inputValue, setInputValue] = useState('');
     const [vninValue, setVninValue] = useState('');
     const [bvnValue, setBvnValue] = useState('');
-    const [modCode, setModCode] = useState<'601' | '602' | '603'>('601');
+    const [modCode, setModCode] = useState<'620' | '621' | '622' | '623' | '624' | '625' | '626'>('620');
     const [newPhone, setNewPhone] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -162,28 +160,25 @@ export default function BVNVerificationScreen() {
 
     const getSelectedPrice = () => {
         if (searchType === 'vnin_nibss') {
-            return prices.bvn_vnin_nibss;
-        }
-        if (searchType === 'modification') {
-            return prices.bvn_modification;
-        }
-        if (searchType === 'card') {
-            return prices.bvn_card;
+            return prices.bvn_vnin_nibss || 2500;
         }
         if (searchType === 'phone') {
-            return detailsNeeded === 'basic' ? prices.bvn_phone_basic : prices.bvn_phone_advanced;
+            return prices.bvn_phone || 900;
         }
-        return detailsNeeded === 'basic' ? prices.bvn_num_basic : prices.bvn_num_advanced;
+        if (searchType === 'modification') {
+            if (['620', '621', '625'].includes(modCode)) return prices.bvn_mod_dob || 5000;
+            if (['622', '623', '624'].includes(modCode)) return prices.bvn_mod_combo || 7000;
+            if (modCode === '626') return prices.bvn_mod_all || 9000;
+            return 5000;
+        }
+        return prices.bvn_verification || 150;
     };
 
     const getSelectedPriceId = () => {
         if (searchType === 'vnin_nibss') return 'bvn_vnin_nibss';
-        if (searchType === 'modification') return 'bvn_modification';
-        if (searchType === 'card') return 'bvn_card';
-        if (searchType === 'phone') {
-            return detailsNeeded === 'basic' ? 'bvn_phone_basic' : 'bvn_phone_advanced';
-        }
-        return detailsNeeded === 'basic' ? 'bvn_num_basic' : 'bvn_num_advanced';
+        if (searchType === 'phone') return 'bvn_phone';
+        if (searchType === 'modification') return `bvn_mod_${modCode}`;
+        return 'bvn_verification';
     };
 
     const saveHistoryItem = async (verifiedData: any) => {
@@ -203,12 +198,10 @@ export default function BVNVerificationScreen() {
                 slip: searchType === 'vnin_nibss'
                     ? 'VNIN to NIBSS Linking'
                     : searchType === 'modification'
-                        ? 'BVN Modification Request'
-                        : searchType === 'card' 
-                            ? 'BVN Card Verification' 
-                            : searchType === 'phone'
-                                ? `Phone BVN ${detailsNeeded === 'basic' ? 'Basic' : 'Advanced'} Verification`
-                                : `BVN ${detailsNeeded === 'basic' ? 'Basic' : 'Advanced'} Verification`,
+                        ? `BVN Modification (${modCode})`
+                        : searchType === 'phone'
+                            ? 'BVN Retrieval (Phone)'
+                            : 'BVN Verification & Premium Slip',
                 amount,
                 date: (() => {
                     const d = new Date();
@@ -242,7 +235,7 @@ export default function BVNVerificationScreen() {
     useEffect(() => {
         fetchPrices();
         fetchWalletBalance();
-    }, [searchType, detailsNeeded]);
+    }, [searchType, modCode]);
 
     const handleVerify = async () => {
         const cleanVal = inputValue.trim();
@@ -286,8 +279,6 @@ export default function BVNVerificationScreen() {
                 }, priceId);
             } else if (searchType === 'phone') {
                 res = await api.identity.retrieveBVN(cleanVal, priceId);
-            } else if (searchType === 'card') {
-                res = await api.identity.getBVNCard(cleanVal, priceId);
             } else {
                 res = await api.identity.validateBVN(cleanVal, priceId);
             }
@@ -803,23 +794,9 @@ export default function BVNVerificationScreen() {
 </html>
             `;
             
-            let finalHtml = html;
-            let printWidth = 595;
-            let printHeight = 842;
-            
-            if (searchType === 'card') {
-                finalHtml = html;
-                printWidth = 595;
-                printHeight = 842;
-            } else if (detailsNeeded === 'advanced') {
-                finalHtml = advancedHtml;
-                printWidth = 842;
-                printHeight = 595;
-            } else {
-                finalHtml = basicHtml;
-                printWidth = 842;
-                printHeight = 595;
-            }
+            const finalHtml = advancedHtml || html;
+            const printWidth = 842;
+            const printHeight = 595;
 
             if (Platform.OS === 'web') {
                 const printWin = window.open('', '_blank');
@@ -1112,27 +1089,27 @@ export default function BVNVerificationScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* 1. SEARCH TYPE */}
+                {/* 1. SELECT BVN SERVICE */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>1</Text>
                         </View>
-                        <Text style={styles.cardTitle}>SEARCH TYPE</Text>
+                        <Text style={styles.cardTitle}>SELECT BVN SERVICE</Text>
                     </View>
 
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
                         <TouchableOpacity 
-                            onPress={() => setSearchType('number')}
+                            onPress={() => setSearchType('verification')}
                             style={[
                                 styles.choiceCellHorizontal,
-                                searchType === 'number' ? styles.choiceSelected : styles.choiceUnselected
+                                searchType === 'verification' ? styles.choiceSelected : styles.choiceUnselected
                             ]}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="finger-print" size={16} color={searchType === 'number' ? '#060d21' : '#64748b'} />
-                            <Text style={[styles.choiceLabelHorizontal, searchType === 'number' ? styles.textSelected : styles.textUnselected]}>
-                                BVN Number Verification
+                            <Ionicons name="shield-checkmark-outline" size={16} color={searchType === 'verification' ? '#060d21' : '#64748b'} />
+                            <Text style={[styles.choiceLabelHorizontal, searchType === 'verification' ? styles.textSelected : styles.textUnselected]}>
+                                BVN Verification & Slip (₦{(prices.bvn_verification || 150).toFixed(2)})
                             </Text>
                         </TouchableOpacity>
 
@@ -1146,21 +1123,7 @@ export default function BVNVerificationScreen() {
                         >
                             <Ionicons name="call-outline" size={16} color={searchType === 'phone' ? '#060d21' : '#64748b'} />
                             <Text style={[styles.choiceLabelHorizontal, searchType === 'phone' ? styles.textSelected : styles.textUnselected]}>
-                                Phone Number
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            onPress={() => setSearchType('card')}
-                            style={[
-                                styles.choiceCellHorizontal,
-                                searchType === 'card' ? styles.choiceSelected : styles.choiceUnselected
-                            ]}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="card-outline" size={16} color={searchType === 'card' ? '#060d21' : '#64748b'} />
-                            <Text style={[styles.choiceLabelHorizontal, searchType === 'card' ? styles.textSelected : styles.textUnselected]}>
-                                BVN Card Verification
+                                BVN Retrieval: Phone (₦{(prices.bvn_phone || 900).toFixed(2)})
                             </Text>
                         </TouchableOpacity>
 
@@ -1174,7 +1137,7 @@ export default function BVNVerificationScreen() {
                         >
                             <Ionicons name="link-outline" size={16} color={searchType === 'vnin_nibss' ? '#060d21' : '#64748b'} />
                             <Text style={[styles.choiceLabelHorizontal, searchType === 'vnin_nibss' ? styles.textSelected : styles.textUnselected]}>
-                                VNIN to NIBSS
+                                VNIN to NIBSS (₦{(prices.bvn_vnin_nibss || 2500).toFixed(2)})
                             </Text>
                         </TouchableOpacity>
 
@@ -1188,71 +1151,81 @@ export default function BVNVerificationScreen() {
                         >
                             <Ionicons name="create-outline" size={16} color={searchType === 'modification' ? '#060d21' : '#64748b'} />
                             <Text style={[styles.choiceLabelHorizontal, searchType === 'modification' ? styles.textSelected : styles.textUnselected]}>
-                                BVN Modification
+                                BVN Modification (From ₦5,000)
                             </Text>
                         </TouchableOpacity>
                     </ScrollView>
                 </View>
 
-                {/* 2. DETAILS NEEDED / SLIP LAYOUT */}
+                {/* 2. SERVICE OPTIONS / MODIFICATION TYPE */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.stepBadge}>
                             <Text style={styles.stepBadgeText}>2</Text>
                         </View>
-                        <Text style={styles.cardTitle}>{searchType === 'card' ? 'SLIP LAYOUT' : 'DETAILS NEEDED'}</Text>
+                        <Text style={styles.cardTitle}>
+                            {searchType === 'modification' ? 'SELECT MODIFICATION TYPE' : 'SERVICE FEE & DETAILS'}
+                        </Text>
                     </View>
 
-                    {searchType === 'card' ? (
-                        <View style={[styles.choiceGrid, { justifyContent: 'center' }]}>
-                            <TouchableOpacity 
-                                style={[styles.choiceCell, styles.choiceSelected, { width: '50%', minHeight: 130 }]}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.choicePrice, styles.textSelected]}>
-                                    ₦{prices.bvn_card.toFixed(2)}
-                                </Text>
-                                <View style={styles.slipImageBox}>
-                                    <Image source={require('../../assets/images/sample_image.jpg')} style={styles.slipPreviewImage as any} resizeMode="contain" />
-                                </View>
-                                <Text style={[styles.choiceLabel, styles.textSelected]}>
-                                    BVN Card
-                                </Text>
-                            </TouchableOpacity>
+                    {searchType === 'modification' ? (
+                        <View>
+                            <Text style={{ fontSize: 11, color: '#64748b', marginBottom: 10, fontWeight: '600' }}>
+                                Choose the exact modification package supported on AgentHub:
+                            </Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingBottom: 6 }}>
+                                {[
+                                    { code: '620', label: 'DOB (620)', price: 5000 },
+                                    { code: '621', label: 'Name (621)', price: 5000 },
+                                    { code: '625', label: 'Phone (625)', price: 5000 },
+                                    { code: '622', label: 'Name & Phone (622)', price: 7000 },
+                                    { code: '623', label: 'Name & DOB (623)', price: 7000 },
+                                    { code: '624', label: 'DOB & Phone (624)', price: 7000 },
+                                    { code: '626', label: 'Phone, DOB & Name (626)', price: 9000 },
+                                ].map((item) => (
+                                    <TouchableOpacity
+                                        key={item.code}
+                                        onPress={() => setModCode(item.code as any)}
+                                        style={[
+                                            styles.choiceCellHorizontal,
+                                            modCode === item.code ? styles.choiceSelected : styles.choiceUnselected,
+                                            { paddingVertical: 10, paddingHorizontal: 14 }
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.choiceLabelHorizontal, modCode === item.code ? styles.textSelected : styles.textUnselected, { fontWeight: '700' }]}>
+                                            {item.label}
+                                        </Text>
+                                        <Text style={{ fontSize: 10, color: modCode === item.code ? '#d97706' : '#94a3b8', fontWeight: '800', marginTop: 2 }}>
+                                            ₦{item.price.toLocaleString()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
                         </View>
                     ) : (
-                        <View style={styles.choiceGrid}>
-                            <TouchableOpacity 
-                                onPress={() => setDetailsNeeded('basic')}
-                                style={[
-                                    styles.choiceCell,
-                                    detailsNeeded === 'basic' ? styles.choiceSelected : styles.choiceUnselected
-                                ]}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.choicePrice, detailsNeeded === 'basic' ? styles.textSelected : styles.textUnselected]}>
-                                    ₦{(searchType === 'phone' ? prices.bvn_phone_basic : prices.bvn_num_basic).toFixed(2)}
+                        <View style={{ backgroundColor: '#f8fafc', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1e293b' }}>
+                                    {searchType === 'verification' 
+                                        ? 'BVN Verification + Premium PDF Slip'
+                                        : searchType === 'phone'
+                                            ? 'BVN Retrieval by Phone (Code 630)'
+                                            : 'VNIN to NIBSS Linking'}
                                 </Text>
-                                <Text style={[styles.choiceLabel, detailsNeeded === 'basic' ? styles.textSelected : styles.textUnselected]}>
-                                    Basic Details
+                                <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                    {searchType === 'verification'
+                                        ? 'Instant verification with downloadable electronic slip'
+                                        : searchType === 'phone'
+                                            ? 'Direct retrieval via registered phone number'
+                                            : 'Official NIBSS verification and linking'}
                                 </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity 
-                                onPress={() => setDetailsNeeded('advanced')}
-                                style={[
-                                    styles.choiceCell,
-                                    detailsNeeded === 'advanced' ? styles.choiceSelected : styles.choiceUnselected
-                                ]}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.choicePrice, detailsNeeded === 'advanced' ? styles.textSelected : styles.textUnselected]}>
-                                    ₦{(searchType === 'phone' ? prices.bvn_phone_advanced : prices.bvn_num_advanced).toFixed(2)}
+                            </View>
+                            <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#fde68a', marginLeft: 12 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '900', color: '#92400e' }}>
+                                    ₦{getSelectedPrice().toFixed(2)}
                                 </Text>
-                                <Text style={[styles.choiceLabel, detailsNeeded === 'advanced' ? styles.textSelected : styles.textUnselected]}>
-                                    Advanced Details
-                                </Text>
-                            </TouchableOpacity>
+                            </View>
                         </View>
                     )}
                 </View>
@@ -1265,17 +1238,17 @@ export default function BVNVerificationScreen() {
                         </View>
                         <Text style={styles.cardTitle}>
                             {searchType === 'phone' 
-                                ? 'SUPPLY PHONE NUMBER' 
+                                ? 'SUPPLY PHONE NUMBER & NAME' 
                                 : searchType === 'vnin_nibss'
-                                    ? 'VNIN TO NIBSS LINKING'
+                                    ? 'VNIN & BVN DETAILS'
                                     : searchType === 'modification'
-                                        ? 'BVN MODIFICATION DETAILS'
+                                        ? 'MODIFICATION DETAILS'
                                         : 'SUPPLY BVN NUMBER'}
                         </Text>
                     </View>
 
                     {/* Blue Info Dial Box */}
-                    {(searchType === 'number' || searchType === 'card') && (
+                    {searchType === 'verification' && (
                         <View style={styles.infoDialBox}>
                             <Ionicons name="information-circle" size={16} color="#0284c7" style={{ marginRight: 8, marginTop: 1 }} />
                             <Text style={styles.infoDialText}>
@@ -1303,10 +1276,10 @@ export default function BVNVerificationScreen() {
                             </View>
 
                             <View style={{ marginBottom: 12 }}>
-                                <Text style={styles.labelHeader}>BVN Number (Optional)</Text>
+                                <Text style={styles.labelHeader}>BVN Number (11 Digits)</Text>
                                 <View style={styles.inputContainer}>
                                     <TextInput
-                                        placeholder="Enter 11-digit BVN (Optional)"
+                                        placeholder="Enter 11-digit BVN"
                                         placeholderTextColor="#cbd5e1"
                                         style={styles.inputStyleCentered}
                                         value={bvnValue}
@@ -1320,31 +1293,8 @@ export default function BVNVerificationScreen() {
                         </View>
                     ) : searchType === 'modification' ? (
                         <View style={{ marginBottom: 12 }}>
-                            {/* Modification Type Picker */}
-                            <Text style={[styles.labelHeader, { marginBottom: 8 }]}>Modification Type</Text>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-                                <TouchableOpacity
-                                    onPress={() => setModCode('601')}
-                                    style={[styles.choiceCellHorizontal, modCode === '601' ? styles.choiceSelected : styles.choiceUnselected]}
-                                >
-                                    <Text style={[styles.choiceLabelHorizontal, modCode === '601' ? styles.textSelected : styles.textUnselected]}>Name (601)</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => setModCode('602')}
-                                    style={[styles.choiceCellHorizontal, modCode === '602' ? styles.choiceSelected : styles.choiceUnselected]}
-                                >
-                                    <Text style={[styles.choiceLabelHorizontal, modCode === '602' ? styles.textSelected : styles.textUnselected]}>Phone (602)</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => setModCode('603')}
-                                    style={[styles.choiceCellHorizontal, modCode === '603' ? styles.choiceSelected : styles.choiceUnselected]}
-                                >
-                                    <Text style={[styles.choiceLabelHorizontal, modCode === '603' ? styles.textSelected : styles.textUnselected]}>Address (603)</Text>
-                                </TouchableOpacity>
-                            </View>
-
                             <View style={{ marginBottom: 12 }}>
-                                <Text style={styles.labelHeader}>BVN Number (11 Digits)</Text>
+                                <Text style={styles.labelHeader}>Target BVN Number (11 Digits)</Text>
                                 <View style={styles.inputContainer}>
                                     <TextInput
                                         placeholder="Enter 11-digit BVN"
@@ -1359,23 +1309,29 @@ export default function BVNVerificationScreen() {
                                 </View>
                             </View>
 
-                            <View style={{ marginBottom: 12 }}>
-                                <Text style={styles.labelHeader}>Phone Number</Text>
-                                <View style={styles.inputContainer}>
-                                    <TextInput
-                                        placeholder="08012345678"
-                                        placeholderTextColor="#cbd5e1"
-                                        style={styles.inputStyleCentered}
-                                        value={newPhone}
-                                        onChangeText={setNewPhone}
-                                        keyboardType="phone-pad"
-                                        maxLength={11}
-                                        editable={!loading}
-                                    />
+                            {/* Phone number field */}
+                            {['620', '621', '622', '623', '624', '625', '626'].includes(modCode) && (
+                                <View style={{ marginBottom: 12 }}>
+                                    <Text style={styles.labelHeader}>
+                                        {['622', '624', '625', '626'].includes(modCode) ? 'New Phone Number' : 'Current Phone Number'}
+                                    </Text>
+                                    <View style={styles.inputContainer}>
+                                        <TextInput
+                                            placeholder="08012345678"
+                                            placeholderTextColor="#cbd5e1"
+                                            style={styles.inputStyleCentered}
+                                            value={newPhone}
+                                            onChangeText={setNewPhone}
+                                            keyboardType="phone-pad"
+                                            maxLength={11}
+                                            editable={!loading}
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+                            )}
 
-                            {modCode === '601' && (
+                            {/* Name fields */}
+                            {['621', '622', '623', '626'].includes(modCode) && (
                                 <>
                                     <View style={{ marginBottom: 12 }}>
                                         <Text style={styles.labelHeader}>New First Name</Text>
@@ -1406,23 +1362,71 @@ export default function BVNVerificationScreen() {
                                     </View>
                                 </>
                             )}
+
+                            {/* DOB field */}
+                            {['620', '623', '624', '626'].includes(modCode) && (
+                                <View style={{ marginBottom: 12 }}>
+                                    <Text style={styles.labelHeader}>New Date of Birth (YYYY-MM-DD)</Text>
+                                    <View style={styles.inputContainer}>
+                                        <TextInput
+                                            placeholder="1990-01-01"
+                                            placeholderTextColor="#cbd5e1"
+                                            style={styles.inputStyleCentered}
+                                            value={dobValue}
+                                            onChangeText={setDobValue}
+                                            editable={!loading}
+                                        />
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    ) : searchType === 'phone' ? (
+                        <View style={{ marginBottom: 12 }}>
+                            <View style={{ marginBottom: 12 }}>
+                                <Text style={styles.labelHeader}>Phone Number (Linked to BVN)</Text>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        placeholder="08012345678"
+                                        placeholderTextColor="#cbd5e1"
+                                        style={styles.inputStyleCentered}
+                                        value={inputValue} 
+                                        onChangeText={setInputValue} 
+                                        keyboardType="number-pad"
+                                        maxLength={11}
+                                        editable={!loading}
+                                    />
+                                </View>
+                            </View>
+                            <View style={{ marginBottom: 12 }}>
+                                <Text style={styles.labelHeader}>Full Name of Account Holder</Text>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        placeholder="Enter Owner Full Name"
+                                        placeholderTextColor="#cbd5e1"
+                                        style={styles.inputStyleCentered}
+                                        value={firstName} 
+                                        onChangeText={setFirstName} 
+                                        editable={!loading}
+                                    />
+                                </View>
+                            </View>
                         </View>
                     ) : (
-                        <View style={{ marginBottom: 12, marginTop: searchType === 'phone' ? 0 : 12 }}>
+                        <View style={{ marginBottom: 12, marginTop: 12 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                 <Ionicons 
-                                    name={searchType === 'phone' ? 'call-outline' : 'finger-print-outline'} 
+                                    name="finger-print-outline" 
                                     size={14} 
                                     color="#64748b" 
                                     style={{ marginRight: 6 }} 
                                 />
                                 <Text style={styles.labelHeader}>
-                                    {searchType === 'phone' ? 'Phone Number' : 'BVN Number'}
+                                    BVN Number (11 Digits)
                                 </Text>
                             </View>
                             <View style={styles.inputContainer}>
                                 <TextInput
-                                    placeholder={searchType === 'phone' ? '08012345678' : '22000000000'}
+                                    placeholder="22000000000"
                                     placeholderTextColor="#cbd5e1"
                                     style={styles.inputStyleCentered}
                                     value={inputValue} 
@@ -1433,9 +1437,7 @@ export default function BVNVerificationScreen() {
                                 />
                             </View>
                             <Text style={styles.inputHelperText}>
-                                {searchType === 'phone' 
-                                    ? 'Enter the 11-digit phone number linked to the BVN.'
-                                    : "We'll never share your details with anyone else."}
+                                We'll never share your details with anyone else.
                             </Text>
                         </View>
                     )}
