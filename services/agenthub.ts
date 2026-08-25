@@ -521,9 +521,9 @@ export const AgentHubIdentityVerifier = {
   getBVNCard: async (bvn: string, priceId?: string) =>
     AgentHubIdentityVerifier.invokeEdge('bvn-card', bvn, { priceId }),
 
-  /** Retrieve BVN by phone number */
-  retrieveBVN: async (phone: string, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('bvn-phone', phone, { priceId }),
+  /** Retrieve BVN by phone number or CRM */
+  retrieveBVN: async (phone: string, priceId?: string, extra?: any) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-phone', phone, { priceId, ...(extra || {}) }),
 
   /**
    * Generate a printable NIN Slip V2 PDF (PREMIUM, STANDARD, REGULAR)

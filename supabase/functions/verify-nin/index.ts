@@ -586,8 +586,13 @@ serve(async (req: Request) => {
         if (!responseData) {
             console.error(`AgentHub API returned unparsable response:`, lastErrorText.substring(0, 500));
             await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider unreachable`);
-            const cleanText = lastErrorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120);
-            return jsonOk({ error: `Verification provider error: ${cleanText || 'Service temporarily unavailable. Please try again later.'}` });
+            let cleanText = lastErrorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (cleanText.includes('404') || cleanText.includes('could not be found') || cleanText.includes('Page Not Found')) {
+                cleanText = 'Ba a samu bayanan BVN ba / Record not found on provider.';
+            } else {
+                cleanText = cleanText.substring(0, 120);
+            }
+            return jsonOk({ error: cleanText || 'Service temporarily unavailable. Please try again later.' });
         }
 
         // ── Deeply unwrap and normalize AgentHub response ───────────────────────
