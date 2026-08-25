@@ -756,6 +756,8 @@ export const api = {
         delinkAndRetrieve: (number: string, phone?: string, priceId?: string) => identityVerifier.delinkAndRetrieve?.(number, phone, priceId),
         /** Retrieve BVN by phone number or CRM */
         retrieveBVN: (number: string, priceId?: string, extra?: any) => identityVerifier.retrieveBVN?.(number, priceId, extra),
+        /** Check BVN retrieval request status */
+        checkBVNRetrievalStatus: (requestIdOrReference: string) => identityVerifier.checkBVNRetrievalStatus?.(requestIdOrReference),
 
         // ── User Details / Modifications / Slips ───────────────────────
         /** Retrieve NIN personalization/enrollment details */

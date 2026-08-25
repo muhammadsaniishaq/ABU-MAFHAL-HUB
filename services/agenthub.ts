@@ -205,7 +205,7 @@ export const AgentHubIdentityVerifier = {
       else if (slipType === 'REGULAR') serviceCode = '403';
       else if (slipType === 'INFO') serviceCode = '404';
 
-      const candidateList: { url: string; body: any }[] = [];
+      const candidateList: { url: string; body?: any; method?: 'GET' | 'POST' }[] = [];
 
       if (searchType === 'nin') {
         if (slipType === 'REGULAR') {
@@ -239,22 +239,48 @@ export const AgentHubIdentityVerifier = {
         candidateList.push({ url: 'https://agenthub.ng/api/v1/identity/bvn', body: { bvn: searchValue } });
       } else if (searchType === 'bvn-phone' || searchType === 'bvn-retrieval') {
         const ref = extra?.reference || `REF-RET-${Date.now()}`;
-        const sCode = extra?.service_code || '630';
-        const pNum = extra?.phone_number || searchValue;
+        const sCode = String(extra?.service_code || (extra?.ticket_id || extra?.agent_code ? '631' : '630'));
+        const pNum = extra?.phone_number || extra?.phone || searchValue;
         const fName = extra?.full_name || extra?.name || 'Account Holder';
 
-        candidateList.push({ 
-          url: 'https://agenthub.ng/api/bvn/retrieval', 
-          body: { service_code: sCode, reference: ref, phone_number: pNum, full_name: fName } 
-        });
-        candidateList.push({ 
-          url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
-          body: { service_code: sCode, reference: ref, phone_number: pNum, full_name: fName } 
-        });
-        candidateList.push({ 
-          url: 'https://agenthub.ng/api/bvn/retrieval', 
-          body: { phone: pNum, reference: ref } 
-        });
+        if (sCode === '631') {
+          candidateList.push({ 
+            url: 'https://agenthub.ng/api/bvn/retrieval', 
+            body: { 
+              service_code: '631', 
+              reference: ref, 
+              agent_code: extra?.agent_code || extra?.agentCode, 
+              ticket_id: extra?.ticket_id || extra?.ticketId, 
+              bms_ticket: extra?.bms_ticket || extra?.bmsTicket || '', 
+              screenshot: extra?.screenshot || extra?.screenshot_proof || extra?.image || '' 
+            } 
+          });
+          candidateList.push({ 
+            url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
+            body: { 
+              service_code: '631', 
+              reference: ref, 
+              agent_code: extra?.agent_code || extra?.agentCode, 
+              ticket_id: extra?.ticket_id || extra?.ticketId, 
+              bms_ticket: extra?.bms_ticket || extra?.bmsTicket || '', 
+              screenshot: extra?.screenshot || extra?.screenshot_proof || extra?.image || '' 
+            } 
+          });
+        } else {
+          candidateList.push({ 
+            url: 'https://agenthub.ng/api/bvn/retrieval', 
+            body: { service_code: '630', reference: ref, phone_number: pNum, full_name: fName } 
+          });
+          candidateList.push({ 
+            url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
+            body: { service_code: '630', reference: ref, phone_number: pNum, full_name: fName } 
+          });
+        }
+      } else if (searchType === 'bvn-retrieval-status') {
+        const qId = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
+        candidateList.push({ url: `https://agenthub.ng/api/bvn/retrieval/status?request_id=${qId}&reference=${qId}`, method: 'GET' });
+        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/retrieval/status?request_id=${qId}`, method: 'GET' });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/retrieval/status', body: { request_id: searchValue, reference: searchValue } });
       } else if (searchType === 'bvn-card' || searchType === 'card' || searchType === 'bvn-slip') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/premium-slip', body: { bvn: searchValue } });
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/verification', body: { bvn: searchValue } });
@@ -264,6 +290,11 @@ export const AgentHubIdentityVerifier = {
       } else if (searchType === 'vnin-to-nibss') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss', body: { reference: extra?.reference || `REF-VNIN-${Date.now()}`, ticket_id: extra?.ticket_id || `TICKET-${Date.now()}`, full_name: extra?.full_name || 'BVN Holder', nin: extra?.nin || searchValue, bvn: extra?.bvn || searchValue, vnin: searchValue || extra?.vnin } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/vnin-to-nibss', body: { vnin: searchValue || extra?.vnin, bvn: extra?.bvn } });
+      } else if (searchType === 'vnin-to-nibss-status') {
+        const qRef = encodeURIComponent(searchValue || extra?.reference || '');
+        candidateList.push({ url: `https://agenthub.ng/api/bvn/vnin-to-nibss/status?reference=${qRef}&request_id=${qRef}`, method: 'GET' });
+        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/vnin-to-nibss/status?reference=${qRef}`, method: 'GET' });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/vnin-to-nibss/status', body: { reference: searchValue } });
       } else if (searchType === 'bvn-modification') {
         candidateList.push({ 
           url: 'https://agenthub.ng/api/bvn/modification', 
@@ -283,9 +314,19 @@ export const AgentHubIdentityVerifier = {
           } 
         });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/modification', body: { bvn: searchValue || extra?.bvn } });
+      } else if (searchType === 'bvn-modification-status') {
+        const qMod = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
+        candidateList.push({ url: `https://agenthub.ng/api/bvn/modification/status?request_id=${qMod}&reference=${qMod}`, method: 'GET' });
+        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/modification/status?request_id=${qMod}`, method: 'GET' });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/modification/status', body: { request_id: searchValue, reference: searchValue } });
       } else if (searchType === 'bvn-enrollment') {
         candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment', body: { ...extra, reference: extra?.reference || `REF-ENROLL-${Date.now()}` } });
         candidateList.push({ url: 'https://agenthub.ng/api/v1/bvn/enrollment', body: { ...extra } });
+      } else if (searchType === 'bvn-enrollment-status') {
+        const qEnr = encodeURIComponent(searchValue || extra?.request_id || extra?.reference || '');
+        candidateList.push({ url: `https://agenthub.ng/api/bvn/enrollment/status?request_id=${qEnr}&reference=${qEnr}`, method: 'GET' });
+        candidateList.push({ url: `https://agenthub.ng/api/v1/bvn/enrollment/status?request_id=${qEnr}`, method: 'GET' });
+        candidateList.push({ url: 'https://agenthub.ng/api/bvn/enrollment/status', body: { request_id: searchValue, reference: searchValue } });
       } else {
         candidateList.push({ url: endpoint, body: payload });
       }
@@ -294,17 +335,22 @@ export const AgentHubIdentityVerifier = {
       let resData: any = null;
       let successfulData: any = null;
 
-      for (const item of candidateList) {
+      for (const item of candidateList as any[]) {
         try {
-          const res = await fetch(item.url, {
-            method: 'POST',
+          const isGet = (item.method || '').toUpperCase() === 'GET';
+          const fetchOptions: any = {
+            method: item.method || 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: JSON.stringify(item.body)
-          });
+          };
+          if (!isGet && item.body) {
+            fetchOptions.headers['Content-Type'] = 'application/json';
+            fetchOptions.body = JSON.stringify(item.body);
+          }
+
+          const res = await fetch(item.url, fetchOptions);
 
           const parsed = await res.json().catch(() => null);
           if (parsed) {
@@ -521,9 +567,19 @@ export const AgentHubIdentityVerifier = {
   getBVNCard: async (bvn: string, priceId?: string) =>
     AgentHubIdentityVerifier.invokeEdge('bvn-card', bvn, { priceId }),
 
-  /** Retrieve BVN by phone number or CRM */
-  retrieveBVN: async (phone: string, priceId?: string, extra?: any) =>
-    AgentHubIdentityVerifier.invokeEdge('bvn-phone', phone, { priceId, ...(extra || {}) }),
+  /** Retrieve BVN by phone number (Code 630) or CRM Ticket (Code 631) */
+  retrieveBVN: async (phoneOrIdentifier: string, priceId?: string, extra?: any) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-retrieval', phoneOrIdentifier, {
+      priceId: priceId || 'bvn_retrieval',
+      ...(extra || {})
+    }),
+
+  /** Check BVN Retrieval Status via AgentHub */
+  checkBVNRetrievalStatus: async (requestIdOrReference: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-retrieval-status', requestIdOrReference, {
+      request_id: requestIdOrReference,
+      reference: requestIdOrReference,
+    }),
 
   /**
    * Generate a printable NIN Slip V2 PDF (PREMIUM, STANDARD, REGULAR)
