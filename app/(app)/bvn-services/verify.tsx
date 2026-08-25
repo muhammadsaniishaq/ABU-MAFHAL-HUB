@@ -1,16 +1,14 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Dimensions, Platform, Modal, StyleSheet, Linking, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, StyleSheet, Linking, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Clipboard } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -65,7 +63,7 @@ export default function VerifyBVNScreen() {
                         id: item.id,
                         bvn: bvnNum,
                         name: fullName,
-                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
                         data: item.details
                     });
                 }
@@ -86,7 +84,7 @@ export default function VerifyBVNScreen() {
 
     const handlePaste = async () => {
         try {
-            const text = await Clipboard.getString();
+            const text = await Clipboard.getStringAsync();
             if (text) {
                 const cleaned = text.replace(/\D/g, '').slice(0, 11);
                 setBvn(cleaned);
@@ -111,8 +109,8 @@ export default function VerifyBVNScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 150) {
-            showAlert("Insufficient Balance", "Your account balance is insufficient (₦150 required) for BVN verification. Please fund your wallet.", "error");
+        if (userBalance !== null && userBalance < 50) {
+            showAlert("Insufficient Balance", "Your account balance is insufficient. Please fund your wallet to proceed.", "error");
             return;
         }
 
@@ -120,45 +118,29 @@ export default function VerifyBVNScreen() {
         setResult(null);
 
         try {
-            const response = await api.identity.validateBVN(cleanBvn, 'bvn_verification');
-            
-            if (response && response.isValid && response.data) {
-                const rawData = response.data?.data?.data || response.data?.data || response.data;
+            const res = await api.identity.validateBVN(cleanBvn, 'bvn_num_advanced');
+
+            if (res && (res.isValid || res.data)) {
+                const rawData = res.data?.data || res.data || {};
                 setResult(rawData);
+                showAlert("Verification Successful", "BVN record verified successfully!", "success");
 
-                // Save to history
-                const fullName = extractFullName(rawData, `${rawData.firstName || rawData.first_name || ''} ${rawData.lastName || rawData.surname || ''}`);
-                const bvnNum = rawData.idNumber || rawData.bvn || cleanBvn;
-                const newItem = {
-                    id: `bvn_${Date.now()}`,
-                    bvn: bvnNum,
-                    name: fullName,
-                    date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    data: rawData
-                };
-
-                const stored = await AsyncStorage.getItem('recent_bvn_verifications');
-                const localList = stored ? JSON.parse(stored) : [];
-                const updated = [newItem, ...localList.filter((i: any) => i.bvn !== bvnNum)].slice(0, 100);
-                setHistoryList(updated);
-                await AsyncStorage.setItem('recent_bvn_verifications', JSON.stringify(updated));
-
+                const fullName = extractFullName(rawData, rawData.name);
                 await verificationHistory.save({
                     service_category: 'bvn',
                     service_type: 'bvn_verification',
-                    search_number: bvnNum,
-                    holder_name: fullName,
+                    search_number: cleanBvn,
+                    holder_name: fullName || 'BVN Holder',
                     details: rawData,
                 });
 
                 fetchWalletBalance();
-                showAlert("Verification Successful", "BVN details retrieved successfully!", "success");
+                loadHistory();
             } else {
-                const errorMsg = response?.message || response?.error || "BVN record not found. Please verify the number entered.";
-                showAlert("Verification Failed", errorMsg, "error");
+                showAlert("Verification Failed", res?.message || "BVN record not found.", "error");
             }
-        } catch (err: any) {
-            showAlert("Service Unavailable", err.message || "An error occurred while connecting to the verification server.", "error");
+        } catch (e: any) {
+            showAlert("Error", e.message || "An error occurred during verification.", "error");
         } finally {
             setLoading(false);
         }
@@ -167,95 +149,60 @@ export default function VerifyBVNScreen() {
     const handlePrintOrPdf = async () => {
         if (!result) return;
         setIsSaving(true);
+
         try {
-            const fn = result.firstName || result.first_name || '';
-            const mn = result.middleName || result.middle_name || '';
-            const ln = result.lastName || result.surname || '';
-            const fullName = `${fn} ${mn} ${ln}`.trim() || result.fullName || result.name || 'BVN HOLDER';
-            const bvnNum = result.idNumber || result.bvn || bvn || 'N/A';
-            const ninNum = result.nin || 'N/A';
+            const fullName = `${result.firstName || result.first_name || ''} ${result.middleName || result.middle_name || ''} ${result.lastName || result.surname || ''}`.trim() || result.fullName || result.name || 'BVN Holder';
+            const bvnNum = result.idNumber || result.bvn || bvn;
             const dob = result.dateOfBirth || result.dob || result.birthdate || 'N/A';
             const phone = result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A';
             const gender = result.gender || 'N/A';
             const state = result.stateOfOrigin || result.state || 'N/A';
             const lga = result.lgaOfOrigin || result.lga || 'N/A';
-            const rawImg = result.image || result.photo || '';
-            const photoSrc = rawImg ? (rawImg.startsWith('data:') ? rawImg : `data:image/jpeg;base64,${rawImg}`) : '';
+
+            let photoHtml = `<div class="avatar-placeholder">${fullName.charAt(0)}</div>`;
+            if (result.image || result.photo) {
+                const photoSrc = (result.image || result.photo).startsWith('data:') ? (result.image || result.photo) : `data:image/jpeg;base64,${result.image || result.photo}`;
+                photoHtml = `<img src="${photoSrc}" class="avatar-img" />`;
+            }
 
             const html = `
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="utf-8">
-                <title>Official BVN Verification Slip - ${bvnNum}</title>
                 <style>
-                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8fafc; color: #1e293b; }
-                    .card { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden; }
-                    .header { background: #0f172a; color: white; padding: 20px; text-align: center; }
-                    .header h1 { margin: 0 0 4px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-                    .header p { margin: 0; font-size: 11px; opacity: 0.8; }
-                    .body { padding: 24px; display: flex; gap: 20px; }
-                    .photo-box { width: 120px; height: 140px; background: #e2e8f0; border: 1px solid #94a3b8; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-                    .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-                    .info { flex: 1; }
-                    .row { margin-bottom: 10px; }
-                    .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 2px; }
-                    .val { font-size: 14px; font-weight: bold; color: #0f172a; }
-                    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-                    .footer { background: #f1f5f9; padding: 12px 24px; font-size: 10px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
-                    .watermark { font-size: 16px; font-weight: 900; letter-spacing: 2px; color: #059669; }
+                    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f8fafc; padding: 20px; }
+                    .card { max-width: 440px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 2px solid #D4AF37; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+                    .header { background: #0B192C; color: #ffffff; padding: 14px; text-align: center; border-bottom: 2px solid #D4AF37; }
+                    .header h2 { margin: 0; font-size: 16px; color: #D4AF37; letter-spacing: 0.5px; }
+                    .body { padding: 16px; display: flex; gap: 14px; }
+                    .photo-box { width: 90px; height: 110px; border-radius: 6px; overflow: hidden; border: 1px solid #D4AF37; }
+                    .avatar-img { width: 100%; height: 100%; object-fit: cover; }
+                    .avatar-placeholder { width: 100%; height: 100%; background: #FEF9E7; color: #B45309; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; }
+                    .details { flex: 1; }
+                    .row { margin-bottom: 8px; }
+                    .label { font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+                    .val { font-size: 13px; color: #0B192C; font-weight: bold; }
+                    .bvn-val { color: #B45309; font-size: 15px; letter-spacing: 1px; }
+                    .footer { background: #f8fafc; padding: 8px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
                 </style>
             </head>
             <body>
                 <div class="card">
                     <div class="header">
-                        <h1>Central Bank of Nigeria / NIBSS</h1>
-                        <p>OFFICIAL BIOMETRIC VERIFICATION NUMBER (BVN) RECORD</p>
+                        <h2>BANK VERIFICATION RECORD</h2>
                     </div>
                     <div class="body">
-                        <div class="photo-box">
-                            ${photoSrc ? `<img src="${photoSrc}" />` : `<div style="font-size:10px;color:#64748b;">PASSPORT</div>`}
-                        </div>
-                        <div class="info">
-                            <div class="row">
-                                <div class="label">Full Name</div>
-                                <div class="val">${fullName}</div>
-                            </div>
-                            <div class="grid-2">
-                                <div class="row">
-                                    <div class="label">BVN Number</div>
-                                    <div class="val watermark">${bvnNum}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="label">NIN Number</div>
-                                    <div class="val">${ninNum}</div>
-                                </div>
-                            </div>
-                            <div class="grid-2">
-                                <div class="row">
-                                    <div class="label">Date of Birth</div>
-                                    <div class="val">${dob}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="label">Gender</div>
-                                    <div class="val">${gender}</div>
-                                </div>
-                            </div>
-                            <div class="grid-2">
-                                <div class="row">
-                                    <div class="label">Phone Number</div>
-                                    <div class="val">${phone}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="label">State / LGA</div>
-                                    <div class="val">${state} / ${lga}</div>
-                                </div>
-                            </div>
+                        <div class="photo-box">${photoHtml}</div>
+                        <div class="details">
+                            <div class="row"><div class="label">Full Name</div><div class="val">${fullName}</div></div>
+                            <div class="row"><div class="label">BVN Number</div><div class="val bvn-val">${bvnNum}</div></div>
+                            <div class="row"><div class="label">Date of Birth / Gender</div><div class="val">${dob} • ${gender}</div></div>
+                            <div class="row"><div class="label">Phone</div><div class="val">${phone}</div></div>
+                            <div class="row"><div class="label">Origin</div><div class="val">${state} / ${lga}</div></div>
                         </div>
                     </div>
-                    <div class="footer">
-                        Generated securely via Abu-Mafhal Integrated Hub • NIBSS Verified Record
-                    </div>
+                    <div class="footer">Verified via Abu-Mafhal Gateway • Official Record</div>
                 </div>
             </body>
             </html>
@@ -284,67 +231,62 @@ export default function VerifyBVNScreen() {
             <StatusBar style="light" />
 
             <LinearGradient
-                colors={['#050B14', '#0B163A']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 24 }]}
+                colors={['#0B192C', '#06101E']}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 22 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
+                        <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={styles.badge}>
-                        <Text style={styles.badgeText}>INSTANT CARD</Text>
+                        <Text style={styles.badgeText}>INSTANT VERIFY</Text>
                     </View>
                 </View>
                 <Text style={styles.titleText}>BVN Verification</Text>
-                <Text style={styles.subText}>Verify 11-digit BVN & download official verification card</Text>
+                <Text style={styles.subText}>Verify 11-digit BVN and generate official record card</Text>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }}>
                 {/* Dial Helper */}
                 <TouchableOpacity 
                     style={styles.dialHelper} 
                     activeOpacity={0.8}
                     onPress={() => Linking.openURL('tel:*565*0%23')}
                 >
-                    <Ionicons name="phone-portrait" size={18} color="#0284c7" />
-                    <Text style={styles.dialHelperText}>Forgot BVN? Dial <Text style={{ fontWeight: 'bold' }}>*565*0#</Text> from your registered SIM card</Text>
+                    <Ionicons name="phone-portrait-outline" size={15} color="#D4AF37" />
+                    <Text style={styles.dialHelperText}>Forgot BVN? Dial <Text style={{ fontWeight: 'bold' }}>*565*0#</Text> from your registered SIM</Text>
                 </TouchableOpacity>
 
                 {/* Input Card */}
                 <View style={styles.formCard}>
-                    <Text style={styles.inputLabel}>ENTER BVN NUMBER (11 Digits)</Text>
+                    <Text style={styles.inputLabel}>ENTER BVN NUMBER</Text>
                     <View style={styles.inputRow}>
-                        <Ionicons name="finger-print" size={20} color="#64748b" style={{ marginRight: 8 }} />
+                        <Ionicons name="finger-print-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Example: 22824107008"
+                            placeholder="11-digit BVN"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
                             value={bvn}
                             onChangeText={(t) => setBvn(t.replace(/\D/g, ''))}
                         />
-                        <TouchableOpacity onPress={handlePaste} style={styles.pasteBtn}>
+                        <TouchableOpacity onPress={handlePaste} style={styles.pasteBtn} activeOpacity={0.8}>
                             <Text style={styles.pasteBtnText}>Paste</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Verification Fee:</Text>
-                        <Text style={styles.costVal}>₦150</Text>
-                    </View>
-
                     <TouchableOpacity
-                        style={[styles.verifyBtn, (loading || bvn.length !== 11) && { opacity: 0.7 }]}
+                        style={[styles.verifyBtn, (loading || bvn.length !== 11) && { opacity: 0.6 }]}
                         onPress={handleVerify}
                         disabled={loading || bvn.length !== 11}
                         activeOpacity={0.8}
                     >
                         {loading ? (
-                            <ActivityIndicator color="#ffffff" />
+                            <ActivityIndicator color="#0B192C" size="small" />
                         ) : (
                             <>
-                                <Ionicons name="shield-checkmark" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                                <Ionicons name="shield-checkmark" size={16} color="#0B192C" style={{ marginRight: 6 }} />
                                 <Text style={styles.verifyBtnText}>Verify BVN Now</Text>
                             </>
                         )}
@@ -355,14 +297,14 @@ export default function VerifyBVNScreen() {
                 {result && (
                     <View style={styles.resultCard}>
                         <View style={styles.resultHeader}>
-                            <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-                            <Text style={styles.resultHeaderText}>Verified BVN Details</Text>
+                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                            <Text style={styles.resultHeaderText}>Verified BVN Record</Text>
                         </View>
 
-                        {/* Photo Display if available */}
+                        {/* Photo Display */}
                         {(result.image || result.photo) && (
-                            <View style={{ alignItems: 'center', marginVertical: 12 }}>
-                                <View style={{ width: 90, height: 105, borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: '#0284c7', backgroundColor: '#e2e8f0' }}>
+                            <View style={{ alignItems: 'center', marginVertical: 8 }}>
+                                <View style={styles.photoContainer}>
                                     <Image
                                         source={{ uri: (result.image || result.photo).startsWith('data:') ? (result.image || result.photo) : `data:image/jpeg;base64,${result.image || result.photo}` }}
                                         style={{ width: '100%', height: '100%' }}
@@ -381,13 +323,13 @@ export default function VerifyBVNScreen() {
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>BVN Number:</Text>
-                            <Text style={[styles.detailVal, { color: '#0284c7', fontWeight: '900' }]}>{result.idNumber || result.bvn || bvn}</Text>
+                            <Text style={[styles.detailVal, { color: '#B45309', fontWeight: '900' }]}>{result.idNumber || result.bvn || bvn}</Text>
                         </View>
 
                         {result.nin && (
                             <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>NIN Number:</Text>
-                                <Text style={[styles.detailVal, { color: '#059669', fontWeight: '800' }]}>{result.nin}</Text>
+                                <Text style={[styles.detailVal, { color: '#10B981', fontWeight: '800' }]}>{result.nin}</Text>
                             </View>
                         )}
 
@@ -397,18 +339,13 @@ export default function VerifyBVNScreen() {
                         </View>
 
                         <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Phone Number:</Text>
+                            <Text style={styles.detailLabel}>Phone:</Text>
                             <Text style={styles.detailVal}>{result.mobile || result.phoneNumber1 || result.phoneNumber || result.phone || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Gender:</Text>
                             <Text style={styles.detailVal}>{result.gender || 'N/A'}</Text>
-                        </View>
-
-                        <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>State / LGA:</Text>
-                            <Text style={styles.detailVal}>{`${result.stateOfOrigin || result.state || ''} ${result.lgaOfOrigin || result.lga ? `/ ${result.lgaOfOrigin || result.lga}` : ''}`.trim() || 'N/A'}</Text>
                         </View>
 
                         <TouchableOpacity 
@@ -418,11 +355,11 @@ export default function VerifyBVNScreen() {
                             disabled={isSaving}
                         >
                             {isSaving ? (
-                                <ActivityIndicator color="#ffffff" />
+                                <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
                                 <>
-                                    <Ionicons name="print" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                                    <Text style={styles.printBtnText}>Print BVN Card / Save PDF</Text>
+                                    <Ionicons name="print-outline" size={16} color="#0B192C" style={{ marginRight: 6 }} />
+                                    <Text style={styles.printBtnText}>Print Record / Save PDF</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -432,11 +369,12 @@ export default function VerifyBVNScreen() {
                 {/* History Section */}
                 {historyList.length > 0 && (
                     <View style={styles.historySection}>
-                        <Text style={styles.historyTitle}>Recent BVN Verifications</Text>
-                        {historyList.slice(0, 5).map((item) => (
+                        <Text style={styles.historyTitle}>Recent Verifications</Text>
+                        {historyList.slice(0, 4).map((item) => (
                             <TouchableOpacity 
                                 key={item.id || item.bvn} 
                                 style={styles.historyItem}
+                                activeOpacity={0.8}
                                 onPress={() => {
                                     setBvn(item.bvn);
                                     if (item.data) setResult(item.data);
@@ -446,7 +384,7 @@ export default function VerifyBVNScreen() {
                                     <Text style={styles.historyName}>{item.name || 'BVN Holder'}</Text>
                                     <Text style={styles.historyBvn}>{item.bvn}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+                                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -458,38 +396,36 @@ export default function VerifyBVNScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
-    headerGradient: { paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    headerGradient: { paddingHorizontal: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-    badge: { backgroundColor: 'rgba(2,132,199,0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' },
-    badgeText: { color: '#38bdf8', fontSize: 10, fontWeight: '800' },
-    titleText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
-    subText: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-    content: { flex: 1, padding: 16 },
-    dialHelper: { backgroundColor: '#e0f2fe', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 14, borderWidth: 1, borderColor: '#bae6fd' },
-    dialHelperText: { fontSize: 12, color: '#0369a1', marginLeft: 8, flex: 1 },
-    formCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-    inputLabel: { fontSize: 11, fontWeight: '800', color: '#475569', marginBottom: 8 },
-    inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 12, height: 48 },
-    input: { flex: 1, fontSize: 15, fontWeight: '700', color: '#0f172a' },
-    pasteBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-    pasteBtnText: { fontSize: 11, fontWeight: '700', color: '#475569' },
-    costRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, marginBottom: 14 },
-    costLabel: { fontSize: 12, color: '#64748b' },
-    costVal: { fontSize: 14, fontWeight: '800', color: '#059669' },
-    verifyBtn: { backgroundColor: '#0284c7', height: 48, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    verifyBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-    resultCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-    resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-    resultHeaderText: { fontSize: 14, fontWeight: '800', color: '#0f172a', marginLeft: 8 },
-    detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    detailLabel: { fontSize: 12, color: '#64748b' },
-    detailVal: { fontSize: 12, fontWeight: '700', color: '#0f172a', maxWidth: '60%', textAlign: 'right' },
-    printBtn: { backgroundColor: '#059669', height: 44, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-    printBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-    historySection: { marginTop: 8 },
-    historyTitle: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 8 },
-    historyItem: { backgroundColor: '#ffffff', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    historyName: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
-    historyBvn: { fontSize: 11, color: '#64748b', marginTop: 2 },
+    backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    badge: { backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    badgeText: { color: '#D4AF37', fontSize: 9, fontWeight: '800' },
+    titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+    subText: { color: '#94a3b8', fontSize: 11, marginTop: 1 },
+    content: { flex: 1, paddingHorizontal: 14, paddingTop: 12 },
+    dialHelper: { backgroundColor: '#FEF9E7', padding: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    dialHelperText: { fontSize: 11, color: '#78350f', marginLeft: 6, flex: 1 },
+    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
+    inputLabel: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 6 },
+    inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, height: 44, marginBottom: 12 },
+    input: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0B192C' },
+    pasteBtn: { backgroundColor: '#FEF9E7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    pasteBtnText: { fontSize: 10, fontWeight: '700', color: '#0B192C' },
+    verifyBtn: { backgroundColor: '#D4AF37', height: 44, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    verifyBtnText: { color: '#0B192C', fontSize: 13, fontWeight: '800' },
+    resultCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginBottom: 12 },
+    resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+    resultHeaderText: { fontSize: 13, fontWeight: '800', color: '#0B192C', marginLeft: 6 },
+    photoContainer: { width: 70, height: 85, borderRadius: 8, overflow: 'hidden', borderWidth: 1.5, borderColor: '#D4AF37', backgroundColor: '#e2e8f0' },
+    detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    detailLabel: { fontSize: 11, color: '#64748b' },
+    detailVal: { fontSize: 11, fontWeight: '700', color: '#0B192C', maxWidth: '60%', textAlign: 'right' },
+    printBtn: { backgroundColor: '#D4AF37', height: 40, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+    printBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
+    historySection: { marginTop: 4 },
+    historyTitle: { fontSize: 12, fontWeight: '800', color: '#334155', marginBottom: 6 },
+    historyItem: { backgroundColor: '#ffffff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    historyName: { fontSize: 12, fontWeight: '700', color: '#0B192C' },
+    historyBvn: { fontSize: 10, color: '#64748b', marginTop: 1 },
 });

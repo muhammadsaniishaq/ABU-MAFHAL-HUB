@@ -39,8 +39,6 @@ export default function BVNRetrievalScreen() {
     const [copiedBvn, setCopiedBvn] = useState(false);
     const [copiedRequestId, setCopiedRequestId] = useState(false);
 
-    const RETRIEVAL_FEE = 1200;
-
     const fetchWalletBalance = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -66,7 +64,7 @@ export default function BVNRetrievalScreen() {
         try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                showAlert('Permission Denied', 'Camera roll permissions are required to upload screenshot proof.');
+                showAlert('Permission Denied', 'Camera roll permissions are required to upload screenshot.');
                 return;
             }
 
@@ -92,8 +90,8 @@ export default function BVNRetrievalScreen() {
     };
 
     const handleSubmitRetrieval = async () => {
-        if (userBalance !== null && userBalance < RETRIEVAL_FEE) {
-            showAlert("Insufficient Balance", `Your wallet balance is insufficient (₦${RETRIEVAL_FEE.toLocaleString()} required) for BVN retrieval.`);
+        if (userBalance !== null && userBalance < 100) {
+            showAlert("Insufficient Balance", "Your wallet balance is low. Please fund your wallet to continue.");
             return;
         }
 
@@ -109,7 +107,7 @@ export default function BVNRetrievalScreen() {
                 return;
             }
             if (!screenshotBase64 && !screenshotUri) {
-                showAlert("Screenshot Required", "Please upload a clear screenshot proof of the CRM/Ticket dashboard.");
+                showAlert("Screenshot Required", "Please upload a clear screenshot of the CRM dashboard.");
                 return;
             }
         } else {
@@ -119,7 +117,7 @@ export default function BVNRetrievalScreen() {
                 return;
             }
             if (!fullName.trim()) {
-                showAlert("Full Name Required", "Please enter the owner's full name as on record.");
+                showAlert("Full Name Required", "Please enter the owner's full name.");
                 return;
             }
         }
@@ -162,10 +160,9 @@ export default function BVNRetrievalScreen() {
                     reference: data.reference || ref,
                     status: data.status || 'PROCESSING',
                     service: data.service || (activeTab === 'crm' ? 'BVN Retrieval: CRM' : 'BVN Retrieval: Phone'),
-                    amount: data.charged_amount || RETRIEVAL_FEE
                 });
 
-                showAlert("Request Submitted", "Your BVN Retrieval request has been submitted for admin processing.", "success");
+                showAlert("Submitted", "BVN Retrieval request submitted for processing.", "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -183,7 +180,7 @@ export default function BVNRetrievalScreen() {
 
                 fetchWalletBalance();
             } else {
-                showAlert("Submission Failed", res?.message || "Failed to submit retrieval request. Please try again.");
+                showAlert("Submission Failed", res?.message || "Could not submit retrieval request.");
             }
         } catch (e: any) {
             showAlert("Error", e.message || "An error occurred while connecting to the server.");
@@ -195,7 +192,7 @@ export default function BVNRetrievalScreen() {
     const handleCheckStatus = async () => {
         const query = trackQuery.trim();
         if (!query) {
-            showAlert("Required", "Please enter a Request ID or Reference to check status.");
+            showAlert("Required", "Please enter a Request ID or Reference.");
             return;
         }
 
@@ -208,17 +205,17 @@ export default function BVNRetrievalScreen() {
                 const raw = res.data?.data || res.data;
                 setTrackResult({
                     status: res.data.current_status || res.data.status || 'PROCESSING',
-                    message: res.data.message || 'Status checked successfully',
+                    message: res.data.message || 'Status retrieved',
                     bvn: raw.bvn || raw.BVN || null,
                     searchedPhone: raw.searched_phone || raw.searchedPhone || null,
                     searchedName: raw.searched_name || raw.searchedName || null,
                     lastUpdated: res.data.last_updated || new Date().toISOString()
                 });
             } else {
-                showAlert("Status Check", res?.message || "No update found for the provided reference/ID.");
+                showAlert("Status", res?.message || "No record found.");
             }
         } catch (e: any) {
-            showAlert("Error", e.message || "Failed to check retrieval status.");
+            showAlert("Error", e.message || "Failed to check status.");
         } finally {
             setTrackLoading(false);
         }
@@ -241,65 +238,60 @@ export default function BVNRetrievalScreen() {
             <StatusBar style="light" />
 
             <LinearGradient
-                colors={['#050B14', '#0B163A']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 24 }]}
+                colors={['#0B192C', '#06101E']}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 22 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
+                        <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={styles.noticeBadge}
                         onPress={() => setShowTermsModal(true)}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="information-circle-outline" size={14} color="#a855f7" style={{ marginRight: 4 }} />
-                        <Text style={styles.noticeBadgeText}>Retrieval Terms</Text>
+                        <Ionicons name="information-circle-outline" size={13} color="#D4AF37" style={{ marginRight: 3 }} />
+                        <Text style={styles.noticeBadgeText}>Guidelines</Text>
                     </TouchableOpacity>
                 </View>
                 <Text style={styles.titleText}>BVN Retrieval</Text>
-                <Text style={styles.subText}>Request manual BVN retrieval using Phone Number or CRM details</Text>
+                <Text style={styles.subText}>Recover lost or forgotten BVN via Phone or CRM</Text>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }}>
                 {/* Method Selector */}
-                <View style={styles.selectorWrapper}>
-                    <Text style={styles.selectorTitle}>How would you like to retrieve?</Text>
-                    <View style={styles.tabBar}>
-                        <TouchableOpacity
-                            style={[styles.tabItem, activeTab === 'crm' && styles.tabItemActive]}
-                            onPress={() => setActiveTab('crm')}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={[styles.tabItemText, activeTab === 'crm' && styles.tabItemTextActive]}>By CRM</Text>
-                            {activeTab === 'crm' && <Ionicons name="checkmark-circle" size={16} color="#9333ea" style={{ marginLeft: 6 }} />}
-                        </TouchableOpacity>
+                <View style={styles.tabBar}>
+                    <TouchableOpacity
+                        style={[styles.tabItem, activeTab === 'crm' && styles.tabItemActive]}
+                        onPress={() => setActiveTab('crm')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.tabItemText, activeTab === 'crm' && styles.tabItemTextActive]}>By CRM</Text>
+                    </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.tabItem, activeTab === 'phone' && styles.tabItemActive]}
-                            onPress={() => setActiveTab('phone')}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={[styles.tabItemText, activeTab === 'phone' && styles.tabItemTextActive]}>By Phone</Text>
-                            {activeTab === 'phone' && <Ionicons name="checkmark-circle" size={16} color="#9333ea" style={{ marginLeft: 6 }} />}
-                        </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tabItem, activeTab === 'phone' && styles.tabItemActive]}
+                        onPress={() => setActiveTab('phone')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.tabItemText, activeTab === 'phone' && styles.tabItemTextActive]}>By Phone</Text>
+                    </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.tabItem, activeTab === 'track' && styles.tabItemActive]}
-                            onPress={() => setActiveTab('track')}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="time-outline" size={14} color={activeTab === 'track' ? '#9333ea' : '#64748b'} style={{ marginRight: 4 }} />
-                            <Text style={[styles.tabItemText, activeTab === 'track' && styles.tabItemTextActive]}>Track Status</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        style={[styles.tabItem, activeTab === 'track' && styles.tabItemActive]}
+                        onPress={() => setActiveTab('track')}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="time-outline" size={12} color={activeTab === 'track' ? '#0B192C' : '#64748b'} style={{ marginRight: 3 }} />
+                        <Text style={[styles.tabItemText, activeTab === 'track' && styles.tabItemTextActive]}>Track Status</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* TAB 1: BY CRM (Code: 631) */}
                 {activeTab === 'crm' && (
                     <View style={styles.formCard}>
                         <View style={styles.rowTwo}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
+                            <View style={{ flex: 1, marginRight: 6 }}>
                                 <Text style={styles.inputLabel}>Agent Code</Text>
                                 <TextInput
                                     style={styles.input}
@@ -309,7 +301,7 @@ export default function BVNRetrievalScreen() {
                                     onChangeText={setAgentCode}
                                 />
                             </View>
-                            <View style={{ flex: 1, marginLeft: 8 }}>
+                            <View style={{ flex: 1, marginLeft: 6 }}>
                                 <Text style={styles.inputLabel}>Ticket ID</Text>
                                 <TextInput
                                     style={styles.input}
@@ -321,16 +313,16 @@ export default function BVNRetrievalScreen() {
                             </View>
                         </View>
 
-                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>BMS Ticket Reference</Text>
+                        <Text style={[styles.inputLabel, { marginTop: 10 }]}>BMS Ticket Reference (Optional)</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Optional BMS Ticket Reference"
+                            placeholder="BMS Ticket Number"
                             placeholderTextColor="#94a3b8"
                             value={bmsTicket}
                             onChangeText={setBmsTicket}
                         />
 
-                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>Upload Screenshot Proof</Text>
+                        <Text style={[styles.inputLabel, { marginTop: 10 }]}>Screenshot Proof</Text>
                         {screenshotUri ? (
                             <View style={styles.uploadPreviewContainer}>
                                 <Image source={{ uri: screenshotUri }} style={styles.uploadPreviewImage} />
@@ -339,7 +331,7 @@ export default function BVNRetrievalScreen() {
                                     onPress={() => { setScreenshotUri(null); setScreenshotBase64(null); }}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="trash" size={16} color="#ef4444" />
+                                    <Ionicons name="trash" size={14} color="#ef4444" />
                                     <Text style={styles.removeImageText}>Remove Image</Text>
                                 </TouchableOpacity>
                             </View>
@@ -349,15 +341,10 @@ export default function BVNRetrievalScreen() {
                                 onPress={handlePickImage}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="cloud-upload-outline" size={28} color="#9333ea" />
-                                <Text style={styles.uploadText}>Tap to upload image (Max 5MB)</Text>
+                                <Ionicons name="cloud-upload-outline" size={22} color="#D4AF37" />
+                                <Text style={styles.uploadText}>Upload Proof (Max 5MB)</Text>
                             </TouchableOpacity>
                         )}
-
-                        <View style={styles.feeContainer}>
-                            <Text style={styles.feeLabel}>Retrieval Fee</Text>
-                            <Text style={styles.feeValue}>₦{RETRIEVAL_FEE.toLocaleString()}.00</Text>
-                        </View>
 
                         <TouchableOpacity
                             style={[styles.submitBtn, loading && { opacity: 0.7 }]}
@@ -366,9 +353,9 @@ export default function BVNRetrievalScreen() {
                             activeOpacity={0.8}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#ffffff" />
+                                <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Retrieval Request</Text>
+                                <Text style={styles.submitBtnText}>Submit Request</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -388,7 +375,7 @@ export default function BVNRetrievalScreen() {
                             onChangeText={(t) => setPhoneNumber(t.replace(/\D/g, ''))}
                         />
 
-                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>Full Name (As on record)</Text>
+                        <Text style={[styles.inputLabel, { marginTop: 10 }]}>Full Name (As on record)</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="First Last"
@@ -398,11 +385,6 @@ export default function BVNRetrievalScreen() {
                             autoCapitalize="words"
                         />
 
-                        <View style={styles.feeContainer}>
-                            <Text style={styles.feeLabel}>Retrieval Fee</Text>
-                            <Text style={styles.feeValue}>₦{RETRIEVAL_FEE.toLocaleString()}.00</Text>
-                        </View>
-
                         <TouchableOpacity
                             style={[styles.submitBtn, loading && { opacity: 0.7 }]}
                             onPress={handleSubmitRetrieval}
@@ -410,9 +392,9 @@ export default function BVNRetrievalScreen() {
                             activeOpacity={0.8}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#ffffff" />
+                                <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Retrieval Request</Text>
+                                <Text style={styles.submitBtnText}>Submit Request</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -421,11 +403,11 @@ export default function BVNRetrievalScreen() {
                 {/* TAB 3: TRACK STATUS */}
                 {activeTab === 'track' && (
                     <View style={styles.formCard}>
-                        <Text style={styles.inputLabel}>Request ID or Client Reference</Text>
+                        <Text style={styles.inputLabel}>Request ID or Reference</Text>
                         <View style={styles.trackInputRow}>
                             <TextInput
-                                style={[styles.input, { flex: 1, marginRight: 10 }]}
-                                placeholder="e.g. cml0k3xrd... or REF-RET-001"
+                                style={[styles.input, { flex: 1, marginRight: 8 }]}
+                                placeholder="e.g. cml0k3xrd... or REF-..."
                                 placeholderTextColor="#94a3b8"
                                 value={trackQuery}
                                 onChangeText={setTrackQuery}
@@ -438,9 +420,9 @@ export default function BVNRetrievalScreen() {
                                 activeOpacity={0.8}
                             >
                                 {trackLoading ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
+                                    <ActivityIndicator size="small" color="#0B192C" />
                                 ) : (
-                                    <Text style={styles.trackBtnText}>Check Status</Text>
+                                    <Text style={styles.trackBtnText}>Check</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -449,7 +431,7 @@ export default function BVNRetrievalScreen() {
                         {trackResult && (
                             <View style={styles.trackResultCard}>
                                 <View style={styles.trackStatusHeader}>
-                                    <Text style={styles.trackStatusLabel}>Current Status:</Text>
+                                    <Text style={styles.trackStatusLabel}>Status:</Text>
                                     <View style={[
                                         styles.statusPill,
                                         trackResult.status === 'COMPLETED' ? styles.statusPillSuccess :
@@ -467,27 +449,27 @@ export default function BVNRetrievalScreen() {
 
                                 {trackResult.bvn ? (
                                     <View style={styles.bvnFoundBox}>
-                                        <Text style={styles.bvnFoundLabel}>RETRIEVED 11-DIGIT BVN</Text>
+                                        <Text style={styles.bvnFoundLabel}>RETRIEVED BVN</Text>
                                         <Text style={styles.bvnFoundValue}>{trackResult.bvn}</Text>
                                         <TouchableOpacity
                                             style={styles.copyPill}
                                             onPress={() => copyToClipboard(trackResult.bvn, 'bvn')}
                                             activeOpacity={0.8}
                                         >
-                                            <Ionicons name={copiedBvn ? "checkmark" : "copy-outline"} size={14} color="#9333ea" />
+                                            <Ionicons name={copiedBvn ? "checkmark" : "copy-outline"} size={12} color="#0B192C" />
                                             <Text style={styles.copyPillText}>{copiedBvn ? "Copied!" : "Copy BVN"}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
                                     <Text style={styles.trackPendingText}>
                                         {trackResult.status === 'PROCESSING' 
-                                            ? "Your retrieval request is being processed by the Admin. Please check back shortly."
+                                            ? "Your retrieval request is being processed. Please check back shortly."
                                             : trackResult.message}
                                     </Text>
                                 )}
 
                                 {trackResult.searchedName && (
-                                    <Text style={styles.trackMetaText}>Owner Name: {trackResult.searchedName}</Text>
+                                    <Text style={styles.trackMetaText}>Name: {trackResult.searchedName}</Text>
                                 )}
                                 {trackResult.searchedPhone && (
                                     <Text style={styles.trackMetaText}>Phone: {trackResult.searchedPhone}</Text>
@@ -501,10 +483,10 @@ export default function BVNRetrievalScreen() {
                 {submittedData && (
                     <View style={styles.successSubmitCard}>
                         <View style={styles.successHeader}>
-                            <Ionicons name="checkmark-circle" size={24} color="#059669" />
-                            <Text style={styles.successHeaderText}>Retrieval Request Submitted</Text>
+                            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                            <Text style={styles.successHeaderText}>Request Submitted</Text>
                         </View>
-                        <Text style={styles.successDesc}>Your request is now in queue for Admin processing.</Text>
+                        <Text style={styles.successDesc}>Your request is queued for processing.</Text>
 
                         <View style={styles.successDetailBox}>
                             <View style={styles.successRow}>
@@ -512,12 +494,8 @@ export default function BVNRetrievalScreen() {
                                 <Text style={styles.successRowVal}>{submittedData.requestId}</Text>
                             </View>
                             <View style={styles.successRow}>
-                                <Text style={styles.successRowLabel}>Reference:</Text>
-                                <Text style={styles.successRowVal}>{submittedData.reference}</Text>
-                            </View>
-                            <View style={styles.successRow}>
                                 <Text style={styles.successRowLabel}>Status:</Text>
-                                <Text style={[styles.successRowVal, { color: '#d97706', fontWeight: 'bold' }]}>{submittedData.status}</Text>
+                                <Text style={[styles.successRowVal, { color: '#B45309' }]}>{submittedData.status}</Text>
                             </View>
                         </View>
 
@@ -527,8 +505,8 @@ export default function BVNRetrievalScreen() {
                                 onPress={() => copyToClipboard(submittedData.requestId, 'requestId')}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name={copiedRequestId ? "checkmark" : "copy-outline"} size={14} color="#9333ea" />
-                                <Text style={styles.copyReqBtnText}>{copiedRequestId ? "Copied ID" : "Copy Request ID"}</Text>
+                                <Ionicons name={copiedRequestId ? "checkmark" : "copy-outline"} size={12} color="#0B192C" />
+                                <Text style={styles.copyReqBtnText}>{copiedRequestId ? "Copied ID" : "Copy ID"}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -540,21 +518,21 @@ export default function BVNRetrievalScreen() {
                                 }}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.trackNowBtnText}>Track Status Now</Text>
+                                <Text style={styles.trackNowBtnText}>Track Status</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 )}
 
-                {/* Right Side / Bottom Helper Cards (AgentHub Parity) */}
+                {/* Helper Cards in Navy & Gold */}
                 <View style={styles.sideCard}>
                     <View style={styles.sideCardHeader}>
                         <View style={styles.sideIconBox}>
-                            <Ionicons name="server-outline" size={20} color="#9333ea" />
+                            <Ionicons name="server-outline" size={16} color="#D4AF37" />
                         </View>
-                        <View style={{ flex: 1, marginLeft: 10 }}>
+                        <View style={{ flex: 1, marginLeft: 8 }}>
                             <Text style={styles.sideTitle}>Admin Processing</Text>
-                            <Text style={styles.sideDesc}>Retrievals are processed by our admin team. Check your history log to view the retrieved BVN once completed.</Text>
+                            <Text style={styles.sideDesc}>Retrievals are processed by admin. Check history log once completed.</Text>
                         </View>
                     </View>
                     <TouchableOpacity 
@@ -563,17 +541,17 @@ export default function BVNRetrievalScreen() {
                         activeOpacity={0.8}
                     >
                         <Text style={styles.historyBtnText}>View History</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#9333ea" />
+                        <Ionicons name="arrow-forward" size={13} color="#0B192C" />
                     </TouchableOpacity>
                 </View>
 
                 <View style={styles.rulesCard}>
                     <View style={styles.rulesHeader}>
-                        <Ionicons name="information-circle-outline" size={18} color="#dc2626" />
-                        <Text style={styles.rulesHeaderText}>Important Rules</Text>
+                        <Ionicons name="information-circle-outline" size={14} color="#64748b" />
+                        <Text style={styles.rulesHeaderText}>Important Guidelines</Text>
                     </View>
-                    <Text style={styles.ruleItem}>• CRM requests without a valid and clear screenshot will be instantly rejected.</Text>
-                    <Text style={styles.ruleItem}>• If the retrieval fails (e.g. record not found), your wallet will be fully refunded by the admin. You will usually receive an update within 24 Working Hours.</Text>
+                    <Text style={styles.ruleItem}>• CRM requests require a valid screenshot proof.</Text>
+                    <Text style={styles.ruleItem}>• Unsuccessful retrievals are automatically refunded to your wallet.</Text>
                 </View>
             </ScrollView>
 
@@ -587,22 +565,22 @@ export default function BVNRetrievalScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalIconBox}>
-                            <Ionicons name="warning-outline" size={28} color="#9333ea" />
+                            <Ionicons name="warning-outline" size={22} color="#D4AF37" />
                         </View>
-                        <Text style={styles.modalTitle}>Retrieval Terms</Text>
+                        <Text style={styles.modalTitle}>Retrieval Guidelines</Text>
                         <Text style={styles.modalBody}>
                             You are submitting a request to manually retrieve a BVN record from the database.
                         </Text>
 
                         <View style={styles.modalCallout}>
-                            <Text style={styles.modalCalloutHeader}>IMPORTANT</Text>
+                            <Text style={styles.modalCalloutHeader}>CRM REQUIREMENT</Text>
                             <Text style={styles.modalCalloutText}>
-                                For CRM retrievals, you must upload a clear screenshot as proof. Blurry or irrelevant images will be instantly rejected.
+                                For CRM retrievals, upload a clear screenshot as proof.
                             </Text>
                         </View>
 
-                        <Text style={[styles.modalBody, { marginTop: 8 }]}>
-                            Requests are processed manually by our admins. You can check the final result (the retrieved 11-digit BVN) directly from your history log.
+                        <Text style={[styles.modalBody, { marginTop: 6 }]}>
+                            Requests are processed by admins. You can check the final retrieved BVN in your history log.
                         </Text>
 
                         <TouchableOpacity
@@ -610,7 +588,7 @@ export default function BVNRetrievalScreen() {
                             onPress={() => setShowTermsModal(false)}
                             activeOpacity={0.8}
                         >
-                            <Text style={styles.modalBtnText}>I Understand & Agree</Text>
+                            <Text style={styles.modalBtnText}>I Understand</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -621,89 +599,84 @@ export default function BVNRetrievalScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
-    headerGradient: { paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    headerGradient: { paddingHorizontal: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(168,85,247,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#a855f7' },
-    noticeBadgeText: { color: '#c084fc', fontSize: 11, fontWeight: '700' },
-    titleText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
-    subText: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-    content: { flex: 1, padding: 16 },
-    selectorWrapper: { marginBottom: 14 },
-    selectorTitle: { fontSize: 13, fontWeight: '700', color: '#475569', marginBottom: 8 },
-    tabBar: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4 },
-    tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10 },
-    tabItemActive: { backgroundColor: '#ffffff', borderWidth: 1.5, borderColor: '#9333ea' },
-    tabItemText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-    tabItemTextActive: { color: '#9333ea', fontWeight: '800' },
-    formCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
+    backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    noticeBadgeText: { color: '#D4AF37', fontSize: 10, fontWeight: '700' },
+    titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+    subText: { color: '#94a3b8', fontSize: 11, marginTop: 1 },
+    content: { flex: 1, paddingHorizontal: 14, paddingTop: 12 },
+    tabBar: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 10, padding: 3, marginBottom: 12 },
+    tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8 },
+    tabItemActive: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#D4AF37' },
+    tabItemText: { fontSize: 11, fontWeight: '700', color: '#64748b' },
+    tabItemTextActive: { color: '#0B192C', fontWeight: '800' },
+    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
     rowTwo: { flexDirection: 'row', alignItems: 'center' },
-    inputLabel: { fontSize: 11, fontWeight: '800', color: '#475569', marginBottom: 6 },
-    input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 12, height: 46, fontSize: 14, color: '#0f172a', backgroundColor: '#ffffff' },
-    uploadBox: { borderWidth: 1.5, borderColor: '#d8b4fe', borderStyle: 'dashed', borderRadius: 12, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#faf5ff', marginVertical: 6 },
-    uploadText: { fontSize: 12, fontWeight: '700', color: '#9333ea', marginTop: 6 },
+    inputLabel: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 5 },
+    input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 42, fontSize: 13, color: '#0B192C', backgroundColor: '#ffffff' },
+    uploadBox: { borderWidth: 1, borderColor: 'rgba(212,175,55,0.4)', borderStyle: 'dashed', borderRadius: 10, padding: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF9E7', marginVertical: 6 },
+    uploadText: { fontSize: 11, fontWeight: '700', color: '#B45309', marginTop: 4 },
     uploadPreviewContainer: { marginVertical: 6, alignItems: 'center' },
-    uploadPreviewImage: { width: '100%', height: 160, borderRadius: 10, resizeMode: 'cover' },
-    removeImageBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingVertical: 4 },
-    removeImageText: { fontSize: 12, color: '#ef4444', fontWeight: '700', marginLeft: 4 },
-    feeContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fdf4ff', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#f5d0fe', marginVertical: 14 },
-    feeLabel: { fontSize: 12, fontWeight: '700', color: '#701a75' },
-    feeValue: { fontSize: 16, fontWeight: '900', color: '#9333ea' },
-    submitBtn: { backgroundColor: '#9333ea', height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    submitBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-    trackInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    trackBtn: { backgroundColor: '#9333ea', height: 46, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    trackBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-    trackResultCard: { backgroundColor: '#fdf4ff', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#f0abfc' },
-    trackStatusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    trackStatusLabel: { fontSize: 12, fontWeight: '700', color: '#475569' },
-    statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    uploadPreviewImage: { width: '100%', height: 130, borderRadius: 8, resizeMode: 'cover' },
+    removeImageBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingVertical: 2 },
+    removeImageText: { fontSize: 11, color: '#ef4444', fontWeight: '700', marginLeft: 4 },
+    submitBtn: { backgroundColor: '#D4AF37', height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+    submitBtnText: { color: '#0B192C', fontSize: 13, fontWeight: '800' },
+    trackInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    trackBtn: { backgroundColor: '#D4AF37', height: 42, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    trackBtnText: { color: '#0B192C', fontSize: 11, fontWeight: '800' },
+    trackResultCard: { backgroundColor: '#FEF9E7', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    trackStatusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    trackStatusLabel: { fontSize: 11, fontWeight: '700', color: '#475569' },
+    statusPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
     statusPillProcessing: { backgroundColor: '#fef3c7' },
     statusPillSuccess: { backgroundColor: '#dcfce7' },
     statusPillFailed: { backgroundColor: '#fee2e2' },
-    statusPillText: { fontSize: 10, fontWeight: '800' },
+    statusPillText: { fontSize: 9, fontWeight: '800' },
     statusPillTextProcessing: { color: '#d97706' },
     statusPillTextSuccess: { color: '#15803d' },
     statusPillTextFailed: { color: '#b91c1c' },
-    bvnFoundBox: { backgroundColor: '#ffffff', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#e9d5ff', marginVertical: 8 },
-    bvnFoundLabel: { fontSize: 10, fontWeight: '800', color: '#701a75', letterSpacing: 0.5 },
-    bvnFoundValue: { fontSize: 22, fontWeight: '900', color: '#9333ea', letterSpacing: 2, marginVertical: 4 },
-    copyPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f5d0fe', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginTop: 4 },
-    copyPillText: { fontSize: 11, fontWeight: '700', color: '#701a75', marginLeft: 4 },
-    trackPendingText: { fontSize: 12, color: '#64748b', lineHeight: 18, marginVertical: 4 },
-    trackMetaText: { fontSize: 11, color: '#701a75', marginTop: 2 },
-    successSubmitCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#bbf7d0', marginBottom: 16 },
-    successHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    successHeaderText: { fontSize: 14, fontWeight: '800', color: '#059669', marginLeft: 8 },
-    successDesc: { fontSize: 12, color: '#64748b', marginBottom: 12 },
-    successDetailBox: { backgroundColor: '#f8fafc', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
-    successRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 2 },
-    successRowLabel: { fontSize: 11, color: '#64748b' },
-    successRowVal: { fontSize: 11, fontWeight: '700', color: '#0f172a' },
+    bvnFoundBox: { backgroundColor: '#ffffff', borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginVertical: 6 },
+    bvnFoundLabel: { fontSize: 9, fontWeight: '800', color: '#B45309', letterSpacing: 0.5 },
+    bvnFoundValue: { fontSize: 18, fontWeight: '900', color: '#0B192C', letterSpacing: 2, marginVertical: 2 },
+    copyPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF9E7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 4, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    copyPillText: { fontSize: 10, fontWeight: '700', color: '#0B192C', marginLeft: 3 },
+    trackPendingText: { fontSize: 11, color: '#64748b', lineHeight: 16, marginVertical: 2 },
+    trackMetaText: { fontSize: 10, color: '#B45309', marginTop: 2 },
+    successSubmitCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginBottom: 12 },
+    successHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+    successHeaderText: { fontSize: 13, fontWeight: '800', color: '#10B981', marginLeft: 6 },
+    successDesc: { fontSize: 11, color: '#64748b', marginBottom: 8 },
+    successDetailBox: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10 },
+    successRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 1 },
+    successRowLabel: { fontSize: 10, color: '#64748b' },
+    successRowVal: { fontSize: 10, fontWeight: '700', color: '#0B192C' },
     successActions: { flexDirection: 'row', justifyContent: 'space-between' },
-    copyReqBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fdf4ff', paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#f0abfc', marginRight: 6 },
-    copyReqBtnText: { fontSize: 12, fontWeight: '700', color: '#9333ea', marginLeft: 4 },
-    trackNowBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#9333ea', paddingVertical: 10, borderRadius: 8, marginLeft: 6 },
-    trackNowBtnText: { fontSize: 12, fontWeight: '800', color: '#ffffff' },
-    sideCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-    sideCardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-    sideIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#faf5ff', alignItems: 'center', justifyContent: 'center' },
-    sideTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
-    sideDesc: { fontSize: 11, color: '#64748b', lineHeight: 16, marginTop: 2 },
-    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#faf5ff', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#f3e8ff' },
-    historyBtnText: { fontSize: 12, fontWeight: '700', color: '#9333ea' },
-    rulesCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f1f5f9' },
-    rulesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    rulesHeaderText: { fontSize: 12, fontWeight: '800', color: '#475569', marginLeft: 6 },
-    ruleItem: { fontSize: 11, color: '#64748b', lineHeight: 17, marginBottom: 4 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    modalCard: { width: '100%', maxWidth: 400, backgroundColor: '#ffffff', borderRadius: 20, padding: 20, alignItems: 'center' },
-    modalIconBox: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#faf5ff', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-    modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 6 },
-    modalBody: { fontSize: 12, color: '#475569', textAlign: 'center', lineHeight: 18 },
-    modalCallout: { backgroundColor: '#fdf4ff', borderWidth: 1, borderColor: '#f0abfc', borderRadius: 10, padding: 12, marginVertical: 10, width: '100%' },
-    modalCalloutHeader: { fontSize: 11, fontWeight: '900', color: '#9333ea', marginBottom: 2 },
-    modalCalloutText: { fontSize: 11, color: '#701a75', lineHeight: 16 },
-    modalBtn: { backgroundColor: '#9333ea', width: '100%', height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-    modalBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+    copyReqBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF9E7', paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginRight: 4 },
+    copyReqBtnText: { fontSize: 11, fontWeight: '700', color: '#0B192C', marginLeft: 3 },
+    trackNowBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B192C', paddingVertical: 8, borderRadius: 6, marginLeft: 4 },
+    trackNowBtnText: { fontSize: 11, fontWeight: '800', color: '#D4AF37' },
+    sideCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
+    sideCardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
+    sideIconBox: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(212,175,55,0.25)' },
+    sideTitle: { fontSize: 12, fontWeight: '800', color: '#0B192C' },
+    sideDesc: { fontSize: 10, color: '#64748b', lineHeight: 14, marginTop: 1 },
+    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FEF9E7', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    historyBtnText: { fontSize: 11, fontWeight: '700', color: '#0B192C' },
+    rulesCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+    rulesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    rulesHeaderText: { fontSize: 11, fontWeight: '800', color: '#475569', marginLeft: 4 },
+    ruleItem: { fontSize: 10, color: '#64748b', lineHeight: 15, marginBottom: 2 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalCard: { width: '100%', maxWidth: 360, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, alignItems: 'center' },
+    modalIconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    modalTitle: { fontSize: 16, fontWeight: '900', color: '#0B192C', marginBottom: 4 },
+    modalBody: { fontSize: 11, color: '#475569', textAlign: 'center', lineHeight: 16 },
+    modalCallout: { backgroundColor: '#FEF9E7', borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', borderRadius: 8, padding: 8, marginVertical: 8, width: '100%' },
+    modalCalloutHeader: { fontSize: 10, fontWeight: '900', color: '#B45309', marginBottom: 1 },
+    modalCalloutText: { fontSize: 10, color: '#78350f', lineHeight: 14 },
+    modalBtn: { backgroundColor: '#0B192C', width: '100%', height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+    modalBtnText: { color: '#D4AF37', fontSize: 12, fontWeight: '800' },
 });

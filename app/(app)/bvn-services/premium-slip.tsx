@@ -48,8 +48,8 @@ export default function BVNPremiumSlipScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 200) {
-            showAlert("Insufficient Balance", "Your account balance is insufficient (₦200.00 required) to generate BVN Premium Slip.");
+        if (userBalance !== null && userBalance < 50) {
+            showAlert("Insufficient Balance", "Your account balance is insufficient. Please fund your wallet to continue.");
             return;
         }
 
@@ -68,7 +68,6 @@ export default function BVNPremiumSlipScreen() {
                 setUserDetails(uData);
                 showAlert("Slip Generated", "BVN Premium Slip generated successfully!", "success");
                 
-                // Save history
                 await verificationHistory.save({
                     service_category: 'bvn',
                     service_type: 'bvn_premium_slip',
@@ -83,7 +82,7 @@ export default function BVNPremiumSlipScreen() {
                 });
                 fetchWalletBalance();
             } else {
-                showAlert("Generation Failed", res?.message || "The server could not generate the slip for this BVN.");
+                showAlert("Generation Failed", res?.message || "Could not generate slip for this BVN.");
             }
         } catch (e: any) {
             showAlert("Error", e.message || "An error occurred while connecting to the server.");
@@ -116,7 +115,7 @@ export default function BVNPremiumSlipScreen() {
                 const fileUri = `${docDir}bvn_premium_slip_${bvn || 'official'}.pdf`;
                 await FileSystem.writeAsStringAsync(fileUri, generatedPdf, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
                 if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download BVN Premium Slip (PDF)' });
+                    await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download BVN Premium Slip' });
                 }
             }
         } catch (e: any) {
@@ -135,38 +134,38 @@ export default function BVNPremiumSlipScreen() {
             <StatusBar style="light" />
 
             <LinearGradient
-                colors={['#050B14', '#0B163A']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 24 }]}
+                colors={['#0B192C', '#06101E']}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 22 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
+                        <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={styles.noticeBadge}
                         onPress={() => setShowNoticeModal(true)}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="information-circle-outline" size={14} color="#38bdf8" style={{ marginRight: 4 }} />
-                        <Text style={styles.noticeBadgeText}>Notice & Rules</Text>
+                        <Ionicons name="information-circle-outline" size={13} color="#D4AF37" style={{ marginRight: 3 }} />
+                        <Text style={styles.noticeBadgeText}>Guidelines</Text>
                     </TouchableOpacity>
                 </View>
                 <Text style={styles.titleText}>BVN Premium Slip</Text>
-                <Text style={styles.subText}>Generate and download official BVN premium slips instantly</Text>
+                <Text style={styles.subText}>Generate and download official PDF slips</Text>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }}>
                 {/* Form Card */}
                 <View style={styles.formCard}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <View style={styles.labelRow}>
                         <Text style={styles.inputLabel}>TARGET BVN NUMBER</Text>
                         <Text style={styles.digitCounter}>{bvn.length}/11 digits</Text>
                     </View>
                     <View style={styles.inputRow}>
-                        <Ionicons name="document-text-outline" size={20} color="#64748b" style={{ marginRight: 8 }} />
+                        <Ionicons name="document-text-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
                         <TextInput
                             style={styles.input}
-                            placeholder="Enter the 11-digit BVN"
+                            placeholder="Enter 11-digit BVN"
                             placeholderTextColor="#94a3b8"
                             keyboardType="numeric"
                             maxLength={11}
@@ -175,22 +174,17 @@ export default function BVNPremiumSlipScreen() {
                         />
                     </View>
 
-                    <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Generation Charge:</Text>
-                        <Text style={styles.costVal}>₦200.00</Text>
-                    </View>
-
                     <TouchableOpacity
-                        style={[styles.btn, (loading || bvn.length !== 11) && { opacity: 0.7 }]}
+                        style={[styles.btn, (loading || bvn.length !== 11) && { opacity: 0.6 }]}
                         onPress={handleGenerateSlip}
                         disabled={loading || bvn.length !== 11}
                         activeOpacity={0.8}
                     >
                         {loading ? (
-                            <ActivityIndicator color="#ffffff" />
+                            <ActivityIndicator color="#0B192C" size="small" />
                         ) : (
                             <>
-                                <Ionicons name="document-attach" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                                <Ionicons name="document-attach" size={16} color="#0B192C" style={{ marginRight: 6 }} />
                                 <Text style={styles.btnText}>Generate Premium Slip</Text>
                             </>
                         )}
@@ -201,8 +195,8 @@ export default function BVNPremiumSlipScreen() {
                 {generatedPdf && (
                     <View style={styles.resultCard}>
                         <View style={styles.resultHeader}>
-                            <Ionicons name="checkmark-circle" size={24} color="#059669" />
-                            <Text style={styles.resultHeaderText}>Official Slip Generated</Text>
+                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                            <Text style={styles.resultHeaderText}>Slip Ready for Download</Text>
                         </View>
 
                         {/* User Identity Snapshot */}
@@ -212,11 +206,11 @@ export default function BVNPremiumSlipScreen() {
                                     <Image source={{ uri: userPhotoUri }} style={styles.userPhoto} />
                                 ) : (
                                     <View style={[styles.userPhoto, styles.photoPlaceholder]}>
-                                        <Ionicons name="person" size={32} color="#94a3b8" />
+                                        <Ionicons name="person" size={26} color="#94a3b8" />
                                     </View>
                                 )}
-                                <View style={{ flex: 1, marginLeft: 14 }}>
-                                    <Text style={styles.userName}>{`${userDetails.firstName || ''} ${userDetails.middleName || ''} ${userDetails.lastName || ''}`.trim() || userDetails.nameOnCard || 'BVN Holder'}</Text>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <Text style={styles.userName} numberOfLines={1}>{`${userDetails.firstName || ''} ${userDetails.middleName || ''} ${userDetails.lastName || ''}`.trim() || userDetails.nameOnCard || 'BVN Holder'}</Text>
                                     <Text style={styles.userBvn}>BVN: {userDetails.bvn || bvn}</Text>
                                     {userDetails.phoneNumber ? (
                                         <Text style={styles.userDetailRow}>Phone: {userDetails.phoneNumber}</Text>
@@ -232,8 +226,8 @@ export default function BVNPremiumSlipScreen() {
                         )}
 
                         <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadPdf} activeOpacity={0.8}>
-                            <Ionicons name="download" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                            <Text style={styles.downloadBtnText}>Download PDF Slip Now</Text>
+                            <Ionicons name="download-outline" size={16} color="#0B192C" style={{ marginRight: 6 }} />
+                            <Text style={styles.downloadBtnText}>Download PDF Slip</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -242,11 +236,11 @@ export default function BVNPremiumSlipScreen() {
                 <View style={styles.historyCard}>
                     <View style={styles.historyCardHeader}>
                         <View style={styles.historyIconBox}>
-                            <Ionicons name="document-text-outline" size={20} color="#0284c7" />
+                            <Ionicons name="time-outline" size={18} color="#D4AF37" />
                         </View>
                         <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={styles.historyTitle}>Track Your History</Text>
-                            <Text style={styles.historyDesc}>Monitor your previously generated slips securely from your history log. You can re-download PDFs here at any time.</Text>
+                            <Text style={styles.historyTitle}>Slip History</Text>
+                            <Text style={styles.historyDesc}>View past slips and re-download anytime.</Text>
                         </View>
                     </View>
                     <TouchableOpacity 
@@ -255,23 +249,23 @@ export default function BVNPremiumSlipScreen() {
                         activeOpacity={0.8}
                     >
                         <Text style={styles.historyBtnText}>Go to Slip History</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#0284c7" />
+                        <Ionicons name="arrow-forward" size={14} color="#0B192C" />
                     </TouchableOpacity>
                 </View>
 
                 {/* Guidelines Card */}
                 <View style={styles.guidelinesCard}>
                     <View style={styles.guidelinesHeader}>
-                        <Ionicons name="information-circle-outline" size={18} color="#64748b" />
+                        <Ionicons name="information-circle-outline" size={16} color="#64748b" />
                         <Text style={styles.guidelinesHeaderText}>Important Guidelines</Text>
                     </View>
-                    <Text style={styles.guidelineItem}>• Ensure the 11-digit BVN format is completely correct before submitting.</Text>
-                    <Text style={styles.guidelineItem}>• If we fail to generate the slip due to a database error, your wallet will be instantly refunded.</Text>
-                    <Text style={styles.guidelineItem}>• Please download the PDF immediately upon successful generation.</Text>
+                    <Text style={styles.guidelineItem}>• Ensure the 11-digit BVN format is correct.</Text>
+                    <Text style={styles.guidelineItem}>• Failed generation due to provider error is automatically refunded.</Text>
+                    <Text style={styles.guidelineItem}>• Download the PDF immediately after generation.</Text>
                 </View>
             </ScrollView>
 
-            {/* Important Notice Modal */}
+            {/* Terms Modal */}
             <Modal
                 visible={showNoticeModal}
                 transparent={true}
@@ -281,21 +275,21 @@ export default function BVNPremiumSlipScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalIconBox}>
-                            <Ionicons name="document-text" size={28} color="#0284c7" />
+                            <Ionicons name="document-text-outline" size={24} color="#D4AF37" />
                         </View>
                         <Text style={styles.modalTitle}>Important Notice</Text>
                         <Text style={styles.modalBody}>
-                            You are about to generate a <Text style={{ fontWeight: 'bold' }}>BVN Premium Slip</Text> for the provided Bank Verification Number.
+                            You are generating an official <Text style={{ fontWeight: 'bold', color: '#0B192C' }}>BVN Premium Slip</Text> for the provided Bank Verification Number.
                         </Text>
                         
                         <View style={styles.calloutBox}>
                             <Text style={styles.calloutText}>
-                                Your wallet will only be charged if the slip is successfully generated by the database.
+                                Your wallet will only be charged upon successful generation.
                             </Text>
                         </View>
 
-                        <Text style={[styles.modalBody, { marginTop: 10 }]}>
-                            Once generated, click the download button immediately to save your PDF slip to your device. You can also re-download it from your History.
+                        <Text style={[styles.modalBody, { marginTop: 6 }]}>
+                            Once generated, download the PDF immediately or access it from your Slip History.
                         </Text>
 
                         <TouchableOpacity
@@ -303,7 +297,7 @@ export default function BVNPremiumSlipScreen() {
                             onPress={() => setShowNoticeModal(false)}
                             activeOpacity={0.8}
                         >
-                            <Text style={styles.modalBtnText}>I Understand & Agree</Text>
+                            <Text style={styles.modalBtnText}>I Understand</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -314,53 +308,51 @@ export default function BVNPremiumSlipScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
-    headerGradient: { paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    headerGradient: { paddingHorizontal: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(56,189,248,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#38bdf8' },
-    noticeBadgeText: { color: '#7dd3fc', fontSize: 11, fontWeight: '700' },
-    titleText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
-    subText: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-    content: { flex: 1, padding: 16 },
-    formCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-    inputLabel: { fontSize: 11, fontWeight: '800', color: '#475569' },
-    digitCounter: { fontSize: 11, fontWeight: '700', color: '#94a3b8' },
-    inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 12, height: 48 },
-    input: { flex: 1, fontSize: 15, fontWeight: '700', color: '#0f172a' },
-    costRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 14 },
-    costLabel: { fontSize: 12, color: '#64748b' },
-    costVal: { fontSize: 16, fontWeight: '900', color: '#0284c7' },
-    btn: { backgroundColor: '#0284c7', height: 48, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    btnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-    resultCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#bae6fd', marginBottom: 16 },
-    resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    resultHeaderText: { fontSize: 14, fontWeight: '800', color: '#059669', marginLeft: 8 },
-    userSnapshot: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' },
-    userPhoto: { width: 64, height: 76, borderRadius: 8, backgroundColor: '#e2e8f0' },
+    backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    noticeBadgeText: { color: '#D4AF37', fontSize: 10, fontWeight: '700' },
+    titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+    subText: { color: '#94a3b8', fontSize: 11, marginTop: 1 },
+    content: { flex: 1, paddingHorizontal: 14, paddingTop: 12 },
+    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
+    labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    inputLabel: { fontSize: 10, fontWeight: '800', color: '#475569', letterSpacing: 0.3 },
+    digitCounter: { fontSize: 10, fontWeight: '700', color: '#94a3b8' },
+    inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, height: 44, marginBottom: 12 },
+    input: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0B192C' },
+    btn: { backgroundColor: '#D4AF37', height: 44, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    btnText: { color: '#0B192C', fontSize: 13, fontWeight: '800' },
+    resultCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginBottom: 12 },
+    resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    resultHeaderText: { fontSize: 13, fontWeight: '800', color: '#10B981', marginLeft: 6 },
+    userSnapshot: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 10, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+    userPhoto: { width: 54, height: 64, borderRadius: 6, backgroundColor: '#e2e8f0' },
     photoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-    userName: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
-    userBvn: { fontSize: 12, fontWeight: '700', color: '#0284c7', marginTop: 2 },
-    userDetailRow: { fontSize: 11, color: '#64748b', marginTop: 2 },
-    downloadBtn: { backgroundColor: '#0284c7', height: 44, paddingHorizontal: 20, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    downloadBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-    historyCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-    historyCardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-    historyIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' },
-    historyTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
-    historyDesc: { fontSize: 11, color: '#64748b', lineHeight: 16, marginTop: 2 },
-    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f0f9ff', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: '#bae6fd' },
-    historyBtnText: { fontSize: 12, fontWeight: '700', color: '#0284c7' },
-    guidelinesCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f1f5f9' },
-    guidelinesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    guidelinesHeaderText: { fontSize: 12, fontWeight: '800', color: '#475569', marginLeft: 6 },
-    guidelineItem: { fontSize: 11, color: '#64748b', lineHeight: 17, marginBottom: 4 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    modalCard: { width: '100%', maxWidth: 400, backgroundColor: '#ffffff', borderRadius: 20, padding: 20, alignItems: 'center' },
-    modalIconBox: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-    modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 6 },
-    modalBody: { fontSize: 12, color: '#475569', textAlign: 'center', lineHeight: 18 },
-    calloutBox: { backgroundColor: '#f0f9ff', borderWidth: 1, borderColor: '#bae6fd', borderRadius: 8, padding: 10, marginVertical: 10, width: '100%' },
-    calloutText: { fontSize: 11, fontWeight: '700', color: '#0369a1', textAlign: 'center', lineHeight: 16 },
-    modalBtn: { backgroundColor: '#0284c7', width: '100%', height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-    modalBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+    userName: { fontSize: 13, fontWeight: '800', color: '#0B192C' },
+    userBvn: { fontSize: 11, fontWeight: '700', color: '#B45309', marginTop: 1 },
+    userDetailRow: { fontSize: 10, color: '#64748b', marginTop: 1 },
+    downloadBtn: { backgroundColor: '#D4AF37', height: 40, paddingHorizontal: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    downloadBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
+    historyCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
+    historyCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    historyIconBox: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(212,175,55,0.25)' },
+    historyTitle: { fontSize: 12, fontWeight: '800', color: '#0B192C' },
+    historyDesc: { fontSize: 10, color: '#64748b', marginTop: 1 },
+    historyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FEF9E7', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    historyBtnText: { fontSize: 11, fontWeight: '700', color: '#0B192C' },
+    guidelinesCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+    guidelinesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    guidelinesHeaderText: { fontSize: 11, fontWeight: '800', color: '#475569', marginLeft: 4 },
+    guidelineItem: { fontSize: 10, color: '#64748b', lineHeight: 15, marginBottom: 3 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalCard: { width: '100%', maxWidth: 360, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, alignItems: 'center' },
+    modalIconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    modalTitle: { fontSize: 16, fontWeight: '900', color: '#0B192C', marginBottom: 4 },
+    modalBody: { fontSize: 11, color: '#475569', textAlign: 'center', lineHeight: 16 },
+    calloutBox: { backgroundColor: '#FEF9E7', borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', borderRadius: 8, padding: 8, marginVertical: 8, width: '100%' },
+    calloutText: { fontSize: 10, fontWeight: '700', color: '#B45309', textAlign: 'center', lineHeight: 14 },
+    modalBtn: { backgroundColor: '#0B192C', width: '100%', height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+    modalBtnText: { color: '#D4AF37', fontSize: 12, fontWeight: '800' },
 });

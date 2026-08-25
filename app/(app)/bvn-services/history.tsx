@@ -49,7 +49,7 @@ export default function BVNHistoryScreen() {
                         id: item.id,
                         bvn: bvnNum,
                         name: fullName,
-                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently',
+                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
                         data: raw
                     });
                 }
@@ -84,74 +84,44 @@ export default function BVNHistoryScreen() {
         <html>
         <head>
             <meta charset="utf-8">
-            <title>Official BVN Verification Slip - ${bvnNum}</title>
+            <title>Official BVN Slip - ${bvnNum}</title>
             <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8fafc; color: #1e293b; }
-                .card { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden; }
-                .header { background: #0f172a; color: white; padding: 20px; text-align: center; }
-                .header h1 { margin: 0 0 4px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-                .header p { margin: 0; font-size: 11px; opacity: 0.8; }
-                .body { padding: 24px; display: flex; gap: 20px; }
-                .photo-box { width: 120px; height: 140px; background: #e2e8f0; border: 1px solid #94a3b8; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8fafc; color: #0B192C; }
+                .card { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; border: 2px solid #D4AF37; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
+                .header { background: #0B192C; color: white; padding: 14px; text-align: center; border-bottom: 2px solid #D4AF37; }
+                .header h1 { margin: 0 0 2px 0; font-size: 15px; text-transform: uppercase; color: #D4AF37; letter-spacing: 0.5px; }
+                .header p { margin: 0; font-size: 10px; opacity: 0.8; }
+                .body { padding: 16px; display: flex; gap: 14px; }
+                .photo-box { width: 90px; height: 110px; background: #FEF9E7; border: 1px solid #D4AF37; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                 .photo-box img { width: 100%; height: 100%; object-fit: cover; }
                 .info { flex: 1; }
-                .row { margin-bottom: 10px; }
-                .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 2px; }
-                .val { font-size: 14px; font-weight: bold; color: #0f172a; }
-                .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-                .footer { background: #f1f5f9; padding: 12px 24px; font-size: 10px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
-                .watermark { font-size: 16px; font-weight: 900; letter-spacing: 2px; color: #059669; }
+                .row { margin-bottom: 6px; }
+                .label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 1px; }
+                .val { font-size: 12px; font-weight: bold; color: #0B192C; }
+                .val-highlight { color: #B45309; font-size: 14px; }
+                .footer { background: #f8fafc; padding: 8px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
             </style>
         </head>
         <body>
             <div class="card">
                 <div class="header">
-                    <h1>Central Bank of Nigeria / NIBSS</h1>
-                    <p>OFFICIAL BIOMETRIC VERIFICATION NUMBER (BVN) RECORD</p>
+                    <h1>BANK VERIFICATION RECORD</h1>
+                    <p>Official Verification Slip</p>
                 </div>
                 <div class="body">
                     <div class="photo-box">
-                        ${photoSrc ? `<img src="${photoSrc}" />` : `<div style="font-size:10px;color:#64748b;">PASSPORT</div>`}
+                        ${photoSrc ? `<img src="${photoSrc}" />` : `<span style="font-size:24px; color:#B45309; font-weight:bold;">${fullName.charAt(0)}</span>`}
                     </div>
                     <div class="info">
-                        <div class="row">
-                            <div class="label">Full Name</div>
-                            <div class="val">${fullName}</div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="row">
-                                <div class="label">BVN Number</div>
-                                <div class="val watermark">${bvnNum}</div>
-                            </div>
-                            <div class="row">
-                                <div class="label">NIN Number</div>
-                                <div class="val">${ninNum}</div>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="row">
-                                <div class="label">Date of Birth</div>
-                                <div class="val">${dob}</div>
-                            </div>
-                            <div class="row">
-                                <div class="label">Gender</div>
-                                <div class="val">${gender}</div>
-                            </div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="row">
-                                <div class="label">Phone Number</div>
-                                <div class="val">${phone}</div>
-                            </div>
-                            <div class="row">
-                                <div class="label">State / LGA</div>
-                                <div class="val">${state} / ${lga}</div>
-                            </div>
-                        </div>
+                        <div class="row"><div class="label">Full Name</div><div class="val">${fullName}</div></div>
+                        <div class="row"><div class="label">BVN Number</div><div class="val val-highlight">${bvnNum}</div></div>
+                        <div class="row"><div class="label">Date of Birth & Gender</div><div class="val">${dob} • ${gender}</div></div>
+                        <div class="row"><div class="label">Phone Number</div><div class="val">${phone}</div></div>
+                        <div class="row"><div class="label">State / LGA</div><div class="val">${state} / ${lga}</div></div>
                     </div>
                 </div>
                 <div class="footer">
-                    Generated securely via Abu-Mafhal Integrated Hub • NIBSS Verified Record
+                    Abu-Mafhal Integrated Hub • NIBSS Verified Record
                 </div>
             </div>
         </body>
@@ -171,7 +141,7 @@ export default function BVNHistoryScreen() {
                 await Print.printAsync({ html });
             }
         } catch (e: any) {
-            Alert.alert("Print Error", e.message);
+            Alert.alert("Print Error", e.message || "Failed to print verification slip.");
         } finally {
             setPrintingId(null);
         }
@@ -182,19 +152,22 @@ export default function BVNHistoryScreen() {
     }, []);
 
     const filtered = history.filter(item => {
-        const query = searchQuery.toLowerCase();
-        return (item.name && item.name.toLowerCase().includes(query)) ||
-               (item.bvn && item.bvn.includes(query));
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+        return (
+            (item.name && item.name.toLowerCase().includes(query)) ||
+            (item.bvn && item.bvn.includes(query))
+        );
     });
 
-    const handleClearHistory = async () => {
+    const handleClearHistory = () => {
         Alert.alert(
             "Clear History",
-            "Are you sure you want to clear all BVN verification history?",
+            "Are you sure you want to clear your local BVN history?",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Yes, Clear",
+                    text: "Clear All",
                     style: "destructive",
                     onPress: async () => {
                         await AsyncStorage.removeItem('recent_bvn_verifications');
@@ -211,49 +184,49 @@ export default function BVNHistoryScreen() {
             <StatusBar style="light" />
 
             <LinearGradient
-                colors={['#050B14', '#0B163A']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 24 }]}
+                colors={['#0B192C', '#06101E']}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 20 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
+                        <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
                     {history.length > 0 && (
-                        <TouchableOpacity onPress={handleClearHistory} style={styles.clearBtn}>
-                            <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                        <TouchableOpacity onPress={handleClearHistory} style={styles.clearBtn} activeOpacity={0.8}>
+                            <Ionicons name="trash-outline" size={13} color="#ef4444" />
                             <Text style={styles.clearBtnText}>Clear</Text>
                         </TouchableOpacity>
                     )}
                 </View>
-                <Text style={styles.titleText}>BVN Verification History</Text>
-                <Text style={styles.subText}>View past verified records and reprint slips</Text>
+                <Text style={styles.titleText}>BVN History</Text>
+                <Text style={styles.subText}>View past verified records and reprints</Text>
 
                 {/* Search Bar */}
                 <View style={styles.searchBar}>
-                    <Ionicons name="search" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                    <Ionicons name="search-outline" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search by Name or BVN Number..."
+                        placeholder="Search by Name or BVN..."
                         placeholderTextColor="#94a3b8"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                            <Ionicons name="close-circle" size={15} color="#94a3b8" />
                         </TouchableOpacity>
                     )}
                 </View>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }}>
                 {loading ? (
-                    <ActivityIndicator size="large" color="#0284c7" style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="small" color="#D4AF37" style={{ marginTop: 30 }} />
                 ) : filtered.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Ionicons name="folder-open-outline" size={48} color="#cbd5e1" />
+                        <Ionicons name="folder-open-outline" size={40} color="#cbd5e1" />
                         <Text style={styles.emptyTitle}>No Verification History</Text>
-                        <Text style={styles.emptyDesc}>All verified BVN records will appear here for review and free reprinting.</Text>
+                        <Text style={styles.emptyDesc}>All verified BVN records will appear here for free reprinting.</Text>
                     </View>
                 ) : (
                     filtered.map((item) => (
@@ -268,10 +241,10 @@ export default function BVNHistoryScreen() {
                         >
                             <View style={styles.cardHeader}>
                                 <View style={styles.iconBox}>
-                                    <Ionicons name="finger-print" size={20} color="#0284c7" />
+                                    <Ionicons name="finger-print-outline" size={18} color="#D4AF37" />
                                 </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.holderName}>{item.name || 'BVN Holder'}</Text>
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.holderName} numberOfLines={1}>{item.name || 'BVN Holder'}</Text>
                                     <Text style={styles.bvnNumber}>{item.bvn}</Text>
                                 </View>
                                 <TouchableOpacity 
@@ -283,18 +256,20 @@ export default function BVNHistoryScreen() {
                                     }}
                                 >
                                     {printingId === (item.id || item.bvn) ? (
-                                        <ActivityIndicator size="small" color="#059669" />
+                                        <ActivityIndicator size="small" color="#0B192C" />
                                     ) : (
                                         <>
-                                            <Ionicons name="print-outline" size={14} color="#059669" />
-                                            <Text style={styles.reprintText}>Print Slip</Text>
+                                            <Ionicons name="print-outline" size={13} color="#0B192C" />
+                                            <Text style={styles.reprintText}>Print</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.cardFooter}>
                                 <Text style={styles.dateText}>{item.date || 'Recently'}</Text>
-                                <Text style={styles.statusText}>VERIFIED</Text>
+                                <View style={styles.statusPill}>
+                                    <Text style={styles.statusText}>VERIFIED</Text>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     ))
@@ -306,27 +281,28 @@ export default function BVNHistoryScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
-    headerGradient: { paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    headerGradient: { paddingHorizontal: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-    clearBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    clearBtnText: { color: '#f87171', fontSize: 11, fontWeight: '700', marginLeft: 4 },
-    titleText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
-    subText: { color: '#94a3b8', fontSize: 12, marginTop: 2, marginBottom: 12 },
-    searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 12, height: 42 },
-    searchInput: { flex: 1, fontSize: 13, color: '#0f172a' },
-    content: { flex: 1, padding: 16 },
-    emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 30 },
-    emptyTitle: { fontSize: 16, fontWeight: '800', color: '#475569', marginTop: 12 },
-    emptyDesc: { fontSize: 12, color: '#94a3b8', textAlign: 'center', marginTop: 6, lineHeight: 18 },
-    card: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+    backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    clearBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    clearBtnText: { color: '#f87171', fontSize: 10, fontWeight: '700', marginLeft: 3 },
+    titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+    subText: { color: '#94a3b8', fontSize: 11, marginTop: 1, marginBottom: 10 },
+    searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 10, paddingHorizontal: 10, height: 38 },
+    searchInput: { flex: 1, fontSize: 12, color: '#0B192C' },
+    content: { flex: 1, paddingHorizontal: 14, paddingTop: 12 },
+    emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 40, paddingHorizontal: 20 },
+    emptyTitle: { fontSize: 14, fontWeight: '800', color: '#475569', marginTop: 10 },
+    emptyDesc: { fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 4, lineHeight: 16 },
+    card: { backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' },
     cardHeader: { flexDirection: 'row', alignItems: 'center' },
-    iconBox: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#f0f9ff', alignItems: 'center', justifyContent: 'center' },
-    holderName: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
-    bvnNumber: { fontSize: 12, color: '#64748b', marginTop: 2, fontWeight: '600' },
-    reprintBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ecfdf5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-    reprintText: { fontSize: 11, fontWeight: '700', color: '#059669', marginLeft: 4 },
-    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-    dateText: { fontSize: 11, color: '#94a3b8' },
-    statusText: { fontSize: 10, fontWeight: '800', color: '#10B981' },
+    iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(212,175,55,0.25)' },
+    holderName: { fontSize: 13, fontWeight: '800', color: '#0B192C' },
+    bvnNumber: { fontSize: 11, color: '#B45309', marginTop: 1, fontWeight: '700' },
+    reprintBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF9E7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    reprintText: { fontSize: 10, fontWeight: '700', color: '#0B192C', marginLeft: 3 },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+    dateText: { fontSize: 10, color: '#94a3b8' },
+    statusPill: { backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    statusText: { fontSize: 9, fontWeight: '800', color: '#15803d' },
 });

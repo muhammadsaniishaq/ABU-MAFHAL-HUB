@@ -11,72 +11,51 @@ import DynamicBanners from '../../../components/DynamicBanners';
 const BVN_SERVICES = [
     {
         id: 'verify',
-        title: 'BVN Verification & Card',
-        desc: 'Instant BVN details & printable HD ID Card',
-        icon: 'finger-print',
-        bgColor: '#f0f9ff',
-        iconColor: '#0284c7',
-        priceTag: '₦150',
+        title: 'BVN Verification',
+        desc: 'Instant lookup & HD ID Card',
+        icon: 'finger-print-outline',
         route: '/(app)/bvn-services/verify',
     },
     {
         id: 'premium-slip',
         title: 'BVN Premium Slip',
-        desc: 'Official electronic printable PDF slip',
-        icon: 'document-text',
-        bgColor: '#ecfdf5',
-        iconColor: '#059669',
-        priceTag: '₦150',
+        desc: 'Official electronic printable PDF',
+        icon: 'document-text-outline',
         route: '/(app)/bvn-services/premium-slip',
     },
     {
         id: 'retrieval',
-        title: 'BVN Retrieval (Phone/CRM)',
-        desc: 'Recover lost/forgotten BVN via phone number',
-        icon: 'call',
-        bgColor: '#eff6ff',
-        iconColor: '#2563eb',
-        priceTag: '₦900',
+        title: 'BVN Retrieval',
+        desc: 'Recover BVN via Phone or CRM',
+        icon: 'search-outline',
         route: '/(app)/bvn-services/retrieval',
     },
     {
         id: 'vnin-to-nibss',
         title: 'VNIN to NIBSS',
-        desc: 'Link VNIN & BVN directly to NIBSS database',
-        icon: 'link',
-        bgColor: '#faf5ff',
-        iconColor: '#9333ea',
-        priceTag: '₦2,500',
+        desc: 'Link VNIN directly to NIBSS',
+        icon: 'link-outline',
         route: '/(app)/bvn-services/vnin-to-nibss',
     },
     {
         id: 'modification',
         title: 'BVN Modification',
-        desc: 'Change Date of Birth, Name, Phone Number',
-        icon: 'create',
-        bgColor: '#fffbeb',
-        iconColor: '#d97706',
-        priceTag: 'From ₦5,000',
+        desc: 'Change Name, DOB, or Phone',
+        icon: 'create-outline',
         route: '/(app)/bvn-services/modification',
     },
     {
         id: 'enrollment',
-        title: 'BVN User Enrollment',
-        desc: 'Direct enrollment for new BVN account holders',
-        icon: 'person-add',
-        bgColor: '#eef2ff',
-        iconColor: '#4f46e5',
-        priceTag: 'Agent Portal',
+        title: 'User Enrollment',
+        desc: 'Direct enrollment for new holders',
+        icon: 'person-add-outline',
         route: '/(app)/bvn-services/enrollment',
     },
     {
         id: 'history',
-        title: 'BVN History & Reprints',
-        desc: 'View past verifications and reprint cards/slips',
-        icon: 'time',
-        bgColor: '#fef9c3',
-        iconColor: '#b45309',
-        priceTag: 'Free Reprint',
+        title: 'BVN History',
+        desc: 'Past logs & instant reprints',
+        icon: 'time-outline',
         route: '/(app)/bvn-services/history',
     },
 ];
@@ -109,17 +88,14 @@ export default function BVNServicesGatewayScreen() {
             <StatusBar style="light" />
 
             <LinearGradient
-                colors={['#050B14', '#0B163A']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 36 }]}
+                colors={['#0B192C', '#06101E']}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 24 }]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <View style={styles.decorator1} />
-                <View style={styles.decorator2} />
-
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                        <Ionicons name="chevron-back" size={20} color="#ffffff" />
+                        <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={styles.secureBadge}>
                         <View style={styles.secureDot} />
@@ -128,19 +104,19 @@ export default function BVNServicesGatewayScreen() {
                 </View>
 
                 <View style={styles.titleRow}>
-                    <Ionicons name="shield-checkmark" size={22} color="#f5a623" />
+                    <Ionicons name="shield-checkmark" size={20} color="#D4AF37" />
                     <Text style={styles.titleText}>BVN Services</Text>
                 </View>
-                <Text style={styles.subtitleText}>Bank Verification Number Gateway & Identity Suite</Text>
+                <Text style={styles.subtitleText}>Official Bank Verification Gateway</Text>
 
-                {/* Wallet Balance widget */}
+                {/* Compact Wallet Bar */}
                 <View style={styles.walletBar}>
                     <View style={styles.walletLeft}>
-                        <Ionicons name="wallet-outline" size={18} color="#060d21" />
+                        <Ionicons name="wallet-outline" size={16} color="#D4AF37" />
                         <View style={{ marginLeft: 8 }}>
                             <Text style={styles.walletLabel}>Available Balance</Text>
                             <Text style={styles.walletVal}>
-                                {userBalance !== null ? `₦${userBalance.toLocaleString()}` : 'Loading...'}
+                                {userBalance !== null ? `₦${userBalance.toLocaleString()}` : '...'}
                             </Text>
                         </View>
                     </View>
@@ -149,13 +125,13 @@ export default function BVNServicesGatewayScreen() {
                         onPress={() => router.push('/(app)/wallet')}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="add-circle" size={14} color="#ffffff" />
-                        <Text style={styles.fundBtnText}>Fund Wallet</Text>
+                        <Ionicons name="add" size={14} color="#0B192C" />
+                        <Text style={styles.fundBtnText}>Fund</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 16, marginTop: -12 }} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <DynamicBanners placement="nin_bvn" />
 
                 <View style={styles.grid}>
@@ -167,31 +143,29 @@ export default function BVNServicesGatewayScreen() {
                             activeOpacity={0.8}
                         >
                             <View style={styles.menuHeader}>
-                                <View style={[styles.iconBox, { backgroundColor: service.bgColor }]}>
-                                    <Ionicons name={service.icon as any} size={20} color={service.iconColor} />
+                                <View style={styles.iconBox}>
+                                    <Ionicons name={service.icon as any} size={18} color="#D4AF37" />
                                 </View>
-                                <View style={[styles.priceBadge, { backgroundColor: service.bgColor }]}>
-                                    <Text style={[styles.priceBadgeText, { color: service.iconColor }]}>{service.priceTag}</Text>
-                                </View>
+                                <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
                             </View>
-                            <Text style={styles.menuTitle}>{service.title}</Text>
-                            <Text style={styles.menuDesc}>{service.desc}</Text>
+                            <Text style={styles.menuTitle} numberOfLines={1}>{service.title}</Text>
+                            <Text style={styles.menuDesc} numberOfLines={1}>{service.desc}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
 
-                {/* Support Banner */}
+                {/* Compact Support Banner */}
                 <View style={styles.supportBanner}>
                     <View style={styles.supportLeft}>
                         <Text style={styles.supportTitle}>Need Help with BVN?</Text>
-                        <Text style={styles.supportDesc}>Contact our support team for issues regarding BVN retrieval, modifications or NIBSS linking.</Text>
+                        <Text style={styles.supportDesc}>Contact support for instant assistance</Text>
                     </View>
                     <TouchableOpacity 
                         style={styles.supportButton} 
                         activeOpacity={0.8}
                         onPress={() => router.push('/(app)/support')}
                     >
-                        <Ionicons name="chatbubbles" size={18} color="#050B14" />
+                        <Ionicons name="chatbubbles-outline" size={16} color="#0B192C" />
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -205,223 +179,186 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8fafc',
     },
     headerGradient: {
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 15,
-        elevation: 10,
-        paddingHorizontal: 20,
-        position: 'relative',
-    },
-    decorator1: {
-        position: 'absolute',
-        top: -40,
-        right: -32,
-        width: 128,
-        height: 128,
-        borderRadius: 64,
-        backgroundColor: '#f5a623',
-        opacity: 0.05,
-    },
-    decorator2: {
-        position: 'absolute',
-        top: 40,
-        left: -32,
-        width: 96,
-        height: 96,
-        borderRadius: 48,
-        backgroundColor: '#4F46E5',
-        opacity: 0.06,
+        paddingHorizontal: 16,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
     },
     headerTop: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        alignItems: 'center',
+        marginBottom: 8,
     },
     backButton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.08)',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     secureBadge: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 99,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: 'rgba(212,175,55,0.12)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.3)',
     },
     secureDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#10B981',
-        marginRight: 6,
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: '#D4AF37',
+        marginRight: 5,
     },
     secureText: {
-        color: '#ffffff',
-        fontSize: 10,
-        fontWeight: '700',
+        color: '#D4AF37',
+        fontSize: 9,
+        fontWeight: '800',
         letterSpacing: 0.5,
     },
     titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 2,
+        gap: 6,
     },
     titleText: {
         color: '#ffffff',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
-        marginLeft: 8,
-        letterSpacing: 0.2,
     },
     subtitleText: {
         color: '#94a3b8',
-        fontSize: 12,
-        marginTop: 4,
-        marginBottom: 14,
+        fontSize: 11,
+        marginTop: 2,
+        marginBottom: 12,
     },
     walletBar: {
-        backgroundColor: '#ffffff',
-        borderRadius: 14,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        elevation: 3,
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.2)',
     },
     walletLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     walletLabel: {
-        fontSize: 10,
-        color: '#64748b',
+        color: '#94a3b8',
+        fontSize: 9,
         fontWeight: '600',
     },
     walletVal: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: '#0f172a',
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '800',
     },
     fundBtn: {
-        backgroundColor: '#060d21',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#D4AF37',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
     },
     fundBtnText: {
-        color: '#ffffff',
+        color: '#0B192C',
         fontSize: 11,
         fontWeight: '800',
-        marginLeft: 4,
+        marginLeft: 2,
+    },
+    content: {
+        flex: 1,
+        paddingHorizontal: 14,
+        marginTop: 8,
     },
     scrollContent: {
-        paddingBottom: 40,
-        paddingTop: 10,
+        paddingBottom: 30,
     },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginTop: 10,
+        marginTop: 8,
     },
     menuItem: {
         width: '48.5%',
         backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 14,
-        marginBottom: 12,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
         borderWidth: 1,
         borderColor: '#e2e8f0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
     },
     menuHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 10,
+        alignItems: 'center',
+        marginBottom: 8,
     },
     iconBox: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#FEF9E7',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    priceBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    priceBadgeText: {
-        fontSize: 9,
-        fontWeight: '800',
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.25)',
     },
     menuTitle: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
-        color: '#0f172a',
-        marginBottom: 4,
+        color: '#0B192C',
+        marginBottom: 2,
     },
     menuDesc: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#64748b',
-        lineHeight: 15,
     },
     supportBanner: {
-        backgroundColor: '#fef3c7',
-        borderRadius: 16,
-        padding: 16,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 12,
         marginTop: 6,
         borderWidth: 1,
-        borderColor: '#fde68a',
+        borderColor: '#e2e8f0',
     },
     supportLeft: {
         flex: 1,
-        marginRight: 12,
+        marginRight: 10,
     },
     supportTitle: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '800',
-        color: '#92400e',
-        marginBottom: 2,
+        color: '#0B192C',
     },
     supportDesc: {
-        fontSize: 11,
-        color: '#78350f',
-        lineHeight: 15,
+        fontSize: 10,
+        color: '#64748b',
+        marginTop: 1,
     },
     supportButton: {
-        backgroundColor: '#f59e0b',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#D4AF37',
         alignItems: 'center',
         justifyContent: 'center',
     },
