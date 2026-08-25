@@ -105,9 +105,9 @@ export default function BVNModificationScreen() {
 
                 await verificationHistory.save({
                     service_category: 'bvn',
+                    service_type: `bvn_modification_${selectedCode}`,
                     search_number: cleanBvn,
                     holder_name: `${newFirstName} ${newLastName}`.trim() || 'BVN Modification',
-                    price_paid: currentOption.price,
                     details: res.data || payload,
                 });
                 fetchWalletBalance();

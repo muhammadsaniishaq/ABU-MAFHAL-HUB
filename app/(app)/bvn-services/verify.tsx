@@ -144,9 +144,9 @@ export default function VerifyBVNScreen() {
 
                 await verificationHistory.save({
                     service_category: 'bvn',
+                    service_type: 'bvn_verification',
                     search_number: cleanBvn,
                     holder_name: fullName,
-                    price_paid: 150,
                     details: rawData,
                 });
 

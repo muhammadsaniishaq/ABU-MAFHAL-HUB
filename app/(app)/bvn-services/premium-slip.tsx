@@ -65,9 +65,9 @@ export default function BVNPremiumSlipScreen() {
                     // Save history
                     await verificationHistory.save({
                         service_category: 'bvn',
+                        service_type: 'bvn_premium_slip',
                         search_number: cleanBvn,
                         holder_name: extractFullName(res.data) || 'BVN Holder',
-                        price_paid: 150,
                         details: res.data,
                     });
                     fetchWalletBalance();

@@ -74,9 +74,9 @@ export default function VNINToNIBSSScreen() {
 
                 await verificationHistory.save({
                     service_category: 'bvn',
+                    service_type: 'vnin_to_nibss',
                     search_number: `${cleanVnin}_${cleanBvn}`,
                     holder_name: fullName.trim(),
-                    price_paid: 2500,
                     details: res.data || { vnin: cleanVnin, bvn: cleanBvn, status: 'SUBMITTED' },
                 });
                 fetchWalletBalance();

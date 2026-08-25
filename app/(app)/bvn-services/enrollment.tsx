@@ -84,9 +84,9 @@ export default function BVNEnrollmentScreen() {
 
                 await verificationHistory.save({
                     service_category: 'bvn',
+                    service_type: 'enrollment',
                     search_number: phone.trim(),
                     holder_name: `${firstName} ${lastName}`.trim(),
-                    price_paid: 0,
                     details: payload,
                 });
                 fetchWalletBalance();

@@ -40,6 +40,8 @@ export interface VerificationResult {
     isValid: boolean;
     data?: any;
     message: string;
+    pdf_base64?: string;
+    error?: string;
 }
 
 export interface IdentityVerifier {

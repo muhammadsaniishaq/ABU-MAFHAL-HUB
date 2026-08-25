@@ -754,8 +754,8 @@ export const api = {
         // ── Delink & Recovery ──────────────────────────────────────────
         /** Delink phone from NIN or retrieve linked info */
         delinkAndRetrieve: (number: string, phone?: string, priceId?: string) => identityVerifier.delinkAndRetrieve?.(number, phone, priceId),
-        /** Retrieve BVN by phone number or NIN */
-        retrieveBVN: (number: string, priceId?: string) => identityVerifier.retrieveBVN?.(number, priceId),
+        /** Retrieve BVN by phone number or CRM */
+        retrieveBVN: (number: string, priceId?: string, extra?: any) => identityVerifier.retrieveBVN?.(number, priceId, extra),
 
         // ── User Details / Modifications / Slips ───────────────────────
         /** Retrieve NIN personalization/enrollment details */

@@ -91,9 +91,9 @@ export default function BVNRetrievalScreen() {
 
                 await verificationHistory.save({
                     service_category: 'bvn',
+                    service_type: method === 'phone' ? 'bvn_retrieval_phone' : 'bvn_retrieval_crm',
                     search_number: cleanPhone || ticketId,
                     holder_name: fullName.trim() || rawData.fullName || 'BVN Holder',
-                    price_paid: 900,
                     details: rawData,
                 });
                 fetchWalletBalance();
@@ -184,7 +184,7 @@ export default function BVNRetrievalScreen() {
                         <>
                             <Text style={styles.inputLabel}>AGENT CODE</Text>
                             <View style={styles.inputRow}>
-                                <Ionicons name="badge-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+                                <Ionicons name="person-circle-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Agent ID"
