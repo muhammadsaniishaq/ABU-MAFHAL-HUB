@@ -601,15 +601,25 @@ export const AgentHubIdentityVerifier = {
     AgentHubIdentityVerifier.invokeEdge('vnin-to-nibss-status', referenceOrRequestId, { reference: referenceOrRequestId }),
 
   /** Request BVN Modification via AgentHub */
-  requestBVNModification: async (params: BVNModificationParams, priceId?: string) =>
-    AgentHubIdentityVerifier.invokeEdge('bvn-modification', params.number, {
-      bvn: params.number,
-      service_code: (params as any).service_code || '601',
-      phone_number: params.phone,
-      firstname: params.firstname,
-      lastname: params.lastname,
-      dob: params.dob,
+  requestBVNModification: async (params: any, priceId?: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-modification', params.bvn || params.number || 'bvn-modification', {
+      service_code: params.service_code || '620',
+      bank_code: params.bank_code || '706',
+      reference: params.reference || `REF-MOD-${Date.now()}`,
+      nin: params.nin,
+      bvn: params.bvn || params.number,
+      old_first_name: params.old_first_name || params.firstname,
+      old_surname: params.old_surname || params.lastname,
+      old_middle_name: params.old_middle_name || '',
       priceId: priceId || 'bvn_modification',
+      ...params,
+    }),
+
+  /** Check BVN Modification Status via AgentHub */
+  checkBVNModificationStatus: async (requestIdOrReference: string) =>
+    AgentHubIdentityVerifier.invokeEdge('bvn-modification-status', requestIdOrReference, {
+      request_id: requestIdOrReference,
+      reference: requestIdOrReference,
     }),
 
   /** Submit BVN User Enrollment via AgentHub */

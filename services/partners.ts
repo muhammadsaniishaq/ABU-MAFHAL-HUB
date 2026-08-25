@@ -65,7 +65,8 @@ export interface IdentityVerifier {
     attestBirth?(params: BirthAttestationParams): Promise<VerificationResult>;
     linkVNINToNIBSS?(vnin: string, bvn?: string, priceId?: string, extra?: any): Promise<VerificationResult>;
     checkVNINStatus?(referenceOrRequestId: string): Promise<VerificationResult>;
-    requestBVNModification?(params: BVNModificationParams, priceId?: string): Promise<VerificationResult>;
+    requestBVNModification?(params: BVNModificationParams | any, priceId?: string): Promise<VerificationResult>;
+    checkBVNModificationStatus?(requestIdOrReference: string): Promise<VerificationResult>;
     submitBVNEnrollment?(params: any, priceId?: string): Promise<VerificationResult>;
     checkBVNEnrollmentStatus?(requestIdOrReference: string): Promise<VerificationResult>;
     getTransactionHistory?(params?: HistoryParams): Promise<VerificationResult>;

@@ -777,7 +777,9 @@ export const api = {
         /** Check status of VNIN to NIBSS linking request */
         checkVNINStatus: (referenceOrRequestId: string) => identityVerifier.checkVNINStatus?.(referenceOrRequestId),
         /** Request BVN record modification */
-        requestBVNModification: (params: BVNModificationParams, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
+        requestBVNModification: (params: BVNModificationParams | any, priceId?: string) => identityVerifier.requestBVNModification?.(params, priceId),
+        /** Check BVN modification status */
+        checkBVNModificationStatus: (requestIdOrReference: string) => identityVerifier.checkBVNModificationStatus?.(requestIdOrReference),
         /** Submit demographic data for New BVN User / Android Enrollment */
         submitBVNEnrollment: (params: any, priceId?: string) => identityVerifier.submitBVNEnrollment?.(params, priceId),
         /** Check BVN user enrollment status */
