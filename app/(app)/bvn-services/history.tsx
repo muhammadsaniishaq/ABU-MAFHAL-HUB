@@ -10,12 +10,15 @@ import { verificationHistory, extractFullName } from '../../../services/verifica
 import * as Print from 'expo-print';
 import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+
 export default function BVNHistoryScreen() {
     const insets = useSafeAreaInsets();
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [printingId, setPrintingId] = useState<string | null>(null);
+    const [actionId, setActionId] = useState<string | null>(null);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
         title: string;
@@ -40,43 +43,23 @@ export default function BVNHistoryScreen() {
     const loadHistory = async () => {
         setLoading(true);
         try {
-            const dbList = await verificationHistory.getAll('bvn');
-            const stored = await AsyncStorage.getItem('recent_bvn_verifications');
-            const localList = stored ? JSON.parse(stored) : [];
+            const list = await verificationHistory.getAll('bvn');
+            const formatted = list.map((item: any) => {
+                const raw = item.details?.data?.data || item.details?.data || item.details || {};
+                const bvnNum = item.search_number || raw.idNumber || raw.bvn || item.details?.bvn || item.id;
+                const fullName = extractFullName(raw, item.holder_name || item.name);
+                return {
+                    id: item.id,
+                    bvn: bvnNum,
+                    name: fullName,
+                    service_type: item.service_type || 'bvn_verification',
+                    date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
+                    data: raw,
+                    pdf_base64: item.details?.pdf_base64 || raw.pdf_base64,
+                };
+            });
 
-            const combinedMap = new Map();
-
-            for (const item of localList) {
-                const raw = item.data || item.details || {};
-                const fullName = extractFullName(raw, item.name || item.holder_name);
-                const bvnNum = item.bvn || raw.idNumber || raw.bvn || item.search_number || item.id;
-                if (bvnNum) {
-                    combinedMap.set(bvnNum, {
-                        ...item,
-                        bvn: bvnNum,
-                        name: fullName,
-                        date: item.date || 'Recently',
-                        data: raw
-                    });
-                }
-            }
-
-            if (dbList && dbList.length > 0) {
-                for (const item of dbList) {
-                    const raw = item.details?.data?.data || item.details?.data || item.details || {};
-                    const fullName = extractFullName(raw, item.holder_name);
-                    const bvnNum = item.search_number || raw.idNumber || raw.bvn || item.details?.bvn || item.id;
-                    combinedMap.set(bvnNum, {
-                        id: item.id,
-                        bvn: bvnNum,
-                        name: fullName,
-                        date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
-                        data: raw
-                    });
-                }
-            }
-
-            setHistory(Array.from(combinedMap.values()));
+            setHistory(formatted);
         } catch (e) {
             console.warn('Failed to load BVN history', e);
         } finally {
@@ -84,7 +67,7 @@ export default function BVNHistoryScreen() {
         }
     };
 
-    const handlePrintSlip = async (item: any) => {
+    const getOfficialHtml = (item: any) => {
         const raw = item.data || {};
         const fn = raw.firstName || raw.first_name || '';
         const mn = raw.middleName || raw.middle_name || '';
@@ -100,57 +83,105 @@ export default function BVNHistoryScreen() {
         const rawImg = raw.image || raw.photo || '';
         const photoSrc = rawImg ? (rawImg.startsWith('data:') ? rawImg : `data:image/jpeg;base64,${rawImg}`) : '';
 
-        const html = `
+        return `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <title>Official BVN Slip - ${bvnNum}</title>
             <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8fafc; color: #0B192C; }
-                .card { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; border: 2px solid #D4AF37; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
-                .header { background: #0B192C; color: white; padding: 14px; text-align: center; border-bottom: 2px solid #D4AF37; }
-                .header h1 { margin: 0 0 2px 0; font-size: 15px; text-transform: uppercase; color: #D4AF37; letter-spacing: 0.5px; }
-                .header p { margin: 0; font-size: 10px; opacity: 0.8; }
-                .body { padding: 16px; display: flex; gap: 14px; }
-                .photo-box { width: 90px; height: 110px; background: #FEF9E7; border: 1px solid #D4AF37; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-                .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-                .info { flex: 1; }
-                .row { margin-bottom: 6px; }
-                .label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; margin-bottom: 1px; }
-                .val { font-size: 12px; font-weight: bold; color: #0B192C; }
-                .val-highlight { color: #B45309; font-size: 14px; }
-                .footer { background: #f8fafc; padding: 8px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f1f5f9; padding: 24px 12px; color: #0B192C; }
+                .slip-container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; border: 2.5px solid #D4AF37; box-shadow: 0 10px 25px rgba(0,0,0,0.12); overflow: hidden; position: relative; }
+                .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 52px; font-weight: 900; color: rgba(212,175,55,0.06); letter-spacing: 6px; pointer-events: none; text-transform: uppercase; z-index: 0; }
+                .slip-header { background: linear-gradient(135deg, #0B192C 0%, #1a365d 100%); color: #ffffff; padding: 16px 14px; text-align: center; border-bottom: 3px solid #D4AF37; position: relative; z-index: 1; }
+                .slip-country { font-size: 11px; font-weight: 800; color: #D4AF37; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2px; }
+                .slip-title { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase; color: #ffffff; }
+                .slip-sub { font-size: 10px; color: #cbd5e1; margin-top: 3px; font-weight: 600; letter-spacing: 0.5px; }
+                .slip-body { padding: 18px 16px; position: relative; z-index: 1; display: flex; gap: 16px; }
+                .slip-photo-col { width: 120px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+                .photo-frame { width: 110px; height: 130px; border-radius: 8px; border: 2px solid #D4AF37; background: #FEF9E7; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.06); margin-bottom: 8px; }
+                .photo-img { width: 100%; height: 100%; object-fit: cover; }
+                .photo-placeholder { font-size: 36px; font-weight: 900; color: #B45309; }
+                .verified-badge { background: #FEF9E7; border: 1px solid #D4AF37; color: #B45309; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 12px; text-transform: uppercase; text-align: center; width: 100%; }
+                .barcode-mock { width: 100%; height: 28px; background: repeating-linear-gradient(90deg, #0B192C 0, #0B192C 2px, transparent 2px, transparent 4px, #0B192C 4px, #0B192C 7px, transparent 7px, transparent 9px); margin-top: 8px; opacity: 0.75; }
+                .slip-info-col { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+                .bvn-hero-box { background: #FEF9E7; border: 1.5px solid #D4AF37; border-radius: 8px; padding: 8px 12px; margin-bottom: 4px; }
+                .bvn-hero-label { font-size: 9px; font-weight: 800; color: #78350f; text-transform: uppercase; letter-spacing: 0.5px; }
+                .bvn-hero-val { font-size: 18px; font-weight: 900; color: #B45309; letter-spacing: 2px; }
+                .field-row { display: flex; flex-direction: column; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
+                .field-label { font-size: 8.5px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
+                .field-val { font-size: 12px; font-weight: 800; color: #0B192C; margin-top: 1px; }
+                .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                .slip-footer { background: #f8fafc; border-top: 1.5px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; }
+                .seal-box { font-weight: 800; color: #0B192C; display: flex; align-items: center; gap: 4px; }
             </style>
         </head>
         <body>
-            <div class="card">
-                <div class="header">
-                    <h1>BANK VERIFICATION RECORD</h1>
-                    <p>Official Verification Slip</p>
+            <div class="slip-container">
+                <div class="watermark">NIBSS BVN VERIFIED</div>
+                <div class="slip-header">
+                    <div class="slip-country">FEDERAL REPUBLIC OF NIGERIA</div>
+                    <div class="slip-title">BANK VERIFICATION NUMBER (BVN) ENROLMENT SLIP</div>
+                    <div class="slip-sub">NIBSS CENTRAL REPOSITORY • OFFICIAL IDENTITY RECORD</div>
                 </div>
-                <div class="body">
-                    <div class="photo-box">
-                        ${photoSrc ? `<img src="${photoSrc}" />` : `<span style="font-size:24px; color:#B45309; font-weight:bold;">${fullName.charAt(0)}</span>`}
+                <div class="slip-body">
+                    <div class="slip-photo-col">
+                        <div class="photo-frame">
+                            ${photoSrc ? `<img src="${photoSrc}" class="photo-img" />` : `<div class="photo-placeholder">${fullName.charAt(0)}</div>`}
+                        </div>
+                        <div class="verified-badge">✓ ACTIVE RECORD</div>
+                        <div class="barcode-mock"></div>
                     </div>
-                    <div class="info">
-                        <div class="row"><div class="label">Full Name</div><div class="val">${fullName}</div></div>
-                        <div class="row"><div class="label">BVN Number</div><div class="val val-highlight">${bvnNum}</div></div>
-                        <div class="row"><div class="label">Date of Birth & Gender</div><div class="val">${dob} • ${gender}</div></div>
-                        <div class="row"><div class="label">Phone Number</div><div class="val">${phone}</div></div>
-                        <div class="row"><div class="label">State / LGA</div><div class="val">${state} / ${lga}</div></div>
+                    <div class="slip-info-col">
+                        <div class="bvn-hero-box">
+                            <div class="bvn-hero-label">Bank Verification Number (BVN)</div>
+                            <div class="bvn-hero-val">${bvnNum}</div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field-label">Full Name (Surname First)</div>
+                            <div class="field-val" style="text-transform: uppercase;">${fullName}</div>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field-row">
+                                <div class="field-label">National Identity No (NIN)</div>
+                                <div class="field-val" style="color: #10B981;">${ninNum}</div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field-label">Date of Birth</div>
+                                <div class="field-val">${dob}</div>
+                            </div>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field-row">
+                                <div class="field-label">Gender</div>
+                                <div class="field-val" style="text-transform: uppercase;">${gender}</div>
+                            </div>
+                            <div class="field-row">
+                                <div class="field-label">Phone Number</div>
+                                <div class="field-val">${phone}</div>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field-label">State / LGA of Origin</div>
+                            <div class="field-val">${state} / ${lga}</div>
+                        </div>
                     </div>
                 </div>
-                <div class="footer">
-                    Abu-Mafhal Integrated Hub • NIBSS Verified Record
+                <div class="slip-footer">
+                    <div>Abu-Mafhal Hub • Gateway ID: NIBSS-${Date.now().toString(36).toUpperCase()}</div>
+                    <div class="seal-box">★ OFFICIAL VERIFIED RECORD</div>
                 </div>
             </div>
         </body>
         </html>
         `;
+    };
 
-        setPrintingId(item.id || item.bvn);
+    const handlePrintSlip = async (item: any) => {
+        setActionId(item.id || item.bvn);
         try {
+            const html = getOfficialHtml(item);
             if (Platform.OS === 'web') {
                 const printWindow = window.open('', '_blank');
                 if (printWindow) {
@@ -164,8 +195,69 @@ export default function BVNHistoryScreen() {
         } catch (e: any) {
             showAlert("Print Error", e.message || "Failed to print verification slip.", "error");
         } finally {
-            setPrintingId(null);
+            setActionId(null);
         }
+    };
+
+    const handleDownloadPdf = async (item: any) => {
+        setActionId(item.id || item.bvn);
+        try {
+            const pdfBase64 = item.pdf_base64 || item.data?.pdf_base64;
+            if (pdfBase64 && pdfBase64.length > 50) {
+                if (Platform.OS === 'web') {
+                    const byteCharacters = atob(pdfBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `bvn_slip_${item.bvn || 'official'}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                    showAlert("Download Complete", "Official BVN Slip PDF downloaded.", "success");
+                    return;
+                } else {
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}bvn_slip_${item.bvn || 'official'}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, pdfBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download BVN Slip' });
+                    }
+                    return;
+                }
+            }
+
+            // Fallback: Print/Generate PDF
+            await handlePrintSlip(item);
+        } catch (e: any) {
+            showAlert("Download Error", e.message || "Failed to download PDF slip.", "error");
+        } finally {
+            setActionId(null);
+        }
+    };
+
+    const handleDeleteItem = (item: any) => {
+        Alert.alert(
+            "Delete Record",
+            `Remove record for ${item.name || item.bvn} from history?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        await verificationHistory.delete(item.id);
+                        setHistory(prev => prev.filter(x => x.id !== item.id));
+                    }
+                }
+            ]
+        );
     };
 
     useEffect(() => {
@@ -269,27 +361,51 @@ export default function BVNHistoryScreen() {
                                     <Text style={styles.bvnNumber}>{item.bvn}</Text>
                                 </View>
                                 <TouchableOpacity 
-                                    style={styles.reprintBadge}
+                                    style={styles.deleteMiniBtn}
                                     activeOpacity={0.7}
                                     onPress={(e) => {
                                         e.stopPropagation();
-                                        handlePrintSlip(item);
+                                        handleDeleteItem(item);
                                     }}
                                 >
-                                    {printingId === (item.id || item.bvn) ? (
-                                        <ActivityIndicator size="small" color="#0B192C" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="print-outline" size={13} color="#0B192C" />
-                                            <Text style={styles.reprintText}>Print</Text>
-                                        </>
-                                    )}
+                                    <Ionicons name="trash-outline" size={14} color="#94a3b8" />
                                 </TouchableOpacity>
                             </View>
+
                             <View style={styles.cardFooter}>
                                 <Text style={styles.dateText}>{item.date || 'Recently'}</Text>
-                                <View style={styles.statusPill}>
-                                    <Text style={styles.statusText}>VERIFIED</Text>
+                                <View style={styles.cardActionGroup}>
+                                    <TouchableOpacity 
+                                        style={styles.downloadPdfBadge}
+                                        activeOpacity={0.7}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handleDownloadPdf(item);
+                                        }}
+                                        disabled={actionId === (item.id || item.bvn)}
+                                    >
+                                        {actionId === (item.id || item.bvn) ? (
+                                            <ActivityIndicator size="small" color="#0B192C" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="document-text-outline" size={12} color="#0B192C" />
+                                                <Text style={styles.downloadPdfBadgeText}>PDF</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity 
+                                        style={styles.reprintBadge}
+                                        activeOpacity={0.7}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handlePrintSlip(item);
+                                        }}
+                                        disabled={actionId === (item.id || item.bvn)}
+                                    >
+                                        <Ionicons name="print-outline" size={12} color="#D4AF37" />
+                                        <Text style={styles.reprintText}>Print</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -328,8 +444,12 @@ const styles = StyleSheet.create({
     iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FEF9E7', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(212,175,55,0.25)' },
     holderName: { fontSize: 13, fontWeight: '800', color: '#0B192C' },
     bvnNumber: { fontSize: 11, color: '#B45309', marginTop: 1, fontWeight: '700' },
-    reprintBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF9E7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
-    reprintText: { fontSize: 10, fontWeight: '700', color: '#0B192C', marginLeft: 3 },
+    deleteMiniBtn: { padding: 6, borderRadius: 6, backgroundColor: '#f1f5f9' },
+    cardActionGroup: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+    downloadPdfBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D4AF37', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+    downloadPdfBadgeText: { fontSize: 10, fontWeight: '800', color: '#0B192C', marginLeft: 3 },
+    reprintBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0B192C', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#D4AF37' },
+    reprintText: { fontSize: 10, fontWeight: '700', color: '#D4AF37', marginLeft: 3 },
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
     dateText: { fontSize: 10, color: '#94a3b8' },
     statusPill: { backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },

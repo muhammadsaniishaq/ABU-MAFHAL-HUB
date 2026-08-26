@@ -6,10 +6,12 @@ import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as Print from 'expo-print';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
-import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
@@ -159,6 +161,158 @@ export default function VerifyBVNScreen() {
         }
     };
 
+    const convertPdfBase64ToPng = async (pdfBase64: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            if (typeof window === 'undefined') return reject(new Error("Web only"));
+
+            const runConversion = async () => {
+                try {
+                    const pdfjsLib = (window as any).pdfjsLib;
+                    if (!pdfjsLib) return reject(new Error("pdf.js library not loaded"));
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    const binaryString = atob(pdfBase64);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    const loadingTask = pdfjsLib.getDocument({ data: bytes });
+                    const pdf = await loadingTask.promise;
+                    const numPages = pdf.numPages;
+
+                    const pages: { canvas: HTMLCanvasElement; width: number; height: number }[] = [];
+                    let totalHeight = 0;
+                    let maxWidth = 0;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 3.0 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            pages.push({ canvas, width: viewport.width, height: viewport.height });
+                            totalHeight += viewport.height + (i > 1 ? 20 : 0);
+                            maxWidth = Math.max(maxWidth, viewport.width);
+                        }
+                    }
+
+                    if (pages.length === 0) return reject(new Error("No pages rendered"));
+
+                    const mergedCanvas = document.createElement('canvas');
+                    mergedCanvas.width = maxWidth;
+                    mergedCanvas.height = totalHeight;
+                    const mergedCtx = mergedCanvas.getContext('2d');
+                    if (!mergedCtx) return reject(new Error("Canvas context creation failed"));
+
+                    mergedCtx.fillStyle = '#ffffff';
+                    mergedCtx.fillRect(0, 0, maxWidth, totalHeight);
+
+                    let currentY = 0;
+                    for (let i = 0; i < pages.length; i++) {
+                        const { canvas, width, height } = pages[i];
+                        const x = Math.floor((maxWidth - width) / 2);
+                        mergedCtx.drawImage(canvas, x, currentY);
+                        currentY += height + 20;
+                    }
+
+                    resolve(mergedCanvas.toDataURL('image/png'));
+                } catch (err) {
+                    reject(err);
+                }
+            };
+
+            if ((window as any).pdfjsLib) {
+                runConversion();
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                script.onload = () => runConversion();
+                script.onerror = (e) => reject(e);
+                document.head.appendChild(script);
+            }
+        });
+    };
+
+    const handleDownloadPdf = async () => {
+        if (!result) return;
+        setIsSaving(true);
+        try {
+            const pdfBase64 = result.pdf_base64 || result.data?.pdf_base64 || result.data?.data?.pdf_base64;
+            if (pdfBase64 && pdfBase64.length > 50) {
+                if (Platform.OS === 'web') {
+                    const byteCharacters = atob(pdfBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `bvn_premium_slip_${bvn || 'official'}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+                    showAlert("Download Complete", "Official BVN Premium Slip PDF downloaded.", "success");
+                    return;
+                } else {
+                    const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+                    const fileUri = `${docDir}bvn_premium_slip_${bvn || 'official'}.pdf`;
+                    await FileSystem.writeAsStringAsync(fileUri, pdfBase64, { encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any });
+                    if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Download Official BVN Slip (PDF)' });
+                    } else {
+                        showAlert("Downloaded", `PDF saved to device.`, "success");
+                    }
+                    return;
+                }
+            }
+
+            // Fallback: Trigger Print or PDF generation
+            await handlePrintOrPdf();
+        } catch (e: any) {
+            showAlert("Download Error", e.message || "Failed to download PDF slip.", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDownloadPng = async () => {
+        if (!result) return;
+        setIsSaving(true);
+        try {
+            const pdfBase64 = result.pdf_base64 || result.data?.pdf_base64 || result.data?.data?.pdf_base64;
+            if (pdfBase64 && Platform.OS === 'web') {
+                try {
+                    const pngDataUrl = await convertPdfBase64ToPng(pdfBase64);
+                    const link = document.createElement('a');
+                    link.download = `bvn_slip_${bvn || 'official'}.png`;
+                    link.href = pngDataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showAlert("Download Complete", "Official BVN Slip PNG downloaded successfully.", "success");
+                    return;
+                } catch (err: any) {
+                    console.warn("PDF to PNG conversion failed, falling back to print:", err);
+                }
+            }
+
+            await handlePrintOrPdf();
+        } catch (e: any) {
+            showAlert("PNG Download Failed", e.message || "Failed to generate PNG image.", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handlePrintOrPdf = async () => {
         if (!result) return;
         setIsSaving(true);
@@ -198,7 +352,7 @@ export default function VerifyBVNScreen() {
                     .photo-frame { width: 110px; height: 130px; border-radius: 8px; border: 2px solid #D4AF37; background: #FEF9E7; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.06); margin-bottom: 8px; }
                     .photo-img { width: 100%; height: 100%; object-fit: cover; }
                     .photo-placeholder { font-size: 36px; font-weight: 900; color: #B45309; }
-                    .verified-badge { background: #FEF9E7; border: 1px solid #D4AF37; color: #B45309; font-size: 9px; font-weight: 800; padding: 3px 8px; borderRadius: 12px; text-transform: uppercase; text-align: center; width: 100%; }
+                    .verified-badge { background: #FEF9E7; border: 1px solid #D4AF37; color: #B45309; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 12px; text-transform: uppercase; text-align: center; width: 100%; }
                     .barcode-mock { width: 100%; height: 28px; background: repeating-linear-gradient(90deg, #0B192C 0, #0B192C 2px, transparent 2px, transparent 4px, #0B192C 4px, #0B192C 7px, transparent 7px, transparent 9px); margin-top: 8px; opacity: 0.75; }
                     .slip-info-col { flex: 1; display: flex; flex-direction: column; gap: 7px; }
                     .bvn-hero-box { background: #FEF9E7; border: 1.5px solid #D4AF37; border-radius: 8px; padding: 8px 12px; margin-bottom: 4px; }
@@ -484,32 +638,56 @@ export default function VerifyBVNScreen() {
                             </View>
                         </View>
 
-                        {/* Action Buttons */}
-                        <View style={styles.actionBtnRow}>
-                            <TouchableOpacity 
-                                style={styles.printOfficialBtn} 
-                                onPress={handlePrintOrPdf}
-                                activeOpacity={0.8}
-                                disabled={isSaving}
-                            >
-                                {isSaving ? (
-                                    <ActivityIndicator color="#0B192C" size="small" />
-                                ) : (
-                                    <>
-                                        <Ionicons name="print" size={16} color="#0B192C" style={{ marginRight: 6 }} />
-                                        <Text style={styles.printOfficialBtnText}>Print Official Slip</Text>
-                                    </>
-                                )}
-                            </TouchableOpacity>
+                        {/* Action Buttons Suite */}
+                        <View style={styles.actionBtnContainer}>
+                            <View style={styles.actionBtnRow}>
+                                <TouchableOpacity 
+                                    style={styles.downloadPdfBtn} 
+                                    onPress={handleDownloadPdf}
+                                    activeOpacity={0.8}
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? (
+                                        <ActivityIndicator color="#0B192C" size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="document-text" size={15} color="#0B192C" style={{ marginRight: 5 }} />
+                                            <Text style={styles.downloadPdfBtnText}>Download PDF</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
 
-                            <TouchableOpacity 
-                                style={styles.copyOfficialBtn} 
-                                onPress={() => copyToClipboard(displayBvn)}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="copy-outline" size={15} color="#D4AF37" style={{ marginRight: 4 }} />
-                                <Text style={styles.copyOfficialBtnText}>Copy BVN</Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={styles.downloadPngBtn} 
+                                    onPress={handleDownloadPng}
+                                    activeOpacity={0.8}
+                                    disabled={isSaving}
+                                >
+                                    <Ionicons name="image" size={15} color="#D4AF37" style={{ marginRight: 5 }} />
+                                    <Text style={styles.downloadPngBtnText}>Download PNG</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={[styles.actionBtnRow, { marginTop: 6 }]}>
+                                <TouchableOpacity 
+                                    style={styles.printSlipBtn} 
+                                    onPress={handlePrintOrPdf}
+                                    activeOpacity={0.8}
+                                    disabled={isSaving}
+                                >
+                                    <Ionicons name="print-outline" size={14} color="#0B192C" style={{ marginRight: 5 }} />
+                                    <Text style={styles.printSlipBtnText}>Print Official Slip</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity 
+                                    style={styles.copyOfficialBtn} 
+                                    onPress={() => copyToClipboard(displayBvn)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="copy-outline" size={14} color="#D4AF37" style={{ marginRight: 4 }} />
+                                    <Text style={styles.copyOfficialBtnText}>Copy BVN</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -600,11 +778,16 @@ const styles = StyleSheet.create({
     slipFooterRef: { fontSize: 8, fontWeight: '700', color: '#94a3b8' },
     securitySealBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     securitySealText: { fontSize: 8, fontWeight: '800', color: '#B45309' },
-    actionBtnRow: { flexDirection: 'row', padding: 10, gap: 8, backgroundColor: '#f8fafc', borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-    printOfficialBtn: { flex: 1, backgroundColor: '#D4AF37', height: 38, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    printOfficialBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
-    copyOfficialBtn: { backgroundColor: '#0B192C', paddingHorizontal: 14, height: 38, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D4AF37' },
-    copyOfficialBtnText: { color: '#D4AF37', fontSize: 11, fontWeight: '800' },
+    actionBtnContainer: { padding: 10, backgroundColor: '#f8fafc', borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+    actionBtnRow: { flexDirection: 'row', gap: 8 },
+    downloadPdfBtn: { flex: 1, backgroundColor: '#D4AF37', height: 38, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#D4AF37', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 },
+    downloadPdfBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
+    downloadPngBtn: { flex: 1, backgroundColor: '#0B192C', height: 38, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D4AF37' },
+    downloadPngBtnText: { color: '#D4AF37', fontSize: 12, fontWeight: '800' },
+    printSlipBtn: { flex: 1, backgroundColor: '#ffffff', height: 36, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1' },
+    printSlipBtnText: { color: '#0B192C', fontSize: 11, fontWeight: '700' },
+    copyOfficialBtn: { backgroundColor: '#ffffff', paddingHorizontal: 12, height: 36, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1' },
+    copyOfficialBtnText: { color: '#475569', fontSize: 11, fontWeight: '700' },
 
     historySection: { marginTop: 4 },
     historyTitle: { fontSize: 12, fontWeight: '800', color: '#334155', marginBottom: 6 },
