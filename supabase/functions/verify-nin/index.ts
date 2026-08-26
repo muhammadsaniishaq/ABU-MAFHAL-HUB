@@ -125,8 +125,12 @@ serve(async (req: Request) => {
           'bvn': 'bvn_num_advanced',
           'bvn-phone': 'bvn_phone_advanced',
           'bvn-card': 'bvn_card',
+          'bvn-slip': 'bvn_card',
+          'bvn-premium-slip': 'bvn_card',
+          'bvn-retrieval': 'bvn_phone_advanced',
           'vnin-to-nibss': 'bvn_vnin_nibss',
           'bvn-modification': 'bvn_modification',
+          'bvn-enrollment': 'bvn_enrollment',
           'ipe': 'nin_regular',
           'val': 'val_no_record'
         };
@@ -356,9 +360,12 @@ serve(async (req: Request) => {
         bodyPayload = { firstname, lastname, gender, dob };
         break;
 
-      // ── BVN Verification ───────────────────────────────────────────────────
+      // ── BVN Verification & Slips ───────────────────────────────────────────
       case 'bvn':
-        endpoint = `${AGENTHUB_BASE}/bvn/verification`;
+      case 'bvn-card':
+      case 'bvn-slip':
+      case 'bvn-premium-slip':
+        endpoint = `${AGENTHUB_BASE}/bvn/premium-slip`;
         bodyPayload = { bvn: searchValue };
         break;
 
@@ -367,13 +374,6 @@ serve(async (req: Request) => {
       case 'bvn-retrieval':
         endpoint = `${AGENTHUB_BASE}/bvn/retrieval`;
         bodyPayload = { phone: searchValue, reference: requestData.reference || `REF-RET-${Date.now()}` };
-        break;
-
-      // ── BVN Card / Premium Slip ───────────────────────────────────────────
-      case 'bvn-card':
-      case 'bvn-slip':
-        endpoint = `${AGENTHUB_BASE}/bvn/premium-slip`;
-        bodyPayload = { bvn: searchValue };
         break;
 
       // ── VNIN to NIBSS ──────────────────────────────────────────────────────
