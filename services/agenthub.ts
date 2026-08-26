@@ -59,7 +59,43 @@ export const AgentHubIdentityVerifier = {
   // ── Core helper: invoke verification directly with fallback to Edge Function ─────────────────────
   async invokeEdge(searchType: string, searchValue: any, extra?: any): Promise<VerificationResult> {
     try {
-      // 1. Prioritize Direct Client Execution with official AgentHub endpoints
+      // On Web, browser CORS blocks direct calls to agenthub.ng, so use Supabase Edge Function first
+      if (Platform.OS === 'web') {
+        const body = { searchType, searchValue, ...extra };
+        const { data, error } = await supabase.functions.invoke('verify-nin', { body });
+
+        if (error) {
+          return { isValid: false, message: error.message || 'Verification failed. Please try again.' };
+        }
+
+        if (data?.error) {
+          return { isValid: false, message: data.error };
+        }
+
+        if (data?.data) {
+          const agentHubResponse = data.data;
+          const rawStatus = agentHubResponse.status;
+          const isSuccessStatus = rawStatus === true || ['true', 'success', 'pending', 'completed'].includes(String(rawStatus || '').toLowerCase());
+
+          if (isSuccessStatus) {
+            const personData = agentHubResponse.data ?? agentHubResponse;
+            return {
+              isValid: true,
+              message: agentHubResponse.message || 'Verification Successful',
+              data: personData,
+              pdf_base64: agentHubResponse.pdf_base64 || agentHubResponse.data?.pdf_base64
+            };
+          }
+        }
+
+        if (data?.message) {
+          return { isValid: false, message: data.message };
+        }
+
+        return { isValid: false, message: 'Could not verify details. Please check the input and try again.' };
+      }
+
+      // On Mobile native, try Direct Client Execution first
       const directRes = await AgentHubIdentityVerifier.invokeDirect(searchType, searchValue, extra);
       if (directRes && (directRes.isValid || (directRes.data && (directRes.data.bvn || directRes.data.firstName || directRes.data.pdf_base64)))) {
         return directRes;
@@ -68,12 +104,12 @@ export const AgentHubIdentityVerifier = {
       // If direct response indicated an intentional user error (like insufficient funds), return it immediately
       if (directRes && !directRes.isValid && directRes.message) {
         const m = directRes.message.toLowerCase();
-        if (m.includes('insufficient') || m.includes('balance') || m.includes('please log in')) {
+        if (m.includes('insufficient') || m.includes('balance') || m.includes('please log in') || m.includes('provider api wallet')) {
           return directRes;
         }
       }
 
-      // If direct verification did not return success, try the Edge Function as fallback
+      // If direct verification did not return success on mobile, try Edge Function as fallback
       const body = { searchType, searchValue, ...extra };
       const { data, error } = await supabase.functions.invoke('verify-nin', { body });
 
@@ -82,7 +118,7 @@ export const AgentHubIdentityVerifier = {
       }
 
       if (data?.error) {
-        return directRes || { isValid: false, message: data.error };
+        return { isValid: false, message: data.error };
       }
 
       if (data?.data) {
