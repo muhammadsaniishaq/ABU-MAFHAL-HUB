@@ -23,6 +23,7 @@ export default function VerifyBVNScreen() {
     const [result, setResult] = useState<any>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(200);
     const [historyList, setHistoryList] = useState<any[]>([]);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
@@ -50,33 +51,44 @@ export default function VerifyBVNScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'bvn_num_advanced')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load BVN price', e);
+        }
+    };
+
     const loadHistory = async () => {
         try {
-            const dbList = await verificationHistory.getAll('bvn');
+            const list = await verificationHistory.getAll('bvn');
             const stored = await AsyncStorage.getItem('recent_bvn_verifications');
             const localList = stored ? JSON.parse(stored) : [];
 
             const combinedMap = new Map();
+
             for (const item of localList) {
-                const fullName = extractFullName(item.data || item.details, item.name || item.holder_name);
-                const bvnNum = item.bvn || item.search_number || item.id;
+                const bvnNum = item.bvn || item.data?.idNumber || item.data?.bvn || item.id;
                 if (bvnNum) {
-                    combinedMap.set(bvnNum, {
-                        ...item,
-                        bvn: bvnNum,
-                        name: fullName
-                    });
+                    combinedMap.set(bvnNum, item);
                 }
             }
 
-            if (dbList && dbList.length > 0) {
-                for (const item of dbList) {
-                    const fullName = extractFullName(item.details, item.holder_name);
-                    const bvnNum = item.search_number || item.details?.bvn || item.details?.data?.bvn || item.id;
+            if (list && list.length > 0) {
+                for (const item of list) {
+                    const bvnNum = item.search_number || item.details?.idNumber || item.details?.bvn || item.id;
                     combinedMap.set(bvnNum, {
                         id: item.id,
                         bvn: bvnNum,
-                        name: fullName,
+                        name: item.holder_name,
                         date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
                         data: item.details
                     });
@@ -93,6 +105,7 @@ export default function VerifyBVNScreen() {
 
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
         loadHistory();
     }, []);
 
@@ -124,8 +137,8 @@ export default function VerifyBVNScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 50) {
-            showAlert("Insufficient Balance", "Your account balance is insufficient. Please fund your wallet to proceed.", "error");
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet.`, "error");
             return;
         }
 
@@ -496,7 +509,12 @@ export default function VerifyBVNScreen() {
 
                 {/* Input Card */}
                 <View style={styles.formCard}>
-                    <Text style={styles.inputLabel}>ENTER BVN NUMBER</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={styles.inputLabel}>ENTER BVN NUMBER</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF9E7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(212,175,55,0.4)' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#B45309' }}>Fee: ₦{servicePrice.toLocaleString()}</Text>
+                        </View>
+                    </View>
                     <View style={styles.inputRow}>
                         <Ionicons name="finger-print-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
                         <TextInput
@@ -524,7 +542,7 @@ export default function VerifyBVNScreen() {
                         ) : (
                             <>
                                 <Ionicons name="shield-checkmark" size={16} color="#0B192C" style={{ marginRight: 6 }} />
-                                <Text style={styles.verifyBtnText}>Verify BVN Now</Text>
+                                <Text style={styles.verifyBtnText}>Verify BVN (₦{servicePrice.toLocaleString()})</Text>
                             </>
                         )}
                     </TouchableOpacity>

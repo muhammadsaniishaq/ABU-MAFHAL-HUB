@@ -65,6 +65,7 @@ export default function BVNModificationScreen() {
 
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(1500);
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
@@ -94,8 +95,25 @@ export default function BVNModificationScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'bvn_modification')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load BVN modification price', e);
+        }
+    };
+
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
     }, []);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
@@ -139,8 +157,8 @@ export default function BVNModificationScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 100) {
-            showAlert("Insufficient Balance", "Your account balance is low. Please fund your wallet to proceed.");
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to proceed.`);
             return;
         }
 
@@ -416,7 +434,7 @@ export default function BVNModificationScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Modification</Text>
+                                <Text style={styles.submitBtnText}>Submit Modification (₦{servicePrice.toLocaleString()})</Text>
                             )}
                         </TouchableOpacity>
                     </View>

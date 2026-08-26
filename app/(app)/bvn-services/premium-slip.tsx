@@ -19,6 +19,7 @@ export default function BVNPremiumSlipScreen() {
     const [bvn, setBvn] = useState('');
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(200);
     const [generatedPdf, setGeneratedPdf] = useState<string | null>(null);
     const [userDetails, setUserDetails] = useState<any>(null);
     const [showNoticeModal, setShowNoticeModal] = useState(false);
@@ -46,8 +47,25 @@ export default function BVNPremiumSlipScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'bvn_premium_slip')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load BVN slip price', e);
+        }
+    };
+
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
     }, []);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
@@ -66,8 +84,8 @@ export default function BVNPremiumSlipScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 50) {
-            showAlert("Insufficient Balance", "Your account balance is insufficient. Please fund your wallet to continue.");
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet.`);
             return;
         }
 
@@ -397,7 +415,12 @@ export default function BVNPremiumSlipScreen() {
                 <View style={styles.formCard}>
                     <View style={styles.labelRow}>
                         <Text style={styles.inputLabel}>TARGET BVN NUMBER</Text>
-                        <Text style={styles.digitCounter}>{bvn.length}/11 digits</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ backgroundColor: '#FEF9E7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(212,175,55,0.4)' }}>
+                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>Fee: ₦{servicePrice.toLocaleString()}</Text>
+                            </View>
+                            <Text style={styles.digitCounter}>{bvn.length}/11</Text>
+                        </View>
                     </View>
                     <View style={styles.inputRow}>
                         <Ionicons name="document-text-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
@@ -423,7 +446,7 @@ export default function BVNPremiumSlipScreen() {
                         ) : (
                             <>
                                 <Ionicons name="document-attach" size={16} color="#0B192C" style={{ marginRight: 6 }} />
-                                <Text style={styles.btnText}>Generate Premium Slip</Text>
+                                <Text style={styles.btnText}>Generate Premium Slip (₦{servicePrice.toLocaleString()})</Text>
                             </>
                         )}
                     </TouchableOpacity>

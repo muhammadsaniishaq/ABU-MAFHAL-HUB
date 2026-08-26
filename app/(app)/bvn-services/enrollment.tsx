@@ -42,6 +42,7 @@ export default function BVNEnrollmentScreen() {
 
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(2000);
     const [showRulesModal, setShowRulesModal] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
@@ -67,8 +68,25 @@ export default function BVNEnrollmentScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'bvn_enrollment')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load BVN enrollment price', e);
+        }
+    };
+
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
     }, []);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
@@ -100,6 +118,11 @@ export default function BVNEnrollmentScreen() {
         }
         if (cleanAccount.length !== 10) {
             showAlert("Invalid Account Number", "Bank Account Number must be exactly 10 digits.");
+            return;
+        }
+
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to proceed.`);
             return;
         }
 
@@ -309,7 +332,7 @@ export default function BVNEnrollmentScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Application</Text>
+                                <Text style={styles.submitBtnText}>Submit Application (₦{servicePrice.toLocaleString()})</Text>
                             )}
                         </TouchableOpacity>
                     </View>

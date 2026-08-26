@@ -44,9 +44,10 @@ const NL= C.navyLight;// navy light bg
 const MODS = {
   operations: [
     { t:'Users Control',   i:'people',          r:'/manage/users',          c:N,  b:NL,  badge:0, tag:'Core' },
-    { t:'Mail Center',     i:'mail-unread',      r:'/manage/mail-center',    c:G,  b:GL },
+    { t:'BVN Tasks',       i:'finger-print',     r:'/manage/bvn-tasks',      c:G,  b:GL,  badge:0, tag:'Identity' },
     { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:N,  b:NL,  badge:0 },
     { t:'NIN Pricing',     i:'pricetag',         r:'/manage/nin-pricing',    c:G,  b:GL },
+    { t:'Mail Center',     i:'mail-unread',      r:'/manage/mail-center',    c:N,  b:NL },
     { t:'SMM Pricing',     i:'thumbs-up',        r:'/manage/smm-pricing',    c:N,  b:NL },
     { t:'Bills Pricing',   i:'flash',            r:'/manage/bills-pricing',  c:G,  b:GL },
     { t:'CAC Mgmt',        i:'briefcase',        r:'/manage/cac',            c:N,  b:NL },

@@ -19,6 +19,7 @@ export default function VNINToNIBSSScreen() {
     const [bvn, setBvn] = useState('');
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(700);
     const [result, setResult] = useState<any>(null);
 
     // Status tracking states
@@ -52,8 +53,25 @@ export default function VNINToNIBSSScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'vnin_to_nibss')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load VNIN to NIBSS price', e);
+        }
+    };
+
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
     }, []);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
@@ -87,8 +105,8 @@ export default function VNINToNIBSSScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < 100) {
-            showAlert("Insufficient Balance", "Your wallet balance is low. Please fund your wallet to proceed.");
+        if (userBalance !== null && userBalance < servicePrice) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to proceed.`);
             return;
         }
 
@@ -265,7 +283,7 @@ export default function VNINToNIBSSScreen() {
                                 {loading ? (
                                     <ActivityIndicator color="#0B192C" size="small" />
                                 ) : (
-                                    <Text style={styles.submitBtnText}>Submit to NIBSS</Text>
+                                    <Text style={styles.submitBtnText}>Submit to NIBSS (₦{servicePrice.toLocaleString()})</Text>
                                 )}
                             </TouchableOpacity>
                         </View>

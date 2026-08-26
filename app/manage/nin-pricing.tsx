@@ -144,11 +144,13 @@ export default function NinPricingBoard() {
 
             // Auto-seed BVN pricing entries if missing
             const bvnPricingDefaults = [
-                { id: 'bvn_num_basic', service_category: 'bvn', name: 'BVN Number - Basic', cost_price: 150, markup_price: 0 },
-                { id: 'bvn_num_advanced', service_category: 'bvn', name: 'BVN Number - Advanced', cost_price: 150, markup_price: 0 },
-                { id: 'bvn_phone_basic', service_category: 'bvn', name: 'Phone Number - Basic', cost_price: 150, markup_price: 0 },
-                { id: 'bvn_phone_advanced', service_category: 'bvn', name: 'Phone Number - Advanced', cost_price: 150, markup_price: 0 },
-                { id: 'bvn_card', service_category: 'bvn', name: 'BVN Card Layout', cost_price: 150, markup_price: 0 }
+                { id: 'bvn_num_advanced', service_category: 'bvn', name: 'BVN Verification', cost_price: 150, markup_price: 50 },
+                { id: 'bvn_premium_slip', service_category: 'bvn', name: 'BVN Premium Slip', cost_price: 150, markup_price: 50 },
+                { id: 'bvn_phone_basic', service_category: 'bvn', name: 'BVN Phone Retrieval', cost_price: 150, markup_price: 100 },
+                { id: 'bvn_card', service_category: 'bvn', name: 'BVN Plastic Card', cost_price: 200, markup_price: 50 },
+                { id: 'bvn_modification', service_category: 'bvn', name: 'BVN Modification', cost_price: 1000, markup_price: 500 },
+                { id: 'bvn_enrollment', service_category: 'bvn', name: 'BVN Enrollment', cost_price: 1500, markup_price: 500 },
+                { id: 'vnin_to_nibss', service_category: 'bvn', name: 'VNIN to NIBSS Integration', cost_price: 500, markup_price: 200 },
             ];
 
             for (const item of bvnPricingDefaults) {

@@ -33,9 +33,9 @@ export default function BVNRetrievalScreen() {
     const [trackLoading, setTrackLoading] = useState(false);
     const [trackResult, setTrackResult] = useState<any>(null);
 
-    // Submission states
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
+    const [servicePrice, setServicePrice] = useState<number>(250);
     const [submittedData, setSubmittedData] = useState<any>(null);
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [copiedBvn, setCopiedBvn] = useState(false);
@@ -64,8 +64,25 @@ export default function BVNRetrievalScreen() {
         }
     };
 
+    const fetchServicePrice = async () => {
+        try {
+            const { data } = await supabase
+                .from('service_pricing')
+                .select('cost_price, markup_price, selling_price')
+                .eq('id', 'bvn_phone_basic')
+                .maybeSingle();
+            if (data) {
+                const total = data.selling_price ? Number(data.selling_price) : (Number(data.cost_price || 0) + Number(data.markup_price || 0));
+                if (total > 0) setServicePrice(total);
+            }
+        } catch (e) {
+            console.warn('Failed to load BVN retrieval price', e);
+        }
+    };
+
     useEffect(() => {
         fetchWalletBalance();
+        fetchServicePrice();
     }, []);
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
@@ -372,7 +389,7 @@ export default function BVNRetrievalScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Request</Text>
+                                <Text style={styles.submitBtnText}>Submit CRM Request (₦{servicePrice.toLocaleString()})</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -381,7 +398,12 @@ export default function BVNRetrievalScreen() {
                 {/* TAB 2: BY PHONE (Code: 630) */}
                 {activeTab === 'phone' && (
                     <View style={styles.formCard}>
-                        <Text style={styles.inputLabel}>Registered Phone Number</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={styles.inputLabel}>Registered Phone Number</Text>
+                            <View style={{ backgroundColor: '#FEF9E7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(212,175,55,0.4)' }}>
+                                <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>Fee: ₦{servicePrice.toLocaleString()}</Text>
+                            </View>
+                        </View>
                         <TextInput
                             style={styles.input}
                             placeholder="08012345678"
@@ -411,7 +433,7 @@ export default function BVNRetrievalScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Request</Text>
+                                <Text style={styles.submitBtnText}>Retrieve BVN Now (₦{servicePrice.toLocaleString()})</Text>
                             )}
                         </TouchableOpacity>
                     </View>
