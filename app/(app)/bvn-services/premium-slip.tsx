@@ -11,6 +11,8 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 
+import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
+
 export default function BVNPremiumSlipScreen() {
     const insets = useSafeAreaInsets();
     const [bvn, setBvn] = useState('');
@@ -19,6 +21,17 @@ export default function BVNPremiumSlipScreen() {
     const [generatedPdf, setGeneratedPdf] = useState<string | null>(null);
     const [userDetails, setUserDetails] = useState<any>(null);
     const [showNoticeModal, setShowNoticeModal] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+    });
 
     const fetchWalletBalance = async () => {
         try {
@@ -36,9 +49,13 @@ export default function BVNPremiumSlipScreen() {
         fetchWalletBalance();
     }, []);
 
-    const showAlert = (title: string, message: string, type: 'error' | 'success' = 'error') => {
-        if (Platform.OS === 'web') alert(`${title}\n\n${message}`);
-        else Alert.alert(title, message);
+    const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+        setAlertConfig({
+            visible: true,
+            title,
+            message,
+            type,
+        });
     };
 
     const handleGenerateSlip = async () => {
@@ -302,6 +319,14 @@ export default function BVNPremiumSlipScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <BrandAlertModal
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </View>
     );
 }

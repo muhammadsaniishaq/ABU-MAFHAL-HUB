@@ -11,6 +11,8 @@ import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import { verificationHistory } from '../../../services/verificationHistory';
 
+import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
+
 export default function BVNRetrievalScreen() {
     const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState<'crm' | 'phone' | 'track'>('crm');
@@ -38,6 +40,17 @@ export default function BVNRetrievalScreen() {
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [copiedBvn, setCopiedBvn] = useState(false);
     const [copiedRequestId, setCopiedRequestId] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+    });
 
     const fetchWalletBalance = async () => {
         try {
@@ -55,9 +68,13 @@ export default function BVNRetrievalScreen() {
         fetchWalletBalance();
     }, []);
 
-    const showAlert = (title: string, message: string, type: 'error' | 'success' = 'error') => {
-        if (Platform.OS === 'web') alert(`${title}\n\n${message}`);
-        else Alert.alert(title, message);
+    const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+        setAlertConfig({
+            visible: true,
+            title,
+            message,
+            type,
+        });
     };
 
     const handlePickImage = async () => {
@@ -593,6 +610,14 @@ export default function BVNRetrievalScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <BrandAlertModal
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </View>
     );
 }

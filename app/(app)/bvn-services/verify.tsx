@@ -11,6 +11,7 @@ import { api } from '../../../services/api';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
 export default function VerifyBVNScreen() {
     const insets = useSafeAreaInsets();
@@ -21,6 +22,17 @@ export default function VerifyBVNScreen() {
     const [isSaving, setIsSaving] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
     const [historyList, setHistoryList] = useState<any[]>([]);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+    });
 
     const fetchWalletBalance = async () => {
         try {
@@ -94,12 +106,13 @@ export default function VerifyBVNScreen() {
         }
     };
 
-    const showAlert = (title: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
-        if (Platform.OS === 'web') {
-            alert(`${title}\n\n${message}`);
-        } else {
-            Alert.alert(title, message);
-        }
+    const showAlert = (title: string, message: string, type: AlertType = 'info') => {
+        setAlertConfig({
+            visible: true,
+            title,
+            message,
+            type,
+        });
     };
 
     const handleVerify = async () => {
@@ -390,6 +403,14 @@ export default function VerifyBVNScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            <BrandAlertModal
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </View>
     );
 }

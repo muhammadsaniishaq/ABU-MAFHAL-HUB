@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import { verificationHistory } from '../../../services/verificationHistory';
+import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
 const BANK_CODES = [
     { code: '701', name: 'Agency Banking' },
@@ -65,6 +66,17 @@ export default function BVNModificationScreen() {
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
     const [showTermsModal, setShowTermsModal] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+    });
 
     const isNameRequired = ['620', '623', '625', '626'].includes(serviceCode);
     const isDobRequired = ['621', '624', '625', '626'].includes(serviceCode);
@@ -86,9 +98,13 @@ export default function BVNModificationScreen() {
         fetchWalletBalance();
     }, []);
 
-    const showAlert = (title: string, message: string, type: 'error' | 'success' = 'error') => {
-        if (Platform.OS === 'web') alert(`${title}\n\n${message}`);
-        else Alert.alert(title, message);
+    const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+        setAlertConfig({
+            visible: true,
+            title,
+            message,
+            type,
+        });
     };
 
     const handleSubmitModification = async () => {
@@ -466,6 +482,14 @@ export default function BVNModificationScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <BrandAlertModal
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </View>
     );
 }

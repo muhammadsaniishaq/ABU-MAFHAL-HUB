@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 import * as Print from 'expo-print';
+import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
 export default function BVNHistoryScreen() {
     const insets = useSafeAreaInsets();
@@ -15,6 +16,26 @@ export default function BVNHistoryScreen() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [printingId, setPrintingId] = useState<string | null>(null);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = 'error') => {
+        setAlertConfig({
+            visible: true,
+            title,
+            message,
+            type,
+        });
+    };
 
     const loadHistory = async () => {
         setLoading(true);
@@ -141,7 +162,7 @@ export default function BVNHistoryScreen() {
                 await Print.printAsync({ html });
             }
         } catch (e: any) {
-            Alert.alert("Print Error", e.message || "Failed to print verification slip.");
+            showAlert("Print Error", e.message || "Failed to print verification slip.", "error");
         } finally {
             setPrintingId(null);
         }
@@ -275,6 +296,14 @@ export default function BVNHistoryScreen() {
                     ))
                 )}
             </ScrollView>
+
+            <BrandAlertModal
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </View>
     );
 }
