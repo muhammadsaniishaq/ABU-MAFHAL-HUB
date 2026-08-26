@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { verificationHistory } from '../../services/verificationHistory';
 import * as Clipboard from 'expo-clipboard';
 
 // Executive Navy & Gold Design Tokens
@@ -35,16 +36,17 @@ const C = {
     dangerBg: '#FEF2F2',
     blue: '#3B82F6',
     blueBg: '#EFF6FF',
+    purple: '#8B5CF6',
+    purpleBg: '#F5F3FF',
 };
 
 const SERVICE_LABELS: Record<string, { label: string; icon: any; color: string; bg: string }> = {
-    'bvn_modification': { label: 'Modification', icon: 'create-outline', color: '#D4AF37', bg: '#FEF9E7' },
-    'bvn_retrieval': { label: 'Retrieval', icon: 'search-outline', color: '#3B82F6', bg: '#EFF6FF' },
-    'bvn_enrollment': { label: 'Enrollment', icon: 'person-add-outline', color: '#10B981', bg: '#ECFDF5' },
-    'vnin_to_nibss': { label: 'VNIN to NIBSS', icon: 'git-network-outline', color: '#8B5CF6', bg: '#F5F3FF' },
-    'bvn_verification': { label: 'Verification', icon: 'shield-checkmark-outline', color: '#0B192C', bg: '#F1F5F9' },
-    'bvn_premium_slip': { label: 'Premium Slip', icon: 'document-text-outline', color: '#D4AF37', bg: '#FEF9E7' },
-    'bvn_vnin_nibss': { label: 'VNIN Linking', icon: 'link-outline', color: '#8B5CF6', bg: '#F5F3FF' },
+    'bvn_verification': { label: 'BVN Verify', icon: 'shield-checkmark-outline', color: '#10B981', bg: '#ECFDF5' },
+    'bvn_premium_slip': { label: 'Premium Slip', icon: 'star-outline', color: '#D4AF37', bg: '#FEF9E7' },
+    'bvn_retrieval': { label: 'Phone Retrieval', icon: 'search-outline', color: '#3B82F6', bg: '#EFF6FF' },
+    'bvn_modification': { label: 'Modification', icon: 'create-outline', color: '#B45309', bg: '#FEF9E7' },
+    'bvn_enrollment': { label: 'Enrollment', icon: 'person-add-outline', color: '#8B5CF6', bg: '#F5F3FF' },
+    'vnin_to_nibss': { label: 'VNIN to NIBSS', icon: 'git-compare-outline', color: '#0B192C', bg: '#F1F5F9' },
 };
 
 export default function BVNTasksManagerScreen() {
@@ -72,117 +74,7 @@ export default function BVNTasksManagerScreen() {
     const fetchBVNTasks = async () => {
         try {
             setLoading(true);
-            const combinedTasks: any[] = [];
-            const seenKeys = new Set<string>();
-
-            // 1. Fetch from verification_history
-            const { data: vhData, error: vhError } = await supabase
-                .from('verification_history')
-                .select(`
-                    id,
-                    user_id,
-                    service_category,
-                    service_type,
-                    search_number,
-                    holder_name,
-                    details,
-                    created_at,
-                    updated_at,
-                    profiles:user_id (
-                        id,
-                        full_name,
-                        email,
-                        phone_number,
-                        avatar_url
-                    )
-                `)
-                .eq('service_category', 'bvn')
-                .order('created_at', { ascending: false });
-
-            if (!vhError && vhData) {
-                for (const item of vhData) {
-                    seenKeys.add(item.id);
-                    combinedTasks.push(item);
-                }
-            }
-
-            // 2. Fetch Historical Transactions from transactions table as well
-            const { data: txData, error: txError } = await supabase
-                .from('transactions')
-                .select(`
-                    id,
-                    user_id,
-                    type,
-                    amount,
-                    status,
-                    reference,
-                    description,
-                    created_at,
-                    profiles:user_id (
-                        id,
-                        full_name,
-                        email,
-                        phone_number,
-                        avatar_url
-                    )
-                `)
-                .order('created_at', { ascending: false })
-                .limit(200);
-
-            if (!txError && txData) {
-                for (const tx of txData) {
-                    const typeLower = (tx.type || '').toLowerCase();
-                    const descLower = (tx.description || '').toLowerCase();
-
-                    const isBVNRelated =
-                        typeLower.includes('bvn') ||
-                        typeLower.includes('nibss') ||
-                        descLower.includes('bvn') ||
-                        descLower.includes('nibss');
-
-                    if (isBVNRelated) {
-                        let parsedDetails: any = {};
-                        try {
-                            if (tx.description && tx.description.startsWith('{')) {
-                                parsedDetails = JSON.parse(tx.description);
-                            }
-                        } catch (_) {}
-
-                        const refKey = tx.reference || tx.id;
-                        if (!seenKeys.has(refKey) && !seenKeys.has(tx.id)) {
-                            seenKeys.add(refKey);
-
-                            let serviceType = 'bvn_verification';
-                            if (typeLower.includes('mod') || descLower.includes('mod')) serviceType = 'bvn_modification';
-                            else if (typeLower.includes('retrieval') || descLower.includes('retrieval')) serviceType = 'bvn_retrieval';
-                            else if (typeLower.includes('enroll') || descLower.includes('enroll')) serviceType = 'bvn_enrollment';
-                            else if (typeLower.includes('vnin') || descLower.includes('vnin')) serviceType = 'vnin_to_nibss';
-                            else if (typeLower.includes('slip') || descLower.includes('premium')) serviceType = 'bvn_premium_slip';
-
-                            combinedTasks.push({
-                                id: tx.id,
-                                user_id: tx.user_id,
-                                service_category: 'bvn',
-                                service_type: parsedDetails.service_type || serviceType,
-                                search_number: parsedDetails.search_number || parsedDetails.bvn || tx.reference || 'BVN RECORD',
-                                holder_name: parsedDetails.holder_name || (tx as any).profiles?.full_name || 'BVN Applicant',
-                                details: {
-                                    ...parsedDetails,
-                                    amount: tx.amount,
-                                    reference: tx.reference,
-                                    status: tx.status === 'success' ? 'COMPLETED' : tx.status?.toUpperCase() || 'COMPLETED',
-                                    source: 'transactions_history'
-                                },
-                                created_at: tx.created_at,
-                                profiles: (tx as any).profiles
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Sort newest first
-            combinedTasks.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+            const combinedTasks = await verificationHistory.getAllForAdmin('bvn');
             setTasks(combinedTasks);
         } catch (e) {
             console.warn('Failed to load BVN tasks', e);
@@ -196,58 +88,8 @@ export default function BVNTasksManagerScreen() {
     const handleSyncAndBackfill = async () => {
         setBackfilling(true);
         try {
-            let backfilledCount = 0;
-
-            const { data: txList } = await supabase
-                .from('transactions')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(300);
-
-            if (txList && txList.length > 0) {
-                for (const tx of txList) {
-                    const typeLower = (tx.type || '').toLowerCase();
-                    const descLower = (tx.description || '').toLowerCase();
-
-                    const isBVN = typeLower.includes('bvn') || typeLower.includes('nibss') || descLower.includes('bvn') || descLower.includes('nibss');
-
-                    if (isBVN) {
-                        let parsed: any = {};
-                        try {
-                            if (tx.description && tx.description.startsWith('{')) {
-                                parsed = JSON.parse(tx.description);
-                            }
-                        } catch (_) {}
-
-                        // Check if already in verification_history
-                        const { data: existing } = await supabase
-                            .from('verification_history')
-                            .select('id')
-                            .eq('search_number', parsed.search_number || tx.reference || tx.id)
-                            .maybeSingle();
-
-                        if (!existing) {
-                            await supabase.from('verification_history').insert({
-                                user_id: tx.user_id,
-                                service_category: 'bvn',
-                                service_type: parsed.service_type || 'bvn_verification',
-                                search_number: parsed.search_number || parsed.bvn || tx.reference || 'BVN RECORD',
-                                holder_name: parsed.holder_name || 'BVN Applicant',
-                                details: {
-                                    ...parsed,
-                                    amount: tx.amount,
-                                    reference: tx.reference,
-                                    status: tx.status === 'success' ? 'COMPLETED' : tx.status?.toUpperCase() || 'COMPLETED',
-                                },
-                                created_at: tx.created_at
-                            });
-                            backfilledCount++;
-                        }
-                    }
-                }
-            }
-
-            Alert.alert("Sync Complete", `Successfully indexed ${backfilledCount} past historical BVN transaction records into permanent admin records.`);
+            const count = await verificationHistory.syncAndBackfillAll();
+            Alert.alert("Sync Complete", `Successfully indexed ${count} past historical BVN & NIN records into permanent cloud records.`);
             fetchBVNTasks();
         } catch (e: any) {
             Alert.alert("Sync Failed", e.message || "Failed to backfill historical BVN tasks.");

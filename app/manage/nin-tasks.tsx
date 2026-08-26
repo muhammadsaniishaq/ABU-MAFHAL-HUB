@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../services/supabase';
+import { verificationHistory } from '../../services/verificationHistory';
 import * as Clipboard from 'expo-clipboard';
 
 // Executive Navy & Gold Design Tokens
@@ -80,125 +81,7 @@ export default function NINTasksManagerScreen() {
     const fetchNINTasks = async () => {
         try {
             setLoading(true);
-            const combinedTasks: any[] = [];
-            const seenKeys = new Set<string>();
-
-            // 1. Fetch from verification_history
-            const { data: vhData, error: vhError } = await supabase
-                .from('verification_history')
-                .select(`
-                    id,
-                    user_id,
-                    service_category,
-                    service_type,
-                    search_number,
-                    holder_name,
-                    layout,
-                    details,
-                    created_at,
-                    updated_at,
-                    profiles:user_id (
-                        id,
-                        full_name,
-                        email,
-                        phone_number,
-                        avatar_url
-                    )
-                `)
-                .eq('service_category', 'nin')
-                .order('created_at', { ascending: false });
-
-            if (!vhError && vhData) {
-                for (const item of vhData) {
-                    const key = item.id;
-                    seenKeys.add(key);
-                    combinedTasks.push(item);
-                }
-            }
-
-            // 2. Fetch Historical Transactions from transactions table as well
-            const { data: txData, error: txError } = await supabase
-                .from('transactions')
-                .select(`
-                    id,
-                    user_id,
-                    type,
-                    amount,
-                    status,
-                    reference,
-                    description,
-                    created_at,
-                    profiles:user_id (
-                        id,
-                        full_name,
-                        email,
-                        phone_number,
-                        avatar_url
-                    )
-                `)
-                .order('created_at', { ascending: false })
-                .limit(200);
-
-            if (!txError && txData) {
-                for (const tx of txData) {
-                    const typeLower = (tx.type || '').toLowerCase();
-                    const descLower = (tx.description || '').toLowerCase();
-
-                    const isNINRelated =
-                        typeLower.includes('nin') ||
-                        typeLower.includes('ipe') ||
-                        typeLower.includes('vnin') ||
-                        typeLower.includes('validation') ||
-                        typeLower.includes('personalization') ||
-                        descLower.includes('nin') ||
-                        descLower.includes('ipe clearance') ||
-                        descLower.includes('vnin') ||
-                        descLower.includes('nin modification');
-
-                    if (isNINRelated) {
-                        let parsedDetails: any = {};
-                        try {
-                            if (tx.description && tx.description.startsWith('{')) {
-                                parsedDetails = JSON.parse(tx.description);
-                            }
-                        } catch (_) {}
-
-                        const refKey = tx.reference || tx.id;
-                        if (!seenKeys.has(refKey) && !seenKeys.has(tx.id)) {
-                            seenKeys.add(refKey);
-
-                            let serviceType = 'nin_standard';
-                            if (typeLower.includes('mod') || descLower.includes('mod')) serviceType = 'nin_mod_name';
-                            else if (typeLower.includes('ipe') || descLower.includes('ipe')) serviceType = 'ipe_clearance';
-                            else if (typeLower.includes('val') || descLower.includes('val')) serviceType = 'nin_validation';
-                            else if (typeLower.includes('pers') || descLower.includes('pers')) serviceType = 'pers_status';
-                            else if (typeLower.includes('premium') || descLower.includes('premium')) serviceType = 'nin_premium';
-
-                            combinedTasks.push({
-                                id: tx.id,
-                                user_id: tx.user_id,
-                                service_category: 'nin',
-                                service_type: parsedDetails.service_type || serviceType,
-                                search_number: parsedDetails.search_number || parsedDetails.nin || parsedDetails.target || tx.reference || 'NIN RECORD',
-                                holder_name: parsedDetails.holder_name || (tx as any).profiles?.full_name || 'NIN Applicant',
-                                layout: parsedDetails.layout || 'standard',
-                                details: {
-                                    ...parsedDetails,
-                                    amount: tx.amount,
-                                    reference: tx.reference,
-                                    status: tx.status === 'success' ? 'COMPLETED' : tx.status?.toUpperCase() || 'COMPLETED',
-                                    source: 'transactions_history'
-                                },
-                                created_at: tx.created_at,
-                                profiles: (tx as any).profiles
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Sort newest first
-            combinedTasks.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+            const combinedTasks = await verificationHistory.getAllForAdmin('nin');
             setTasks(combinedTasks);
         } catch (e) {
             console.warn('Failed to load NIN tasks', e);
@@ -221,59 +104,8 @@ export default function NINTasksManagerScreen() {
     const handleSyncAndBackfill = async () => {
         setBackfilling(true);
         try {
-            let backfilledCount = 0;
-
-            const { data: txList } = await supabase
-                .from('transactions')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(300);
-
-            if (txList && txList.length > 0) {
-                for (const tx of txList) {
-                    const typeLower = (tx.type || '').toLowerCase();
-                    const descLower = (tx.description || '').toLowerCase();
-
-                    const isNIN = typeLower.includes('nin') || typeLower.includes('ipe') || descLower.includes('nin') || descLower.includes('ipe');
-
-                    if (isNIN) {
-                        let parsed: any = {};
-                        try {
-                            if (tx.description && tx.description.startsWith('{')) {
-                                parsed = JSON.parse(tx.description);
-                            }
-                        } catch (_) {}
-
-                        // Check if already in verification_history
-                        const { data: existing } = await supabase
-                            .from('verification_history')
-                            .select('id')
-                            .eq('search_number', parsed.search_number || tx.reference || tx.id)
-                            .maybeSingle();
-
-                        if (!existing) {
-                            await supabase.from('verification_history').insert({
-                                user_id: tx.user_id,
-                                service_category: 'nin',
-                                service_type: parsed.service_type || 'nin_standard',
-                                search_number: parsed.search_number || parsed.nin || tx.reference || 'NIN RECORD',
-                                holder_name: parsed.holder_name || 'NIN Applicant',
-                                layout: parsed.layout || 'standard',
-                                details: {
-                                    ...parsed,
-                                    amount: tx.amount,
-                                    reference: tx.reference,
-                                    status: tx.status === 'success' ? 'COMPLETED' : tx.status?.toUpperCase() || 'COMPLETED',
-                                },
-                                created_at: tx.created_at
-                            });
-                            backfilledCount++;
-                        }
-                    }
-                }
-            }
-
-            Alert.alert("Sync Complete", `Successfully indexed ${backfilledCount} past historical NIN transaction records into permanent admin records.`);
+            const count = await verificationHistory.syncAndBackfillAll();
+            Alert.alert("Sync Complete", `Successfully indexed ${count} past historical NIN & BVN records into permanent cloud records.`);
             fetchNINTasks();
         } catch (e: any) {
             Alert.alert("Sync Failed", e.message || "Failed to backfill historical tasks.");
