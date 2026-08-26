@@ -500,7 +500,9 @@ export const AgentHubIdentityVerifier = {
 
       let errMsg = resData?.error || resData?.message || resData?.msg || 'Verification failed. Record not found.';
       if (typeof errMsg === 'string') {
-        if (errMsg.toLowerCase().includes('bvn not exists') || errMsg.toLowerCase().includes('bvn not exist')) {
+        if (errMsg.toLowerCase().includes('insufficient wallet balance') || errMsg.toLowerCase().includes('insufficient funds')) {
+          errMsg = 'Provider API Wallet Insufficient Balance: Please top up your AgentHub developer account (https://agenthub.ng) to process identity verifications.';
+        } else if (errMsg.toLowerCase().includes('bvn not exists') || errMsg.toLowerCase().includes('bvn not exist')) {
           errMsg = 'The provided 11-digit BVN does not exist or is not registered in the central database.';
         } else if (errMsg.toLowerCase().includes('nin not exists') || errMsg.toLowerCase().includes('nin not exist')) {
           errMsg = 'The provided 11-digit NIN does not exist or is not registered.';

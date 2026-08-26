@@ -589,7 +589,7 @@ serve(async (req: Request) => {
             await refundUser(supabaseAdmin, user.id, FEE_AMOUNT, `Refund: Provider unreachable`);
             let cleanText = lastErrorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
             if (cleanText.includes('404') || cleanText.includes('could not be found') || cleanText.includes('Page Not Found')) {
-                cleanText = 'Ba a samu bayanan BVN ba / Record not found on provider.';
+                cleanText = 'Record not found on identity verification provider.';
             } else {
                 cleanText = cleanText.substring(0, 120);
             }
@@ -667,10 +667,22 @@ serve(async (req: Request) => {
 
         // ── AgentHub failure ───────────────────────────────────────────────────
         console.error('AgentHub API Error:', responseData);
-        const agentHubMsg =
+        let agentHubMsg =
             responseData.error ||
             responseData.message ||
             'Verification failed. Record not found.';
+
+        if (typeof agentHubMsg === 'string') {
+            if (agentHubMsg.toLowerCase().includes('insufficient wallet balance') || agentHubMsg.toLowerCase().includes('insufficient funds')) {
+                agentHubMsg = 'Provider API Wallet Insufficient Balance: Please top up your AgentHub developer account (https://agenthub.ng) to process identity verifications.';
+            } else if (agentHubMsg.toLowerCase().includes('bvn not exists') || agentHubMsg.toLowerCase().includes('bvn not exist')) {
+                agentHubMsg = 'The provided 11-digit BVN does not exist or is not registered in the central database.';
+            } else if (agentHubMsg.toLowerCase().includes('nin not exists') || agentHubMsg.toLowerCase().includes('nin not exist')) {
+                agentHubMsg = 'The provided 11-digit NIN does not exist or is not registered.';
+            } else if (agentHubMsg.toLowerCase().includes('service currently unavailable') || agentHubMsg.toLowerCase().includes('service unavailable')) {
+                agentHubMsg = 'Service is temporarily busy on the provider network. Please try again shortly.';
+            }
+        }
 
         // AgentHub already refunds on their side ("message": "Refunded")
         // But we still refund the user's wallet locally since we charged them upfront
