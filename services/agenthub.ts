@@ -205,7 +205,7 @@ export const AgentHubIdentityVerifier = {
       else if (slipType === 'REGULAR') serviceCode = '403';
       else if (slipType === 'INFO') serviceCode = '404';
 
-      const candidateList: { url: string; body?: any; method?: 'GET' | 'POST' }[] = [];
+      const candidateList: { url: string; body?: any; method?: 'GET' | 'POST'; isFormData?: boolean }[] = [];
 
       if (searchType === 'nin') {
         if (slipType === 'REGULAR') {
@@ -249,17 +249,7 @@ export const AgentHubIdentityVerifier = {
         if (sCode === '631') {
           candidateList.push({ 
             url: 'https://agenthub.ng/api/bvn/retrieval', 
-            body: { 
-              service_code: '631', 
-              reference: ref, 
-              agent_code: extra?.agent_code || extra?.agentCode, 
-              ticket_id: extra?.ticket_id || extra?.ticketId, 
-              bms_ticket: extra?.bms_ticket || extra?.bmsTicket || '', 
-              screenshot: extra?.screenshot || extra?.screenshot_proof || extra?.image || '' 
-            } 
-          });
-          candidateList.push({ 
-            url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
+            isFormData: true,
             body: { 
               service_code: '631', 
               reference: ref, 
@@ -272,10 +262,7 @@ export const AgentHubIdentityVerifier = {
         } else {
           candidateList.push({ 
             url: 'https://agenthub.ng/api/bvn/retrieval', 
-            body: { service_code: '630', reference: ref, phone_number: pNum, full_name: fName } 
-          });
-          candidateList.push({ 
-            url: 'https://agenthub.ng/api/v1/bvn/retrieval', 
+            isFormData: true,
             body: { service_code: '630', reference: ref, phone_number: pNum, full_name: fName } 
           });
         }
@@ -348,9 +335,36 @@ export const AgentHubIdentityVerifier = {
               'Accept': 'application/json',
             },
           };
+          
           if (!isGet && item.body) {
-            fetchOptions.headers['Content-Type'] = 'application/json';
-            fetchOptions.body = JSON.stringify(item.body);
+            if (item.isFormData) {
+              const fd = new FormData();
+              for (const [k, v] of Object.entries(item.body || {})) {
+                if (v !== undefined && v !== null && v !== '') {
+                  if (k === 'screenshot' && typeof v === 'string' && v.startsWith('data:')) {
+                    try {
+                      const byteString = atob(v.split(',')[1]);
+                      const mimeString = v.split(',')[0].split(':')[1].split(';')[0];
+                      const ab = new ArrayBuffer(byteString.length);
+                      const ia = new Uint8Array(ab);
+                      for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                      }
+                      const blob = new Blob([ab], { type: mimeString });
+                      fd.append('screenshot', blob, 'proof.jpg');
+                    } catch (_) {
+                      fd.append('screenshot', v as any);
+                    }
+                  } else {
+                    fd.append(k, v as any);
+                  }
+                }
+              }
+              fetchOptions.body = fd;
+            } else {
+              fetchOptions.headers['Content-Type'] = 'application/json';
+              fetchOptions.body = JSON.stringify(item.body);
+            }
           }
 
           const res = await fetch(item.url, fetchOptions);
@@ -362,6 +376,7 @@ export const AgentHubIdentityVerifier = {
                               parsed.status === 'success' || 
                               parsed.success === true ||
                               parsed.current_status === 'COMPLETED' ||
+                              parsed.current_status === 'PROCESSING' ||
                               Boolean(parsed.data && (
                                 parsed.data.bvn || 
                                 parsed.data.firstName || 
@@ -369,6 +384,7 @@ export const AgentHubIdentityVerifier = {
                                 parsed.data.nin || 
                                 parsed.data.pdf_base64 || 
                                 parsed.data.user_details || 
+                                parsed.data.request_id ||
                                 parsed.data.data
                               ));
             if (isSuccess) {
@@ -482,7 +498,16 @@ export const AgentHubIdentityVerifier = {
         }
       }
 
-      const errMsg = resData?.error || resData?.message || resData?.msg || 'Verification failed. Record not found.';
+      let errMsg = resData?.error || resData?.message || resData?.msg || 'Verification failed. Record not found.';
+      if (typeof errMsg === 'string') {
+        if (errMsg.toLowerCase().includes('bvn not exists') || errMsg.toLowerCase().includes('bvn not exist')) {
+          errMsg = 'The provided 11-digit BVN does not exist or is not registered in the central database.';
+        } else if (errMsg.toLowerCase().includes('nin not exists') || errMsg.toLowerCase().includes('nin not exist')) {
+          errMsg = 'The provided 11-digit NIN does not exist or is not registered.';
+        } else if (errMsg.toLowerCase().includes('service currently unavailable') || errMsg.toLowerCase().includes('service unavailable')) {
+          errMsg = 'Service is temporarily busy on the provider network. Please try again shortly.';
+        }
+      }
       return { isValid: false, message: errMsg };
     } catch (err: any) {
       return { isValid: false, message: err.message || 'An error occurred during verification.' };
