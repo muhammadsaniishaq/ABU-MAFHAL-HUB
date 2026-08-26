@@ -45,8 +45,9 @@ const MODS = {
   operations: [
     { t:'Users Control',   i:'people',          r:'/manage/users',          c:N,  b:NL,  badge:0, tag:'Core' },
     { t:'BVN Tasks',       i:'finger-print',     r:'/manage/bvn-tasks',      c:G,  b:GL,  badge:0, tag:'Identity' },
-    { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:N,  b:NL,  badge:0 },
-    { t:'NIN Pricing',     i:'pricetag',         r:'/manage/nin-pricing',    c:G,  b:GL },
+    { t:'NIN Tasks',       i:'card',             r:'/manage/nin-tasks',      c:N,  b:NL,  badge:0, tag:'Identity' },
+    { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:G,  b:GL,  badge:0 },
+    { t:'NIN Pricing',     i:'pricetag',         r:'/manage/nin-pricing',    c:N,  b:NL },
     { t:'Mail Center',     i:'mail-unread',      r:'/manage/mail-center',    c:N,  b:NL },
     { t:'SMM Pricing',     i:'thumbs-up',        r:'/manage/smm-pricing',    c:N,  b:NL },
     { t:'Bills Pricing',   i:'flash',            r:'/manage/bills-pricing',  c:G,  b:GL },

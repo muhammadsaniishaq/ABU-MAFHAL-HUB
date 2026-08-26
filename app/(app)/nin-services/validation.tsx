@@ -9,6 +9,7 @@ import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusResult } from '../../../components/StatusResult';
+import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 
 const DEFAULT_STATUS_TYPES = [
     { id: 'val_no_record', db_id: 'val_no_record', name: 'No Record Found', price: 900 },
@@ -86,17 +87,18 @@ export default function ValidationScreen() {
             const statusPrice = statusTypes.find(s => s.id === selectedStatus)?.price || 0;
             const slipPrice = slipTypes.find(s => s.id === selectedSlip)?.price || 0;
             const totalPrice = statusPrice + slipPrice;
+            const cleanTarget = nin.trim();
 
             const newItem = {
                 id: `val_${Date.now()}`,
-                target: nin.trim(),
+                target: cleanTarget,
                 status: 'Completed',
                 slip: slipTypes.find(s => s.id === selectedSlip)?.name || 'No Slip',
                 amount: totalPrice,
                 date: (() => {
                     const d = new Date();
                     const pad = (n: number) => n.toString().padStart(2, '0');
-                    return `${d.getFullYear()}-\$${pad(d.getMonth() + 1)}-\$${pad(d.getDate())}`;
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                 })(),
                 data: verifiedData
             };
@@ -104,6 +106,23 @@ export default function ValidationScreen() {
             const updated = [newItem, ...historyList.filter(item => item.target !== newItem.target)].slice(0, 500);
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_validation_requests', JSON.stringify(updated));
+
+            // Save to Supabase verification_history
+            await verificationHistory.save({
+                service_category: 'nin',
+                service_type: 'nin_validation',
+                search_number: cleanTarget,
+                holder_name: extractFullName(verifiedData, 'NIN Applicant'),
+                layout: slipTypes.find(s => s.id === selectedSlip)?.name || 'No Slip',
+                details: {
+                    ...verifiedData,
+                    nin: cleanTarget,
+                    validation_type: selectedStatus,
+                    slip_type: selectedSlip,
+                    amount: totalPrice,
+                    status: 'COMPLETED'
+                }
+            });
         } catch (e) {
             console.warn('Failed to save history item', e);
         }

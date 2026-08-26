@@ -35,19 +35,27 @@ const C = {
     dangerBg: '#FEF2F2',
     blue: '#3B82F6',
     blueBg: '#EFF6FF',
+    purple: '#8B5CF6',
+    purpleBg: '#F5F3FF',
 };
 
 const SERVICE_LABELS: Record<string, { label: string; icon: any; color: string; bg: string }> = {
-    'bvn_modification': { label: 'Modification', icon: 'create-outline', color: '#D4AF37', bg: '#FEF9E7' },
-    'bvn_retrieval': { label: 'Retrieval', icon: 'search-outline', color: '#3B82F6', bg: '#EFF6FF' },
-    'bvn_enrollment': { label: 'Enrollment', icon: 'person-add-outline', color: '#10B981', bg: '#ECFDF5' },
-    'vnin_to_nibss': { label: 'VNIN to NIBSS', icon: 'git-network-outline', color: '#8B5CF6', bg: '#F5F3FF' },
-    'bvn_verification': { label: 'Verification', icon: 'shield-checkmark-outline', color: '#0B192C', bg: '#F1F5F9' },
-    'bvn_premium_slip': { label: 'Premium Slip', icon: 'document-text-outline', color: '#D4AF37', bg: '#FEF9E7' },
-    'bvn_vnin_nibss': { label: 'VNIN Linking', icon: 'link-outline', color: '#8B5CF6', bg: '#F5F3FF' },
+    'nin_standard': { label: 'Standard Slip', icon: 'document-text-outline', color: '#3B82F6', bg: '#EFF6FF' },
+    'nin_premium': { label: 'Premium Slip', icon: 'star-outline', color: '#D4AF37', bg: '#FEF9E7' },
+    'nin_regular': { label: 'Regular Slip', icon: 'document-outline', color: '#0B192C', bg: '#F1F5F9' },
+    'nin_mod_name': { label: 'Name Mod', icon: 'create-outline', color: '#B45309', bg: '#FEF9E7' },
+    'nin_mod_phone': { label: 'Phone Mod', icon: 'call-outline', color: '#B45309', bg: '#FEF9E7' },
+    'nin_mod_address': { label: 'Address Mod', icon: 'home-outline', color: '#B45309', bg: '#FEF9E7' },
+    'nin_mod_dob': { label: 'DOB Mod', icon: 'calendar-outline', color: '#B45309', bg: '#FEF9E7' },
+    'ipe_clearance': { label: 'IPE Clearance', icon: 'shield-checkmark-outline', color: '#10B981', bg: '#ECFDF5' },
+    'nin_validation': { label: 'NIN Validation', icon: 'checkbox-outline', color: '#8B5CF6', bg: '#F5F3FF' },
+    'pers_status': { label: 'Personalization', icon: 'finger-print-outline', color: '#0B192C', bg: '#F1F5F9' },
+    'vnin_gen': { label: 'VNIN Generate', icon: 'key-outline', color: '#3B82F6', bg: '#EFF6FF' },
+    'vnin_to_nin': { label: 'VNIN to NIN', icon: 'git-compare-outline', color: '#8B5CF6', bg: '#F5F3FF' },
+    'nin_phone': { label: 'Phone Search', icon: 'search-outline', color: '#3B82F6', bg: '#EFF6FF' },
 };
 
-export default function BVNTasksManagerScreen() {
+export default function NINTasksManagerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -69,7 +77,7 @@ export default function BVNTasksManagerScreen() {
     const [updating, setUpdating] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
-    const fetchBVNTasks = async () => {
+    const fetchNINTasks = async () => {
         try {
             setLoading(true);
             const combinedTasks: any[] = [];
@@ -85,6 +93,7 @@ export default function BVNTasksManagerScreen() {
                     service_type,
                     search_number,
                     holder_name,
+                    layout,
                     details,
                     created_at,
                     updated_at,
@@ -96,12 +105,13 @@ export default function BVNTasksManagerScreen() {
                         avatar_url
                     )
                 `)
-                .eq('service_category', 'bvn')
+                .eq('service_category', 'nin')
                 .order('created_at', { ascending: false });
 
             if (!vhError && vhData) {
                 for (const item of vhData) {
-                    seenKeys.add(item.id);
+                    const key = item.id;
+                    seenKeys.add(key);
                     combinedTasks.push(item);
                 }
             }
@@ -134,13 +144,18 @@ export default function BVNTasksManagerScreen() {
                     const typeLower = (tx.type || '').toLowerCase();
                     const descLower = (tx.description || '').toLowerCase();
 
-                    const isBVNRelated =
-                        typeLower.includes('bvn') ||
-                        typeLower.includes('nibss') ||
-                        descLower.includes('bvn') ||
-                        descLower.includes('nibss');
+                    const isNINRelated =
+                        typeLower.includes('nin') ||
+                        typeLower.includes('ipe') ||
+                        typeLower.includes('vnin') ||
+                        typeLower.includes('validation') ||
+                        typeLower.includes('personalization') ||
+                        descLower.includes('nin') ||
+                        descLower.includes('ipe clearance') ||
+                        descLower.includes('vnin') ||
+                        descLower.includes('nin modification');
 
-                    if (isBVNRelated) {
+                    if (isNINRelated) {
                         let parsedDetails: any = {};
                         try {
                             if (tx.description && tx.description.startsWith('{')) {
@@ -152,20 +167,21 @@ export default function BVNTasksManagerScreen() {
                         if (!seenKeys.has(refKey) && !seenKeys.has(tx.id)) {
                             seenKeys.add(refKey);
 
-                            let serviceType = 'bvn_verification';
-                            if (typeLower.includes('mod') || descLower.includes('mod')) serviceType = 'bvn_modification';
-                            else if (typeLower.includes('retrieval') || descLower.includes('retrieval')) serviceType = 'bvn_retrieval';
-                            else if (typeLower.includes('enroll') || descLower.includes('enroll')) serviceType = 'bvn_enrollment';
-                            else if (typeLower.includes('vnin') || descLower.includes('vnin')) serviceType = 'vnin_to_nibss';
-                            else if (typeLower.includes('slip') || descLower.includes('premium')) serviceType = 'bvn_premium_slip';
+                            let serviceType = 'nin_standard';
+                            if (typeLower.includes('mod') || descLower.includes('mod')) serviceType = 'nin_mod_name';
+                            else if (typeLower.includes('ipe') || descLower.includes('ipe')) serviceType = 'ipe_clearance';
+                            else if (typeLower.includes('val') || descLower.includes('val')) serviceType = 'nin_validation';
+                            else if (typeLower.includes('pers') || descLower.includes('pers')) serviceType = 'pers_status';
+                            else if (typeLower.includes('premium') || descLower.includes('premium')) serviceType = 'nin_premium';
 
                             combinedTasks.push({
                                 id: tx.id,
                                 user_id: tx.user_id,
-                                service_category: 'bvn',
+                                service_category: 'nin',
                                 service_type: parsedDetails.service_type || serviceType,
-                                search_number: parsedDetails.search_number || parsedDetails.bvn || tx.reference || 'BVN RECORD',
-                                holder_name: parsedDetails.holder_name || (tx as any).profiles?.full_name || 'BVN Applicant',
+                                search_number: parsedDetails.search_number || parsedDetails.nin || parsedDetails.target || tx.reference || 'NIN RECORD',
+                                holder_name: parsedDetails.holder_name || (tx as any).profiles?.full_name || 'NIN Applicant',
+                                layout: parsedDetails.layout || 'standard',
                                 details: {
                                     ...parsedDetails,
                                     amount: tx.amount,
@@ -185,14 +201,23 @@ export default function BVNTasksManagerScreen() {
             combinedTasks.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
             setTasks(combinedTasks);
         } catch (e) {
-            console.warn('Failed to load BVN tasks', e);
+            console.warn('Failed to load NIN tasks', e);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     };
 
-    // Sync & Backfill Historical BVN Transactions into permanent verification_history table
+    useEffect(() => {
+        fetchNINTasks();
+    }, []);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchNINTasks();
+    }, []);
+
+    // Sync & Backfill Historical Transactions into permanent verification_history table
     const handleSyncAndBackfill = async () => {
         setBackfilling(true);
         try {
@@ -209,9 +234,9 @@ export default function BVNTasksManagerScreen() {
                     const typeLower = (tx.type || '').toLowerCase();
                     const descLower = (tx.description || '').toLowerCase();
 
-                    const isBVN = typeLower.includes('bvn') || typeLower.includes('nibss') || descLower.includes('bvn') || descLower.includes('nibss');
+                    const isNIN = typeLower.includes('nin') || typeLower.includes('ipe') || descLower.includes('nin') || descLower.includes('ipe');
 
-                    if (isBVN) {
+                    if (isNIN) {
                         let parsed: any = {};
                         try {
                             if (tx.description && tx.description.startsWith('{')) {
@@ -229,10 +254,11 @@ export default function BVNTasksManagerScreen() {
                         if (!existing) {
                             await supabase.from('verification_history').insert({
                                 user_id: tx.user_id,
-                                service_category: 'bvn',
-                                service_type: parsed.service_type || 'bvn_verification',
-                                search_number: parsed.search_number || parsed.bvn || tx.reference || 'BVN RECORD',
-                                holder_name: parsed.holder_name || 'BVN Applicant',
+                                service_category: 'nin',
+                                service_type: parsed.service_type || 'nin_standard',
+                                search_number: parsed.search_number || parsed.nin || tx.reference || 'NIN RECORD',
+                                holder_name: parsed.holder_name || 'NIN Applicant',
+                                layout: parsed.layout || 'standard',
                                 details: {
                                     ...parsed,
                                     amount: tx.amount,
@@ -247,23 +273,14 @@ export default function BVNTasksManagerScreen() {
                 }
             }
 
-            Alert.alert("Sync Complete", `Successfully indexed ${backfilledCount} past historical BVN transaction records into permanent admin records.`);
-            fetchBVNTasks();
+            Alert.alert("Sync Complete", `Successfully indexed ${backfilledCount} past historical NIN transaction records into permanent admin records.`);
+            fetchNINTasks();
         } catch (e: any) {
-            Alert.alert("Sync Failed", e.message || "Failed to backfill historical BVN tasks.");
+            Alert.alert("Sync Failed", e.message || "Failed to backfill historical tasks.");
         } finally {
             setBackfilling(false);
         }
     };
-
-    useEffect(() => {
-        fetchBVNTasks();
-    }, []);
-
-    const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        fetchBVNTasks();
-    }, []);
 
     // Filtered Tasks
     const filteredTasks = tasks.filter(task => {
@@ -277,7 +294,7 @@ export default function BVNTasksManagerScreen() {
         if (statusFilter === 'failed' && status !== 'FAILED' && status !== 'REJECTED') return false;
 
         // Type Filter
-        if (typeFilter !== 'all' && task.service_type !== typeFilter) return false;
+        if (typeFilter !== 'all' && !task.service_type?.includes(typeFilter)) return false;
 
         // Search Query
         if (searchQuery.trim()) {
@@ -286,8 +303,8 @@ export default function BVNTasksManagerScreen() {
             const searchNum = (task.search_number || '').toLowerCase();
             const email = (task.profiles?.email || '').toLowerCase();
             const userName = (task.profiles?.full_name || '').toLowerCase();
-            const phone = (task.profiles?.phone_number || details.phone_number || details.old_phone || details.new_phone_number || '').toLowerCase();
-            const ref = (details.reference || details.request_id || details.requestId || task.id || '').toLowerCase();
+            const phone = (task.profiles?.phone_number || details.phone_number || details.current_phone || details.new_phone || '').toLowerCase();
+            const ref = (details.reference || details.ref || details.request_id || task.id || '').toLowerCase();
 
             return holder.includes(q) || searchNum.includes(q) || email.includes(q) || userName.includes(q) || phone.includes(q) || ref.includes(q);
         }
@@ -318,7 +335,7 @@ export default function BVNTasksManagerScreen() {
             setAdminStatus('PROCESSING');
         }
         setAdminNotes(details.admin_notes || details.resolution_message || '');
-        setRetrievedValue(details.retrieved_bvn || details.bvn || '');
+        setRetrievedValue(details.retrieved_nin || details.nin || '');
     };
 
     const handleUpdateTask = async () => {
@@ -331,7 +348,7 @@ export default function BVNTasksManagerScreen() {
                 status: adminStatus,
                 admin_notes: adminNotes.trim(),
                 resolution_message: adminNotes.trim(),
-                retrieved_bvn: retrievedValue.trim() || selectedTask.details?.retrieved_bvn,
+                retrieved_nin: retrievedValue.trim() || selectedTask.details?.retrieved_nin,
                 resolved_at: new Date().toISOString(),
             };
 
@@ -345,9 +362,9 @@ export default function BVNTasksManagerScreen() {
 
             if (error) throw error;
 
-            Alert.alert("Task Updated", `BVN request status updated to ${adminStatus} successfully.`);
+            Alert.alert("Task Updated", `NIN request status updated to ${adminStatus} successfully.`);
             setSelectedTask(null);
-            fetchBVNTasks();
+            fetchNINTasks();
         } catch (e: any) {
             Alert.alert("Update Failed", e.message || "Failed to update task.");
         } finally {
@@ -356,17 +373,17 @@ export default function BVNTasksManagerScreen() {
     };
 
     const handleContactUser = (type: 'whatsapp' | 'call' | 'email') => {
-        const phone = selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.new_phone_number;
+        const phone = selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.current_phone || selectedTask?.details?.new_phone;
         const email = selectedTask?.profiles?.email;
 
         if (type === 'whatsapp' && phone) {
             const cleanPhone = phone.replace(/\D/g, '');
             const intlPhone = cleanPhone.startsWith('0') ? `234${cleanPhone.slice(1)}` : cleanPhone;
-            Linking.openURL(`https://wa.me/${intlPhone}?text=Hello%20${encodeURIComponent(selectedTask?.profiles?.full_name || 'Customer')},%20regarding%20your%20BVN%20request%20on%20Abu%20Mafhal...`);
+            Linking.openURL(`https://wa.me/${intlPhone}?text=Hello%20${encodeURIComponent(selectedTask?.profiles?.full_name || 'Customer')},%20regarding%20your%20NIN%20service%20request%20on%20Abu%20Mafhal...`);
         } else if (type === 'call' && phone) {
             Linking.openURL(`tel:${phone}`);
         } else if (type === 'email' && email) {
-            Linking.openURL(`mailto:${email}?subject=Update%20on%20your%20BVN%20Request`);
+            Linking.openURL(`mailto:${email}?subject=Update%20on%20your%20NIN%20Request`);
         } else {
             Alert.alert("Contact Info Missing", "Phone number or email is not available for this user.");
         }
@@ -377,7 +394,7 @@ export default function BVNTasksManagerScreen() {
             <Stack.Screen
                 options={{
                     headerShown: true,
-                    title: 'BVN Tasks & Applications',
+                    title: 'NIN Tasks & Applications',
                     headerStyle: { backgroundColor: C.navy },
                     headerTintColor: '#FFFFFF',
                     headerTitleStyle: { fontWeight: '700', fontSize: 16 },
@@ -429,7 +446,7 @@ export default function BVNTasksManagerScreen() {
                     <Ionicons name="search-outline" size={16} color={C.textMuted} style={{ marginRight: 8 }} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search BVN, NIN, Name, Ref, Phone..."
+                        placeholder="Search NIN, Tracking ID, Name, Ref, Phone..."
                         placeholderTextColor={C.textMuted}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -490,7 +507,7 @@ export default function BVNTasksManagerScreen() {
             {loading && !refreshing ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={C.gold} />
-                    <Text style={styles.loadingText}>Loading BVN submissions...</Text>
+                    <Text style={styles.loadingText}>Loading NIN submissions & history...</Text>
                 </View>
             ) : (
                 <FlatList
@@ -501,7 +518,7 @@ export default function BVNTasksManagerScreen() {
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <Ionicons name="document-text-outline" size={48} color={C.textMuted} />
-                            <Text style={styles.emptyTitle}>No BVN Tasks Found</Text>
+                            <Text style={styles.emptyTitle}>No NIN Tasks Found</Text>
                             <Text style={styles.emptySub}>Tap the cloud download icon above to backfill all past transaction records.</Text>
                             <TouchableOpacity style={styles.syncEmptyBtn} onPress={handleSyncAndBackfill}>
                                 <Ionicons name="cloud-download-outline" size={16} color="#0B192C" style={{ marginRight: 6 }} />
@@ -511,7 +528,7 @@ export default function BVNTasksManagerScreen() {
                     }
                     renderItem={({ item }) => {
                         const details = item.details || {};
-                        const sType = item.service_type || 'bvn_verification';
+                        const sType = item.service_type || 'nin_standard';
                         const sInfo = SERVICE_LABELS[sType] || { label: sType, icon: 'shield-outline', color: C.navy, bg: C.navyLight };
                         const status = (details.status || 'COMPLETED').toUpperCase();
 
@@ -553,7 +570,7 @@ export default function BVNTasksManagerScreen() {
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.holderNameText} numberOfLines={1}>
-                                                {item.holder_name || item.profiles?.full_name || 'BVN Applicant'}
+                                                {item.holder_name || item.profiles?.full_name || 'NIN Applicant'}
                                             </Text>
                                             <Text style={styles.userMetaText} numberOfLines={1}>
                                                 User: {item.profiles?.email || item.profiles?.full_name || 'Direct Client'}
@@ -565,29 +582,31 @@ export default function BVNTasksManagerScreen() {
                                     <View style={styles.identifiersRow}>
                                         {item.search_number ? (
                                             <View style={styles.idChip}>
-                                                <Text style={styles.idChipLabel}>BVN:</Text>
+                                                <Text style={styles.idChipLabel}>NIN/Track:</Text>
                                                 <Text style={styles.idChipVal}>{item.search_number}</Text>
                                             </View>
                                         ) : null}
-                                        {details.nin ? (
-                                            <View style={styles.idChip}>
-                                                <Text style={styles.idChipLabel}>NIN:</Text>
-                                                <Text style={styles.idChipVal}>{details.nin}</Text>
-                                            </View>
-                                        ) : null}
-                                        {details.phone_number || details.old_phone || details.new_phone_number ? (
+                                        {details.phone_number || details.current_phone || details.new_phone ? (
                                             <View style={styles.idChip}>
                                                 <Text style={styles.idChipLabel}>Phone:</Text>
-                                                <Text style={styles.idChipVal}>{details.phone_number || details.old_phone || details.new_phone_number}</Text>
+                                                <Text style={styles.idChipVal}>{details.phone_number || details.current_phone || details.new_phone}</Text>
+                                            </View>
+                                        ) : null}
+                                        {details.amount ? (
+                                            <View style={[styles.idChip, { backgroundColor: '#FEF9E7' }]}>
+                                                <Text style={[styles.idChipLabel, { color: C.goldDk }]}>Fee:</Text>
+                                                <Text style={[styles.idChipVal, { color: C.goldDk }]}>₦{Number(details.amount).toLocaleString()}</Text>
                                             </View>
                                         ) : null}
                                     </View>
 
-                                    {/* Modification Summary / Notes preview */}
-                                    {details.new_first_name || details.new_surname ? (
+                                    {/* Modification Summary */}
+                                    {details.new_first_name || details.first_name || details.new_address ? (
                                         <View style={styles.modPreviewBox}>
-                                            <Text style={styles.modPreviewLabel}>Requested Name:</Text>
-                                            <Text style={styles.modPreviewVal}>{details.new_first_name} {details.new_surname}</Text>
+                                            <Text style={styles.modPreviewLabel}>Modification Target:</Text>
+                                            <Text style={styles.modPreviewVal}>
+                                                {details.new_first_name || details.first_name} {details.last_name || ''} {details.new_address || ''}
+                                            </Text>
                                         </View>
                                     ) : null}
                                 </View>
@@ -621,9 +640,9 @@ export default function BVNTasksManagerScreen() {
                         {/* Modal Header */}
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.modalTitle}>Manage BVN Task</Text>
+                                <Text style={styles.modalTitle}>Manage NIN Task</Text>
                                 <Text style={styles.modalSub}>
-                                    ID: {selectedTask?.details?.request_id || selectedTask?.details?.reference || selectedTask?.id}
+                                    Ref: {selectedTask?.details?.reference || selectedTask?.details?.ref || selectedTask?.id}
                                 </Text>
                             </View>
                             <TouchableOpacity onPress={() => setSelectedTask(null)} style={styles.modalCloseBtn}>
@@ -637,97 +656,36 @@ export default function BVNTasksManagerScreen() {
                                 <Text style={styles.sectionTitle}>APPLICANT DETAILS</Text>
                                 <View style={styles.infoGrid}>
                                     <View style={styles.infoItem}>
-                                        <Text style={styles.infoLabel}>Holder Name</Text>
+                                        <Text style={styles.infoLabel}>Applicant Name</Text>
                                         <Text style={styles.infoValue}>{selectedTask?.holder_name || 'N/A'}</Text>
                                     </View>
                                     <View style={styles.infoItem}>
-                                        <Text style={styles.infoLabel}>Target BVN</Text>
-                                        <TouchableOpacity onPress={() => copyText(selectedTask?.search_number || '', 'bvn')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.infoLabel}>Search / Target NIN</Text>
+                                        <TouchableOpacity onPress={() => copyText(selectedTask?.search_number || '', 'nin')} style={{ flexDirection: 'row', alignItems: 'center' }}>
                                             <Text style={[styles.infoValue, { color: C.navy, fontWeight: '700' }]}>{selectedTask?.search_number || 'N/A'}</Text>
-                                            <Ionicons name={copiedField === 'bvn' ? "checkmark-circle" : "copy-outline"} size={13} color={C.goldDk} style={{ marginLeft: 4 }} />
+                                            <Ionicons name={copiedField === 'nin' ? "checkmark-circle" : "copy-outline"} size={13} color={C.goldDk} style={{ marginLeft: 4 }} />
                                         </TouchableOpacity>
                                     </View>
-                                    {selectedTask?.details?.nin && (
-                                        <View style={styles.infoItem}>
-                                            <Text style={styles.infoLabel}>NIN Number</Text>
-                                            <TouchableOpacity onPress={() => copyText(selectedTask?.details?.nin || '', 'nin')} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={[styles.infoValue, { color: C.navy, fontWeight: '700' }]}>{selectedTask?.details?.nin}</Text>
-                                                <Ionicons name={copiedField === 'nin' ? "checkmark-circle" : "copy-outline"} size={13} color={C.goldDk} style={{ marginLeft: 4 }} />
-                                            </TouchableOpacity>
-                                        </View>
-                                    )}
                                     {selectedTask?.profiles?.email && (
                                         <View style={styles.infoItem}>
                                             <Text style={styles.infoLabel}>User Account</Text>
                                             <Text style={styles.infoValue}>{selectedTask?.profiles?.email}</Text>
                                         </View>
                                     )}
-                                    {(selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.new_phone_number) && (
+                                    {(selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.current_phone || selectedTask?.details?.new_phone) && (
                                         <View style={styles.infoItem}>
                                             <Text style={styles.infoLabel}>Phone Number</Text>
-                                            <Text style={styles.infoValue}>{selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.new_phone_number}</Text>
+                                            <Text style={styles.infoValue}>{selectedTask?.profiles?.phone_number || selectedTask?.details?.phone_number || selectedTask?.details?.current_phone || selectedTask?.details?.new_phone}</Text>
+                                        </View>
+                                    )}
+                                    {selectedTask?.details?.amount && (
+                                        <View style={styles.infoItem}>
+                                            <Text style={styles.infoLabel}>Transaction Fee</Text>
+                                            <Text style={[styles.infoValue, { color: C.goldDk, fontWeight: '700' }]}>₦{Number(selectedTask.details.amount).toLocaleString()}</Text>
                                         </View>
                                     )}
                                 </View>
                             </View>
-
-                            {/* Service Specific Payload / Modification Details */}
-                            {selectedTask?.service_type === 'bvn_modification' && (
-                                <View style={styles.sectionCard}>
-                                    <Text style={styles.sectionTitle}>MODIFICATION SPECIFICS</Text>
-                                    <View style={styles.modCompareBox}>
-                                        <View style={styles.modCol}>
-                                            <Text style={styles.modColHeader}>OLD DETAILS</Text>
-                                            <Text style={styles.modFieldText}>Name: {selectedTask?.details?.old_first_name} {selectedTask?.details?.old_surname}</Text>
-                                            {selectedTask?.details?.old_dob ? <Text style={styles.modFieldText}>DOB: {selectedTask?.details?.old_dob}</Text> : null}
-                                            {selectedTask?.details?.old_phone ? <Text style={styles.modFieldText}>Phone: {selectedTask?.details?.old_phone}</Text> : null}
-                                        </View>
-                                        <View style={[styles.modCol, { borderLeftWidth: 1, borderLeftColor: C.border }]}>
-                                            <Text style={[styles.modColHeader, { color: C.success }]}>NEW DETAILS</Text>
-                                            <Text style={[styles.modFieldText, { fontWeight: '700' }]}>Name: {selectedTask?.details?.new_first_name} {selectedTask?.details?.new_surname}</Text>
-                                            {selectedTask?.details?.new_dob ? <Text style={[styles.modFieldText, { fontWeight: '700' }]}>DOB: {selectedTask?.details?.new_dob}</Text> : null}
-                                            {selectedTask?.details?.new_phone_number ? <Text style={[styles.modFieldText, { fontWeight: '700' }]}>Phone: {selectedTask?.details?.new_phone_number}</Text> : null}
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Service Specific: Enrollment Details */}
-                            {selectedTask?.service_type === 'bvn_enrollment' && (
-                                <View style={styles.sectionCard}>
-                                    <Text style={styles.sectionTitle}>ENROLLMENT PROFILE</Text>
-                                    <View style={styles.infoGrid}>
-                                        <View style={styles.infoItem}>
-                                            <Text style={styles.infoLabel}>Bank</Text>
-                                            <Text style={styles.infoValue}>{selectedTask?.details?.bank_name || 'N/A'}</Text>
-                                        </View>
-                                        <View style={styles.infoItem}>
-                                            <Text style={styles.infoLabel}>Account</Text>
-                                            <Text style={styles.infoValue}>{selectedTask?.details?.account_number || 'N/A'}</Text>
-                                        </View>
-                                        <View style={styles.infoItem}>
-                                            <Text style={styles.infoLabel}>Location</Text>
-                                            <Text style={styles.infoValue}>{selectedTask?.details?.local_government}, {selectedTask?.details?.state_of_residence}</Text>
-                                        </View>
-                                        <View style={styles.infoItem}>
-                                            <Text style={styles.infoLabel}>Address</Text>
-                                            <Text style={styles.infoValue}>{selectedTask?.details?.home_address || 'N/A'}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Proof Image / Screenshot (if any) */}
-                            {selectedTask?.details?.screenshot && (
-                                <View style={styles.sectionCard}>
-                                    <Text style={styles.sectionTitle}>ATTACHED SCREENSHOT PROOF</Text>
-                                    <Image
-                                        source={{ uri: selectedTask.details.screenshot }}
-                                        style={{ width: '100%', height: 220, borderRadius: 8, backgroundColor: '#000' }}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            )}
 
                             {/* Direct Communication Buttons */}
                             <View style={styles.contactRow}>
@@ -769,20 +727,16 @@ export default function BVNTasksManagerScreen() {
                                     ))}
                                 </View>
 
-                                {selectedTask?.service_type === 'bvn_retrieval' && (
-                                    <View style={{ marginTop: 12 }}>
-                                        <Text style={styles.inputLabel}>Retrieved BVN Result (Sent to User)</Text>
-                                        <TextInput
-                                            style={styles.adminInput}
-                                            placeholder="Enter 11-digit Retrieved BVN"
-                                            placeholderTextColor={C.textMuted}
-                                            keyboardType="numeric"
-                                            maxLength={11}
-                                            value={retrievedValue}
-                                            onChangeText={setRetrievedValue}
-                                        />
-                                    </View>
-                                )}
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={styles.inputLabel}>Resolved NIN or Result Reference (Optional)</Text>
+                                    <TextInput
+                                        style={styles.adminInput}
+                                        placeholder="Enter NIN or Document Link/Reference"
+                                        placeholderTextColor={C.textMuted}
+                                        value={retrievedValue}
+                                        onChangeText={setRetrievedValue}
+                                    />
+                                </View>
 
                                 <View style={{ marginTop: 12 }}>
                                     <Text style={styles.inputLabel}>Resolution Notes / Remarks</Text>
@@ -938,7 +892,7 @@ const styles = StyleSheet.create({
         color: C.textSub,
     },
     emptyState: {
-        paddingTop: 60,
+        paddingTop: 50,
         alignItems: 'center',
         paddingHorizontal: 20,
     },
@@ -1179,27 +1133,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: C.textMain,
-    },
-    modCompareBox: {
-        flexDirection: 'row',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 6,
-        overflow: 'hidden',
-    },
-    modCol: {
-        flex: 1,
-        padding: 8,
-    },
-    modColHeader: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: C.textMuted,
-        marginBottom: 4,
-    },
-    modFieldText: {
-        fontSize: 11,
-        color: C.textMain,
-        marginBottom: 2,
     },
     contactRow: {
         flexDirection: 'row',

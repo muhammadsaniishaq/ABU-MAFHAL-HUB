@@ -9,6 +9,7 @@ import { supabase } from '../../../services/supabase';
 import { api } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusResult } from '../../../components/StatusResult';
+import { verificationHistory, extractFullName } from '../../../services/verificationHistory';
 
 const DEFAULT_SLIP_TYPES = [
     { id: 'pers_status', db_id: 'pers_status', name: 'Personalization', price: 250, image: require('../../../assets/images/premium.png') }
@@ -71,10 +72,11 @@ export default function TrackingScreen() {
     const saveHistoryItem = async (verifiedData: any) => {
         try {
             const slipPrice = slipTypes.find(s => s.id === selectedSlip)?.price || 0;
+            const cleanTarget = trackingID.trim();
 
             const newItem = {
                 id: `pers_${Date.now()}`,
-                target: trackingID.trim(),
+                target: cleanTarget,
                 status: 'Completed',
                 slip: 'Personalization',
                 amount: slipPrice,
@@ -89,6 +91,21 @@ export default function TrackingScreen() {
             const updated = [newItem, ...historyList.filter(item => item.target !== newItem.target)].slice(0, 500);
             setHistoryList(updated);
             await AsyncStorage.setItem('recent_personalization_requests', JSON.stringify(updated));
+
+            // Save to Supabase verification_history
+            await verificationHistory.save({
+                service_category: 'nin',
+                service_type: 'pers_status',
+                search_number: cleanTarget,
+                holder_name: extractFullName(verifiedData, 'Tracking Applicant'),
+                layout: 'Personalization',
+                details: {
+                    ...verifiedData,
+                    tracking_id: cleanTarget,
+                    amount: slipPrice,
+                    status: 'COMPLETED'
+                }
+            });
         } catch (e) {
             console.warn('Failed to save history item', e);
         }
