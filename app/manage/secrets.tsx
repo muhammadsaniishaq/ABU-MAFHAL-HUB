@@ -171,16 +171,11 @@ export default function SecretsManager() {
             for (const k of keysToSync) {
                 await AsyncStorage.setItem(`@vault_${k}`, cleanVal);
 
+                // Exclusively store in system_secrets (protected by Admin-only RLS)
                 await supabase.from('system_secrets').upsert({
                     key: k,
                     value: cleanVal,
                     description: keyItem.desc,
-                    updated_at: new Date().toISOString()
-                });
-
-                await supabase.from('app_settings').upsert({
-                    key: k,
-                    value: cleanVal,
                     updated_at: new Date().toISOString()
                 });
             }

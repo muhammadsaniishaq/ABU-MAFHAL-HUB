@@ -93,7 +93,12 @@ Deno.serve(async (req: Request) => {
 
             // signature verification uses rawBody if signature header present
             const bodyText = rawBody;
-            if (payvesselSignature && PAYVESSEL_API_SECRET) {
+            if (PAYVESSEL_API_SECRET) {
+                if (!payvesselSignature) {
+                    console.error("[Payvessel Webhook] Missing required payvessel-http-signature header");
+                    return new Response(JSON.stringify({ error: "Missing signature header" }), { status: 401, headers: { "Content-Type": "application/json" } });
+                }
+
                 const encoder = new TextEncoder();
                 const key = await crypto.subtle.importKey(
                     "raw",
@@ -113,7 +118,8 @@ Deno.serve(async (req: Request) => {
                 const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
                 if (hashHex.toLowerCase() !== payvesselSignature.toLowerCase()) {
-                    console.warn("[Payvessel Webhook] Signature mismatch. Received:", payvesselSignature, "Computed:", hashHex, ". Proceeding with payload verification.");
+                    console.error("[Payvessel Webhook] Signature mismatch. Received:", payvesselSignature, "Computed:", hashHex);
+                    return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401, headers: { "Content-Type": "application/json" } });
                 }
             }
 
@@ -233,10 +239,11 @@ Deno.serve(async (req: Request) => {
                 return new Response("Invalid JSON", { status: 400 });
              }
 
-             // Verify Hash (Optional strict check)
+             // Verify Hash strictly if configured
              const secretHash = Deno.env.get('FLUTTERWAVE_SECRET_HASH');
              if (secretHash && flwSignature !== secretHash) {
-                 console.warn("Flutterwave signature mismatch (but continuing if not enforced)");
+                 console.error("[Flutterwave Webhook] Invalid secret hash signature");
+                 return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401, headers: { "Content-Type": "application/json" } });
              }
 
              if (event.event === 'charge.completed' || (event['event.type'] === 'BANK_TRANSFER_TRANSACTION')) {

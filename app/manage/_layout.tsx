@@ -8,26 +8,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AdminLayout() {
     const router = useRouter();
-    const [isAuthorized, setIsAuthorized] = useState(true);
-    const [loading, setLoading] = useState(false);
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let isMounted = true;
 
         const checkAdminAuth = async () => {
             try {
-                // 1. Check cached session/role first for instant rendering on refresh
-                const cachedSession = await AsyncStorage.getItem('has_active_session');
-                const lastVerification = await AsyncStorage.getItem('last_security_verification_time');
-
-                if (cachedSession === 'true' || lastVerification) {
-                    if (isMounted) {
-                        setIsAuthorized(true);
-                        setLoading(false);
-                    }
-                }
-
-                // 2. Fetch session from Supabase
+                // 1. Fetch current authenticated session from Supabase
                 const { data: { session } } = await supabase.auth.getSession();
                 let user = session?.user;
 
@@ -36,56 +25,50 @@ export default function AdminLayout() {
                     user = fetchedUser || undefined;
                 }
 
-                if (user) {
-                    const cachedRole = await AsyncStorage.getItem(`user_role_${user.id}`);
-                    const userEmail = user.email?.toLowerCase() || '';
-                    const isKnownAdminEmail = userEmail.includes('admin') || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng') || userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com';
-
-                    if (cachedRole && ['admin', 'super_admin'].includes(cachedRole)) {
-                        if (isMounted) {
-                            setIsAuthorized(true);
-                            setLoading(false);
-                        }
+                if (!user) {
+                    if (isMounted) {
+                        setIsAuthorized(false);
+                        setLoading(false);
+                        router.replace('/(auth)/login');
                     }
+                    return;
+                }
 
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('role, email')
-                        .eq('id', user.id)
-                        .maybeSingle();
+                const userEmail = user.email?.toLowerCase() || '';
+                const isKnownAdminEmail = userEmail === 'sale.abumafhal@gmail.com' || userEmail === 'abumafhal@gmail.com' || userEmail.endsWith('@abumafhal.com') || userEmail.endsWith('@abumafhal.com.ng');
 
-                    const role = profile?.role || user.user_metadata?.role || cachedRole || (isKnownAdminEmail ? 'admin' : 'admin');
-                    
-                    if (['admin', 'super_admin'].includes(role) || isKnownAdminEmail) {
-                        await AsyncStorage.setItem(`user_role_${user.id}`, role);
-                        await AsyncStorage.setItem('has_active_session', 'true');
-                        await AsyncStorage.setItem('last_security_verification_time', Date.now().toString());
-                        if (isMounted) {
-                            setIsAuthorized(true);
-                            setLoading(false);
-                        }
-                        return;
+                // 2. Fetch verified role directly from profiles table
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role, email')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                const role = profile?.role || user.user_metadata?.role || (isKnownAdminEmail ? 'admin' : 'user');
+                const hasAdminPrivileges = ['admin', 'super_admin'].includes(role) || isKnownAdminEmail;
+
+                if (hasAdminPrivileges) {
+                    await AsyncStorage.setItem(`user_role_${user.id}`, role);
+                    await AsyncStorage.setItem('has_active_session', 'true');
+                    await AsyncStorage.setItem('last_security_verification_time', Date.now().toString());
+                    if (isMounted) {
+                        setIsAuthorized(true);
+                        setLoading(false);
                     }
                 } else {
-                    // Check if we have cached admin credentials before redirecting
-                    if (cachedSession === 'true' || lastVerification) {
-                        if (isMounted) {
-                            setIsAuthorized(true);
-                            setLoading(false);
-                        }
-                        return;
+                    console.warn(`[Security Guard] Unauthorized access attempt to /manage by user: ${user.id} (${user.email})`);
+                    if (isMounted) {
+                        setIsAuthorized(false);
+                        setLoading(false);
+                        router.replace('/(app)/dashboard');
                     }
                 }
-
-                if (isMounted) {
-                    setIsAuthorized(true);
-                    setLoading(false);
-                }
             } catch (e) {
-                console.error("Admin verification check error:", e);
+                console.error("[Security Guard] Admin verification error:", e);
                 if (isMounted) {
-                    setIsAuthorized(true);
+                    setIsAuthorized(false);
                     setLoading(false);
+                    router.replace('/(app)/dashboard');
                 }
             }
         };
@@ -94,10 +77,10 @@ export default function AdminLayout() {
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user && isMounted) {
-                await AsyncStorage.setItem('has_active_session', 'true');
-                setIsAuthorized(true);
+            if (!session?.user && isMounted) {
+                setIsAuthorized(false);
                 setLoading(false);
+                router.replace('/(auth)/login');
             }
         });
 
@@ -109,7 +92,28 @@ export default function AdminLayout() {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: '#060B19' }} />
+            <View style={{ flex: 1, backgroundColor: '#060B19', alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color="#FFD700" />
+                <Text style={{ color: '#FFD700', marginTop: 12, fontWeight: '700', fontSize: 12, letterSpacing: 0.5 }}>VERIFYING CREDENTIALS...</Text>
+            </View>
+        );
+    }
+
+    if (!isAuthorized) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#060B19', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <Ionicons name="shield-outline" size={48} color="#EF4444" />
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 16 }}>ACCESS RESTRICTED</Text>
+                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 20 }}>
+                    You do not have administrative clearance to access the management vault.
+                </Text>
+                <TouchableOpacity 
+                    onPress={() => router.replace('/(app)/dashboard')}
+                    style={{ backgroundColor: '#FFD700', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                >
+                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 12 }}>RETURN TO DASHBOARD</Text>
+                </TouchableOpacity>
+            </View>
         );
     }
 

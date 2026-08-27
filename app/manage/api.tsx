@@ -503,7 +503,7 @@ export default function APIVaultScreen() {
                         await AsyncStorage.setItem(`@vault_${alias}`, val);
                     }
 
-                    // Upsert canonical + aliases to system_secrets & app_settings
+                    // Upsert canonical + aliases to system_secrets
                     const upsertList = [item.canonical, ...item.aliases];
                     for (const keyToSave of upsertList) {
                         await supabase.from('system_secrets').upsert({
@@ -513,11 +513,14 @@ export default function APIVaultScreen() {
                             updated_at: new Date().toISOString()
                         });
 
-                        await supabase.from('app_settings').upsert({
-                            key: keyToSave,
-                            value: val,
-                            updated_at: new Date().toISOString()
-                        });
+                        // Only non-secret configuration options (e.g. VTU_VENDOR, FAILOVER_MODE) are mirrored to app_settings
+                        if (['VTU_VENDOR', 'FAILOVER_MODE'].includes(item.canonical)) {
+                            await supabase.from('app_settings').upsert({
+                                key: keyToSave,
+                                value: val,
+                                updated_at: new Date().toISOString()
+                            });
+                        }
                     }
                 }
             }
