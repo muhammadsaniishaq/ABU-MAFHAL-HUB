@@ -8,12 +8,14 @@ import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
 import { Audio } from 'expo-av';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 import { AIService } from '../../services/ai';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 
 // Platinum Light Executive Theme Tokens
 const L = {
@@ -63,7 +65,7 @@ export default function RealtimeEnterpriseTeamSuite() {
   const [currentUserRole, setCurrentUserRole] = useState<string>('ADMIN');
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
 
-  // Live Staff Directory from Database
+  // Live Staff Directory from Supabase
   const [staffDirectory, setStaffDirectory] = useState<any[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
 
@@ -83,11 +85,9 @@ export default function RealtimeEnterpriseTeamSuite() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
 
-  // Thread Replies State
-  const [activeThreadMessage, setActiveThreadMessage] = useState<any | null>(null);
-  const [threadReplies, setThreadReplies] = useState<any[]>([]);
-  const [newThreadReply, setNewThreadReply] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
+  // In-App Video Conference Room State (Bypasses Google Play Store completely)
+  const [activeMeetingUrl, setActiveMeetingUrl] = useState<string | null>(null);
+  const [activeMeetingTitle, setActiveMeetingTitle] = useState<string>('Team Sync');
 
   // Real Audio Recording & Playback (expo-av)
   const [recordingObject, setRecordingObject] = useState<Audio.Recording | null>(null);
@@ -134,7 +134,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     };
   }, [activeChannel, activeDmUser]);
 
-  // 1. Fetch Current Authenticated Admin
+  // 1. Fetch Current Authenticated Admin Profile
   const fetchCurrentAdminProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -155,7 +155,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // 2. Fetch Live Staff & Admins from Profiles Table (NO MOCKUPS)
+  // 2. Fetch Live Staff from Supabase Profiles Table
   const fetchLiveStaffDirectory = async () => {
     try {
       setLoadingStaff(true);
@@ -166,7 +166,6 @@ export default function RealtimeEnterpriseTeamSuite() {
         .limit(50);
 
       if (!error && data) {
-        // Map verified team profiles
         const mappedStaff = data.map(u => ({
           id: u.id,
           name: u.full_name || u.email?.split('@')[0] || 'Staff Member',
@@ -184,7 +183,6 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 3. Fetch Live Messages from `team_messages` table
   const currentRoomId = useMemo(() => {
     if (activeDmUser && currentUserId) {
       return `dm_${[currentUserId, activeDmUser.id].sort().join('_')}`;
@@ -192,6 +190,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     return activeChannel;
   }, [activeChannel, activeDmUser, currentUserId]);
 
+  // 3. Fetch Live Messages
   const fetchLiveMessages = async () => {
     try {
       setLoading(true);
@@ -215,7 +214,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 4. Fetch Live Meetings from `team_meetings` table
+  // 4. Fetch Live Meetings
   const fetchLiveMeetings = async () => {
     try {
       const { data, error } = await supabase
@@ -229,7 +228,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // 5. Supabase Realtime Subscriptions
+  // 5. Supabase Realtime Channel
   const setupRealtimeSubscription = () => {
     const channel = supabase
       .channel(`live_team_room_${currentRoomId}`)
@@ -265,47 +264,32 @@ export default function RealtimeEnterpriseTeamSuite() {
     };
   };
 
-  // 6. Send Live Message
-  const sendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
-    const text = newMessage.trim();
-    setNewMessage('');
-    setSending(true);
-
-    const msgPayload = {
-      channel: currentRoomId,
-      sender_id: currentUserId || null,
-      sender_name: currentUserName,
-      sender_role: currentUserRole,
-      sender_avatar: currentUserAvatar,
-      content: text,
-      type: 'text',
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      const { data, error } = await supabase.from('team_messages').insert(msgPayload).select().single();
-      if (error) {
-        setMessages(prev => [...prev, { ...msgPayload, id: `local-${Date.now()}` }]);
-      } else if (data) {
-        setMessages(prev => [...prev.filter(m => m.id !== data.id), data]);
-      }
-    } catch (e) {
-      setMessages(prev => [...prev, { ...msgPayload, id: `local-${Date.now()}` }]);
-    } finally {
-      setSending(false);
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-    }
+  // Helper: Build Zero-App In-Browser Jitsi URL (disables Play Store deep-linking redirect)
+  const buildDirectWebMeetingUrl = (rawRoomCode: string) => {
+    const cleanRoom = rawRoomCode.replace(/[^a-zA-Z0-9_-]/g, '');
+    return `https://meet.jit.si/${cleanRoom}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.MOBILE_APP_PROMO=false`;
   };
 
-  // 7. Live Virtual Meeting Launcher (Jitsi Meet Enterprise Bridge)
+  // 6. Join or Launch Meeting (In-App Modal Viewer - No Google Play Store Redirect)
+  const openInAppMeeting = (url: string, title?: string) => {
+    // Ensure the URL includes deep-linking disable flags
+    let finalUrl = url;
+    if (!finalUrl.includes('disableDeepLinking=true')) {
+      finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'config.prejoinPageEnabled=false&config.disableDeepLinking=true&interfaceConfig.MOBILE_APP_PROMO=false';
+    }
+    setActiveMeetingTitle(title || 'Live Team Conference');
+    setActiveMeetingUrl(finalUrl);
+  };
+
+  // 7. Start Instant Meeting Room
   const startInstantMeeting = async () => {
     const roomCode = `AbuMafhal_${activeChannel}_${Date.now().toString().slice(-6)}`;
-    const meetingUrl = `https://meet.jit.si/${roomCode}#config.prejoinPageEnabled=false`;
+    const meetingUrl = buildDirectWebMeetingUrl(roomCode);
+    const meetingTitleText = `Live Sync: #${activeChannel.toUpperCase()}`;
 
     const meetingRecord = {
-      title: `Live Sync: #${activeChannel.toUpperCase()}`,
-      description: `Live video conference launched by ${currentUserName}. Screen sharing, HD voice, and camera available.`,
+      title: meetingTitleText,
+      description: `Live video conference launched by ${currentUserName}. Screen sharing, HD voice, and camera available in-app.`,
       channel: activeChannel,
       meeting_url: meetingUrl,
       status: 'live',
@@ -334,10 +318,10 @@ export default function RealtimeEnterpriseTeamSuite() {
       });
       fetchLiveMessages();
       fetchLiveMeetings();
-      Linking.openURL(meetingUrl);
-    } catch (e: any) {
-      Linking.openURL(meetingUrl);
-    }
+    } catch (e) {}
+
+    // Launch directly in In-App Conference Viewer
+    openInAppMeeting(meetingUrl, meetingTitleText);
   };
 
   // 8. Schedule Future Meeting
@@ -349,7 +333,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
     setCreatingMeeting(true);
     const roomCode = `AbuMafhal_${activeChannel}_${Date.now().toString().slice(-4)}`;
-    const meetingUrl = `https://meet.jit.si/${roomCode}`;
+    const meetingUrl = buildDirectWebMeetingUrl(roomCode);
 
     const meetingRecord = {
       title: meetingTitle.trim(),
@@ -394,7 +378,40 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 9. Real Audio Recording with expo-av
+  // 9. Send Live Message
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sending) return;
+    const text = newMessage.trim();
+    setNewMessage('');
+    setSending(true);
+
+    const msgPayload = {
+      channel: currentRoomId,
+      sender_id: currentUserId || null,
+      sender_name: currentUserName,
+      sender_role: currentUserRole,
+      sender_avatar: currentUserAvatar,
+      content: text,
+      type: 'text',
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const { data, error } = await supabase.from('team_messages').insert(msgPayload).select().single();
+      if (error) {
+        setMessages(prev => [...prev, { ...msgPayload, id: `local-${Date.now()}` }]);
+      } else if (data) {
+        setMessages(prev => [...prev.filter(m => m.id !== data.id), data]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { ...msgPayload, id: `local-${Date.now()}` }]);
+    } finally {
+      setSending(false);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  };
+
+  // 10. Real Audio Recording with expo-av
   const startRealAudioRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -505,7 +522,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 10. Live AI Cortex Copilot Analysis
+  // 11. Live AI Cortex Copilot Analysis
   const handleAskCortexAI = async () => {
     if (aiAnalyzing) return;
     setAiAnalyzing(true);
@@ -537,7 +554,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 11. Create Live Poll
+  // 12. Create Live Poll
   const savePoll = async () => {
     if (!pollQuestion.trim()) {
       Alert.alert('Required', 'Please enter a poll question.');
@@ -579,7 +596,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // Vote on Poll in Database
+  // Vote on Poll
   const votePoll = async (msgId: string, optionIdx: number) => {
     const targetMsg = messages.find(m => m.id === msgId);
     if (!targetMsg || !targetMsg.metadata || !targetMsg.metadata.options) return;
@@ -602,7 +619,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // 12. Create Real Task in Database
+  // 13. Create Real Task
   const saveTask = async () => {
     if (!taskTitle.trim()) {
       Alert.alert('Required', 'Please enter task title.');
@@ -656,7 +673,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // 13. Pick Document (PDF, Excel, CSV)
+  // 14. Pick Document (PDF, Excel, CSV)
   const pickAndUploadDocument = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -702,7 +719,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 14. Pick Image (Gallery / Camera)
+  // 15. Pick Image (Gallery / Camera)
   const pickAndUploadImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -775,7 +792,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // Filter messages for search bar
+  // Search Bar Filter
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return messages;
     return messages.filter(
@@ -937,9 +954,8 @@ export default function RealtimeEnterpriseTeamSuite() {
                 const timeStr = msg.created_at
                   ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : '';
-                const isSaved = bookmarks.some(b => b.id === msg.id);
 
-                // Render TYPE 1: Live Video Meeting Card
+                // Render TYPE 1: Live Video Meeting Card (Opens in In-App Viewer directly)
                 if (msg.type === 'meeting') {
                   const mData = msg.metadata || {};
                   return (
@@ -956,13 +972,13 @@ export default function RealtimeEnterpriseTeamSuite() {
                       {mData.description ? <Text style={s.meetingBubbleDesc}>{mData.description}</Text> : null}
 
                       <TouchableOpacity
-                        onPress={() => Linking.openURL(mData.meeting_url)}
+                        onPress={() => openInAppMeeting(mData.meeting_url || msg.content, mData.title)}
                         style={s.joinMeetingBtn}
                         activeOpacity={0.85}
                       >
                         <LinearGradient colors={['#0F172A', '#1E293B']} style={s.joinMeetingGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                           <Ionicons name="videocam" size={13} color={L.gold} />
-                          <Text style={s.joinMeetingText}>Join Virtual Room (Web/App)</Text>
+                          <Text style={s.joinMeetingText}>Join Room Directly (In-App / Browser)</Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     </View>
@@ -1202,7 +1218,7 @@ export default function RealtimeEnterpriseTeamSuite() {
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={s.instantTitle}>Launch Instant Video Conference</Text>
-                <Text style={s.instantSub}>HD audio, video & screen sharing room</Text>
+                <Text style={s.instantSub}>Direct In-App WebRTC • Zero app install needed</Text>
               </View>
               <Ionicons name="arrow-forward-circle" size={20} color={L.gold} />
             </LinearGradient>
@@ -1240,7 +1256,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 <View style={s.meetingListFooter}>
                   <Text style={s.meetingHost}>Host: {m.created_by_name || 'Staff'}</Text>
                   <TouchableOpacity
-                    onPress={() => Linking.openURL(m.meeting_url)}
+                    onPress={() => openInAppMeeting(m.meeting_url, m.title)}
                     style={s.joinListBtn}
                     activeOpacity={0.8}
                   >
@@ -1253,7 +1269,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           )}
         </ScrollView>
       ) : activeTab === 'dms' ? (
-        /* TAB 3: LIVE STAFF DIRECTORY DMs (FETCHED FROM DATABASE) */
+        /* TAB 3: LIVE STAFF DIRECTORY DMs */
         <ScrollView style={s.meetingsScroll} contentContainerStyle={s.meetingsContent} showsVerticalScrollIndicator={false}>
           <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Verified Staff Directory ({staffDirectory.length})</Text>
           {loadingStaff ? (
@@ -1317,6 +1333,78 @@ export default function RealtimeEnterpriseTeamSuite() {
           )}
         </ScrollView>
       )}
+
+      {/* FULLSCREEN IN-APP VIDEO CONFERENCE MODAL (Zero Google Play Store Redirect) */}
+      <Modal visible={!!activeMeetingUrl} animationType="slide" onRequestClose={() => setActiveMeetingUrl(null)}>
+        <View style={s.videoModalContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+          {/* Top Video Header */}
+          <View style={s.videoModalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <View style={s.liveDot} />
+              <Text style={s.videoModalTitle} numberOfLines={1}>{activeMeetingTitle}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {/* External Browser Fallback */}
+              <TouchableOpacity
+                onPress={() => {
+                  if (activeMeetingUrl) {
+                    if (Platform.OS === 'web') {
+                      window.open(activeMeetingUrl, '_blank');
+                    } else {
+                      WebBrowser.openBrowserAsync(activeMeetingUrl);
+                    }
+                  }
+                }}
+                style={s.openBrowserHeaderBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="open-outline" size={13} color={L.gold} />
+                <Text style={s.openBrowserHeaderText}>Browser</Text>
+              </TouchableOpacity>
+
+              {/* End/Close Call Button */}
+              <TouchableOpacity onPress={() => setActiveMeetingUrl(null)} style={s.endCallBtn} activeOpacity={0.8}>
+                <Ionicons name="close" size={16} color="#FFFFFF" />
+                <Text style={s.endCallBtnText}>Leave Room</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Embedded WebRTC View */}
+          {activeMeetingUrl && (
+            <View style={{ flex: 1, backgroundColor: '#000000' }}>
+              {Platform.OS === 'web' ? (
+                // Web: Pure standard HTML5 iframe with camera/mic permissions
+                // @ts-ignore
+                <iframe
+                  src={activeMeetingUrl}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  allow="camera; microphone; display-capture; autoplay; clipboard-write"
+                />
+              ) : (
+                // Native iOS/Android: In-App WebView with inline WebRTC
+                <WebView
+                  source={{ uri: activeMeetingUrl }}
+                  style={{ flex: 1 }}
+                  allowsInlineMediaPlayback={true}
+                  mediaPlaybackRequiresUserAction={false}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={true}
+                  renderLoading={() => (
+                    <View style={s.videoLoadingCenter}>
+                      <ActivityIndicator size="large" color={L.gold} />
+                      <Text style={s.videoLoadingText}>Connecting to Encrypted Video Room...</Text>
+                    </View>
+                  )}
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {/* CHANNEL SELECTOR DRAWER MODAL */}
       <Modal visible={showChannelDrawer} transparent animationType="fade" onRequestClose={() => setShowChannelDrawer(false)}>
@@ -2450,5 +2538,67 @@ const s = StyleSheet.create({
   zoomImage: {
     width: '95%',
     height: '80%',
+  },
+  videoModalContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  videoModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 44 : 28,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  videoModalTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  openBrowserHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.4)',
+  },
+  openBrowserHeaderText: {
+    color: L.gold,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  endCallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.coral,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  endCallBtnText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+  },
+  videoLoadingCenter: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  videoLoadingText: {
+    color: L.goldLight,
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
