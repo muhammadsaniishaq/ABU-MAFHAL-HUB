@@ -48,6 +48,7 @@ const MODS = {
     { t:'NIN Tasks',       i:'card',             r:'/manage/nin-tasks',      c:N,  b:NL,  badge:0, tag:'Identity' },
     { t:'KYC Requests',    i:'id-card',          r:'/manage/kyc',            c:G,  b:GL,  badge:0 },
     { t:'NIN Pricing',     i:'pricetag',         r:'/manage/nin-pricing',    c:N,  b:NL },
+    { t:'BVN Pricing',     i:'pricetags',        r:'/manage/bvn-pricing',    c:G,  b:GL },
     { t:'Mail Center',     i:'mail-unread',      r:'/manage/mail-center',    c:N,  b:NL },
     { t:'SMM Pricing',     i:'thumbs-up',        r:'/manage/smm-pricing',    c:N,  b:NL },
     { t:'Bills Pricing',   i:'flash',            r:'/manage/bills-pricing',  c:G,  b:GL },
