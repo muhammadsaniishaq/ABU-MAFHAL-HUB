@@ -34,14 +34,9 @@
   ],
   "rewrites": [
     { "source": "/landing", "destination": "/landing.html" },
-    { "source": "/login(.*)", "destination": "/index.html" },
-    { "source": "/signup(.*)", "destination": "/index.html" },
-    { "source": "/otp(.*)", "destination": "/index.html" },
-    { "source": "/pin(.*)", "destination": "/index.html" },
-    { "source": "/pin-setup(.*)", "destination": "/index.html" },
-    { "source": "/dashboard(.*)", "destination": "/index.html" },
-    { "source": "/(app)(.*)", "destination": "/index.html" },
-    { "source": "/privacy(.*)", "destination": "/index.html" },
-    { "source": "/terms(.*)", "destination": "/index.html" }
+    { "source": "/landing.html", "destination": "/landing.html" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/((?!landing|landing-assets|_expo|assets|sw.js|manifest.json|favicon.ico|robots.txt|.*\\..*).*)", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
