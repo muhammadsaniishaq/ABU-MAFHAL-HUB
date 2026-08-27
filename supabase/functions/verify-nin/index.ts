@@ -113,28 +113,33 @@ serve(async (req: Request) => {
       if (!priceId) {
         // Fallback map searchType -> default priceId
         const defaultPriceMap: Record<string, string> = {
-          'nin': 'nin_regular',
+          'nin': 'nin_standard',
+          'nin-standard': 'nin_standard',
+          'nin-premium': 'nin_premium',
+          'nin-regular': 'nin_regular',
           'nin-slip': 'nin_regular',
           'nin-slip-v2': 'nin_premium',
-          'nin-validation': 'val_no_record',
-          'nin-personalization': 'nin_personalization',
-          'nin-modification': 'nin_modification_501',
-          'vnin-slip': 'nin_regular',
-          'phone': 'nin_regular',
-          'demographic': 'nin_regular',
+          'nin-validation': 'nin_validation',
+          'nin-personalization': 'pers_status',
+          'pers_status': 'pers_status',
+          'nin-modification': 'nin_mod_name',
+          'vnin-slip': 'nin_standard',
+          'phone': 'nin_phone',
+          'demographic': 'nin_standard',
           'bvn': 'bvn_num_advanced',
-          'bvn-phone': 'bvn_phone_advanced',
+          'bvn-phone': 'bvn_phone_basic',
           'bvn-card': 'bvn_card',
-          'bvn-slip': 'bvn_card',
-          'bvn-premium-slip': 'bvn_card',
-          'bvn-retrieval': 'bvn_phone_advanced',
-          'vnin-to-nibss': 'bvn_vnin_nibss',
+          'bvn-slip': 'bvn_premium_slip',
+          'bvn-premium-slip': 'bvn_premium_slip',
+          'bvn-retrieval': 'bvn_phone_basic',
+          'vnin-to-nibss': 'vnin_to_nibss',
           'bvn-modification': 'bvn_modification',
           'bvn-enrollment': 'bvn_enrollment',
-          'ipe': 'nin_regular',
-          'val': 'val_no_record'
+          'ipe': 'ipe_clearance',
+          'ipe_clearance': 'ipe_clearance',
+          'val': 'nin_validation'
         };
-        priceId = defaultPriceMap[searchType] || 'nin_regular';
+        priceId = defaultPriceMap[searchType] || 'nin_standard';
       }
 
       // Fetch dynamic pricing from service_pricing table

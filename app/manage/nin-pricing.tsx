@@ -205,6 +205,15 @@ export default function NinPricingBoard() {
         }));
     };
 
+    const applyPresetMarkup = (id: string, addition: number) => {
+        setPrices(prev => prev.map(p => {
+            if (p.id === id) {
+                return { ...p, markup_price: Math.max(0, (Number(p.markup_price) || 0) + addition) };
+            }
+            return p;
+        }));
+    };
+
     const hasChanges = () => {
         return JSON.stringify(prices) !== JSON.stringify(originalPrices);
     };
@@ -476,6 +485,20 @@ export default function NinPricingBoard() {
                                             />
                                         </View>
                                     </View>
+                                </View>
+
+                                {/* Quick Margin Presets */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
+                                    <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '600' }}>Add Margin:</Text>
+                                    {[+50, +100, +200, +500].map(addVal => (
+                                        <TouchableOpacity
+                                            key={addVal}
+                                            style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 }}
+                                            onPress={() => applyPresetMarkup(item.id, addVal)}
+                                        >
+                                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0f172a' }}>+{addVal}</Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
                             </View>
                         );
