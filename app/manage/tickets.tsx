@@ -1,9 +1,12 @@
-import { View, Text, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Image, ActivityIndicator, RefreshControl, LayoutAnimation, UIManager, Alert, Modal, Linking, Switch } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView,
+  Platform, ScrollView, Image, ActivityIndicator, RefreshControl,
+  LayoutAnimation, UIManager, Alert, Modal, Linking, Switch, StyleSheet, Dimensions, StatusBar
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
@@ -11,945 +14,1838 @@ import { supabase } from '../../services/supabase';
 import { sendAdminReplyEmail } from '../../services/ticketEmail';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const { width: W } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
+// Light Luxury Executive Design Tokens
+const L = {
+  bg: '#F4F6FB',
+  card: '#FFFFFF',
+  cardBorder: '#E2E8F0',
+  navyHeader: '#0F172A',
+  navyMid: '#1E293B',
+  gold: '#FFD700',
+  goldDk: '#DAA520',
+  goldAmber: '#D97706',
+  goldLight: '#FEF3C7',
+  textPrimary: '#0F172A',
+  textSecondary: '#334155',
+  textMuted: '#64748B',
+  emerald: '#10B981',
+  emeraldBg: '#ECFDF5',
+  emeraldBorder: '#A7F3D0',
+  sky: '#0EA5E9',
+  skyBg: '#F0F9FF',
+  coral: '#EF4444',
+  coralBg: '#FFF1F2',
+  coralBorder: '#FECDD3',
+};
+
 type Ticket = {
-    id: string;
-    user_id: string;
-    subject: string;
-    status: string;
-    priority: string;
-    created_at: string;
-    profiles?: { full_name: string; avatar_url?: string; email?: string };
+  id: string;
+  user_id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  profiles?: { full_name: string; avatar_url?: string; email?: string; phone?: string };
 };
 
 type TicketMessage = {
-    id: string;
-    ticket_id: string;
-    sender_id: string;
-    message: string;
-    created_at: string;
-    profiles?: { role?: string; avatar_url?: string; full_name?: string };
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  profiles?: { role?: string; avatar_url?: string; full_name?: string };
 };
 
-export default function SupportTickets() {
-    const router = useRouter();
-    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-    const [tickets, setTickets] = useState<Ticket[]>([]);
-    const [messages, setMessages] = useState<TicketMessage[]>([]);
-    const [reply, setReply] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('All');
-    const [timeFilter, setTimeFilter] = useState('All Time');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectMode, setSelectMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [myUserId, setMyUserId] = useState<string | null>(null);
-    const [showUserModal, setShowUserModal] = useState(false);
-    const [userDetails, setUserDetails] = useState<any>(null);
-    const [loadingUser, setLoadingUser] = useState(false);
-    
-    const scrollViewRef = useRef<ScrollView>(null);
+const CANNED_REPLIES = [
+  { label: "✅ Wallet Credited", text: "Your wallet has been verified and credited successfully. Please check your balance." },
+  { label: "📄 Request Proof", text: "Kindly attach a clear screenshot or receipt of your bank debit for quick verification." },
+  { label: "⚡ Data / Airtime Sent", text: "Your order has been reprocessed and delivered successfully. Thank you for your patience." },
+  { label: "🔍 Checking Provider", text: "We are currently liaising with the gateway service provider regarding your request." },
+  { label: "🎉 Issue Resolved", text: "This issue has been fully resolved. Thank you for choosing Abu Mafhal Hub!" },
+];
 
-    useEffect(() => {
+export default function ManagerSupportDesk() {
+  const router = useRouter();
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
+  const [reply, setReply] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [userDetails, setUserDetails] = useState<any>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [isInternalNote, setIsInternalNote] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    fetchTickets();
+
+    // Realtime subscription for incoming user tickets
+    const ticketSub = supabase
+      .channel('admin_tickets_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        fetchTickets(false);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ticketSub);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchMessages(selectedTicket.id);
+
+      const msgSub = supabase
+        .channel(`admin_chat:${selectedTicket.id}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'ticket_messages', 
+          filter: `ticket_id=eq.${selectedTicket.id}` 
+        }, (payload) => {
+          setMessages(prev => {
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new as TicketMessage];
+          });
+          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(msgSub);
+      };
+    }
+  }, [selectedTicket?.id]);
+
+  const fetchTickets = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*, profiles(full_name, avatar_url, email, phone)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (data && !error) setTickets(data as any);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchMessages = async (ticketId: string) => {
+    const { data } = await supabase
+      .from('ticket_messages')
+      .select('*, profiles:sender_id(role, avatar_url, full_name)')
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true });
+    if (data) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setMessages(data);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 60);
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted' && Platform.OS !== 'web') {
+        Alert.alert("Permission Required", "Please grant photo library access.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64;
+        const mimeType = asset.mimeType || 'image/jpeg';
+
+        if (!base64Data) return;
+
+        if (selectedTicket?.id) {
+          setSending(true);
+          const filePath = `tickets/${selectedTicket.id}/admin_${Date.now()}.jpg`;
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from('chat_images')
+              .upload(filePath, decode(base64Data), {
+                contentType: mimeType,
+                upsert: true
+              });
+
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+              await sendMessage(`[IMAGE] ${publicUrl}`);
+              return;
+            }
+          } catch (e) {
+            console.warn("Storage upload fallback:", e);
+          }
+        }
+
+        // Guaranteed fallback to Data URI
+        const base64Str = `data:${mimeType};base64,${base64Data}`;
+        await sendMessage(`[IMAGE] ${base64Str}`);
+      }
+    } catch (err: any) {
+      Alert.alert("Image Error", err.message || "Failed to select image.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || reply.trim();
+    if (!textToSend || !selectedTicket) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setSending(true);
+    if (!textOverride) setReply('');
+
+    const formattedMessage = isInternalNote ? `[INTERNAL NOTE] ${textToSend}` : textToSend;
+
+    try {
+      const { error } = await supabase
+        .from('ticket_messages')
+        .insert({
+          ticket_id: selectedTicket.id,
+          sender_id: user.id,
+          message: formattedMessage
+        });
+
+      if (error) {
+        Alert.alert('Error Sending', error.message);
+      } else {
+        if (selectedTicket.status === 'open' && !isInternalNote) {
+          await supabase.from('tickets').update({ status: 'in_progress' }).eq('id', selectedTicket.id);
+          setSelectedTicket(prev => prev ? { ...prev, status: 'in_progress' } : null);
+        }
+
+        fetchMessages(selectedTicket.id);
         fetchTickets();
-        supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id || null));
-    }, []);
 
-    useEffect(() => {
-        if (selectedTicket) {
-            fetchMessages(selectedTicket.id);
+        // Push notification if not internal note
+        if (!isInternalNote) {
+          supabase.from('notifications').insert({
+            user_id: selectedTicket.user_id,
+            title: 'Support Agent Response',
+            body: textToSend.startsWith('[IMAGE]') ? 'Agent sent an attachment' : textToSend,
+            data: { route: `/tickets/${selectedTicket.id}` },
+            read: false
+          }).then();
+
+          // Dispatch automatic email
+          if (selectedTicket.profiles?.email) {
+            sendAdminReplyEmail(
+              selectedTicket.id,
+              selectedTicket.subject,
+              textToSend,
+              selectedTicket.profiles.email,
+              selectedTicket.profiles.full_name
+            );
+          }
         }
-    }, [selectedTicket]);
+      }
+    } finally {
+      setSending(false);
+    }
+  };
 
-    const fetchTickets = async (isRefresh = false) => {
-        if (isRefresh) setRefreshing(true);
-        else setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('tickets')
-                .select('*, profiles(full_name, avatar_url, email)')
-                .order('created_at', { ascending: false });
-            if (data) setTickets(data as any);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+  const changeTicketStatus = async (status: string) => {
+    if (!selectedTicket) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedTicket({ ...selectedTicket, status });
 
-    const fetchMessages = async (ticketId: string) => {
-        const { data } = await supabase
-            .from('ticket_messages')
-            .select('*, profiles:sender_id(role, avatar_url, full_name)')
-            .eq('ticket_id', ticketId)
-            .order('created_at', { ascending: true });
-        if (data) {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setMessages(data);
-        }
-    };
+    const { error } = await supabase
+      .from('tickets')
+      .update({ status })
+      .eq('id', selectedTicket.id);
 
-    const pickImage = async () => {
-        try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted' && Platform.OS !== 'web') {
-                Alert.alert("Permission Required", "Please grant photo library permissions.");
-                return;
-            }
+    if (!error) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('ticket_messages').insert({
+          ticket_id: selectedTicket.id,
+          sender_id: user.id,
+          message: `[SYSTEM] Support status updated to ${status.toUpperCase()}`
+        });
+      }
+      fetchTickets();
+      fetchMessages(selectedTicket.id);
+    }
+  };
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 0.6,
-                base64: true,
-            });
+  const changePriority = async (priority: string) => {
+    if (!selectedTicket) return;
+    setSelectedTicket({ ...selectedTicket, priority });
+    await supabase.from('tickets').update({ priority }).eq('id', selectedTicket.id);
+    fetchTickets();
+  };
 
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                const asset = result.assets[0];
-                const base64Data = asset.base64;
-                const mimeType = asset.mimeType || 'image/jpeg';
+  const openUserModal = async (userId: string) => {
+    setShowUserModal(true);
+    setLoadingUser(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (data) setUserDetails(data);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
 
-                if (!base64Data) return;
+  const toggleUserStatus = async () => {
+    if (!userDetails) return;
+    const newStatus = userDetails.status === 'active' ? 'suspended' : 'active';
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: newStatus })
+      .eq('id', userDetails.id);
+    if (!error) {
+      setUserDetails({ ...userDetails, status: newStatus });
+      Alert.alert('Success', `User account status changed to: ${newStatus.toUpperCase()}`);
+    }
+  };
 
-                if (selectedTicket?.id) {
-                    const filePath = `tickets/${selectedTicket.id}/admin_${Date.now()}.jpg`;
-                    try {
-                        const { error: uploadError } = await supabase.storage
-                            .from('chat_images')
-                            .upload(filePath, decode(base64Data), {
-                                contentType: mimeType,
-                                upsert: true
-                            });
+  const resolveSelectedTickets = async () => {
+    if (selectedIds.length === 0) return;
+    const { error } = await supabase
+      .from('tickets')
+      .update({ status: 'resolved' })
+      .in('id', selectedIds);
 
-                        if (!uploadError) {
-                            const { data: { publicUrl } } = supabase.storage.from('chat_images').getPublicUrl(filePath);
-                            sendMessage(`[IMAGE] ${publicUrl}`);
-                            return;
-                        }
-                    } catch (e) {
-                        console.warn("Admin image upload fallback:", e);
-                    }
-                }
+    if (!error) {
+      Alert.alert('Success', `${selectedIds.length} tickets resolved.`);
+      setSelectMode(false);
+      setSelectedIds([]);
+      fetchTickets();
+    }
+  };
 
-                // Fallback to direct data URI
-                const base64Str = `data:${mimeType};base64,${base64Data}`;
-                sendMessage(`[IMAGE] ${base64Str}`);
-            }
-        } catch (err: any) {
-            Alert.alert("Image Error", err.message || "Failed to select image.");
-        }
-    };
+  const toggleSelection = (id: string) => {
+    if (selectedIds.includes(id)) {
+      const newIds = selectedIds.filter(i => i !== id);
+      setSelectedIds(newIds);
+      if (newIds.length === 0) setSelectMode(false);
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
 
-    const sendMessage = async (text: string = reply) => {
-        if (!text.trim() || !selectedTicket) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const copyTicketId = async (id: string) => {
+    await Clipboard.setStringAsync(id);
+    Alert.alert('Copied 📋', `Ticket ID #${id.split('-')[0].toUpperCase()} copied!`);
+  };
 
-        try {
-            const { error } = await supabase
-                .from('ticket_messages')
-                .insert({
-                    ticket_id: selectedTicket.id,
-                    sender_id: user.id,
-                    message: text.trim()
-                });
+  const openWhatsAppWithUser = (phone?: string) => {
+    if (!phone) {
+      Alert.alert("Notice", "User has not registered a phone number.");
+      return;
+    }
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const formatted = cleanPhone.startsWith('0') ? `234${cleanPhone.slice(1)}` : cleanPhone;
+    const text = `Hello ${selectedTicket?.profiles?.full_name || 'Customer'}, I am contacting you from Abu Mafhal Hub Support regarding your ticket #${selectedTicket?.id?.split('-')[0].toUpperCase()}.`;
+    Linking.openURL(`whatsapp://send?phone=${formatted}&text=${encodeURIComponent(text)}`).catch(() => {});
+  };
 
-            if (error) {
-                Alert.alert('Error Sending', error.message);
-                console.error("Reply error:", error);
-            } else {
-                if (text === reply) setReply('');
-                fetchMessages(selectedTicket.id);
+  // Metrics
+  const openCount = tickets.filter(t => t.status === 'open').length;
+  const inProgressCount = tickets.filter(t => t.status === 'in_progress').length;
+  const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
+  const totalCount = tickets.length;
 
-                // Trigger Push Notification
-                supabase.from('notifications').insert({
-                    user_id: selectedTicket.user_id,
-                    title: 'New Reply from Support',
-                    body: text.trim().startsWith('[IMAGE]') ? 'Admin sent an image' : text.trim(),
-                    data: { route: `/ai-chat?ticketId=${selectedTicket.id}` },
-                    read: false
-                }).then();
+  // Filtered ticket queue
+  const filteredTickets = tickets.filter(t => {
+    const matchesFilter =
+      activeFilter === 'all' ? true :
+      activeFilter === 'open' ? t.status === 'open' :
+      activeFilter === 'in_progress' ? t.status === 'in_progress' :
+      t.status === 'resolved';
 
-                // 📧 AUTOMATIC EMAIL NOTIFICATION TO USER
-                if (selectedTicket.profiles?.email) {
-                    sendAdminReplyEmail(
-                        selectedTicket.id,
-                        selectedTicket.subject,
-                        text.trim(),
-                        selectedTicket.profiles.email,
-                        selectedTicket.profiles.full_name
-                    );
-                }
-            }
-        } catch (e: any) {
-            Alert.alert('Error', e.message || 'Failed to send message');
-        }
-    };
+    const matchesCategory =
+      categoryFilter === 'All' ? true :
+      t.subject?.toLowerCase().includes(categoryFilter.toLowerCase());
 
-    const changeTicketStatus = async (status: string) => {
-        if (!selectedTicket) return;
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        
-        // Optimistic update
-        setSelectedTicket({ ...selectedTicket, status });
-        
-        const { error } = await supabase
-            .from('tickets')
-            .update({ status })
-            .eq('id', selectedTicket.id);
-            
-        if (error) {
-            Alert.alert('Error', 'Failed to update ticket status');
-        } else {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // Log action to messages
-                await supabase.from('ticket_messages').insert({
-                    ticket_id: selectedTicket.id,
-                    sender_id: user.id,
-                    message: `[SYSTEM] Changed ticket status to ${status.toUpperCase()}`
-                });
-            }
-            fetchTickets();
-            fetchMessages(selectedTicket.id);
-        }
-    };
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch =
+      t.subject?.toLowerCase().includes(searchLower) ||
+      t.profiles?.full_name?.toLowerCase().includes(searchLower) ||
+      t.profiles?.email?.toLowerCase().includes(searchLower) ||
+      t.id.toLowerCase().includes(searchLower);
 
-    const openUserModal = async (userId: string) => {
-        setShowUserModal(true);
-        setLoadingUser(true);
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-        if (data) setUserDetails(data);
-        setLoadingUser(false);
-    };
+    return matchesFilter && matchesCategory && matchesSearch;
+  });
 
-    const toggleUserStatus = async () => {
-        if (!userDetails) return;
-        const newStatus = userDetails.status === 'active' ? 'suspended' : 'active';
-        const { error } = await supabase
-            .from('profiles')
-            .update({ status: newStatus })
-            .eq('id', userDetails.id);
-        if (!error) {
-            setUserDetails({ ...userDetails, status: newStatus });
-            Alert.alert('Success', `User account ${newStatus}`);
-        } else {
-            Alert.alert('Error', 'Failed to update user status');
-        }
-    };
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
 
-    const resolveTicket = async () => {
-        await changeTicketStatus('resolved');
-    };
-
-    const resolveSelectedTickets = async () => {
-        if (selectedIds.length === 0) return;
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        
-        const { error } = await supabase
-            .from('tickets')
-            .update({ status: 'resolved' })
-            .in('id', selectedIds);
-            
-        if (!error) {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // Log action to messages for all resolved tickets
-                const messages = selectedIds.map(id => ({
-                    ticket_id: id,
-                    sender_id: user.id,
-                    message: `[SYSTEM] Changed ticket status to RESOLVED (Bulk Action)`
-                }));
-                await supabase.from('ticket_messages').insert(messages);
-            }
-            
-            Alert.alert('Success', `${selectedIds.length} tickets resolved`);
-            setSelectMode(false);
-            setSelectedIds([]);
-            fetchTickets();
-        } else {
-            Alert.alert('Error', 'Failed to resolve tickets');
-        }
-    };
-
-    const toggleSelection = (id: string) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        if (selectedIds.includes(id)) {
-            const newIds = selectedIds.filter(i => i !== id);
-            setSelectedIds(newIds);
-            if (newIds.length === 0) setSelectMode(false);
-        } else {
-            setSelectedIds([...selectedIds, id]);
-        }
-    };
-
-    const copyTicketId = async (id: string) => {
-        await Clipboard.setStringAsync(id);
-        Alert.alert('Copied', 'Ticket ID copied to clipboard');
-    };
-
-    // Derived State
-    const openCount = tickets.filter(t => t.status === 'open').length;
-    const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
-    const totalCount = tickets.length;
-
-    // Filter & Search Logic
-    const filteredTickets = tickets.filter(t => {
-        const matchesFilter = 
-            activeFilter === 'All' ? true :
-            activeFilter === 'Open' ? t.status === 'open' :
-            activeFilter === 'In Progress' ? t.status === 'in_progress' :
-            t.status === 'resolved';
-
-        let matchesTime = true;
-        const ticketDate = new Date(t.created_at);
-        const today = new Date();
-        if (timeFilter === 'Today') {
-            matchesTime = ticketDate.toDateString() === today.toDateString();
-        } else if (timeFilter === 'This Week') {
-            const weekAgo = new Date();
-            weekAgo.setDate(today.getDate() - 7);
-            matchesTime = ticketDate >= weekAgo;
-        }
-
-        const searchLower = searchQuery.toLowerCase();
-        const matchesSearch = 
-            t.subject?.toLowerCase().includes(searchLower) ||
-            t.profiles?.full_name?.toLowerCase().includes(searchLower) ||
-            t.id.toLowerCase().includes(searchLower);
-
-        return matchesFilter && matchesTime && matchesSearch;
-    });
-
-    const getInitials = (name: string) => {
-        if (!name) return 'U';
-        return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    };
-
-    const renderTicketList = () => (
-        <View className="flex-1 bg-[#040814]">
-            {/* Ultra-Modern Compact Glass Header */}
-            <View className="bg-[#060d21] pt-12 pb-3 px-4 border-b border-slate-800/80 shadow-lg">
-                <View className="flex-row justify-between items-center mb-3">
-                    <View className="flex-row items-center gap-2.5">
-                        <TouchableOpacity onPress={() => router.back()} className="w-9 h-9 bg-slate-900 rounded-full items-center justify-center border border-slate-800">
-                            <Ionicons name="chevron-back" size={18} color="#f5a623" />
-                        </TouchableOpacity>
-                        <View>
-                            <Text className="text-lg font-black text-white tracking-tight">Admin Support Desk</Text>
-                            <View className="flex-row items-center gap-1.5 mt-0.5">
-                                <View className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <Text className="text-slate-400 font-bold text-xs uppercase tracking-wider">{openCount} Needs Action</Text>
-                            </View>
-                        </View>
-                    </View>
-                    <View className="flex-row gap-1.5">
-                        <TouchableOpacity onPress={() => fetchTickets(true)} className="w-9 h-9 rounded-full bg-slate-900 items-center justify-center border border-slate-800">
-                            <Ionicons name="refresh" size={16} color="#f5a623" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* METRICS ROW */}
-                <View className="flex-row gap-2 mb-3">
-                    <View className="flex-1 bg-slate-900/90 border border-slate-800 p-2 rounded-xl items-center">
-                        <Text className="text-slate-400 text-xs font-bold uppercase">Total</Text>
-                        <Text className="text-white font-extrabold text-[13px]">{totalCount}</Text>
-                    </View>
-                    <View className="flex-1 bg-rose-500/10 border border-rose-500/30 p-2 rounded-xl items-center">
-                        <Text className="text-rose-400 text-xs font-bold uppercase">🔴 Open</Text>
-                        <Text className="text-rose-400 font-extrabold text-[13px]">{openCount}</Text>
-                    </View>
-                    <View className="flex-1 bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl items-center">
-                        <Text className="text-emerald-400 text-xs font-bold uppercase">🟢 Closed</Text>
-                        <Text className="text-emerald-400 font-extrabold text-[13px]">{resolvedCount}</Text>
-                    </View>
-                </View>
-
-                {/* Search Bar */}
-                <View className="bg-slate-900 border border-slate-800 rounded-full flex-row items-center px-3.5 h-10">
-                    <Ionicons name="search" size={16} color="#64748b" />
-                    <TextInput 
-                        placeholder="Search tickets, names, or IDs..."
-                        placeholderTextColor="#64748b"
-                        className="flex-1 ml-2 text-white font-bold text-[12.5px] h-full"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        autoCapitalize="none"
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={16} color="#64748b" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Filters */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2.5 flex-row">
-                    {['All', 'Open', 'In Progress', 'Resolved'].map((filter) => {
-                        const isActive = activeFilter === filter;
-                        return (
-                            <TouchableOpacity 
-                                key={filter} 
-                                onPress={() => {
-                                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                    setActiveFilter(filter);
-                                }}
-                                className={`px-3 py-1 rounded-full border mr-1.5 ${
-                                    isActive 
-                                        ? 'bg-[#f5a623]/20 border-[#f5a623]' 
-                                        : 'bg-slate-900 border-slate-800'
-                                }`}
-                            >
-                                <Text className={`font-bold text-xs uppercase ${isActive ? 'text-[#f5a623]' : 'text-slate-400'}`}>
-                                    {filter}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+  // ============================================================================
+  // RENDER: TICKET QUEUE INBOX
+  // ============================================================================
+  const renderTicketList = () => (
+    <View style={s.inboxContainer}>
+      {/* EXECUTIVE TOP BAR */}
+      <View style={s.topBar}>
+        <View style={s.topBarRow}>
+          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
+            <Ionicons name="arrow-back" size={16} color={L.gold} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={s.topBarTitle}>Support Desk Manager</Text>
+            <View style={s.topBarSubRow}>
+              <View style={s.pulseGreenDot} />
+              <Text style={s.topBarSubText}>{openCount} Tickets Need Attention</Text>
             </View>
-
-            {selectMode && (
-                <View className="bg-indigo-900 px-4 py-2 flex-row justify-between items-center z-20 border-b border-indigo-700">
-                    <Text className="text-white font-bold text-[12px]">{selectedIds.length} Selected</Text>
-                    <View className="flex-row gap-2">
-                        <TouchableOpacity onPress={() => { setSelectMode(false); setSelectedIds([]); }} className="px-2.5 py-1 bg-white/20 rounded-full">
-                            <Text className="text-white text-xs font-bold">Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={resolveSelectedTickets} className="px-3 py-1 bg-emerald-500 rounded-full">
-                            <Text className="text-white text-xs font-bold uppercase">Resolve All</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
-
-            {loading ? (
-                <View className="flex-1 justify-center items-center">
-                    <ActivityIndicator size="small" color="#f5a623" />
-                </View>
-            ) : (
-                <FlatList
-                    data={filteredTickets}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={{ padding: 10, paddingBottom: 90 }}
-                    refreshControl={
-                        <RefreshControl 
-                            refreshing={refreshing} 
-                            onRefresh={() => fetchTickets(true)} 
-                            tintColor="#f5a623" 
-                        />
-                    }
-                    ListEmptyComponent={() => (
-                        <View className="items-center justify-center mt-20">
-                            <View className="w-14 h-14 bg-slate-900 border border-slate-800 rounded-full items-center justify-center mb-3">
-                                <Ionicons name="file-tray-outline" size={28} color="#f5a623" />
-                            </View>
-                            <Text className="text-base font-bold text-white">No Support Tickets Found</Text>
-                            <Text className="text-slate-400 mt-1 text-xs text-center px-10">
-                                {searchQuery ? 'No tickets match your search query.' : 'There are no active tickets matching your filter.'}
-                            </Text>
-                        </View>
-                    )}
-                    renderItem={({ item }) => {
-                        const isSelected = selectedIds.includes(item.id);
-                        return (
-                        <TouchableOpacity
-                            onLongPress={() => {
-                                setSelectMode(true);
-                                toggleSelection(item.id);
-                            }}
-                            onPress={() => {
-                                if (selectMode) toggleSelection(item.id);
-                                else setSelectedTicket(item);
-                            }}
-                            className={`bg-slate-900/90 p-3 rounded-xl mb-2 border ${
-                                isSelected ? 'border-indigo-500 bg-indigo-950/40' : 'border-slate-800/80'
-                            } shadow-md active:scale-[0.99]`}
-                        >
-                            <View className="flex-row justify-between items-start mb-1.5">
-                                <View className="flex-row items-center gap-2">
-                                    {selectMode ? (
-                                        <View className={`w-8 h-8 rounded-full items-center justify-center border-2 ${isSelected ? 'bg-[#f5a623] border-[#f5a623]' : 'border-slate-700'}`}>
-                                            {isSelected && <Ionicons name="checkmark" size={14} color="#060d21" />}
-                                        </View>
-                                    ) : item.profiles?.avatar_url ? (
-                                        <Image source={{ uri: item.profiles.avatar_url }} className="w-8 h-8 rounded-full border border-slate-700" />
-                                    ) : (
-                                        <View className="w-8 h-8 rounded-full bg-slate-800 items-center justify-center border border-slate-700">
-                                            <Text className="font-black text-slate-300 text-xs">{getInitials(item.profiles?.full_name || 'Anonym')}</Text>
-                                        </View>
-                                    )}
-                                    <View>
-                                        <Text className="font-extrabold text-white text-[13px]">{item.profiles?.full_name || 'Anonymous User'}</Text>
-                                        <Text className="text-xs font-semibold text-slate-400 mt-0.5">#{item.id.split('-')[0]} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
-                                    </View>
-                                </View>
-
-                                {/* Priority Badge */}
-                                <View className={`px-2 py-0.5 rounded-full border ${
-                                    item.priority === 'high' ? 'bg-rose-500/10 border-rose-500/30' :
-                                    item.priority === 'medium' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800 border-slate-700'
-                                }`}>
-                                    <Text className={`text-xs uppercase font-black tracking-wider ${
-                                        item.priority === 'high' ? 'text-rose-400' :
-                                        item.priority === 'medium' ? 'text-amber-400' : 'text-slate-400'
-                                    }`}>{item.priority}</Text>
-                                </View>
-                            </View>
-                            
-                            <Text className="text-slate-300 font-medium text-[12px] mb-2 leading-4 pl-[40px]" numberOfLines={2}>{item.subject}</Text>
-
-                            {/* Action Row */}
-                            <View className="flex-row items-center justify-between pt-2 border-t border-slate-800/60 ml-[40px]">
-                                <View className={`px-2 py-0.5 rounded-full border ${
-                                    item.status === 'open' ? 'bg-rose-500/10 border-rose-500/30' :
-                                    item.status === 'in_progress' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-emerald-500/10 border-emerald-500/30'
-                                }`}>
-                                    <Text className={`text-xs font-extrabold ${
-                                        item.status === 'open' ? 'text-rose-400' :
-                                        item.status === 'in_progress' ? 'text-blue-400' : 'text-emerald-400'
-                                    }`}>
-                                        {item.status === 'open' ? '🔴 OPEN' : item.status === 'in_progress' ? '🔵 ACTIVE' : '🟢 CLOSED'}
-                                    </Text>
-                                </View>
-
-                                {/* Direct Actions */}
-                                <View className="flex-row gap-1.5">
-                                    {item.status !== 'resolved' && (
-                                        <TouchableOpacity 
-                                            onPress={async () => {
-                                                const { error } = await supabase.from('tickets').update({ status: 'resolved' }).eq('id', item.id);
-                                                if (!error) fetchTickets();
-                                            }}
-                                            className="bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 flex-row items-center gap-1"
-                                        >
-                                            <Ionicons name="checkmark" size={10} color="#34d399" />
-                                            <Text className="text-emerald-400 text-xs font-black uppercase">Resolve</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    <TouchableOpacity 
-                                        onPress={() => setSelectedTicket(item)}
-                                        className="bg-[#f5a623] px-2.5 py-0.5 rounded-full flex-row items-center gap-1 shadow-sm"
-                                    >
-                                        <Ionicons name="chatbubbles" size={10} color="#060d21" />
-                                        <Text className="text-[#060d21] text-xs font-black uppercase">Reply</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                        );
-                    }}
-                />
-            )}
+          </View>
+          <TouchableOpacity onPress={() => fetchTickets(true)} style={s.refreshBtn} activeOpacity={0.8}>
+            <Ionicons name="refresh" size={15} color={L.gold} />
+          </TouchableOpacity>
         </View>
-    );
 
-    const renderChatInterface = () => (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-[#f1f5f9]">
-            {/* Header */}
-            <View className="bg-white pt-12 pb-3 px-4 border-b border-slate-200/60 shadow-sm z-10 flex-col">
-                <View className="flex-row items-center gap-3 mb-3">
-                    <TouchableOpacity onPress={() => setSelectedTicket(null)} className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 items-center justify-center active:bg-slate-100">
-                        <Ionicons name="chevron-back" size={20} color="#0d1b3e" />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity onPress={() => openUserModal(selectedTicket?.user_id || '')} className="flex-1 flex-row items-center gap-3">
-                        {selectedTicket?.profiles?.avatar_url ? (
-                            <Image source={{ uri: selectedTicket.profiles.avatar_url }} className="w-10 h-10 rounded-full border border-[#d4af37]" />
-                        ) : (
-                            <View className="w-10 h-10 rounded-full bg-[#0d1b3e] items-center justify-center border border-[#d4af37]">
-                                <Text className="font-bold text-[#d4af37] text-xs">{getInitials(selectedTicket?.profiles?.full_name || 'A')}</Text>
-                            </View>
-                        )}
-                        <View className="flex-1">
-                            <Text className="font-extrabold text-[#0d1b3e] text-[15px]">{selectedTicket?.profiles?.full_name || 'Anonymous'}</Text>
-                            <View className="flex-row items-center gap-1.5 mt-0.5 flex-wrap">
-                                <Text className="text-slate-500 text-xs font-bold">Ticket #{selectedTicket?.id?.split('-')[0]}</Text>
-                                <View className={`px-1.5 py-0.5 rounded-sm ${
-                                    selectedTicket?.priority === 'high' ? 'bg-rose-100' :
-                                    selectedTicket?.priority === 'medium' ? 'bg-orange-100' : 'bg-slate-100'
-                                }`}>
-                                    <Text className={`text-xs font-bold uppercase tracking-wider ${
-                                        selectedTicket?.priority === 'high' ? 'text-rose-600' :
-                                        selectedTicket?.priority === 'medium' ? 'text-orange-600' : 'text-slate-500'
-                                    }`}>
-                                        {selectedTicket?.priority || 'normal'}
-                                    </Text>
-                                </View>
-                                <View className="bg-slate-100 px-1.5 py-0.5 rounded-sm"><Text className="text-xs text-slate-500 font-bold uppercase tracking-wider">View Profile</Text></View>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                </View>
+        {/* METRICS ROW */}
+        <View style={s.metricsRow}>
+          <TouchableOpacity onPress={() => setActiveFilter('all')} style={[s.metricBox, activeFilter === 'all' && s.metricBoxActive]}>
+            <Text style={s.metricNum}>{totalCount}</Text>
+            <Text style={s.metricLabel}>Total</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveFilter('open')} style={[s.metricBox, activeFilter === 'open' && s.metricBoxActive]}>
+            <Text style={[s.metricNum, { color: L.coral }]}>{openCount}</Text>
+            <Text style={s.metricLabel}>Open</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveFilter('in_progress')} style={[s.metricBox, activeFilter === 'in_progress' && s.metricBoxActive]}>
+            <Text style={[s.metricNum, { color: L.sky }]}>{inProgressCount}</Text>
+            <Text style={s.metricLabel}>Active</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setActiveFilter('resolved')} style={[s.metricBox, activeFilter === 'resolved' && s.metricBoxActive]}>
+            <Text style={[s.metricNum, { color: L.emerald }]}>{resolvedCount}</Text>
+            <Text style={s.metricLabel}>Closed</Text>
+          </TouchableOpacity>
+        </View>
 
-                {/* Status Toggle Buttons */}
-                <View className="flex-row justify-around bg-slate-50 p-1 rounded-lg border border-slate-100">
-                    <TouchableOpacity onPress={() => changeTicketStatus('open')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'open' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'open' ? 'text-rose-600' : 'text-slate-400'}`}>Open</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => changeTicketStatus('in_progress')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'in_progress' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'in_progress' ? 'text-blue-600' : 'text-slate-400'}`}>In Progress</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => changeTicketStatus('resolved')} className={`flex-1 items-center py-1.5 rounded-md ${selectedTicket?.status === 'resolved' ? 'bg-white shadow-sm border border-slate-100' : ''}`}>
-                        <Text className={`text-xs font-black uppercase tracking-wider ${selectedTicket?.status === 'resolved' ? 'text-emerald-600' : 'text-slate-400'}`}>Resolved</Text>
-                    </TouchableOpacity>
-                </View>
+        {/* SEARCH BAR */}
+        <View style={s.searchBox}>
+          <Ionicons name="search" size={14} color={L.goldDk} />
+          <TextInput
+            placeholder="Search by ticket ID, user name, or issue..."
+            placeholderTextColor="#94A3B8"
+            style={s.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            selectionColor={L.goldDk}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={15} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* CATEGORY CHIPS */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catChipsRow}>
+          {['All', 'Wallet', 'Data', 'Airtime', 'Bills', 'CAC', 'Crypto', 'NIN', 'Card'].map((cat) => {
+            const isCatSelected = categoryFilter === cat;
+            return (
+              <TouchableOpacity
+                key={cat}
+                onPress={() => setCategoryFilter(cat)}
+                style={[s.catChip, isCatSelected && s.catChipActive]}
+                activeOpacity={0.75}
+              >
+                <Text style={[s.catChipText, isCatSelected && s.catChipTextActive]}>{cat}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* BULK ACTION BAR */}
+      {selectMode && (
+        <View style={s.bulkBar}>
+          <Text style={s.bulkText}>{selectedIds.length} Selected</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity onPress={() => { setSelectMode(false); setSelectedIds([]); }} style={s.bulkCancelBtn}>
+              <Text style={s.bulkCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={resolveSelectedTickets} style={s.bulkResolveBtn}>
+              <Text style={s.bulkResolveText}>Resolve All</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* TICKETS LIST */}
+      {loading ? (
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={L.goldDk} />
+          <Text style={s.loadingText}>Loading support queue...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredTickets}
+          keyExtractor={item => item.id}
+          contentContainerStyle={s.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => fetchTickets(true)} tintColor={L.goldDk} />
+          }
+          ListEmptyComponent={
+            <View style={s.emptyBox}>
+              <View style={s.emptyIconCircle}>
+                <Ionicons name="chatbubbles-outline" size={24} color={L.goldDk} />
+              </View>
+              <Text style={s.emptyTitle}>No Support Tickets Found</Text>
+              <Text style={s.emptySub}>
+                {searchQuery ? 'No tickets match your query.' : 'There are no active tickets matching the current filter.'}
+              </Text>
             </View>
+          }
+          renderItem={({ item }) => {
+            const isSelected = selectedIds.includes(item.id);
+            const isOpen = item.status === 'open';
+            const isActive = item.status === 'in_progress';
+            const statusColor = isOpen ? L.coral : isActive ? L.sky : L.emerald;
+            const statusBg = isOpen ? L.coralBg : isActive ? L.skyBg : L.emeraldBg;
+            const statusBorder = isOpen ? L.coralBorder : isActive ? '#BAE6FD' : L.emeraldBorder;
+            const shortId = item.id.split('-')[0].toUpperCase();
 
-            {/* Chat Area */}
-            <ScrollView 
-                ref={scrollViewRef} 
-                className="flex-1 px-4 py-6" 
-                contentContainerStyle={{ paddingBottom: 20 }}
-                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-            >
-                {selectedTicket && messages.length > 0 ? (
-                    Object.entries(
-                        messages.reduce((acc, msg) => {
-                            const dateStr = new Date(msg.created_at).toDateString();
-                            if (!acc[dateStr]) acc[dateStr] = [];
-                            acc[dateStr].push(msg);
-                            return acc;
-                        }, {} as Record<string, TicketMessage[]>)
-                    ).map(([dateStr, dateMessages]) => {
-                        const today = new Date().toDateString();
-                        const yesterday = new Date(Date.now() - 86400000).toDateString();
-                        let displayDate = dateStr;
-                        if (dateStr === today) displayDate = 'Today';
-                        else if (dateStr === yesterday) displayDate = 'Yesterday';
-                        else {
-                            displayDate = new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-                        }
-
-                        return (
-                            <View key={dateStr}>
-                                {/* Date Separator */}
-                                <View className="items-center my-5">
-                                    <View className="bg-slate-200/50 px-4 py-1.5 rounded-full border border-slate-200">
-                                        <Text className="text-slate-500 text-xs font-bold tracking-widest uppercase">{displayDate}</Text>
-                                    </View>
-                                </View>
-
-                                {/* Messages for this Date */}
-                                {dateMessages.map((m: any) => {
-                                    // Admins (and super_admins) are always on the right side
-                                    const isMe = m.profiles?.role === 'admin' || m.profiles?.role === 'super_admin';
-                                    
-                                    if (m.message.startsWith('[SYSTEM]')) {
-                                        return (
-                                            <View key={m.id} className="w-full my-2 items-center justify-center">
-                                                <View className="bg-slate-200/50 px-4 py-1.5 rounded-full flex-row items-center gap-1.5 border border-slate-200">
-                                                    <Ionicons name="information-circle-outline" size={12} color="#64748b" />
-                                                    <Text className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                                                        {m.profiles?.full_name || 'Admin'} {m.message.replace('[SYSTEM]', '').trim()}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        );
-                                    }
-
-                                    return (
-                                        <View key={m.id} className={`mb-3 w-full flex-row items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                            {!isMe && (
-                                                <TouchableOpacity onPress={() => openUserModal(selectedTicket.user_id)}>
-                                                    {m.profiles?.avatar_url ? (
-                                                        <Image source={{ uri: m.profiles.avatar_url }} className="w-7 h-7 rounded-full border border-slate-300" />
-                                                    ) : (
-                                                        <View className="w-7 h-7 rounded-full bg-slate-200 border border-slate-300 items-center justify-center">
-                                                            <Text className="font-bold text-slate-500 text-xs">{getInitials(m.profiles?.full_name || selectedTicket?.profiles?.full_name || 'U')}</Text>
-                                                        </View>
-                                                    )}
-                                                </TouchableOpacity>
-                                            )}
-                                            <View className={`max-w-[82%] ${isMe ? 'items-end' : 'items-start'}`}>
-                                                {isMe && <Text className="text-xs text-slate-400 mb-1 pr-2 font-medium">{m.profiles?.full_name || 'Admin'}</Text>}
-                                                <TouchableOpacity 
-                                                    activeOpacity={0.9}
-                                                    onLongPress={async () => {
-                                                        if (!m.message.startsWith('[IMAGE]')) {
-                                                            await Clipboard.setStringAsync(m.message);
-                                                            Alert.alert('Copied', 'Message text copied to clipboard');
-                                                        }
-                                                    }}
-                                                >
-                                                    <View className={`px-4 py-3 shadow-sm shadow-slate-200/40 ${
-                                                        m.message.startsWith('[IMAGE]') ? 'bg-transparent p-0 shadow-none' :
-                                                        (isMe ? 'bg-[#0d1b3e] rounded-3xl rounded-br-md border border-[#d4af37]/30' : 'bg-white rounded-3xl rounded-bl-md border border-slate-100/50')
-                                                    }`}>
-                                                        {m.message.startsWith('[IMAGE]') ? (
-                                                            <Image 
-                                                                source={{ uri: m.message.replace('[IMAGE] ', '').trim() }} 
-                                                                className="w-56 h-72 rounded-3xl bg-slate-200"
-                                                                resizeMode="cover"
-                                                            />
-                                                        ) : (
-                                                            <Text className={`${isMe ? 'text-[#d4af37]' : 'text-slate-800'} text-[16px] leading-[22px]`}>
-                                                                {m.message}
-                                                            </Text>
-                                                        )}
-                                                        <View className={`flex-row items-center mt-1.5 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                            <Text className={`text-xs font-medium ${isMe ? (m.message.startsWith('[IMAGE]') ? 'text-gray-500' : 'text-[#d4af37]/60') : 'text-slate-400'}`}>
-                                                                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </Text>
-                                                            {isMe && <Ionicons name="checkmark-done" size={12} color="#d4af37" className="ml-1 opacity-70" />}
-                                                        </View>
-                                                    </View>
-                                                </TouchableOpacity>
-                                            </View>
-                                            {isMe && (
-                                                <TouchableOpacity onPress={() => openUserModal(m.sender_id)}>
-                                                    {m.profiles?.avatar_url ? (
-                                                        <Image source={{ uri: m.profiles.avatar_url }} className="w-7 h-7 rounded-full border border-[#d4af37]" />
-                                                    ) : (
-                                                        <View className="w-7 h-7 rounded-full bg-[#0d1b3e] border border-[#d4af37] items-center justify-center">
-                                                            <Text className="font-bold text-[#d4af37] text-xs">{getInitials(m.profiles?.full_name || 'A')}</Text>
-                                                        </View>
-                                                    )}
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    );
-                                })}
-                            </View>
-                        );
-                    })
-                ) : (
-                    <View className="flex-1 items-center justify-center mt-20">
-                        <View className="w-20 h-20 bg-blue-50 rounded-full items-center justify-center mb-4">
-                            <Ionicons name="chatbubbles-outline" size={32} color="#0d1b3e" />
-                        </View>
-                        <Text className="text-gray-400 font-medium">No messages yet</Text>
+            return (
+              <TouchableOpacity
+                onLongPress={() => {
+                  setSelectMode(true);
+                  toggleSelection(item.id);
+                }}
+                onPress={() => {
+                  if (selectMode) toggleSelection(item.id);
+                  else setSelectedTicket(item);
+                }}
+                style={[s.ticketCard, isSelected && s.ticketCardSelected]}
+                activeOpacity={0.8}
+              >
+                <View style={s.ticketCardHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    {selectMode ? (
+                      <View style={[s.selectCircle, isSelected && s.selectCircleActive]}>
+                        {isSelected && <Ionicons name="checkmark" size={11} color="#0F172A" />}
+                      </View>
+                    ) : item.profiles?.avatar_url ? (
+                      <Image source={{ uri: item.profiles.avatar_url }} style={s.userAvatar} />
+                    ) : (
+                      <View style={s.userAvatarFallback}>
+                        <Text style={s.userAvatarText}>{getInitials(item.profiles?.full_name || 'U')}</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1, marginLeft: 7 }}>
+                      <Text style={s.userNameText} numberOfLines={1}>{item.profiles?.full_name || 'Customer'}</Text>
+                      <Text style={s.userMetaText}>#{shortId} • {new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
                     </View>
-                )}
-            </ScrollView>
+                  </View>
 
-            {/* Input Area & FAB */}
-            {selectedTicket?.status !== 'resolved' && (
-                <View className="bg-[#f8fafc] border-t border-slate-200/50">
-                    
-                    {/* Quick Replies (100% Professional English) */}
-                    <View className="px-3 py-2 border-b border-slate-800/80 bg-slate-950">
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                            {[
-                                "We are reviewing your request now.", 
-                                "The issue has been resolved. Please try again.", 
-                                "Please send us a payment screenshot or receipt.", 
-                                "Your wallet has been credited successfully.",
-                                "A support agent will contact you shortly."
-                            ].map((qr, index) => (
-                                <TouchableOpacity 
-                                    key={index} 
-                                    onPress={() => sendMessage(qr)} 
-                                    className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full mr-2 shadow-sm"
-                                >
-                                    <Text className="text-xs text-slate-300 font-medium">{qr}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-
-                    <View className="px-4 pb-10 pt-3 flex-row items-end gap-2 bg-[#060d21]">
-                        {selectedTicket?.profiles?.avatar_url ? (
-                            <Image source={{ uri: selectedTicket.profiles.avatar_url }} className="h-10 w-10 rounded-full border border-slate-800 shadow-sm" />
-                        ) : (
-                            <View className="h-10 w-10 rounded-full bg-slate-900 items-center justify-center border border-slate-800 shadow-sm">
-                                <Text className="font-bold text-[#f5a623] text-sm">{getInitials(selectedTicket?.profiles?.full_name || 'U')}</Text>
-                            </View>
-                        )}
-                        <View className="flex-1 bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden">
-                            {/* Toolbar (AI, Private Note) */}
-                            <View className="flex-row justify-between items-center px-3 py-1.5 border-b border-slate-800/80 bg-slate-950">
-                                <TouchableOpacity 
-                                    onPress={() => {
-                                        const draft = `Hello! Thank you for reaching out regarding "${selectedTicket?.subject || 'your ticket'}". We are currently processing your request and will provide an update shortly.`;
-                                        setReply(draft);
-                                    }}
-                                    className="flex-row items-center gap-1 bg-[#f5a623]/20 border border-[#f5a623]/40 px-2 py-0.5 rounded-full active:opacity-80"
-                                >
-                                    <Ionicons name="sparkles" size={11} color="#f5a623" />
-                                    <Text className="text-[#f5a623] text-xs font-black uppercase tracking-wider">AI Draft (English)</Text>
-                                </TouchableOpacity>
-                                
-                                <View className="flex-row items-center gap-2">
-                                    <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">Internal Note</Text>
-                                    <Switch trackColor={{false: '#334155', true: '#f5a623'}} thumbColor="#fff" style={{ transform: [{ scale: 0.6 }] }} />
-                                </View>
-                            </View>
-
-                            <View className="flex-row items-end gap-1 pl-1 pr-1.5 py-1.5">
-                                <TouchableOpacity 
-                                    onPress={pickImage}
-                                    className="h-10 w-10 items-center justify-center rounded-full active:bg-slate-50 mb-0.5"
-                                >
-                                    <Ionicons name="image-outline" size={20} color="#64748b" />
-                                </TouchableOpacity>
-                            <TextInput 
-                                className="flex-1 py-3 px-1 text-slate-800 text-[16px] max-h-28 leading-5 font-medium"
-                                placeholder="Type a reply..."
-                                placeholderTextColor="#94a3b8"
-                                multiline
-                                value={reply}
-                                onChangeText={setReply}
-                            />
-                            {reply.trim() || reply.startsWith('[IMAGE]') ? (
-                                <TouchableOpacity 
-                                    onPress={() => sendMessage()}
-                                    className="mb-0.5 ml-1 rounded-full overflow-hidden active:scale-95 shadow-md shadow-[#0d1b3e]/30"
-                                >
-                                    <View className="bg-[#0d1b3e] h-10 w-10 items-center justify-center border border-[#d4af37]/50 rounded-full">
-                                        <Ionicons name="arrow-up" size={20} color="#d4af37" />
-                                    </View>
-                                </TouchableOpacity>
-                            ) : null}
-                        </View>
-                    </View>
+                  {/* Priority Tag */}
+                  <View style={[s.priorityBadge, {
+                    backgroundColor: item.priority === 'critical' ? L.coralBg : item.priority === 'high' ? L.goldLight : L.bg,
+                    borderColor: item.priority === 'critical' ? L.coral : item.priority === 'high' ? L.goldAmber : L.cardBorder,
+                  }]}>
+                    <Text style={[s.priorityBadgeText, {
+                      color: item.priority === 'critical' ? L.coral : item.priority === 'high' ? L.goldAmber : L.textMuted
+                    }]}>{(item.priority || 'Normal').toUpperCase()}</Text>
+                  </View>
                 </View>
-            </View>
-        )}
-            {/* User Profile Modal */}
-            <Modal visible={showUserModal} transparent animationType="slide" onRequestClose={() => setShowUserModal(false)}>
-                <View className="flex-1 justify-end bg-black/50">
-                    <TouchableOpacity className="flex-1" onPress={() => setShowUserModal(false)} />
-                    <View className="bg-white rounded-t-3xl min-h-[50%] p-6 shadow-2xl pb-10">
-                        
-                        <View className="absolute top-4 right-4 z-20">
-                            <TouchableOpacity onPress={() => setShowUserModal(false)} className="w-8 h-8 bg-slate-100 rounded-full items-center justify-center">
-                                <Ionicons name="close" size={20} color="#64748b" />
-                            </TouchableOpacity>
-                        </View>
 
-                        <View className="items-center mb-6">
-                            <View className="w-16 h-1.5 bg-slate-200 rounded-full mb-4" />
-                            {selectedTicket?.profiles?.avatar_url ? (
-                                <Image source={{ uri: selectedTicket.profiles.avatar_url }} className="w-20 h-20 rounded-full border-4 border-slate-50 shadow-sm" />
-                            ) : (
-                                <View className="w-20 h-20 rounded-full bg-[#0d1b3e] items-center justify-center border-4 border-slate-50 shadow-sm">
-                                    <Text className="font-extrabold text-[#d4af37] text-2xl">{getInitials(selectedTicket?.profiles?.full_name || 'A')}</Text>
-                                </View>
-                            )}
-                            <Text className="text-xl font-black text-slate-800 mt-3">{selectedTicket?.profiles?.full_name || 'Anonymous User'}</Text>
-                            <Text className="text-slate-500 font-medium text-sm">{userDetails?.email || 'Loading email...'}</Text>
-                            
-                            {userDetails && (
-                                <View className={`mt-2 px-3 py-1 rounded-full ${userDetails.status === 'active' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                                    <Text className={`text-xs uppercase font-black tracking-widest ${userDetails.status === 'active' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                        {userDetails.status}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                {/* Subject */}
+                <Text style={s.ticketSubject} numberOfLines={2}>{item.subject}</Text>
 
-                        {loadingUser ? (
-                            <ActivityIndicator size="large" color="#0d1b3e" className="mt-10" />
-                        ) : userDetails ? (
-                            <ScrollView showsVerticalScrollIndicator={false} className="w-full">
-                                <View className="flex-row justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
-                                    <View className="items-center flex-1 border-r border-slate-200">
-                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Wallet</Text>
-                                        <Text className="text-emerald-600 font-black text-sm">₦{userDetails.balance?.toLocaleString() || '0'}</Text>
-                                    </View>
-                                    <View className="items-center flex-1 border-r border-slate-200">
-                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">KYC Tier</Text>
-                                        <Text className="text-[#0d1b3e] font-black text-sm">Tier {userDetails.kyc_tier || 1}</Text>
-                                    </View>
-                                    <View className="items-center flex-1">
-                                        <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Joined</Text>
-                                        <Text className="text-[#0d1b3e] font-black text-xs mt-0.5">{new Date(userDetails.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</Text>
-                                    </View>
-                                </View>
+                {/* Footer Controls */}
+                <View style={s.ticketCardFooter}>
+                  <View style={[s.statusPill, { backgroundColor: statusBg, borderColor: statusBorder }]}>
+                    <Text style={[s.statusPillText, { color: statusColor }]}>
+                      {isOpen ? '🔴 OPEN' : isActive ? '🔵 IN PROGRESS' : '🟢 RESOLVED'}
+                    </Text>
+                  </View>
 
-                                <Text className="text-slate-800 font-bold mb-3 px-1 text-[13px] uppercase tracking-wider">Complete User Data</Text>
+                  <View style={{ flexDirection: 'row', gap: 5 }}>
+                    <TouchableOpacity onPress={() => copyTicketId(item.id)} style={s.actionPill} activeOpacity={0.7}>
+                      <Ionicons name="copy-outline" size={10} color={L.textMuted} />
+                      <Text style={s.actionPillText}>ID</Text>
+                    </TouchableOpacity>
 
-                                <View className="bg-white border border-slate-100 rounded-2xl p-4 mb-6 shadow-sm shadow-slate-100/50">
-                                    {[
-                                        { label: 'Role', value: userDetails.role, icon: 'shield-checkmark-outline', color: '#8b5cf6' },
-                                        { label: 'Username', value: userDetails.username || 'N/A', icon: 'at-circle-outline', color: '#f59e0b' },
-                                        { label: 'Phone', value: userDetails.phone || 'N/A', icon: 'call-outline', color: '#10b981' },
-                                        { label: 'Custom ID', value: userDetails.custom_id || 'N/A', icon: 'finger-print-outline', color: '#3b82f6' },
-                                        { label: 'BVN', value: userDetails.bvn ? 'Linked' : 'Not Linked', icon: 'card-outline', color: '#64748b' },
-                                        { label: 'Reward Points', value: userDetails.reward_points || '0', icon: 'star-outline', color: '#d4af37' },
-                                        { label: 'Monthly Profit', value: `₦${userDetails.monthly_profit?.toLocaleString() || '0'}`, icon: 'trending-up-outline', color: '#14b8a6' },
-                                        { label: 'Referral Code', value: userDetails.referral_code || 'N/A', icon: 'people-outline', color: '#ec4899' },
-                                        { label: 'Referral Balance', value: `₦${userDetails.referral_balance?.toLocaleString() || '0'}`, icon: 'gift-outline', color: '#f43f5e' },
-                                    ].map((item, index) => (
-                                        <View key={index} className={`flex-row items-center justify-between py-3 ${index !== 8 ? 'border-b border-slate-50' : ''}`}>
-                                            <View className="flex-row items-center gap-3">
-                                                <Ionicons name={item.icon as any} size={18} color={item.color} />
-                                                <Text className="text-slate-500 font-medium text-[13px]">{item.label}</Text>
-                                            </View>
-                                            <Text className="text-slate-800 font-bold text-[13px]">{item.value}</Text>
-                                        </View>
-                                    ))}
-                                </View>
+                    {item.status !== 'resolved' && (
+                      <TouchableOpacity 
+                        onPress={async () => {
+                          await supabase.from('tickets').update({ status: 'resolved' }).eq('id', item.id);
+                          fetchTickets();
+                        }}
+                        style={s.resolvePill}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="checkmark" size={10} color={L.emerald} />
+                        <Text style={s.resolvePillText}>Close</Text>
+                      </TouchableOpacity>
+                    )}
 
-                                <Text className="text-slate-800 font-bold mb-3 px-1 text-[13px] uppercase tracking-wider mt-4">Quick Actions</Text>
-                                
-                                <View className="flex-row gap-2 mb-4">
-                                    <TouchableOpacity 
-                                        onPress={async () => { await Clipboard.setStringAsync(userDetails.email); Alert.alert('Copied', 'Email copied'); }}
-                                        className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
-                                    >
-                                        <View className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center mb-2"><Ionicons name="copy-outline" size={16} color="#3b82f6" /></View>
-                                        <Text className="text-slate-600 font-bold text-xs uppercase">Copy Email</Text>
-                                    </TouchableOpacity>
-                                    
-                                    <TouchableOpacity 
-                                        onPress={() => {
-                                            if (userDetails.phone) Linking.openURL(`tel:${userDetails.phone}`);
-                                            else Alert.alert('Error', 'No phone number found');
-                                        }}
-                                        className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
-                                    >
-                                        <View className="w-8 h-8 rounded-full bg-emerald-100 items-center justify-center mb-2"><Ionicons name="call-outline" size={16} color="#10b981" /></View>
-                                        <Text className="text-slate-600 font-bold text-xs uppercase">Call User</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity 
-                                        onPress={() => {
-                                            if (userDetails.email) {
-                                                setShowUserModal(false);
-                                                router.push(`/manage/communications?tab=email&recipient=${encodeURIComponent(userDetails.email)}`);
-                                            }
-                                        }}
-                                        className="flex-1 items-center justify-center bg-slate-50 p-3 rounded-xl border border-slate-100 active:bg-slate-100"
-                                    >
-                                        <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center mb-2"><Ionicons name="mail-outline" size={16} color="#6366f1" /></View>
-                                        <Text className="text-slate-600 font-bold text-xs uppercase">Send Email</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity 
-                                    onPress={toggleUserStatus}
-                                    className={`flex-row items-center justify-between p-4 rounded-xl mb-10 active:opacity-80 ${userDetails.status === 'active' ? 'bg-rose-50' : 'bg-emerald-50'}`}
-                                >
-                                    <View className="flex-row items-center gap-3">
-                                        <View className={`w-8 h-8 rounded-full items-center justify-center ${userDetails.status === 'active' ? 'bg-rose-100' : 'bg-emerald-100'}`}>
-                                            <Ionicons name={userDetails.status === 'active' ? 'ban-outline' : 'checkmark-circle-outline'} size={18} color={userDetails.status === 'active' ? '#e11d48' : '#10b981'} />
-                                        </View>
-                                        <Text className={`font-bold ${userDetails.status === 'active' ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                            {userDetails.status === 'active' ? 'Suspend User Account' : 'Reactivate User Account'}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </ScrollView>
-                        ) : null}
-                    </View>
+                    <TouchableOpacity onPress={() => setSelectedTicket(item)} style={s.replyBtn} activeOpacity={0.75}>
+                      <Ionicons name="chatbubble-ellipses" size={10} color={L.gold} />
+                      <Text style={s.replyBtnText}>Open Chat</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-            </Modal>
-        </KeyboardAvoidingView>
-    );
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
+    </View>
+  );
+
+  // ============================================================================
+  // RENDER: LIVE CHAT & CRM INSPECTOR
+  // ============================================================================
+  const renderChatInterface = () => {
+    const isResolved = selectedTicket?.status === 'resolved';
+    const shortId = selectedTicket?.id?.split('-')[0].toUpperCase();
 
     return (
-        <View className="flex-1 bg-[#f8fafc]">
-            <Stack.Screen options={{ headerShown: false }} />
-            {selectedTicket ? renderChatInterface() : renderTicketList()}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.chatContainer}>
+        {/* CHAT HEADER BAR */}
+        <View style={s.chatHeader}>
+          <View style={s.chatHeaderTopRow}>
+            <TouchableOpacity onPress={() => setSelectedTicket(null)} style={s.backBtn} activeOpacity={0.75}>
+              <Ionicons name="arrow-back" size={16} color={L.gold} />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => openUserModal(selectedTicket?.user_id || '')} style={s.chatUserInfo} activeOpacity={0.8}>
+              {selectedTicket?.profiles?.avatar_url ? (
+                <Image source={{ uri: selectedTicket.profiles.avatar_url }} style={s.chatUserAvatar} />
+              ) : (
+                <View style={s.chatUserAvatarFallback}>
+                  <Text style={s.chatUserAvatarText}>{getInitials(selectedTicket?.profiles?.full_name || 'U')}</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={s.chatUserName} numberOfLines={1}>{selectedTicket?.profiles?.full_name || 'Customer'}</Text>
+                <Text style={s.chatUserSub}>Ticket #{shortId} • Tap to view profile details</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Quick Actions */}
+            <View style={{ flexDirection: 'row', gap: 5 }}>
+              <TouchableOpacity onPress={() => openWhatsAppWithUser(selectedTicket?.profiles?.phone)} style={s.waHeaderBtn} activeOpacity={0.75}>
+                <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openUserModal(selectedTicket?.user_id || '')} style={s.profileHeaderBtn} activeOpacity={0.75}>
+                <Ionicons name="person-outline" size={14} color={L.gold} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* STATUS SELECTOR PILLS */}
+          <View style={s.statusControlRow}>
+            <TouchableOpacity onPress={() => changeTicketStatus('open')} style={[s.statusSelectPill, selectedTicket?.status === 'open' && s.statusSelectPillActive]}>
+              <Text style={[s.statusSelectText, selectedTicket?.status === 'open' && { color: L.coral, fontWeight: '900' }]}>🔴 Open</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => changeTicketStatus('in_progress')} style={[s.statusSelectPill, selectedTicket?.status === 'in_progress' && s.statusSelectPillActive]}>
+              <Text style={[s.statusSelectText, selectedTicket?.status === 'in_progress' && { color: L.sky, fontWeight: '900' }]}>🔵 In Progress</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => changeTicketStatus('resolved')} style={[s.statusSelectPill, selectedTicket?.status === 'resolved' && s.statusSelectPillActive]}>
+              <Text style={[s.statusSelectText, selectedTicket?.status === 'resolved' && { color: L.emerald, fontWeight: '900' }]}>🟢 Resolved</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* MESSAGES LIST */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={s.messagesScroll}
+          contentContainerStyle={s.messagesContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.length > 0 ? (
+            messages.map((m) => {
+              const isMe = m.profiles?.role === 'admin' || m.profiles?.role === 'super_admin';
+              const isSystem = m.message.startsWith('[SYSTEM]');
+              const isInternal = m.message.startsWith('[INTERNAL NOTE]');
+              const isImage = m.message.startsWith('[IMAGE]');
+              const cleanMsg = m.message.replace('[SYSTEM]', '').replace('[INTERNAL NOTE]', '').replace('[IMAGE]', '').trim();
+
+              if (isSystem) {
+                return (
+                  <View key={m.id} style={s.systemMsgWrap}>
+                    <Ionicons name="information-circle-outline" size={11} color={L.textMuted} />
+                    <Text style={s.systemMsgText}>{cleanMsg}</Text>
+                  </View>
+                );
+              }
+
+              if (isInternal) {
+                return (
+                  <View key={m.id} style={s.internalNoteWrap}>
+                    <View style={s.internalNoteHeader}>
+                      <Ionicons name="lock-closed" size={10} color={L.goldAmber} />
+                      <Text style={s.internalNoteHeaderText}>INTERNAL MANAGER NOTE</Text>
+                    </View>
+                    <Text style={s.internalNoteBody}>{cleanMsg}</Text>
+                  </View>
+                );
+              }
+
+              return (
+                <View key={m.id} style={[s.msgRow, isMe ? s.msgRowAdmin : s.msgRowUser]}>
+                  {!isMe && (
+                    <View style={s.userMsgAvatar}>
+                      <Text style={s.userMsgAvatarText}>{getInitials(m.profiles?.full_name || 'U')}</Text>
+                    </View>
+                  )}
+
+                  <View style={[s.msgBubble, isMe ? s.msgBubbleAdmin : s.msgBubbleUser]}>
+                    {isImage ? (
+                      <TouchableOpacity onPress={() => setPreviewImage(cleanMsg)} activeOpacity={0.9}>
+                        <Image source={{ uri: cleanMsg }} style={s.msgImage} resizeMode="cover" />
+                        <View style={s.zoomTag}>
+                          <Ionicons name="scan-outline" size={10} color="#FFFFFF" />
+                          <Text style={s.zoomTagText}>Zoom</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={[s.msgText, isMe ? s.msgTextAdmin : s.msgTextUser]}>{m.message}</Text>
+                    )}
+
+                    <View style={s.msgFooter}>
+                      <Text style={[s.msgTime, isMe && { color: 'rgba(255, 215, 0, 0.7)' }]}>
+                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      {isMe && <Ionicons name="checkmark-done" size={10} color={L.gold} style={{ marginLeft: 3 }} />}
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <View style={s.emptyChatBox}>
+              <Ionicons name="chatbubbles-outline" size={24} color={L.goldDk} />
+              <Text style={s.emptyChatText}>No messages yet in this ticket conversation.</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* CANNED REPLIES CAROUSEL */}
+        {!isResolved && (
+          <View style={s.cannedRepliesBar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cannedRepliesScroll}>
+              {CANNED_REPLIES.map((cr, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => sendMessage(cr.text)}
+                  style={s.cannedPill}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.cannedPillText}>{cr.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* INPUT COMPOSER BAR */}
+        {!isResolved && (
+          <View style={s.inputBarContainer}>
+            {/* Toolbar (AI Draft, Internal Note Toggle) */}
+            <View style={s.toolbarRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  const draft = `Hello ${selectedTicket?.profiles?.full_name || 'Customer'}, thank you for contacting Abu Mafhal Support regarding "${selectedTicket?.subject || 'your request'}". We have checked the records and your transaction is processed. Please verify your account.`;
+                  setReply(draft);
+                }}
+                style={s.aiDraftBtn}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="sparkles" size={11} color={L.goldAmber} />
+                <Text style={s.aiDraftBtnText}>AI Draft Response</Text>
+              </TouchableOpacity>
+
+              <View style={s.internalNoteToggle}>
+                <Text style={[s.internalNoteLabel, isInternalNote && { color: L.goldAmber }]}>Internal Note</Text>
+                <Switch
+                  value={isInternalNote}
+                  onValueChange={setIsInternalNote}
+                  trackColor={{ false: '#CBD5E1', true: L.goldAmber }}
+                  thumbColor="#FFFFFF"
+                  style={{ transform: [{ scale: 0.65 }] }}
+                />
+              </View>
+            </View>
+
+            {/* Input Row */}
+            <View style={[s.inputRow, isInternalNote && s.inputRowInternal]}>
+              <TouchableOpacity onPress={pickImage} style={s.attachBtn} activeOpacity={0.75}>
+                <Ionicons name="attach" size={16} color={L.navyHeader} />
+              </TouchableOpacity>
+
+              <TextInput
+                placeholder={isInternalNote ? "Write an internal team note..." : "Type reply to user..."}
+                placeholderTextColor="#94A3B8"
+                style={s.textInput}
+                value={reply}
+                onChangeText={setReply}
+                multiline
+                selectionColor={L.goldDk}
+              />
+
+              <TouchableOpacity
+                onPress={() => sendMessage()}
+                disabled={sending || !reply.trim()}
+                style={s.sendBtn}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={sending || !reply.trim() ? ['#94A3B8', '#64748B'] : ['#0F172A', '#1E293B']}
+                  style={s.sendBtnGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={L.gold} />
+                  ) : (
+                    <Ionicons name="paper-plane" size={12} color={!reply.trim() ? '#E2E8F0' : L.gold} style={{ marginLeft: 1 }} />
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* FULLSCREEN IMAGE PREVIEW */}
+        <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+          <View style={s.imageModalOverlay}>
+            <TouchableOpacity onPress={() => setPreviewImage(null)} style={s.imageModalClose}>
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            {previewImage && <Image source={{ uri: previewImage }} style={s.imageModalImg} resizeMode="contain" />}
+          </View>
+        </Modal>
+
+        {/* USER PROFILE MODAL */}
+        <Modal visible={showUserModal} transparent animationType="slide" onRequestClose={() => setShowUserModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={s.userModalCard}>
+              <View style={s.userModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={s.userModalIcon}>
+                    <Ionicons name="person" size={14} color={L.gold} />
+                  </View>
+                  <Text style={s.userModalTitle}>Customer Profile Inspector</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowUserModal(false)} style={s.modalCloseBtn}>
+                  <Ionicons name="close" size={16} color={L.navyHeader} />
+                </TouchableOpacity>
+              </View>
+
+              {loadingUser ? (
+                <ActivityIndicator size="small" color={L.goldDk} style={{ marginVertical: 20 }} />
+              ) : userDetails ? (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {/* Summary Bar */}
+                  <View style={s.userSummaryRow}>
+                    <View style={s.userSummaryBox}>
+                      <Text style={s.userSummaryLabel}>Balance</Text>
+                      <Text style={s.userBalanceText}>₦{Number(userDetails.balance || 0).toLocaleString()}</Text>
+                    </View>
+                    <View style={s.userSummaryBox}>
+                      <Text style={s.userSummaryLabel}>KYC Level</Text>
+                      <Text style={s.userKycText}>Tier {userDetails.kyc_tier || 1}</Text>
+                    </View>
+                    <View style={s.userSummaryBox}>
+                      <Text style={s.userSummaryLabel}>Status</Text>
+                      <Text style={[s.userStatusText, { color: userDetails.status === 'active' ? L.emerald : L.coral }]}>
+                        {(userDetails.status || 'Active').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Information Rows */}
+                  <View style={s.userInfoCard}>
+                    {[
+                      { label: 'Full Name', value: userDetails.full_name || 'N/A', icon: 'person-outline' },
+                      { label: 'Email', value: userDetails.email || 'N/A', icon: 'mail-outline' },
+                      { label: 'Phone', value: userDetails.phone || 'N/A', icon: 'call-outline' },
+                      { label: 'Username', value: userDetails.username || 'N/A', icon: 'at-outline' },
+                      { label: 'Role', value: (userDetails.role || 'user').toUpperCase(), icon: 'shield-outline' },
+                      { label: 'Referral Code', value: userDetails.referral_code || 'N/A', icon: 'gift-outline' },
+                    ].map((row, idx) => (
+                      <View key={idx} style={[s.infoRow, idx !== 5 && s.infoRowBorder]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name={row.icon as any} size={12} color={L.textMuted} />
+                          <Text style={s.infoRowLabel}>{row.label}</Text>
+                        </View>
+                        <Text style={s.infoRowValue}>{row.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Actions */}
+                  <View style={s.userActionButtonsRow}>
+                    <TouchableOpacity onPress={() => openWhatsAppWithUser(userDetails.phone)} style={s.userActionBtn}>
+                      <Ionicons name="logo-whatsapp" size={13} color="#25D366" />
+                      <Text style={s.userActionText}>WhatsApp</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (userDetails.phone) Linking.openURL(`tel:${userDetails.phone}`);
+                      }}
+                      style={s.userActionBtn}
+                    >
+                      <Ionicons name="call-outline" size={13} color={L.sky} />
+                      <Text style={s.userActionText}>Call</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={toggleUserStatus} style={[s.userActionBtn, { borderColor: userDetails.status === 'active' ? L.coral : L.emerald }]}>
+                      <Ionicons name={userDetails.status === 'active' ? "ban-outline" : "checkmark-circle-outline"} size={13} color={userDetails.status === 'active' ? L.coral : L.emerald} />
+                      <Text style={[s.userActionText, { color: userDetails.status === 'active' ? L.coral : L.emerald }]}>
+                        {userDetails.status === 'active' ? 'Suspend' : 'Activate'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              ) : null}
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
     );
+  };
+
+  return (
+    <View style={s.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <Stack.Screen options={{ headerShown: false }} />
+      {selectedTicket ? renderChatInterface() : renderTicketList()}
+    </View>
+  );
 }
+
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: L.bg,
+  },
+  inboxContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    backgroundColor: L.bg,
+  },
+  topBar: {
+    backgroundColor: L.navyHeader,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 44 : 32,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomWidth: 1.5,
+    borderColor: L.goldDk,
+  },
+  topBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: L.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  topBarSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+  },
+  pulseGreenDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: L.emerald,
+  },
+  topBarSubText: {
+    color: L.goldLight,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  refreshBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: L.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 5,
+    marginBottom: 8,
+  },
+  metricBox: {
+    flex: 1,
+    backgroundColor: '#060B19',
+    borderRadius: 8,
+    paddingVertical: 5,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.25)',
+  },
+  metricBoxActive: {
+    backgroundColor: '#1E293B',
+    borderColor: L.gold,
+  },
+  metricNum: {
+    color: L.gold,
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  metricLabel: {
+    color: '#94A3B8',
+    fontSize: 8,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#060B19',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.3)',
+    paddingHorizontal: 8,
+    height: 32,
+    marginBottom: 6,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 11,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  catChipsRow: {
+    gap: 4,
+    paddingVertical: 2,
+  },
+  catChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: '#060B19',
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.25)',
+  },
+  catChipActive: {
+    backgroundColor: L.gold,
+    borderColor: L.gold,
+  },
+  catChipText: {
+    color: '#CBD5E1',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  catChipTextActive: {
+    color: '#0F172A',
+    fontWeight: '900',
+  },
+  bulkBar: {
+    backgroundColor: L.navyHeader,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: L.goldDk,
+  },
+  bulkText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 10.5,
+  },
+  bulkCancelBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  bulkCancelText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  bulkResolveBtn: {
+    backgroundColor: L.emerald,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  bulkResolveText: {
+    color: '#0F172A',
+    fontSize: 9.5,
+    fontWeight: '900',
+  },
+  listContent: {
+    padding: 10,
+    paddingBottom: 60,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 40,
+  },
+  loadingText: {
+    color: L.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: L.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    marginTop: 10,
+  },
+  emptyIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: L.goldLight,
+    borderWidth: 1,
+    borderColor: L.goldDk,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  emptySub: {
+    color: L.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  ticketCard: {
+    backgroundColor: L.card,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 7,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  ticketCardSelected: {
+    borderColor: L.goldDk,
+    backgroundColor: L.goldLight,
+  },
+  ticketCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  selectCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: L.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectCircleActive: {
+    backgroundColor: L.gold,
+    borderColor: L.goldDk,
+  },
+  userAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.cardBorder,
+  },
+  userAvatarFallback: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.navyHeader,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarText: {
+    color: L.gold,
+    fontWeight: '900',
+    fontSize: 9,
+  },
+  userNameText: {
+    color: L.navyHeader,
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  userMetaText: {
+    color: L.textMuted,
+    fontSize: 8.5,
+  },
+  priorityBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  priorityBadgeText: {
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  ticketSubject: {
+    color: L.textSecondary,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginLeft: 31,
+  },
+  ticketCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginLeft: 31,
+  },
+  statusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: L.bg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  actionPillText: {
+    color: L.textMuted,
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  resolvePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: L.emeraldBg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: L.emeraldBorder,
+  },
+  resolvePillText: {
+    color: L.emerald,
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+  replyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.navyHeader,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+  },
+  replyBtnText: {
+    color: L.gold,
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+  chatContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    backgroundColor: L.bg,
+  },
+  chatHeader: {
+    backgroundColor: L.navyHeader,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 44 : 32,
+    paddingBottom: 8,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomWidth: 1.5,
+    borderColor: L.goldDk,
+  },
+  chatHeaderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  chatUserInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  chatUserAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: L.gold,
+  },
+  chatUserAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#060B19',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: L.gold,
+  },
+  chatUserAvatarText: {
+    color: L.gold,
+    fontWeight: '900',
+    fontSize: 10,
+  },
+  chatUserName: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  chatUserSub: {
+    color: L.goldLight,
+    fontSize: 8.5,
+  },
+  waHeaderBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(37, 211, 102, 0.15)',
+    borderWidth: 1,
+    borderColor: '#25D366',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileHeaderBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: L.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusControlRow: {
+    flexDirection: 'row',
+    backgroundColor: '#060B19',
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.25)',
+  },
+  statusSelectPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusSelectPillActive: {
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: L.gold,
+  },
+  statusSelectText: {
+    color: '#94A3B8',
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  messagesScroll: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingBottom: 20,
+  },
+  systemMsgWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: L.card,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    alignSelf: 'center',
+    marginVertical: 4,
+  },
+  systemMsgText: {
+    color: L.textMuted,
+    fontSize: 8.5,
+    fontWeight: '600',
+  },
+  internalNoteWrap: {
+    backgroundColor: L.goldLight,
+    borderWidth: 1,
+    borderColor: L.goldDk,
+    borderRadius: 8,
+    padding: 6,
+    marginVertical: 4,
+  },
+  internalNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 2,
+  },
+  internalNoteHeaderText: {
+    color: L.goldAmber,
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  internalNoteBody: {
+    color: L.textPrimary,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  msgRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    width: '100%',
+  },
+  msgRowAdmin: {
+    justifyContent: 'flex-end',
+  },
+  msgRowUser: {
+    justifyContent: 'flex-start',
+  },
+  userMsgAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: L.navyHeader,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 5,
+    marginTop: 2,
+  },
+  userMsgAvatarText: {
+    color: L.gold,
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  msgBubble: {
+    maxWidth: '82%',
+    borderRadius: 10,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  msgBubbleAdmin: {
+    backgroundColor: L.navyHeader,
+    borderBottomRightRadius: 2,
+    borderWidth: 1,
+    borderColor: L.navyMid,
+  },
+  msgBubbleUser: {
+    backgroundColor: L.card,
+    borderBottomLeftRadius: 2,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  msgText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+  },
+  msgTextAdmin: {
+    color: '#FFFFFF',
+  },
+  msgTextUser: {
+    color: L.textPrimary,
+  },
+  msgImage: {
+    width: 170,
+    height: 170,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+  },
+  zoomTag: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  zoomTagText: {
+    color: '#FFFFFF',
+    fontSize: 7.5,
+    fontWeight: '600',
+  },
+  msgFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 2,
+  },
+  msgTime: {
+    fontSize: 8,
+    fontWeight: '600',
+    color: L.textMuted,
+  },
+  emptyChatBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 40,
+    gap: 6,
+  },
+  emptyChatText: {
+    color: L.textMuted,
+    fontSize: 10.5,
+    fontWeight: '500',
+  },
+  cannedRepliesBar: {
+    backgroundColor: L.card,
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: L.cardBorder,
+  },
+  cannedRepliesScroll: {
+    paddingHorizontal: 8,
+    gap: 5,
+  },
+  cannedPill: {
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  cannedPillText: {
+    color: L.navyHeader,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  inputBarContainer: {
+    backgroundColor: L.card,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 6,
+    borderTopWidth: 1,
+    borderTopColor: L.cardBorder,
+  },
+  toolbarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    paddingHorizontal: 2,
+  },
+  aiDraftBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.goldLight,
+    borderWidth: 1,
+    borderColor: L.goldDk,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  aiDraftBtnText: {
+    color: L.goldAmber,
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  internalNoteToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  internalNoteLabel: {
+    color: L.textMuted,
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: L.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  inputRowInternal: {
+    backgroundColor: L.goldLight,
+    borderColor: L.goldDk,
+  },
+  attachBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: L.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  textInput: {
+    flex: 1,
+    color: L.textPrimary,
+    fontSize: 11,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    maxHeight: 60,
+    fontWeight: '500',
+  },
+  sendBtn: {
+    borderRadius: 13,
+    overflow: 'hidden',
+  },
+  sendBtnGrad: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+  },
+  imageModalClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModalImg: {
+    width: Math.min(W * 0.9, 450),
+    height: Math.min(W * 0.9, 450),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+  },
+  userModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: L.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    padding: 14,
+    maxHeight: '85%',
+  },
+  userModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: L.cardBorder,
+  },
+  userModalIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.navyHeader,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userModalTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 12.5,
+  },
+  modalCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userSummaryRow: {
+    flexDirection: 'row',
+    backgroundColor: L.bg,
+    borderRadius: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    marginBottom: 8,
+  },
+  userSummaryBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  userSummaryLabel: {
+    color: L.textMuted,
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginBottom: 1,
+  },
+  userBalanceText: {
+    color: L.emerald,
+    fontWeight: '900',
+    fontSize: 11.5,
+  },
+  userKycText: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 11.5,
+  },
+  userStatusText: {
+    fontWeight: '900',
+    fontSize: 10.5,
+  },
+  userInfoCard: {
+    backgroundColor: L.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  infoRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  infoRowLabel: {
+    color: L.textMuted,
+    fontSize: 9.5,
+    fontWeight: '600',
+  },
+  infoRowValue: {
+    color: L.navyHeader,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  userActionButtonsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  userActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  userActionText: {
+    color: L.navyHeader,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+});
