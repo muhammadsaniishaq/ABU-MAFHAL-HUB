@@ -125,20 +125,27 @@ export default function EditProfileScreen() {
             if (!image.base64) throw new Error('No image data');
 
             const fileName = `${user.id}/${Date.now()}.jpg`;
-            const { error } = await supabase
-                .storage
-                .from('avatars')
-                .upload(fileName, decode(image.base64), {
-                    contentType: 'image/jpeg',
-                    upsert: true
-                });
+            let publicUrl = `data:image/jpeg;base64,${image.base64}`;
 
-            if (error) throw error;
+            try {
+                const { error } = await supabase
+                    .storage
+                    .from('avatars')
+                    .upload(fileName, decode(image.base64), {
+                        contentType: 'image/jpeg',
+                        upsert: true
+                    });
 
-            const { data: { publicUrl } } = supabase
-                .storage
-                .from('avatars')
-                .getPublicUrl(fileName);
+                if (!error) {
+                    const { data: { publicUrl: storageUrl } } = supabase
+                        .storage
+                        .from('avatars')
+                        .getPublicUrl(fileName);
+                    if (storageUrl) publicUrl = storageUrl;
+                }
+            } catch (storageErr) {
+                console.warn("Avatar storage upload fallback:", storageErr);
+            }
 
             await supabase
                 .from('profiles')

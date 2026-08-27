@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 import { sendAdminReplyEmail } from '../../services/ticketEmail';
 
@@ -91,16 +92,53 @@ export default function SupportTickets() {
     };
 
     const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            quality: 0.5,
-            base64: true,
-        });
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted' && Platform.OS !== 'web') {
+                Alert.alert("Permission Required", "Please grant photo library permissions.");
+                return;
+            }
 
-        if (!result.canceled && result.assets[0].base64) {
-            const base64Str = `data:${result.assets[0].mimeType || 'image/jpeg'};base64,${result.assets[0].base64}`;
-            sendMessage(`[IMAGE] ${base64Str}`);
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 0.6,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                const base64Data = asset.base64;
+                const mimeType = asset.mimeType || 'image/jpeg';
+
+                if (!base64Data) return;
+
+                if (selectedTicket?.id) {
+                    const filePath = `tickets/${selectedTicket.id}/admin_${Date.now()}.jpg`;
+                    try {
+                        const { error: uploadError } = await supabase.storage
+                            .from('chat_images')
+                            .upload(filePath, decode(base64Data), {
+                                contentType: mimeType,
+                                upsert: true
+                            });
+
+                        if (!uploadError) {
+                            const { data: { publicUrl } } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+                            sendMessage(`[IMAGE] ${publicUrl}`);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn("Admin image upload fallback:", e);
+                    }
+                }
+
+                // Fallback to direct data URI
+                const base64Str = `data:${mimeType};base64,${base64Data}`;
+                sendMessage(`[IMAGE] ${base64Str}`);
+            }
+        } catch (err: any) {
+            Alert.alert("Image Error", err.message || "Failed to select image.");
         }
     };
 

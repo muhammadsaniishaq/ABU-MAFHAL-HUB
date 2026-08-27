@@ -169,21 +169,35 @@ export default function UserKYCScreen() {
 
             if (docImageUri) {
                 try {
-                    const base64 = await FileSystem.readAsStringAsync(docImageUri, { encoding: 'base64' });
-                    const fileExt = docImageUri.split('.').pop() || 'jpg';
-                    const fileName = `${user.id}_${selectedDocType}_${Date.now()}.${fileExt}`;
-                    
-                    const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('kyc-documents')
-                        .upload(fileName, decode(base64), {
-                            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`
-                        });
+                    if (docImageUri.startsWith('data:')) {
+                        fileUrl = docImageUri;
+                    } else {
+                        let base64 = '';
+                        try {
+                            base64 = await FileSystem.readAsStringAsync(docImageUri, { encoding: 'base64' });
+                        } catch (fsErr) {}
 
-                    if (!uploadError && uploadData) {
-                        const { data: publicUrlData } = supabase.storage
-                            .from('kyc-documents')
-                            .getPublicUrl(fileName);
-                        fileUrl = publicUrlData?.publicUrl || fileName;
+                        const fileExt = (docImageUri.split('.').pop() || 'jpg').split('?')[0];
+                        const fileName = `${user.id}_${selectedDocType}_${Date.now()}.${fileExt}`;
+                        const mime = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+                        
+                        if (base64) {
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                                .from('kyc-documents')
+                                .upload(fileName, decode(base64), {
+                                    contentType: mime,
+                                    upsert: true
+                                });
+
+                            if (!uploadError && uploadData) {
+                                const { data: publicUrlData } = supabase.storage
+                                    .from('kyc-documents')
+                                    .getPublicUrl(fileName);
+                                fileUrl = publicUrlData?.publicUrl || fileName;
+                            } else {
+                                fileUrl = `data:${mime};base64,${base64}`;
+                            }
+                        }
                     }
                 } catch (imgErr) {
                     console.warn("Doc image upload warning:", imgErr);

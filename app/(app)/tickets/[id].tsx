@@ -201,37 +201,59 @@ export default function UserTicketChatScreen() {
 
   const pickImage = async () => {
     if (!userId || !id) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.7,
-      base64: true
-    });
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted' && Platform.OS !== 'web') {
+        Alert.alert("Permission Required", "Please grant access to your photo library to attach receipts or screenshots.");
+        return;
+      }
 
-    if (!result.canceled && result.assets[0].base64) {
-      try {
-        setSending(true);
-        const base64Data = result.assets[0].base64;
-        const filePath = `tickets/${id}/${Date.now()}.jpg`;
-        
-        const { error } = await supabase.storage
-          .from('chat_images')
-          .upload(filePath, decode(base64Data), {
-            contentType: 'image/jpeg'
-          });
-        
-        if (error) {
-          Alert.alert('Upload Notice', 'Sending direct note instead.');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.6,
+        base64: true
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64;
+        const mimeType = asset.mimeType || 'image/jpeg';
+
+        if (!base64Data) {
+          Alert.alert("Notice", "Unable to read selected image data.");
           return;
         }
-        
-        const { data: { publicUrl } } = supabase.storage.from('chat_images').getPublicUrl(filePath);
-        await sendMessage(`[IMAGE] ${publicUrl}`);
-      } catch (e: any) {
-        Alert.alert('Error', e.message);
-      } finally {
-        setSending(false);
+
+        setSending(true);
+        const filePath = `tickets/${id}/${Date.now()}.jpg`;
+
+        // 1. Try Supabase Storage Upload
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('chat_images')
+            .upload(filePath, decode(base64Data), {
+              contentType: mimeType,
+              upsert: true
+            });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+            await sendMessage(`[IMAGE] ${publicUrl}`);
+            return;
+          }
+        } catch (storageErr) {
+          console.warn("Storage upload fallback to Data URI:", storageErr);
+        }
+
+        // 2. Guaranteed Reliable Fallback: Direct Data URI
+        const dataUri = `data:${mimeType};base64,${base64Data}`;
+        await sendMessage(`[IMAGE] ${dataUri}`);
       }
+    } catch (e: any) {
+      Alert.alert('Upload Error', e.message || 'Failed to attach image');
+    } finally {
+      setSending(false);
     }
   };
 
