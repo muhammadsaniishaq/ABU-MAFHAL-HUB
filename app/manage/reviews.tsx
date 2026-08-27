@@ -34,18 +34,7 @@ const COLORS = {
   success: '#10b981',
 };
 
-type Review = {
-  id: string;
-  user_id?: string;
-  user_name: string;
-  avatar_url?: string;
-  rating: number;
-  category: string;
-  comment: string;
-  is_hidden?: boolean;
-  is_featured?: boolean;
-  created_at: string;
-};
+import { reviewsService, Review } from '../../services/reviews';
 
 export default function AdminReviewsManagement() {
   const router = useRouter();
@@ -65,83 +54,36 @@ export default function AdminReviewsManagement() {
 
   useEffect(() => {
     fetchReviews();
+
+    // Supabase Realtime Channel for instant live updates across devices
+    const channel = supabase
+      .channel('public:reviews:admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
+        fetchReviews(false);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (showLoader = true) => {
     try {
-      setLoading(true);
-
-      // Read deleted IDs
-      let deletedIds: string[] = [];
-      try {
-        const delStr = await AsyncStorage.getItem(DELETED_KEY);
-        if (delStr) deletedIds = JSON.parse(delStr);
-      } catch (err) {}
-
-      // Read local stored reviews
-      let localReviews: Review[] = [];
-      try {
-        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-        if (localStr) localReviews = JSON.parse(localStr);
-      } catch (err) {}
-
-      // Fetch remote reviews from DB
-      let remoteReviews: Review[] = [];
-      try {
-        const { data } = await supabase
-          .from('reviews')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (data && data.length > 0) remoteReviews = data;
-      } catch (e) {
-        console.log('Remote reviews error:', e);
-      }
-
-      const map = new Map<string, Review>();
-      remoteReviews.forEach(r => map.set(r.id, r));
-      localReviews.forEach(r => map.set(r.id, r));
-
-      let finalArr = Array.from(map.values()).filter(r => !deletedIds.includes(r.id));
-      if (finalArr.length === 0) {
-        finalArr = [
-          {
-            id: 'rev-1',
-            user_name: 'Usman Garba',
-            avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-            rating: 5,
-            category: 'CAC Services',
-            comment: 'Masha Allah! CAC Business Name registration yayi saurin fitowa a kasa da kwana 3! Nagode sosai Abu Mafhal Sub.',
-            is_hidden: false,
-            is_featured: true,
-            created_at: new Date(Date.now() - 3600000 * 24).toISOString()
-          },
-          {
-            id: 'rev-2',
-            user_name: 'Amina Bello',
-            avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-            rating: 5,
-            category: 'Social Boost',
-            comment: 'Social boost din ku yana aiki 100%! Instagram followers da likes sun shigo cikin minti 5 kacal.',
-            is_hidden: false,
-            is_featured: false,
-            created_at: new Date(Date.now() - 3600000 * 48).toISOString()
-          }
-        ];
-      }
-
-      finalArr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setReviews(finalArr);
+      if (showLoader) setLoading(true);
+      const data = await reviewsService.getAll(true);
+      setReviews(data);
     } catch (e) {
-      console.error(e);
+      console.error('Fetch reviews error:', e);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   const handleDeleteReview = (id: string) => {
     Alert.alert(
       'Delete Review',
-      'Are you sure you want to permanently delete this review?',
+      'Are you sure you want to permanently delete this review? It will be removed globally for all users.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -150,24 +92,11 @@ export default function AdminReviewsManagement() {
           onPress: async () => {
             setReviews(prev => prev.filter(r => r.id !== id));
             try {
-              // Store deleted ID locally
-              const delStr = await AsyncStorage.getItem(DELETED_KEY);
-              const deletedList = delStr ? JSON.parse(delStr) : [];
-              if (!deletedList.includes(id)) {
-                deletedList.push(id);
-                await AsyncStorage.setItem(DELETED_KEY, JSON.stringify(deletedList));
-              }
-
-              const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-              if (localStr) {
-                const existing = JSON.parse(localStr);
-                const filtered = existing.filter((r: any) => r.id !== id);
-                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-              }
-
-              await supabase.from('reviews').delete().eq('id', id);
+              await reviewsService.delete(id);
+              Alert.alert('Deleted', 'Review was permanently deleted from database.');
             } catch (e: any) {
-              console.log('Delete error:', e.message);
+              Alert.alert('Delete Error', e.message || 'Could not delete review from database.');
+              fetchReviews(false);
             }
           }
         }
@@ -179,15 +108,10 @@ export default function AdminReviewsManagement() {
     try {
       const nextHidden = !currentHidden;
       setReviews(prev => prev.map(r => r.id === id ? { ...r, is_hidden: nextHidden } : r));
-
-      const { error } = await supabase
-        .from('reviews')
-        .update({ is_hidden: nextHidden })
-        .eq('id', id);
-
-      if (error && error.code !== '42P01') throw error;
+      await reviewsService.toggleHide(id, currentHidden);
     } catch (e: any) {
-      console.log('Toggle hide error:', e.message);
+      Alert.alert('Error', e.message || 'Could not toggle visibility.');
+      fetchReviews(false);
     }
   };
 
@@ -195,15 +119,10 @@ export default function AdminReviewsManagement() {
     try {
       const nextFeatured = !currentFeatured;
       setReviews(prev => prev.map(r => r.id === id ? { ...r, is_featured: nextFeatured } : r));
-
-      const { error } = await supabase
-        .from('reviews')
-        .update({ is_featured: nextFeatured })
-        .eq('id', id);
-
-      if (error && error.code !== '42P01') throw error;
+      await reviewsService.toggleFeatured(id, currentFeatured);
     } catch (e: any) {
-      console.log('Toggle featured error:', e.message);
+      Alert.alert('Error', e.message || 'Could not toggle featured status.');
+      fetchReviews(false);
     }
   };
 
@@ -214,8 +133,7 @@ export default function AdminReviewsManagement() {
     try {
       setSubmitting(true);
 
-      const newRev: Review = {
-        id: `rev-${Date.now()}`,
+      const newRev = await reviewsService.create({
         user_name: nameInput.trim(),
         avatar_url: avatarInput.trim() || undefined,
         rating: ratingInput,
@@ -223,38 +141,15 @@ export default function AdminReviewsManagement() {
         comment: commentInput.trim(),
         is_hidden: false,
         is_featured: true,
-        created_at: new Date().toISOString()
-      };
+        verified: true,
+      });
 
-      // 1. Save locally to AsyncStorage
-      try {
-        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-        const existing = localStr ? JSON.parse(localStr) : [];
-        const updatedLocal = [newRev, ...existing];
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocal));
-      } catch (err) {}
-
-      // 2. Insert into DB
-      try {
-        await supabase.from('reviews').insert([{
-          id: newRev.id,
-          user_name: newRev.user_name,
-          avatar_url: newRev.avatar_url,
-          rating: newRev.rating,
-          category: newRev.category,
-          comment: newRev.comment,
-          is_featured: true
-        }]);
-      } catch (dbErr) {
-        console.log('Database insert error (saved locally):', dbErr);
-      }
-
-      setReviews(prev => [newRev, ...prev]);
+      setReviews(prev => [newRev, ...prev.filter(r => r.id !== newRev.id)]);
       setModalVisible(false);
       setNameInput('');
       setAvatarInput('');
       setCommentInput('');
-      Alert.alert('Success', 'Custom review created and saved successfully!');
+      Alert.alert('Success', 'Custom review created and saved live for all users!');
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {

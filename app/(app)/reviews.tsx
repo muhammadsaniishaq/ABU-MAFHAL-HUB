@@ -35,6 +35,8 @@ const COLORS = {
   success: '#10b981',
 };
 
+import { reviewsService, Review } from '../../services/reviews';
+
 const CATEGORIES = [
   'All',
   'CAC Services',
@@ -44,81 +46,12 @@ const CATEGORIES = [
   'General Support'
 ];
 
-type ReviewItem = {
-  id: string;
-  user_name: string;
-  avatar_url?: string;
-  rating: number;
-  category: string;
-  comment: string;
-  created_at: string;
-  likes_count?: number;
-  verified?: boolean;
-  is_hidden?: boolean;
-};
-
-const INITIAL_REVIEWS: ReviewItem[] = [
-  {
-    id: 'rev-1',
-    user_name: 'Usman Garba',
-    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    rating: 5,
-    category: 'CAC Services',
-    comment: 'Masha Allah! CAC Business Name registration yayi saurin fitowa a kasa da kwana 3! Nagode sosai Abu Mafhal Sub.',
-    created_at: '2026-07-28T14:30:00Z',
-    likes_count: 34,
-    verified: true
-  },
-  {
-    id: 'rev-2',
-    user_name: 'Amina Bello',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    rating: 5,
-    category: 'Social Boost',
-    comment: 'Social boost din ku yana aiki 100%! Instagram followers da likes sun shigo cikin minti 5 kacal.',
-    created_at: '2026-07-27T09:15:00Z',
-    likes_count: 21,
-    verified: true
-  },
-  {
-    id: 'rev-3',
-    user_name: 'Ibrahim Sani',
-    avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    rating: 5,
-    category: 'Data Bundles',
-    comment: 'Sauri da aminci wajen siyan Data koda a cikin tsakiyar dare. Instant delivery ne wlh!',
-    created_at: '2026-07-26T21:45:00Z',
-    likes_count: 18,
-    verified: true
-  },
-  {
-    id: 'rev-4',
-    user_name: 'Fatima Zubairu',
-    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    rating: 5,
-    category: 'CAC Services',
-    comment: 'Nayi rajistar Limited Liability Company tare da TIN. An tura min official certificate dita lafiya lau.',
-    created_at: '2026-07-25T11:20:00Z',
-    likes_count: 42,
-    verified: true
-  },
-  {
-    id: 'rev-5',
-    user_name: 'Kabiru Lawal',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    rating: 4,
-    category: 'Airtime & Cable',
-    comment: 'Cable TV subscription (DSTV/GOTV) dina ya dawo nan take. Wanta yayi kyau sosai.',
-    created_at: '2026-07-24T18:00:00Z',
-    likes_count: 9,
-    verified: true
-  }
-];
+export type ReviewItem = Review;
 
 export default function ReviewsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [reviews, setReviews] = useState<ReviewItem[]>(INITIAL_REVIEWS);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStarFilter, setSelectedStarFilter] = useState<number | null>(null);
   
@@ -136,6 +69,18 @@ export default function ReviewsScreen() {
   useEffect(() => {
     fetchReviews();
     fetchUserProfile();
+
+    // Supabase Realtime Subscription for instant live updates across devices
+    const channel = supabase
+      .channel('public:reviews:user')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
+        fetchReviews(false);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchUserProfile = async () => {
@@ -154,62 +99,15 @@ export default function ReviewsScreen() {
     }
   };
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (showLoader = true) => {
     try {
-      setLoading(true);
-      
-      // 1. Read locally deleted review IDs
-      let deletedIds: string[] = [];
-      try {
-        const delStr = await AsyncStorage.getItem(DELETED_KEY);
-        if (delStr) deletedIds = JSON.parse(delStr);
-      } catch (err) {}
-
-      // 2. Read local stored user reviews
-      let localReviews: ReviewItem[] = [];
-      try {
-        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-        if (localStr) localReviews = JSON.parse(localStr);
-      } catch (err) {}
-
-      // 3. Fetch remote reviews from Supabase DB
-      let remoteReviews: ReviewItem[] = [];
-      try {
-        const { data, error } = await supabase
-          .from('reviews')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          remoteReviews = data;
-        }
-      } catch (e) {
-        console.log('Error fetching remote reviews, using local cache:', e);
-      }
-
-      // 4. Combine all sources: remote + local user reviews + defaults
-      const map = new Map<string, ReviewItem>();
-      
-      // Add defaults first
-      INITIAL_REVIEWS.forEach(r => map.set(r.id, r));
-
-      // Add remote DB reviews
-      remoteReviews.forEach(r => map.set(r.id, r));
-
-      // Add local user submitted reviews
-      localReviews.forEach(r => map.set(r.id, r));
-
-      // Filter out locally deleted items
-      let combined = Array.from(map.values()).filter(r => !deletedIds.includes(r.id));
-      
-      // Sort descending by date
-      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      setReviews(combined);
+      if (showLoader) setLoading(true);
+      const data = await reviewsService.getAll(false);
+      setReviews(data);
     } catch (e) {
       console.log('Error in fetchReviews:', e);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -221,11 +119,10 @@ export default function ReviewsScreen() {
       setReviews(current => current.map(item => {
         if (item.id === id) {
           const newLikes = (item.likes_count || 0) + (newStatus ? 1 : -1);
-          // Async sync likes count to Supabase
-          supabase.from('reviews').update({ likes_count: newLikes }).eq('id', id).then(() => {}, () => {});
+          reviewsService.like(id, Math.max(0, newLikes)).catch(console.warn);
           return {
             ...item,
-            likes_count: newLikes
+            likes_count: Math.max(0, newLikes)
           };
         }
         return item;
@@ -244,55 +141,25 @@ export default function ReviewsScreen() {
       setSubmitting(true);
       const { data: { user } } = await supabase.auth.getUser();
 
-      const newReviewItem: ReviewItem = {
-        id: `rev-${Date.now()}`,
-        user_name: userName || 'Anonymous User',
+      const createdReview = await reviewsService.create({
+        user_id: user?.id || null,
+        user_name: userName.trim() || 'Valued Customer',
         avatar_url: userAvatar || undefined,
         rating: newRating,
         category: newCategory,
         comment: newComment.trim(),
-        created_at: new Date().toISOString(),
         likes_count: 0,
-        verified: true
-      };
+        verified: true,
+        is_hidden: false,
+        is_featured: false,
+      });
 
-      // 1. Save to local AsyncStorage immediately as backup
-      try {
-        const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-        const existing = localStr ? JSON.parse(localStr) : [];
-        const updatedLocal = [newReviewItem, ...existing];
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocal));
-      } catch (err) {
-        console.log('Failed to save review to AsyncStorage:', err);
-      }
-
-      // 2. Insert into Supabase DB (online for all users across devices)
-      try {
-        const { error: dbErr } = await supabase.from('reviews').insert([{
-          id: newReviewItem.id,
-          user_id: user?.id || null,
-          user_name: newReviewItem.user_name,
-          avatar_url: newReviewItem.avatar_url || null,
-          rating: newReviewItem.rating,
-          category: newReviewItem.category,
-          comment: newReviewItem.comment,
-          likes_count: 0,
-          verified: true,
-          created_at: newReviewItem.created_at
-        }]);
-        if (dbErr) {
-          console.log('Supabase insert review result/error:', dbErr);
-        }
-      } catch (dbErr) {
-        console.log('DB insert error (review preserved locally):', dbErr);
-      }
-
-      setReviews(prev => [newReviewItem, ...prev]);
+      setReviews(prev => [createdReview, ...prev.filter(r => r.id !== createdReview.id)]);
       setModalVisible(false);
       setNewComment('');
       setNewRating(5);
 
-      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully and posted!');
+      Alert.alert('Thank You! 🎉', 'Your review has been submitted successfully and is live for everyone!');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to submit review');
     } finally {
@@ -327,29 +194,11 @@ export default function ReviewsScreen() {
           style: 'destructive',
           onPress: async () => {
             setReviews(prev => prev.filter(r => r.id !== id));
-            
-            // Save deleted ID locally so it stays deleted
             try {
-              const delStr = await AsyncStorage.getItem(DELETED_KEY);
-              const deletedList = delStr ? JSON.parse(delStr) : [];
-              if (!deletedList.includes(id)) {
-                deletedList.push(id);
-                await AsyncStorage.setItem(DELETED_KEY, JSON.stringify(deletedList));
-              }
-
-              // Remove from stored user reviews
-              const localStr = await AsyncStorage.getItem(STORAGE_KEY);
-              if (localStr) {
-                const existing = JSON.parse(localStr);
-                const filtered = existing.filter((r: any) => r.id !== id);
-                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-              }
-            } catch (err) {}
-
-            try {
-              await supabase.from('reviews').delete().eq('id', id);
-            } catch (e) {
-              console.log('Error deleting review from DB:', e);
+              await reviewsService.delete(id);
+            } catch (e: any) {
+              Alert.alert('Delete Failed', e.message || 'Could not delete review.');
+              fetchReviews(false);
             }
           }
         }
