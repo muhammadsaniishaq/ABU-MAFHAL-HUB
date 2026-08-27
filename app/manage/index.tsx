@@ -89,7 +89,7 @@ const MODS = {
     { t:'Staff HR',        i:'briefcase',        r:'/manage/staff',          c:N,  b:NL },
     { t:'Voice OS',        i:'mic',              r:'/manage/voice',          c:G,  b:GL },
     { t:'Legal',           i:'document-text',    r:'/manage/legal',          c:N,  b:NL },
-    { t:'Team Chat',       i:'people-circle',    r:'/manage/team',           c:G,  b:GL,  badge:0 },
+    { t:'Team Chat',       i:'people-circle',    r:'/manage/team',           c:G,  b:GL,  badge:0, sup:true },
     { t:'Academy',         i:'school',           r:'/manage/academy',        c:N,  b:NL },
     { t:'Theme & UX',      i:'color-palette',    r:'/manage/appearance',     c:G,  b:GL },
     { t:'Automation',      i:'flash',            r:'/manage/automation',     c:N,  b:NL },

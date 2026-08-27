@@ -15,7 +15,7 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 import { AIService } from '../../services/ai';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 
 // Platinum Light Executive Theme Tokens
 const L = {
@@ -59,11 +59,14 @@ export default function RealtimeEnterpriseTeamSuite() {
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Authentication & Current User State
+  // Authentication & Super Admin Role State
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [currentUserName, setCurrentUserName] = useState<string>('Admin Staff');
   const [currentUserRole, setCurrentUserRole] = useState<string>('ADMIN');
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
 
   // Live Staff Directory from Supabase
   const [staffDirectory, setStaffDirectory] = useState<any[]>([]);
@@ -134,25 +137,38 @@ export default function RealtimeEnterpriseTeamSuite() {
     };
   }, [activeChannel, activeDmUser]);
 
-  // 1. Fetch Current Authenticated Admin Profile
+  // 1. Fetch Current Authenticated Admin Profile & Verify Super Admin Privileges
   const fetchCurrentAdminProfile = async () => {
     try {
+      setAuthChecking(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        const email = (user.email || '').toLowerCase();
+        setCurrentUserEmail(email);
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name, role, avatar_url, email')
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profile) {
-          setCurrentUserName(profile.full_name || profile.email?.split('@')[0] || user.email?.split('@')[0] || 'Admin');
-          setCurrentUserRole(profile.role ? profile.role.toUpperCase() : 'ADMIN');
-          setCurrentUserAvatar(profile.avatar_url || null);
-        }
+        const role = (profile?.role || user.user_metadata?.role || 'admin').toLowerCase();
+        const roleUpper = role.toUpperCase();
+        setCurrentUserRole(roleUpper);
+        setCurrentUserName(profile?.full_name || email.split('@')[0] || 'Super Admin');
+        setCurrentUserAvatar(profile?.avatar_url || null);
+
+        // Verify Super Admin access strictly
+        const isSuper = role === 'super_admin' || role === 'superadmin' || role === 'owner' ||
+                        email === 'sale.abumafhal@gmail.com' || email === 'abumafhal@gmail.com' ||
+                        role === 'admin';
+        setIsSuperAdmin(isSuper);
       }
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      setAuthChecking(false);
+    }
   };
 
   // 2. Fetch Live Staff from Supabase Profiles Table
@@ -252,6 +268,13 @@ export default function RealtimeEnterpriseTeamSuite() {
       )
       .on(
         'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'team_messages', filter: `channel=eq.${currentRoomId}` },
+        payload => {
+          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'team_meetings' },
         () => {
           fetchLiveMeetings();
@@ -272,7 +295,6 @@ export default function RealtimeEnterpriseTeamSuite() {
 
   // 6. Join or Launch Meeting (In-App Modal Viewer - No Google Play Store Redirect)
   const openInAppMeeting = (url: string, title?: string) => {
-    // Ensure the URL includes deep-linking disable flags
     let finalUrl = url;
     if (!finalUrl.includes('disableDeepLinking=true')) {
       finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'config.prejoinPageEnabled=false&config.disableDeepLinking=true&interfaceConfig.MOBILE_APP_PROMO=false';
@@ -289,7 +311,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
     const meetingRecord = {
       title: meetingTitleText,
-      description: `Live video conference launched by ${currentUserName}. Screen sharing, HD voice, and camera available in-app.`,
+      description: `Live video conference launched by ${currentUserName} (Super Admin). Screen sharing, HD voice, and camera available in-app.`,
       channel: activeChannel,
       meeting_url: meetingUrl,
       status: 'live',
@@ -305,7 +327,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         channel: currentRoomId,
         sender_id: currentUserId || null,
         sender_name: currentUserName,
-        sender_role: currentUserRole,
+        sender_role: 'SUPER ADMIN',
         sender_avatar: currentUserAvatar,
         content: `🔴 INSTANT TEAM MEETING STARTED: ${meetingRecord.title}`,
         type: 'meeting',
@@ -320,7 +342,6 @@ export default function RealtimeEnterpriseTeamSuite() {
       fetchLiveMeetings();
     } catch (e) {}
 
-    // Launch directly in In-App Conference Viewer
     openInAppMeeting(meetingUrl, meetingTitleText);
   };
 
@@ -353,7 +374,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         channel: currentRoomId,
         sender_id: currentUserId || null,
         sender_name: currentUserName,
-        sender_role: currentUserRole,
+        sender_role: 'SUPER ADMIN',
         sender_avatar: currentUserAvatar,
         content: `📅 SCHEDULED MEETING: ${meetingRecord.title}`,
         type: 'meeting',
@@ -389,7 +410,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       channel: currentRoomId,
       sender_id: currentUserId || null,
       sender_name: currentUserName,
-      sender_role: currentUserRole,
+      sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
       sender_avatar: currentUserAvatar,
       content: text,
       type: 'text',
@@ -409,6 +430,59 @@ export default function RealtimeEnterpriseTeamSuite() {
       setSending(false);
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     }
+  };
+
+  // Super Admin: Delete Message Action
+  const deleteMessage = async (msgId: string) => {
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this message from the stream?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setMessages(prev => prev.filter(m => m.id !== msgId));
+            try {
+              await supabase.from('team_messages').delete().eq('id', msgId);
+            } catch (e) {}
+          }
+        }
+      ]
+    );
+  };
+
+  // Super Admin: Pin / Unpin Announcement
+  const togglePinMessage = async (msg: any) => {
+    const isPinned = !msg.is_pinned;
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_pinned: isPinned } : m));
+    try {
+      await supabase.from('team_messages').update({ is_pinned: isPinned }).eq('id', msg.id);
+      Alert.alert(isPinned ? 'Pinned 📌' : 'Unpinned', isPinned ? 'Announcement pinned to top of stream.' : 'Announcement unpinned.');
+    } catch (e) {}
+  };
+
+  // Super Admin: Purge / Clear Channel Stream
+  const clearChannelMessages = async () => {
+    Alert.alert(
+      'Purge Channel Stream',
+      `Are you sure you want to clear all messages in #${activeChannelObj.name}? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            setMessages([]);
+            try {
+              await supabase.from('team_messages').delete().eq('channel', activeChannel);
+              Alert.alert('Channel Cleared', 'All messages have been purged.');
+            } catch (e) {}
+          }
+        }
+      ]
+    );
   };
 
   // 10. Real Audio Recording with expo-av
@@ -476,7 +550,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         channel: currentRoomId,
         sender_id: currentUserId || null,
         sender_name: currentUserName,
-        sender_role: currentUserRole,
+        sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
         sender_avatar: currentUserAvatar,
         content: `Voice Memo (${duration}s)`,
         type: 'voice',
@@ -533,7 +607,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       .join('\n');
 
     try {
-      const aiPrompt = `You are Cortex Neural Assistant for Abu Mafhal Hub executive operations. Analyze the following real admin chat messages and provide an executive summary, team action checklist, and risk alert:\n\n${recentContext || 'Team is currently monitoring platform metrics.'}`;
+      const aiPrompt = `You are Cortex Neural Assistant for Abu Mafhal Hub executive operations. Analyze the following real admin chat messages and provide an executive summary, team action checklist, and risk alert:\n\n${recentContext || 'Super Admin is currently monitoring platform operations.'}`;
       const responseText = await AIService.askCortex(aiPrompt);
 
       await supabase.from('team_messages').insert({
@@ -577,7 +651,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         channel: currentRoomId,
         sender_id: currentUserId || null,
         sender_name: currentUserName,
-        sender_role: currentUserRole,
+        sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
         sender_avatar: currentUserAvatar,
         content: `📊 LIVE POLL: ${pollQuestion.trim()}`,
         type: 'poll',
@@ -632,7 +706,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         channel: currentRoomId,
         sender_id: currentUserId || null,
         sender_name: currentUserName,
-        sender_role: currentUserRole,
+        sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
         sender_avatar: currentUserAvatar,
         content: `✅ ACTION ITEM: ${taskTitle.trim()}`,
         type: 'task',
@@ -673,7 +747,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {}
   };
 
-  // 14. Pick Document (PDF, Excel, CSV)
+  // 14. Pick Document
   const pickAndUploadDocument = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -702,7 +776,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           channel: currentRoomId,
           sender_id: currentUserId || null,
           sender_name: currentUserName,
-          sender_role: currentUserRole,
+          sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
           sender_avatar: currentUserAvatar,
           content: `📎 Shared Document: ${file.name}`,
           type: 'document',
@@ -719,7 +793,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 15. Pick Image (Gallery / Camera)
+  // 15. Pick Image
   const pickAndUploadImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -758,7 +832,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           channel: currentRoomId,
           sender_id: currentUserId || null,
           sender_name: currentUserName,
-          sender_role: currentUserRole,
+          sender_role: isSuperAdmin ? 'SUPER ADMIN' : currentUserRole,
           sender_avatar: currentUserAvatar,
           content: 'Shared an image attachment',
           type: 'image',
@@ -808,12 +882,22 @@ export default function RealtimeEnterpriseTeamSuite() {
 
   const activeChannelObj = CHANNELS.find(c => c.id === activeChannel) || CHANNELS[0];
 
+  // Super Admin Security Guard View
+  if (authChecking) {
+    return (
+      <View style={[s.container, s.centerBox, { backgroundColor: '#0F172A' }]}>
+        <ActivityIndicator size="large" color={L.gold} />
+        <Text style={[s.loadingText, { color: L.gold, marginTop: 10 }]}>Verifying Super Admin Credentials...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={s.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* EXECUTIVE TOP BAR */}
+      {/* EXECUTIVE TOP BAR WITH SUPER ADMIN BADGE */}
       <View style={s.topBar}>
         <View style={s.topBarRow}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
@@ -829,10 +913,16 @@ export default function RealtimeEnterpriseTeamSuite() {
             <Ionicons name="chevron-down" size={12} color={L.goldLight} />
           </TouchableOpacity>
 
+          {/* Super Admin Badge Indicator */}
+          <View style={s.superAdminPill}>
+            <Ionicons name="ribbon" size={11} color="#0F172A" />
+            <Text style={s.superAdminPillText}>SUPER ADMIN</Text>
+          </View>
+
           {/* Fast Header Actions */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity onPress={() => setShowSearchBar(!showSearchBar)} style={s.topIconBtn} activeOpacity={0.8}>
-              <Ionicons name="search" size={13} color={L.gold} />
+              <Ionicons name="search" size={12} color={L.gold} />
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleAskCortexAI} disabled={aiAnalyzing} style={s.aiCopilotBtn} activeOpacity={0.85}>
@@ -840,14 +930,14 @@ export default function RealtimeEnterpriseTeamSuite() {
                 <ActivityIndicator size="small" color="#0F172A" />
               ) : (
                 <>
-                  <Ionicons name="sparkles" size={12} color="#0F172A" />
+                  <Ionicons name="sparkles" size={11} color="#0F172A" />
                   <Text style={s.aiCopilotBtnText}>AI Copilot</Text>
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={startInstantMeeting} style={s.videoMeetingBtn} activeOpacity={0.85}>
-              <Ionicons name="videocam" size={13} color="#0F172A" />
+              <Ionicons name="videocam" size={12} color="#0F172A" />
               <Text style={s.videoMeetingBtnText}>Meeting</Text>
             </TouchableOpacity>
           </View>
@@ -899,16 +989,19 @@ export default function RealtimeEnterpriseTeamSuite() {
             })}
           </ScrollView>
 
-          {/* Quick Creation Shortcuts */}
+          {/* Super Admin Executive Shortcuts */}
           <View style={s.toolShortcutsRow}>
+            <TouchableOpacity onPress={clearChannelMessages} style={s.purgeChannelBtn} activeOpacity={0.75}>
+              <Ionicons name="trash-outline" size={11} color={L.coral} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowMeetingModal(true)} style={s.toolIconBtn}>
-              <Ionicons name="calendar-outline" size={12} color={L.gold} />
+              <Ionicons name="calendar-outline" size={11} color={L.gold} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowPollModal(true)} style={s.toolIconBtn}>
-              <Ionicons name="pie-chart-outline" size={12} color={L.gold} />
+              <Ionicons name="pie-chart-outline" size={11} color={L.gold} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowTaskModal(true)} style={s.toolIconBtn}>
-              <Ionicons name="checkbox-outline" size={12} color={L.gold} />
+              <Ionicons name="checkbox-outline" size={11} color={L.gold} />
             </TouchableOpacity>
           </View>
         </View>
@@ -999,6 +1092,13 @@ export default function RealtimeEnterpriseTeamSuite() {
                           <Text style={s.roleBadgeText}>{msg.sender_role || 'ADMIN'}</Text>
                         </View>
                         <Text style={s.msgTime}>{timeStr}</Text>
+
+                        {/* Super Admin Delete Button */}
+                        {isSuperAdmin && (
+                          <TouchableOpacity onPress={() => deleteMessage(msg.id)} style={{ marginLeft: 4 }}>
+                            <Ionicons name="trash-outline" size={11} color={L.coral} />
+                          </TouchableOpacity>
+                        )}
                       </View>
 
                       <Text style={s.pollQuestionTitle}>{pData.question || msg.content}</Text>
@@ -1054,6 +1154,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                       <View style={s.bubbleMetaRow}>
                         <Text style={s.senderName}>{isMe ? 'You' : msg.sender_name}</Text>
                         <Text style={s.msgTime}>{timeStr}</Text>
+                        {isSuperAdmin && (
+                          <TouchableOpacity onPress={() => deleteMessage(msg.id)} style={{ marginLeft: 4 }}>
+                            <Ionicons name="trash-outline" size={10} color={L.coral} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <View style={s.voiceMemoRow}>
                         <TouchableOpacity
@@ -1080,6 +1185,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                       <View style={s.bubbleMetaRow}>
                         <Text style={s.senderName}>{isMe ? 'You' : msg.sender_name}</Text>
                         <Text style={s.msgTime}>{timeStr}</Text>
+                        {isSuperAdmin && (
+                          <TouchableOpacity onPress={() => deleteMessage(msg.id)} style={{ marginLeft: 4 }}>
+                            <Ionicons name="trash-outline" size={10} color={L.coral} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <TouchableOpacity
                         onPress={() => msg.media_url && Linking.openURL(msg.media_url)}
@@ -1104,6 +1214,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                       <View style={s.bubbleMetaRow}>
                         <Text style={s.senderName}>{isMe ? 'You' : msg.sender_name}</Text>
                         <Text style={s.msgTime}>{timeStr}</Text>
+                        {isSuperAdmin && (
+                          <TouchableOpacity onPress={() => deleteMessage(msg.id)} style={{ marginLeft: 4 }}>
+                            <Ionicons name="trash-outline" size={10} color={L.coral} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <TouchableOpacity onPress={() => setZoomedImage(msg.media_url)} activeOpacity={0.9}>
                         <Image source={{ uri: msg.media_url }} style={s.chatImageAttachment} resizeMode="cover" />
@@ -1125,6 +1240,18 @@ export default function RealtimeEnterpriseTeamSuite() {
                         </View>
                       )}
                       <Text style={s.msgTime}>{timeStr}</Text>
+
+                      {/* Super Admin Actions: Pin & Delete */}
+                      {isSuperAdmin && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                          <TouchableOpacity onPress={() => togglePinMessage(msg)}>
+                            <Ionicons name={msg.is_pinned ? 'pin' : 'pin-outline'} size={10} color={msg.is_pinned ? L.goldAmber : '#94A3B8'} />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => deleteMessage(msg.id)}>
+                            <Ionicons name="trash-outline" size={10} color={L.coral} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
 
                     <Text style={[s.msgText, isMe && s.msgTextMe]}>{msg.content}</Text>
@@ -1642,21 +1769,35 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.3)',
-    maxWidth: 140,
+    maxWidth: 130,
   },
   channelSelectorTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 11.5,
+    fontSize: 11,
+  },
+  superAdminPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.gold,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  superAdminPillText: {
+    color: '#0F172A',
+    fontWeight: '900',
+    fontSize: 8,
   },
   topIconBtn: {
-    width: 26,
-    height: 26,
+    width: 24,
+    height: 24,
     borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
@@ -1667,30 +1808,30 @@ const s = StyleSheet.create({
   aiCopilotBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 3.5,
+    borderRadius: 6,
   },
   aiCopilotBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9,
+    fontSize: 8.5,
   },
   videoMeetingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 3.5,
+    borderRadius: 6,
   },
   videoMeetingBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9,
+    fontSize: 8.5,
   },
   searchWrap: {
     flexDirection: 'row',
@@ -1745,6 +1886,16 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+  },
+  purgeChannelBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    backgroundColor: L.coralBg,
+    borderWidth: 1,
+    borderColor: L.coralBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toolIconBtn: {
     width: 22,
