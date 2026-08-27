@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView,
   Platform, ScrollView, ActivityIndicator, Alert, Image, StyleSheet, Dimensions, StatusBar,
-  Modal
+  Modal, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,6 +13,30 @@ import * as Clipboard from 'expo-clipboard';
 import { decode } from 'base64-arraybuffer';
 
 const { width: W } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
+// Light Luxury Executive Design Tokens
+const L = {
+  bg: '#F4F6FB',
+  card: '#FFFFFF',
+  cardBorder: '#E2E8F0',
+  navyHeader: '#0F172A',
+  navyMid: '#1E293B',
+  gold: '#FFD700',
+  goldDk: '#DAA520',
+  goldAmber: '#D97706',
+  goldLight: '#FEF3C7',
+  textPrimary: '#0F172A',
+  textSecondary: '#334155',
+  textMuted: '#64748B',
+  emerald: '#10B981',
+  emeraldBg: '#ECFDF5',
+  emeraldBorder: '#A7F3D0',
+  sky: '#0EA5E9',
+  skyBg: '#F0F9FF',
+  coral: '#EF4444',
+  coralBg: '#FFF1F2',
+};
 
 type TicketMessage = {
   id: string;
@@ -23,10 +47,10 @@ type TicketMessage = {
 };
 
 const QUICK_RESPONSES = [
-  "Payment proof uploaded 📄",
+  "Payment receipt attached 📄",
   "Checking my bank app now ⏳",
-  "Issue resolved, thank you! 👍",
-  "Please verify my transaction 🔍",
+  "Verified and working, thank you! 👍",
+  "Please re-check the account 🔍",
 ];
 
 export default function UserTicketChatScreen() {
@@ -42,7 +66,6 @@ export default function UserTicketChatScreen() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [rating, setRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -169,9 +192,8 @@ export default function UserTicketChatScreen() {
   };
 
   const submitRating = async () => {
-    setRatingSubmitted(true);
     try {
-      await sendMessage(`⭐ User Satisfaction Rating: ${rating}/5 Stars. ${feedbackComment.trim() ? `Feedback: "${feedbackComment.trim()}"` : ''}`);
+      await sendMessage(`⭐ Satisfaction Rating: ${rating}/5 Stars. ${feedbackComment.trim() ? `Feedback: "${feedbackComment.trim()}"` : ''}`);
       setShowRatingModal(false);
       Alert.alert("Thank You! 🎉", "Your feedback helps us continuously improve our service.");
     } catch (e) {}
@@ -199,7 +221,7 @@ export default function UserTicketChatScreen() {
           });
         
         if (error) {
-          Alert.alert('Upload Warning', 'Could not upload file directly. Sending message instead.');
+          Alert.alert('Upload Notice', 'Sending direct note instead.');
           return;
         }
         
@@ -218,216 +240,231 @@ export default function UserTicketChatScreen() {
     Alert.alert("Copied", "Message copied to clipboard!");
   };
 
+  const escalateToWhatsApp = () => {
+    const shortId = id ? (id as string).split('-')[0].toUpperCase() : '';
+    const text = `Hello Abu Mafhal Support, I am following up on Ticket #${shortId}: ${ticketDetails?.subject || ''}`;
+    Linking.openURL(`whatsapp://send?phone=2348145853539&text=${encodeURIComponent(text)}`).catch(() => {});
+  };
+
   const isResolved = ticketDetails?.status === 'resolved';
+  const shortId = id ? (id as string).split('-')[0].toUpperCase() : '';
 
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
       style={s.container}
     >
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
       <Stack.Screen options={{ 
-        title: ticketDetails?.subject || 'Live Support Chat',
+        title: `#${shortId} Support Chat`,
         headerShown: true,
-        headerStyle: { backgroundColor: '#060d21' },
-        headerTintColor: '#f5a623',
-        headerTitleStyle: { fontWeight: '900', fontSize: 15 },
+        headerStyle: { backgroundColor: '#0F172A' },
+        headerTintColor: L.gold,
+        headerTitleStyle: { fontWeight: '900', fontSize: 13.5 },
         headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity onPress={escalateToWhatsApp} style={s.headerWaBtn} activeOpacity={0.8}>
+              <Ionicons name="logo-whatsapp" size={13} color="#25D366" />
+            </TouchableOpacity>
+
             {isResolved ? (
-              <View style={[s.headerLiveBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10b981' }]}>
-                <Text style={[s.liveGreenText, { color: '#10b981' }]}>Resolved</Text>
+              <View style={s.resolvedHeaderBadge}>
+                <Ionicons name="checkmark-circle" size={12} color={L.emerald} />
+                <Text style={s.resolvedHeaderText}>Resolved</Text>
               </View>
             ) : (
               <TouchableOpacity onPress={handleMarkResolved} style={s.resolveBtn} activeOpacity={0.8}>
-                <Ionicons name="checkmark-circle" size={13} color="#10b981" />
-                <Text style={s.resolveBtnText}>Close Ticket</Text>
+                <Ionicons name="checkmark-done" size={12} color={L.emerald} />
+                <Text style={s.resolveBtnText}>Close</Text>
               </TouchableOpacity>
             )}
           </View>
         )
       }} />
 
-      {loading ? (
-        <View style={s.loadingBox}>
-          <ActivityIndicator size="large" color="#f5a623" />
-          <Text style={s.loadingText}>Connecting to Live Support Desk...</Text>
-        </View>
-      ) : (
-        <>
-          {/* TICKET DETAILS HEADER BANNER */}
-          <View style={s.ticketBanner}>
-            <View style={s.ticketBannerLeft}>
-              <View style={s.ticketIconCircle}>
-                <Ionicons name="headset" size={13} color="#f5a623" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.ticketBannerTitle} numberOfLines={1}>
-                  #{id ? (id as string).split('-')[0].toUpperCase() : ''} • {ticketDetails?.subject || 'Live Ticket'}
-                </Text>
-                <Text style={s.ticketBannerSub}>
-                  Priority: <Text style={{ color: '#f5a623', fontWeight: '800' }}>{(ticketDetails?.priority || 'High').toUpperCase()}</Text> • Status: <Text style={{ color: isResolved ? '#10b981' : '#60a5fa', fontWeight: '800' }}>{(ticketDetails?.status || 'Open').toUpperCase()}</Text>
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={fetchMessages} style={s.refreshBtn}>
-              <Ionicons name="refresh-outline" size={16} color="#94a3b8" />
-            </TouchableOpacity>
+      <View style={isWeb ? s.webCenterContainer : { flex: 1 }}>
+        {loading ? (
+          <View style={s.loadingBox}>
+            <ActivityIndicator size="small" color={L.goldDk} />
+            <Text style={s.loadingText}>Connecting to ticket channel...</Text>
           </View>
+        ) : (
+          <>
+            {/* TICKET DETAILS HEADER BANNER */}
+            <View style={s.ticketBanner}>
+              <View style={s.ticketBannerLeft}>
+                <View style={s.ticketIconCircle}>
+                  <Ionicons name="chatbubble-ellipses" size={12} color={L.navyHeader} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.ticketBannerTitle} numberOfLines={1}>
+                    {ticketDetails?.subject || 'Live Support Chat'}
+                  </Text>
+                  <Text style={s.ticketBannerSub}>
+                    Priority: <Text style={{ color: L.goldAmber, fontWeight: '800' }}>{(ticketDetails?.priority || 'Normal').toUpperCase()}</Text> • Status: <Text style={{ color: isResolved ? L.emerald : L.sky, fontWeight: '800' }}>{(ticketDetails?.status || 'Open').toUpperCase()}</Text>
+                  </Text>
+                </View>
+              </View>
 
-          {/* MESSAGES LIST */}
-          <ScrollView 
-            ref={scrollViewRef}
-            style={s.messagesScroll} 
-            contentContainerStyle={s.messagesContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {messages.length > 0 ? (
-              messages.map((m) => {
-                const isUser = m.sender_id === userId;
-                const isImage = m.message.startsWith('[IMAGE]');
-                const imageUrl = isImage ? m.message.replace('[IMAGE]', '').trim() : null;
+              <TouchableOpacity onPress={fetchMessages} style={s.refreshBtn} activeOpacity={0.7}>
+                <Ionicons name="refresh-outline" size={15} color={L.textMuted} />
+              </TouchableOpacity>
+            </View>
 
-                return (
-                  <View key={m.id} style={[s.msgRow, isUser ? s.msgRowUser : s.msgRowAgent]}>
-                    {!isUser && (
-                      <View style={s.agentAvatarCircle}>
-                        <Ionicons name="shield-checkmark" size={12} color="#f5a623" />
-                      </View>
-                    )}
+            {/* MESSAGES LIST */}
+            <ScrollView 
+              ref={scrollViewRef}
+              style={s.messagesScroll} 
+              contentContainerStyle={s.messagesContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {messages.length > 0 ? (
+                messages.map((m) => {
+                  const isUser = m.sender_id === userId;
+                  const isImage = m.message.startsWith('[IMAGE]');
+                  const imageUrl = isImage ? m.message.replace('[IMAGE]', '').trim() : null;
 
-                    <View style={[s.msgBubble, isUser ? s.msgBubbleUser : s.msgBubbleAgent]}>
+                  return (
+                    <View key={m.id} style={[s.msgRow, isUser ? s.msgRowUser : s.msgRowAgent]}>
                       {!isUser && (
-                        <View style={s.agentHeaderLine}>
-                          <Ionicons name="headset" size={11} color="#f5a623" style={{ marginRight: 4 }} />
-                          <Text style={s.agentLabel}>Official Support Agent</Text>
+                        <View style={s.agentAvatarCircle}>
+                          <Ionicons name="shield-checkmark" size={11} color={L.goldAmber} />
                         </View>
                       )}
 
-                      <TouchableOpacity 
-                        onLongPress={() => handleCopy(m.message)} 
-                        onPress={() => isImage && imageUrl && setPreviewImage(imageUrl)}
-                        activeOpacity={0.9}
-                      >
-                        {isImage && imageUrl ? (
-                          <View style={s.imageWrap}>
-                            <Image 
-                              source={{ uri: imageUrl }} 
-                              style={s.msgImage}
-                              resizeMode="cover" 
-                            />
-                            <View style={s.zoomOverlay}>
-                              <Ionicons name="scan-outline" size={14} color="#ffffff" />
-                              <Text style={s.zoomText}>Tap to enlarge</Text>
-                            </View>
+                      <View style={[s.msgBubble, isUser ? s.msgBubbleUser : s.msgBubbleAgent]}>
+                        {!isUser && (
+                          <View style={s.agentHeaderLine}>
+                            <Ionicons name="headset" size={9.5} color={L.goldAmber} style={{ marginRight: 3 }} />
+                            <Text style={s.agentLabel}>Abu Mafhal Support Agent</Text>
                           </View>
-                        ) : (
-                          <Text style={[s.msgText, isUser ? s.msgTextUser : s.msgTextAgent]}>
-                            {m.message}
-                          </Text>
                         )}
-                      </TouchableOpacity>
 
-                      <View style={s.msgFooter}>
-                        <Text style={s.msgTimeText}>
-                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                        {isUser && (
-                          <Ionicons name="checkmark-done" size={13} color="#60a5fa" style={{ marginLeft: 4 }} />
-                        )}
+                        <TouchableOpacity 
+                          onLongPress={() => handleCopy(m.message)} 
+                          onPress={() => isImage && imageUrl && setPreviewImage(imageUrl)}
+                          activeOpacity={0.9}
+                        >
+                          {isImage && imageUrl ? (
+                            <View style={s.imageWrap}>
+                              <Image 
+                                source={{ uri: imageUrl }} 
+                                style={s.msgImage}
+                                resizeMode="cover" 
+                              />
+                              <View style={s.zoomOverlay}>
+                                <Ionicons name="scan-outline" size={12} color="#FFFFFF" />
+                                <Text style={s.zoomText}>Tap to zoom</Text>
+                              </View>
+                            </View>
+                          ) : (
+                            <Text style={[s.msgText, isUser ? s.msgTextUser : s.msgTextAgent]}>
+                              {m.message}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+
+                        <View style={s.msgFooter}>
+                          <Text style={[s.msgTimeText, isUser && { color: 'rgba(255, 255, 255, 0.7)' }]}>
+                            {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                          {isUser && (
+                            <Ionicons name="checkmark-done" size={11} color={L.gold} style={{ marginLeft: 3 }} />
+                          )}
+                        </View>
                       </View>
                     </View>
+                  );
+                })
+              ) : (
+                <View style={s.emptyChatBox}>
+                  <View style={s.emptyChatIconCircle}>
+                    <Ionicons name="chatbubbles-outline" size={24} color={L.goldDk} />
                   </View>
-                );
-              })
-            ) : (
-              <View style={s.emptyChatBox}>
-                <View style={s.emptyChatIconCircle}>
-                  <Ionicons name="chatbubbles-outline" size={30} color="#f5a623" />
+                  <Text style={s.emptyChatTitle}>Chat Session Initialized</Text>
+                  <Text style={s.emptyChatDesc}>
+                    Type your message or attach transaction screenshots below. Our active support representative will assist you promptly.
+                  </Text>
                 </View>
-                <Text style={s.emptyChatTitle}>Support Chat Initialized</Text>
-                <Text style={s.emptyChatDesc}>
-                  Type your message or upload payment receipts below. An active agent will attend to your query shortly.
-                </Text>
+              )}
+            </ScrollView>
+
+            {/* QUICK SMART REPLY CHIPS */}
+            {!isResolved && (
+              <View style={s.quickResponsesWrap}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickResponsesContent}>
+                  {QUICK_RESPONSES.map((chip, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => sendMessage(chip)}
+                      style={s.quickChip}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={s.quickChipText}>{chip}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             )}
-          </ScrollView>
 
-          {/* QUICK ACTION CHIPS */}
-          {!isResolved && (
-            <View style={s.quickResponsesWrap}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickResponsesContent}>
-                {QUICK_RESPONSES.map((chip, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={() => sendMessage(chip)}
-                    style={s.quickChip}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={s.quickChipText}>{chip}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* COMPACT INPUT BAR */}
-          {isResolved ? (
-            <View style={s.resolvedNoticeBar}>
-              <Ionicons name="checkmark-circle" size={18} color="#10b981" style={{ marginRight: 8 }} />
-              <Text style={s.resolvedNoticeText}>This support ticket has been resolved and closed.</Text>
-            </View>
-          ) : (
-            <View style={s.inputContainer}>
-              <View style={s.inputWrapper}>
-                <TouchableOpacity 
-                  onPress={pickImage} 
-                  style={s.attachBtn}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="attach" size={18} color="#f5a623" />
-                </TouchableOpacity>
-
-                <TextInput
-                  placeholder="Type message to support..."
-                  placeholderTextColor="#64748b"
-                  style={s.textInput}
-                  value={reply}
-                  onChangeText={setReply}
-                  multiline
-                  selectionColor="#f5a623"
-                />
-
-                <TouchableOpacity
-                  onPress={() => sendMessage()}
-                  disabled={sending || !reply.trim()}
-                  style={s.sendBtn}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={sending || !reply.trim() ? ['#334155', '#1e293b'] : ['#f5a623', '#d97706']}
-                    style={s.sendBtnGrad}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    {sending ? (
-                      <ActivityIndicator color="#060d21" size="small" />
-                    ) : (
-                      <Ionicons name="paper-plane" size={15} color={!reply.trim() ? '#94a3b8' : '#060d21'} style={{ marginLeft: 2 }} />
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+            {/* COMPACT INPUT BAR */}
+            {isResolved ? (
+              <View style={s.resolvedNoticeBar}>
+                <Ionicons name="checkmark-circle" size={15} color={L.emerald} style={{ marginRight: 6 }} />
+                <Text style={s.resolvedNoticeText}>This support ticket is resolved and closed.</Text>
               </View>
-            </View>
-          )}
-        </>
-      )}
+            ) : (
+              <View style={s.inputContainer}>
+                <View style={s.inputWrapper}>
+                  <TouchableOpacity 
+                    onPress={pickImage} 
+                    style={s.attachBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="attach" size={16} color={L.navyHeader} />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    placeholder="Type message to agent..."
+                    placeholderTextColor="#94A3B8"
+                    style={s.textInput}
+                    value={reply}
+                    onChangeText={setReply}
+                    multiline
+                    selectionColor={L.goldDk}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => sendMessage()}
+                    disabled={sending || !reply.trim()}
+                    style={s.sendBtn}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient
+                      colors={sending || !reply.trim() ? ['#94A3B8', '#64748B'] : ['#0F172A', '#1E293B']}
+                      style={s.sendBtnGrad}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      {sending ? (
+                        <ActivityIndicator color={L.gold} size="small" />
+                      ) : (
+                        <Ionicons name="paper-plane" size={13} color={!reply.trim() ? '#E2E8F0' : L.gold} style={{ marginLeft: 1 }} />
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
 
       {/* FULLSCREEN IMAGE PREVIEW MODAL */}
       <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
         <View style={s.imageModalOverlay}>
           <TouchableOpacity onPress={() => setPreviewImage(null)} style={s.imageModalCloseBtn}>
-            <Ionicons name="close" size={24} color="#ffffff" />
+            <Ionicons name="close" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           {previewImage && (
             <Image source={{ uri: previewImage }} style={s.imageModalImg} resizeMode="contain" />
@@ -435,35 +472,35 @@ export default function UserTicketChatScreen() {
         </View>
       </Modal>
 
-      {/* RATING & FEEDBACK MODAL */}
-      <Modal visible={showRatingModal} transparent animationType="slide" onRequestClose={() => setShowRatingModal(false)}>
+      {/* COMPACT SATISFACTION RATING MODAL */}
+      <Modal visible={showRatingModal} transparent animationType="fade" onRequestClose={() => setShowRatingModal(false)}>
         <View style={s.ratingModalOverlay}>
           <View style={s.ratingModalCard}>
             <View style={s.ratingIconCircle}>
-              <Ionicons name="star" size={28} color="#f5a623" />
+              <Ionicons name="star" size={22} color={L.goldAmber} />
             </View>
             <Text style={s.ratingTitle}>Rate Support Experience</Text>
-            <Text style={s.ratingSubtitle}>How satisfied are you with our agent's assistance on this ticket?</Text>
+            <Text style={s.ratingSubtitle}>How satisfied are you with our agent's assistance?</Text>
 
             <View style={s.starsRow}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRating(star)} activeOpacity={0.75} style={{ padding: 4 }}>
-                  <Ionicons name={star <= rating ? "star" : "star-outline"} size={32} color="#f5a623" />
+                <TouchableOpacity key={star} onPress={() => setRating(star)} activeOpacity={0.75} style={{ padding: 3 }}>
+                  <Ionicons name={star <= rating ? "star" : "star-outline"} size={26} color={L.goldAmber} />
                 </TouchableOpacity>
               ))}
             </View>
 
             <TextInput
               style={s.feedbackInput}
-              placeholder="Leave an optional comment or feedback..."
-              placeholderTextColor="#64748b"
+              placeholder="Leave an optional comment..."
+              placeholderTextColor="#94A3B8"
               value={feedbackComment}
               onChangeText={setFeedbackComment}
               multiline
             />
 
             <TouchableOpacity onPress={submitRating} style={s.submitRatingBtn} activeOpacity={0.85}>
-              <LinearGradient colors={['#f5a623', '#d97706']} style={s.submitRatingGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <LinearGradient colors={['#0F172A', '#1E293B']} style={s.submitRatingGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <Text style={s.submitRatingText}>Submit Review</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -477,53 +514,73 @@ export default function UserTicketChatScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#040814',
+    backgroundColor: L.bg,
   },
-  headerLiveBadge: {
+  webCenterContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+    backgroundColor: L.bg,
+  },
+  headerWaBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(37, 211, 102, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resolvedHeaderBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    backgroundColor: L.emeraldBg,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: 8,
+    gap: 3,
     borderWidth: 1,
+    borderColor: L.emeraldBorder,
   },
-  liveGreenText: {
+  resolvedHeaderText: {
+    color: L.emerald,
     fontWeight: '800',
-    fontSize: 10.5,
+    fontSize: 9.5,
   },
   resolveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: L.emeraldBg,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderColor: L.emeraldBorder,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    gap: 3,
   },
   resolveBtnText: {
-    color: '#10b981',
+    color: L.emerald,
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 10,
   },
   loadingBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
+    marginTop: 40,
   },
   loadingText: {
-    color: '#94a3b8',
-    fontSize: 13,
+    color: L.textMuted,
+    fontSize: 11,
     fontWeight: '600',
   },
   ticketBanner: {
-    backgroundColor: '#060d21',
+    backgroundColor: L.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: L.cardBorder,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -532,41 +589,43 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 10,
-  },
-  ticketIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: 8,
   },
+  ticketIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: L.goldLight,
+    borderWidth: 1,
+    borderColor: L.goldDk,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
   ticketBannerTitle: {
-    color: '#f8fafc',
-    fontSize: 12.5,
+    color: L.navyHeader,
+    fontSize: 11.5,
     fontWeight: '800',
   },
   ticketBannerSub: {
-    color: '#64748b',
-    fontSize: 10,
+    color: L.textMuted,
+    fontSize: 9,
     marginTop: 1,
   },
   refreshBtn: {
-    padding: 6,
+    padding: 4,
   },
   messagesScroll: {
     flex: 1,
   },
   messagesContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    paddingBottom: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingBottom: 16,
   },
   msgRow: {
     flexDirection: 'row',
-    marginBottom: 14,
+    marginBottom: 8,
     width: '100%',
   },
   msgRowUser: {
@@ -576,220 +635,222 @@ const s = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   agentAvatarCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#0c1633',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.goldLight,
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
+    borderColor: L.goldDk,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 6,
     marginTop: 2,
   },
   msgBubble: {
     maxWidth: '82%',
-    borderRadius: 18,
-    padding: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 12,
+    padding: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
   },
   msgBubbleUser: {
-    backgroundColor: '#1d4ed8',
-    borderBottomRightRadius: 4,
+    backgroundColor: L.navyHeader,
+    borderBottomRightRadius: 2,
     borderWidth: 1,
-    borderColor: 'rgba(96, 165, 250, 0.3)',
+    borderColor: L.navyMid,
   },
   msgBubbleAgent: {
-    backgroundColor: '#09132e',
-    borderBottomLeftRadius: 4,
+    backgroundColor: L.card,
+    borderBottomLeftRadius: 2,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: L.cardBorder,
   },
   agentHeaderLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    paddingBottom: 4,
+    marginBottom: 4,
+    paddingBottom: 3,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(30, 41, 59, 0.6)',
+    borderBottomColor: '#F1F5F9',
   },
   agentLabel: {
-    color: '#f5a623',
-    fontWeight: '800',
-    fontSize: 10,
+    color: L.goldAmber,
+    fontWeight: '900',
+    fontSize: 8.5,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   msgText: {
-    fontSize: 13.5,
-    lineHeight: 19,
+    fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: '500',
   },
   msgTextUser: {
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
   msgTextAgent: {
-    color: '#f1f5f9',
+    color: L.textPrimary,
   },
   imageWrap: {
     position: 'relative',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   msgImage: {
-    width: 210,
-    height: 210,
-    borderRadius: 12,
-    backgroundColor: '#1e293b',
+    width: 180,
+    height: 180,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
   },
   zoomOverlay: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 6,
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   zoomText: {
-    color: '#ffffff',
-    fontSize: 9.5,
+    color: '#FFFFFF',
+    fontSize: 8.5,
     fontWeight: '600',
   },
   msgFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 5,
+    marginTop: 3,
   },
   msgTimeText: {
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.65)',
+    color: L.textMuted,
   },
   emptyChatBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingHorizontal: 20,
   },
   emptyChatIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#0c1633',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 166, 35, 0.3)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: L.goldLight,
+    borderWidth: 1,
+    borderColor: L.goldDk,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   emptyChatTitle: {
-    color: '#ffffff',
+    color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 16,
-    marginBottom: 6,
+    fontSize: 13.5,
+    marginBottom: 4,
   },
   emptyChatDesc: {
-    color: '#94a3b8',
-    fontSize: 12,
+    color: L.textMuted,
+    fontSize: 10.5,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 15,
   },
   quickResponsesWrap: {
-    backgroundColor: '#060d21',
-    paddingVertical: 6,
+    backgroundColor: L.card,
+    paddingVertical: 5,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: L.cardBorder,
   },
   quickResponsesContent: {
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingHorizontal: 10,
+    gap: 6,
   },
   quickChip: {
-    backgroundColor: '#0c1633',
+    backgroundColor: L.bg,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
+    borderColor: L.cardBorder,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   quickChipText: {
-    color: '#cbd5e1',
-    fontSize: 11,
+    color: L.textSecondary,
+    fontSize: 9.5,
     fontWeight: '700',
   },
   resolvedNoticeBar: {
-    backgroundColor: '#060d21',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    backgroundColor: L.card,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: L.cardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   resolvedNoticeText: {
-    color: '#10b981',
+    color: L.emerald,
     fontWeight: '800',
-    fontSize: 12.5,
+    fontSize: 11,
   },
   inputContainer: {
-    backgroundColor: '#060d21',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    backgroundColor: L.card,
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: L.cardBorder,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0c1633',
-    borderRadius: 24,
+    backgroundColor: L.bg,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    borderColor: L.cardBorder,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
   },
   attachBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#09132e',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: L.card,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: L.cardBorder,
   },
   textInput: {
     flex: 1,
-    color: '#ffffff',
-    fontSize: 13.5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    maxHeight: 90,
+    color: L.textPrimary,
+    fontSize: 11.5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxHeight: 70,
     fontWeight: '500',
   },
   sendBtn: {
-    borderRadius: 18,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   sendBtnGrad: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   imageModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
@@ -799,88 +860,89 @@ const s = StyleSheet.create({
     top: 50,
     right: 20,
     zIndex: 10,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   imageModalImg: {
-    width: W * 0.9,
-    height: W * 0.9,
+    width: Math.min(W * 0.9, 450),
+    height: Math.min(W * 0.9, 450),
   },
   ratingModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 14,
   },
   ratingModalCard: {
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#060d21',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#1e293b',
-    padding: 20,
+    maxWidth: 340,
+    backgroundColor: L.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    padding: 16,
     alignItems: 'center',
   },
   ratingIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: L.goldLight,
     borderWidth: 1,
-    borderColor: 'rgba(245, 166, 35, 0.4)',
+    borderColor: L.goldDk,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   ratingTitle: {
-    color: '#ffffff',
+    color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 17,
-    marginBottom: 4,
+    fontSize: 14,
+    marginBottom: 2,
   },
   ratingSubtitle: {
-    color: '#94a3b8',
-    fontSize: 12,
+    color: L.textMuted,
+    fontSize: 10.5,
     textAlign: 'center',
-    lineHeight: 16,
-    marginBottom: 16,
+    lineHeight: 14,
+    marginBottom: 12,
   },
   starsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   feedbackInput: {
     width: '100%',
-    backgroundColor: '#0c1633',
-    borderRadius: 14,
+    backgroundColor: L.bg,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    padding: 12,
-    color: '#ffffff',
-    fontSize: 12.5,
-    minHeight: 60,
-    marginBottom: 18,
+    borderColor: L.cardBorder,
+    padding: 8,
+    color: L.textPrimary,
+    fontSize: 11,
+    minHeight: 48,
+    marginBottom: 12,
   },
   submitRatingBtn: {
     width: '100%',
-    borderRadius: 22,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   submitRatingGrad: {
-    paddingVertical: 12,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitRatingText: {
-    color: '#060d21',
+    color: L.gold,
     fontWeight: '900',
-    fontSize: 13.5,
+    fontSize: 11.5,
   },
 });
+
