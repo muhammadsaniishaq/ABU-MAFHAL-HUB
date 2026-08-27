@@ -1,777 +1,1354 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Image, Switch, ActivityIndicator, Modal, TextInput, Alert, ScrollView } from 'react-native';
+import {
+  View, Text, TouchableOpacity, Image, Switch, ActivityIndicator,
+  Modal, TextInput, Alert, ScrollView, StyleSheet, Platform, Dimensions, StatusBar
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { supabase } from '../../services/supabase';
+import { Stack, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
-import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../services/supabase';
 
-const AVAILABLE_PLACEMENTS = ['dashboard', 'airtime', 'data', 'bills', 'transfer', 'education', 'smile', 'cac', 'nin_bvn', 'social_boost', 'crypto', 'qr_pay', 'wallet', 'services'];
+// Platinum Light Executive Theme Tokens
+const L = {
+  bg: '#F4F6FB',
+  card: '#FFFFFF',
+  cardBorder: '#E2E8F0',
+  navyHeader: '#0F172A',
+  navyMid: '#1E293B',
+  gold: '#FFD700',
+  goldDk: '#DAA520',
+  goldAmber: '#D97706',
+  goldLight: '#FEF3C7',
+  textPrimary: '#0F172A',
+  textSecondary: '#334155',
+  textMuted: '#64748B',
+  emerald: '#10B981',
+  emeraldBg: '#ECFDF5',
+  emeraldBorder: '#A7F3D0',
+  sky: '#0EA5E9',
+  skyBg: '#F0F9FF',
+  coral: '#EF4444',
+  coralBg: '#FFF1F2',
+  coralBorder: '#FECDD3',
+};
 
-export default function ContentManager() {
-    const [banners, setBanners] = useState<any[]>([]);
-    const [partners, setPartners] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+const AVAILABLE_PLACEMENTS = [
+  'dashboard', 'airtime', 'data', 'bills', 'transfer',
+  'education', 'smile', 'cac', 'nin_bvn', 'social_boost', 'crypto', 'qr_pay', 'wallet', 'services'
+];
 
-    const [showModal, setShowModal] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [newTitle, setNewTitle] = useState('');
-    const [newTargetUrl, setNewTargetUrl] = useState('');
-    const [newPlacements, setNewPlacements] = useState<string[]>(['dashboard']);
-    const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
-    const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
-    const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+export default function ModernContentManager() {
+  const router = useRouter();
+  const [banners, setBanners] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    const [showPartnerModal, setShowPartnerModal] = useState(false);
-    const [newPartnerName, setNewPartnerName] = useState('');
-    const [newPartnerLogo, setNewPartnerLogo] = useState<ImagePicker.ImagePickerAsset | null>(null);
-    const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
-    const [existingPartnerLogoUrl, setExistingPartnerLogoUrl] = useState<string | null>(null);
+  // Banner modal state
+  const [showModal, setShowModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newTargetUrl, setNewTargetUrl] = useState('');
+  const [newPlacements, setNewPlacements] = useState<string[]>(['dashboard']);
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'banners' | 'partners' | 'announcements' | 'settings'>('banners');
-    const [announcementText, setAnnouncementText] = useState('');
-    const [announcementUrl, setAnnouncementUrl] = useState('');
-    const [announcementType, setAnnouncementType] = useState<'image' | 'video'>('image');
-    const [announcementActive, setAnnouncementActive] = useState(false);
-    const [savingAnnouncement, setSavingAnnouncement] = useState(false);
-    const [uploadingAnnouncement, setUploadingAnnouncement] = useState(false);
+  // Partner modal state
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState('');
+  const [newPartnerLogo, setNewPartnerLogo] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
+  const [existingPartnerLogoUrl, setExistingPartnerLogoUrl] = useState<string | null>(null);
 
-    const [maintenanceMode, setMaintenanceMode] = useState(false);
-    const [savingSettings, setSavingSettings] = useState(false);
+  // Active tab & announcement state
+  const [activeTab, setActiveTab] = useState<'banners' | 'partners' | 'announcements' | 'settings'>('banners');
+  const [announcementText, setAnnouncementText] = useState('');
+  const [announcementUrl, setAnnouncementUrl] = useState('');
+  const [announcementType, setAnnouncementType] = useState<'image' | 'video'>('image');
+  const [announcementActive, setAnnouncementActive] = useState(false);
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+  const [uploadingAnnouncement, setUploadingAnnouncement] = useState(false);
 
-    useEffect(() => {
-        fetchBanners();
-        fetchPartners();
-        fetchAnnouncement();
-    }, []);
+  // System settings
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
-    const fetchPartners = async () => {
-        try {
-            const { data } = await supabase.from('partners').select('*').order('sort_order', { ascending: true });
-            if (data) setPartners(data);
-        } catch (e) {}
-    };
+  useEffect(() => {
+    fetchBanners();
+    fetchPartners();
+    fetchAnnouncement();
+  }, []);
 
-    const fetchAnnouncement = async () => {
-        const { data } = await supabase.from('app_settings').select('key, value').in('key', ['global_announcement', 'maintenance_mode']);
-        if (data) {
-            data.forEach(setting => {
-                if (setting.key === 'global_announcement' && setting.value) {
-                    try {
-                        const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
-                        setAnnouncementText(parsed.text || '');
-                        setAnnouncementUrl(parsed.mediaUrl || '');
-                        setAnnouncementType(parsed.mediaType || 'image');
-                        setAnnouncementActive(!!parsed.isActive);
-                    } catch (e) {
-                        console.log(e);
-                    }
-                }
-                if (setting.key === 'maintenance_mode') {
-                    setMaintenanceMode(setting.value === 'true' || setting.value === true);
-                }
-            });
-        }
-    };
+  const fetchPartners = async () => {
+    try {
+      const { data } = await supabase.from('partners').select('*').order('sort_order', { ascending: true });
+      if (data) setPartners(data);
+    } catch (e) {}
+  };
 
-    const fetchBanners = async () => {
-        setLoading(true);
-        try {
-            const { data } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
-            if (data) setBanners(data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const pickImage = async () => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [16, 9],
-            quality: 0.8,
-            base64: true,
+  const fetchAnnouncement = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['global_announcement', 'maintenance_mode']);
+      if (data) {
+        data.forEach(setting => {
+          if (setting.key === 'global_announcement' && setting.value) {
+            try {
+              const parsed = typeof setting.value === 'string' ? JSON.parse(setting.value) : setting.value;
+              setAnnouncementText(parsed.text || '');
+              setAnnouncementUrl(parsed.mediaUrl || '');
+              setAnnouncementType(parsed.mediaType || 'image');
+              setAnnouncementActive(!!parsed.isActive);
+            } catch (e) {}
+          }
+          if (setting.key === 'maintenance_mode') {
+            setMaintenanceMode(setting.value === 'true' || setting.value === true);
+          }
         });
+      }
+    } catch (e) {}
+  };
 
-        if (!result.canceled) {
-            setSelectedImage(result.assets[0]);
+  const fetchBanners = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
+      if (data) setBanners(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted' && Platform.OS !== 'web') {
+        Alert.alert("Permission Required", "Please grant photo library access.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImage(result.assets[0]);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to pick image");
+    }
+  };
+
+  const pickPartnerLogo = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted' && Platform.OS !== 'web') {
+        Alert.alert("Permission Required", "Please grant photo library access.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setNewPartnerLogo(result.assets[0]);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to pick logo");
+    }
+  };
+
+  const pickAnnouncementMedia = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted' && Platform.OS !== 'web') {
+        return Alert.alert("Permission Required", "Please allow gallery access.");
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        quality: 0.85,
+        base64: true,
+      });
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        setUploadingAnnouncement(true);
+
+        const isVideo = asset.type === 'video';
+        const fileExt = (asset.uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).split('?')[0];
+        const fileName = `announcement_${Date.now()}.${fileExt}`;
+        const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+
+        let publicUrl = asset.base64 ? `data:${mimeType};base64,${asset.base64}` : asset.uri;
+
+        if (asset.base64) {
+          try {
+            const { error: uploadErr } = await supabase.storage
+              .from('banners')
+              .upload(`announcements/${fileName}`, decode(asset.base64), {
+                contentType: mimeType,
+                upsert: true
+              });
+
+            if (!uploadErr) {
+              const { data: publicUrlData } = supabase.storage
+                .from('banners')
+                .getPublicUrl(`announcements/${fileName}`);
+              if (publicUrlData?.publicUrl) publicUrl = publicUrlData.publicUrl;
+            }
+          } catch (storageErr) {
+            console.warn("Announcement storage upload fallback:", storageErr);
+          }
         }
-    };
 
-    const pickPartnerLogo = async () => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-            base64: true,
-        });
+        setAnnouncementType(isVideo ? 'video' : 'image');
+        setAnnouncementUrl(publicUrl);
+        Alert.alert("Media Ready 🎉", "Announcement media attached successfully!");
+      }
+    } catch (err: any) {
+      Alert.alert("Media Error", err.message || "Failed to select media");
+    } finally {
+      setUploadingAnnouncement(false);
+    }
+  };
 
-        if (!result.canceled) {
-            setNewPartnerLogo(result.assets[0]);
+  const saveBanner = async () => {
+    if (!selectedImage && !existingImageUrl) return Alert.alert("Required", "Please select a banner image");
+
+    setUploading(true);
+    try {
+      let publicUrl = existingImageUrl;
+
+      if (selectedImage) {
+        const fileExt = (selectedImage.uri.split('.').pop() || 'jpg').split('?')[0];
+        const fileName = `banner_${Date.now()}.${fileExt}`;
+        const mimeType = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+
+        publicUrl = selectedImage.base64 ? `data:${mimeType};base64,${selectedImage.base64}` : selectedImage.uri;
+
+        if (selectedImage.base64) {
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from('banners')
+              .upload(fileName, decode(selectedImage.base64), { contentType: mimeType, upsert: true });
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage.from('banners').getPublicUrl(fileName);
+              if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
+            }
+          } catch (storageErr) {
+            console.warn("Banner storage upload fallback:", storageErr);
+          }
         }
-    };
+      }
 
-    const pickAnnouncementMedia = async () => {
-        try {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permission.granted) {
-                return Alert.alert("Permission Required", "Please allow gallery access to upload banner media.");
+      if (editingBannerId) {
+        const { error } = await supabase
+          .from('banners')
+          .update({
+            title: newTitle.trim(),
+            image_url: publicUrl,
+            target_url: newTargetUrl.trim(),
+            placement: newPlacements.join(',')
+          })
+          .eq('id', editingBannerId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('banners')
+          .insert({
+            title: newTitle.trim(),
+            image_url: publicUrl,
+            target_url: newTargetUrl.trim(),
+            placement: newPlacements.join(','),
+            is_active: true
+          });
+        if (error) throw error;
+      }
+
+      fetchBanners();
+      closeModal();
+      Alert.alert("Success 🎉", "Banner saved successfully!");
+    } catch (err: any) {
+      Alert.alert("Failed", err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const savePartner = async () => {
+    if (!newPartnerName.trim()) return Alert.alert("Required", "Please enter partner name");
+    if (!newPartnerLogo && !existingPartnerLogoUrl) return Alert.alert("Required", "Please select a partner logo");
+
+    setUploading(true);
+    try {
+      let logoUrl = existingPartnerLogoUrl;
+
+      if (newPartnerLogo) {
+        const fileExt = (newPartnerLogo.uri.split('.').pop() || 'png').split('?')[0];
+        const fileName = `partner_${Date.now()}.${fileExt}`;
+        const mimeType = fileExt.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+
+        logoUrl = newPartnerLogo.base64 ? `data:${mimeType};base64,${newPartnerLogo.base64}` : newPartnerLogo.uri;
+
+        if (newPartnerLogo.base64) {
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from('partners')
+              .upload(fileName, decode(newPartnerLogo.base64), { contentType: mimeType, upsert: true });
+
+            if (!uploadError) {
+              const { data: publicUrlData } = supabase.storage.from('partners').getPublicUrl(fileName);
+              if (publicUrlData?.publicUrl) logoUrl = publicUrlData.publicUrl;
             }
-
-            const res = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.All,
-                quality: 0.85,
-                base64: true,
-            });
-
-            if (!res.canceled && res.assets && res.assets.length > 0) {
-                const asset = res.assets[0];
-                setUploadingAnnouncement(true);
-
-                const isVideo = asset.type === 'video';
-                const fileExt = asset.uri.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
-                const fileName = `announcement_${Date.now()}.${fileExt}`;
-
-                let blob: Blob;
-                if (asset.base64) {
-                    blob = new Blob([decode(asset.base64)], { type: isVideo ? 'video/mp4' : 'image/jpeg' });
-                } else {
-                    const r = await fetch(asset.uri);
-                    blob = await r.blob();
-                }
-
-                const { error: uploadErr } = await supabase.storage
-                    .from('public-assets')
-                    .upload(`announcements/${fileName}`, blob, {
-                        contentType: isVideo ? 'video/mp4' : 'image/jpeg',
-                        upsert: true
-                    });
-
-                if (uploadErr) {
-                    setUploadingAnnouncement(false);
-                    return Alert.alert("Upload Failed", uploadErr.message);
-                }
-
-                const { data: publicUrlData } = supabase.storage
-                    .from('public-assets')
-                    .getPublicUrl(`announcements/${fileName}`);
-
-                if (publicUrlData?.publicUrl) {
-                    setAnnouncementType(isVideo ? 'video' : 'image');
-                    setAnnouncementUrl(publicUrlData.publicUrl);
-                    Alert.alert("Uploaded 🎉", "Banner media uploaded successfully!");
-                }
-            }
-        } catch (err: any) {
-            Alert.alert("Media Error", err.message || "Failed to select media");
-        } finally {
-            setUploadingAnnouncement(false);
+          } catch (storageErr) {
+            console.warn("Partner logo storage upload fallback:", storageErr);
+          }
         }
-    };
+      }
 
-    const savePartner = async () => {
-        if (!newPartnerName.trim()) return Alert.alert("Required", "Please enter partner name");
-        if (!newPartnerLogo && !existingPartnerLogoUrl) return Alert.alert("Required", "Please select a partner logo");
+      if (editingPartnerId) {
+        const { error } = await supabase
+          .from('partners')
+          .update({
+            name: newPartnerName.trim(),
+            logo_url: logoUrl,
+          })
+          .eq('id', editingPartnerId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('partners')
+          .insert({
+            name: newPartnerName.trim(),
+            logo_url: logoUrl,
+            sort_order: partners.length + 1,
+            is_active: true
+          });
+        if (error) throw error;
+      }
 
-        setUploading(true);
-        try {
-            let logoUrl = existingPartnerLogoUrl;
+      fetchPartners();
+      closePartnerModal();
+      Alert.alert("Success 🎉", "Partner saved successfully!");
+    } catch (err: any) {
+      Alert.alert("Failed", err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
-            if (newPartnerLogo) {
-                const fileExt = newPartnerLogo.uri.split('.').pop() || 'png';
-                const fileName = `partner_${Date.now()}.${fileExt}`;
-                
-                let blob: Blob;
-                if (newPartnerLogo.base64) {
-                    blob = new Blob([decode(newPartnerLogo.base64)], { type: 'image/png' });
-                } else {
-                    const res = await fetch(newPartnerLogo.uri);
-                    blob = await res.blob();
-                }
+  const openEditBannerModal = (banner: any) => {
+    setEditingBannerId(banner.id);
+    setNewTitle(banner.title || '');
+    setNewTargetUrl(banner.target_url || '');
+    setNewPlacements(banner.placement ? banner.placement.split(',') : ['dashboard']);
+    setExistingImageUrl(banner.image_url);
+    setSelectedImage(null);
+    setShowModal(true);
+  };
 
-                const { error: uploadError } = await supabase.storage
-                    .from('public-assets')
-                    .upload(`partners/${fileName}`, blob, { contentType: 'image/png', upsert: true });
+  const openEditPartnerModal = (partner: any) => {
+    setEditingPartnerId(partner.id);
+    setNewPartnerName(partner.name);
+    setExistingPartnerLogoUrl(partner.logo_url);
+    setNewPartnerLogo(null);
+    setShowPartnerModal(true);
+  };
 
-                if (uploadError) throw uploadError;
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingBannerId(null);
+    setNewTitle('');
+    setNewTargetUrl('');
+    setNewPlacements(['dashboard']);
+    setSelectedImage(null);
+    setExistingImageUrl(null);
+  };
 
-                const { data: publicUrlData } = supabase.storage
-                    .from('public-assets')
-                    .getPublicUrl(`partners/${fileName}`);
+  const closePartnerModal = () => {
+    setShowPartnerModal(false);
+    setEditingPartnerId(null);
+    setNewPartnerName('');
+    setNewPartnerLogo(null);
+    setExistingPartnerLogoUrl(null);
+  };
 
-                logoUrl = publicUrlData.publicUrl;
-            }
+  const togglePlacement = (placement: string) => {
+    if (newPlacements.includes(placement)) {
+      if (newPlacements.length > 1) {
+        setNewPlacements(newPlacements.filter(p => p !== placement));
+      } else {
+        Alert.alert("Notice", "Banner must have at least one placement destination.");
+      }
+    } else {
+      setNewPlacements([...newPlacements, placement]);
+    }
+  };
 
-            if (editingPartnerId) {
-                const { error } = await supabase
-                    .from('partners')
-                    .update({
-                        name: newPartnerName.trim(),
-                        logo_url: logoUrl,
-                    })
-                    .eq('id', editingPartnerId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('partners')
-                    .insert({
-                        name: newPartnerName.trim(),
-                        logo_url: logoUrl,
-                        sort_order: partners.length + 1,
-                        is_active: true
-                    });
-                if (error) throw error;
-            }
+  const toggleSelectAllPlacements = () => {
+    if (newPlacements.length === AVAILABLE_PLACEMENTS.length) {
+      setNewPlacements(['dashboard']);
+    } else {
+      setNewPlacements([...AVAILABLE_PLACEMENTS]);
+    }
+  };
 
-            fetchPartners();
-            closePartnerModal();
-        } catch (err: any) {
-            Alert.alert("Failed", err.message);
-        } finally {
-            setUploading(false);
+  const toggleBanner = async (id: string, currentStatus: boolean) => {
+    try {
+      await supabase.from('banners').update({ is_active: !currentStatus }).eq('id', id);
+      fetchBanners();
+    } catch (e) {}
+  };
+
+  const deleteBanner = async (id: string) => {
+    Alert.alert("Delete Banner", "Are you sure you want to permanently delete this banner?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await supabase.from('banners').delete().eq('id', id);
+          fetchBanners();
         }
-    };
+      }
+    ]);
+  };
 
-    const deletePartner = async (id: string) => {
-        Alert.alert("Delete Partner", "Are you sure?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                    await supabase.from('partners').delete().eq('id', id);
-                    fetchPartners();
-                }
-            }
-        ]);
-    };
-
-    const saveBanner = async () => {
-        if (!selectedImage && !existingImageUrl) return Alert.alert("Error", "Please select an image");
-
-        setUploading(true);
-        try {
-            let publicUrl = existingImageUrl;
-
-            if (selectedImage) {
-                const fileExt = selectedImage.uri.split('.').pop() || 'jpg';
-                const fileName = `${Date.now()}.${fileExt}`;
-                const filePath = `banners/${fileName}`;
-
-                let blob: Blob;
-                if (selectedImage.base64) {
-                    blob = new Blob([decode(selectedImage.base64)], { type: `image/${fileExt}` });
-                } else {
-                    const response = await fetch(selectedImage.uri);
-                    blob = await response.blob();
-                }
-
-                const { error: uploadError } = await supabase.storage
-                    .from('public-assets')
-                    .upload(filePath, blob, { contentType: `image/${fileExt}`, upsert: true });
-
-                if (uploadError) throw uploadError;
-
-                const { data: urlData } = supabase.storage
-                    .from('public-assets')
-                    .getPublicUrl(filePath);
-
-                publicUrl = urlData.publicUrl;
-            }
-
-            if (editingBannerId) {
-                const { error } = await supabase
-                    .from('banners')
-                    .update({
-                        title: newTitle,
-                        image_url: publicUrl,
-                        target_url: newTargetUrl,
-                        placement: newPlacements.join(',')
-                    })
-                    .eq('id', editingBannerId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('banners')
-                    .insert({
-                        title: newTitle,
-                        image_url: publicUrl,
-                        target_url: newTargetUrl,
-                        placement: newPlacements.join(','),
-                        is_active: true
-                    });
-                if (error) throw error;
-            }
-
-            fetchBanners();
-            closeModal();
-        } catch (err: any) { Alert.alert("Failed", err.message); } 
-        finally { setUploading(false); }
-    };
-
-    const openEditPartnerModal = (partner: any) => {
-        setEditingPartnerId(partner.id);
-        setNewPartnerName(partner.name);
-        setExistingPartnerLogoUrl(partner.logo_url);
-        setNewPartnerLogo(null);
-        setShowPartnerModal(true);
-    };
-
-    const closePartnerModal = () => {
-        setShowPartnerModal(false);
-        setEditingPartnerId(null);
-        setNewPartnerName('');
-        setNewPartnerLogo(null);
-        setExistingPartnerLogoUrl(null);
-    };
-
-    const openEditModal = (banner: any) => {
-        setEditingBannerId(banner.id);
-        setNewTitle(banner.title || '');
-        setNewTargetUrl(banner.target_url || '');
-        setNewPlacements(banner.placement ? banner.placement.split(',') : ['dashboard']);
-        setExistingImageUrl(banner.image_url);
-        setSelectedImage(null);
-        setShowModal(true);
-    };
-
-    const togglePlacement = (placement: string) => {
-        if (newPlacements.includes(placement)) {
-            if (newPlacements.length > 1) {
-                setNewPlacements(newPlacements.filter(p => p !== placement));
-            } else {
-                Alert.alert("Notice", "Banner must have at least one placement destination.");
-            }
-        } else {
-            setNewPlacements([...newPlacements, placement]);
+  const deletePartner = async (id: string) => {
+    Alert.alert("Delete Partner", "Are you sure you want to delete this partner brand?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await supabase.from('partners').delete().eq('id', id);
+          fetchPartners();
         }
-    };
+      }
+    ]);
+  };
 
-    const toggleSelectAllPlacements = () => {
-        if (newPlacements.length === AVAILABLE_PLACEMENTS.length) {
-            setNewPlacements(['dashboard']);
-        } else {
-            setNewPlacements([...AVAILABLE_PLACEMENTS]);
-        }
-    };
+  const saveAnnouncement = async () => {
+    setSavingAnnouncement(true);
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'global_announcement',
+        value: {
+          text: announcementText,
+          mediaUrl: announcementUrl,
+          mediaType: announcementType,
+          isActive: announcementActive
+        },
+        description: 'Global Popup Announcement'
+      }, { onConflict: 'key' });
+      Alert.alert("Success 🎉", "Global Announcement published successfully!");
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    } finally {
+      setSavingAnnouncement(false);
+    }
+  };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setEditingBannerId(null);
-        setNewTitle('');
-        setNewTargetUrl('');
-        setNewPlacements(['dashboard']);
-        setSelectedImage(null);
-        setExistingImageUrl(null);
-    };
+  const toggleMaintenanceMode = async (value: boolean) => {
+    setMaintenanceMode(value);
+    setSavingSettings(true);
+    try {
+      await supabase.from('app_settings').upsert({
+        key: 'maintenance_mode',
+        value: String(value),
+        description: 'Put app in maintenance mode'
+      }, { onConflict: 'key' });
+      Alert.alert("Notice", `Maintenance mode is now ${value ? 'ACTIVATED' : 'DEACTIVATED'}`);
+    } catch (e) {} finally {
+      setSavingSettings(false);
+    }
+  };
 
-    const toggleBanner = async (id: string, currentStatus: boolean) => {
-        try {
-            await supabase.from('banners').update({ is_active: !currentStatus }).eq('id', id);
-            fetchBanners();
-        } catch (e) {}
-    };
+  return (
+    <View style={s.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <Stack.Screen options={{ headerShown: false }} />
 
-    const deleteBanner = async (id: string) => {
-        Alert.alert("Delete Banner", "Are you sure?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                    await supabase.from('banners').delete().eq('id', id);
-                    fetchBanners();
-                }
-            }
-        ]);
-    };
-
-    const saveAnnouncement = async () => {
-        setSavingAnnouncement(true);
-        try {
-            await supabase.from('app_settings').upsert({
-                key: 'global_announcement',
-                value: { 
-                    text: announcementText, 
-                    mediaUrl: announcementUrl,
-                    mediaType: announcementType,
-                    isActive: announcementActive 
-                },
-                description: 'Global Popup Announcement'
-            });
-            Alert.alert("Success 🎉", "Global Announcement saved successfully!");
-        } catch (e: any) { Alert.alert("Error", e.message); } 
-        finally { setSavingAnnouncement(false); }
-    };
-
-    const toggleMaintenanceMode = async (value: boolean) => {
-        setMaintenanceMode(value);
-        setSavingSettings(true);
-        try {
-            await supabase.from('app_settings').upsert({ key: 'maintenance_mode', value: String(value), description: 'Put app in maintenance mode' });
-        } catch(e) {} 
-        finally { setSavingSettings(false); }
-    };
-
-    if (loading) return (
-        <View className="flex-1 items-center justify-center bg-slate-100">
-            <ActivityIndicator size="large" color="#0D1B3E" />
+      {/* EXECUTIVE TOP BAR */}
+      <View style={s.topBar}>
+        <View style={s.topBarRow}>
+          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
+            <Ionicons name="arrow-back" size={16} color={L.gold} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={s.topBarTitle}>Content & Brand Manager</Text>
+            <Text style={s.topBarSub}>Manage banners, partnerships, announcements, and app alerts</Text>
+          </View>
+          {activeTab === 'banners' ? (
+            <TouchableOpacity onPress={() => setShowModal(true)} style={s.addBtn} activeOpacity={0.8}>
+              <Ionicons name="add" size={15} color="#0F172A" />
+              <Text style={s.addBtnText}>New Banner</Text>
+            </TouchableOpacity>
+          ) : activeTab === 'partners' ? (
+            <TouchableOpacity onPress={() => setShowPartnerModal(true)} style={s.addBtn} activeOpacity={0.8}>
+              <Ionicons name="add" size={15} color="#0F172A" />
+              <Text style={s.addBtnText}>New Partner</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
-    );
 
-    return (
-        <View className="flex-1 bg-slate-100">
-            <Stack.Screen options={{ 
-                title: 'Content Manager', 
-                headerStyle: { backgroundColor: '#0D1B3E' },
-                headerTintColor: '#F5A623',
-                headerTitleStyle: { fontWeight: 'bold' }
-            }} />
+        {/* CUSTOM SEGMENTED TAB BAR */}
+        <View style={s.tabBarRow}>
+          {[
+            { id: 'banners', label: 'Banners', icon: 'images-outline' },
+            { id: 'partners', label: 'Partners', icon: 'briefcase-outline' },
+            { id: 'announcements', label: 'Popup Alert', icon: 'megaphone-outline' },
+            { id: 'settings', label: 'System', icon: 'construct-outline' }
+          ].map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id as any)}
+                style={[s.tabPill, isActive && s.tabPillActive]}
+                activeOpacity={0.75}
+              >
+                <Ionicons name={tab.icon as any} size={11} color={isActive ? '#0F172A' : L.goldLight} />
+                <Text style={[s.tabPillText, isActive && s.tabPillTextActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
-            {/* Custom Tab Bar */}
-            <View className="flex-row bg-[#0D1B3E] p-1.5 border-b border-slate-800">
-                <TouchableOpacity 
-                    onPress={() => setActiveTab('banners')}
-                    className={`flex-1 py-2.5 items-center justify-center rounded-xl flex-row gap-1.5 ${activeTab === 'banners' ? 'bg-[#F5A623]' : 'bg-transparent'}`}
-                >
-                    <Ionicons name="images" size={14} color={activeTab === 'banners' ? '#0D1B3E' : '#94A3B8'} />
-                    <Text className={`text-xs font-bold ${activeTab === 'banners' ? 'text-[#0D1B3E]' : 'text-slate-400'}`}>Banners</Text>
+      {/* BODY CONTENT */}
+      {loading ? (
+        <View style={s.centerBox}>
+          <ActivityIndicator size="small" color={L.goldDk} />
+          <Text style={s.loadingText}>Loading content assets...</Text>
+        </View>
+      ) : (
+        <ScrollView style={s.scrollArea} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* TAB 1: BANNERS */}
+          {activeTab === 'banners' && (
+            <View>
+              {banners.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Ionicons name="images-outline" size={28} color={L.goldDk} />
+                  <Text style={s.emptyTitle}>No Promo Banners Active</Text>
+                  <Text style={s.emptySub}>Tap "New Banner" above to create promotions and app sliders.</Text>
+                </View>
+              ) : (
+                banners.map(b => (
+                  <View key={b.id} style={s.card}>
+                    <Image source={{ uri: b.image_url }} style={s.bannerImagePreview} resizeMode="cover" />
+                    <View style={s.cardBody}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={s.cardTitle}>{b.title || 'Untitled Banner'}</Text>
+                          {b.target_url ? <Text style={s.cardUrl} numberOfLines={1}>{b.target_url}</Text> : null}
+                        </View>
+                        <Switch
+                          value={b.is_active}
+                          onValueChange={() => toggleBanner(b.id, b.is_active)}
+                          trackColor={{ false: '#CBD5E1', true: L.emerald }}
+                          thumbColor="#FFFFFF"
+                          style={{ transform: [{ scale: 0.75 }] }}
+                        />
+                      </View>
+
+                      {/* Placements */}
+                      <View style={s.placementsRow}>
+                        {(b.placement ? b.placement.split(',') : ['dashboard']).map((p: string) => (
+                          <View key={p} style={s.placementBadge}>
+                            <Text style={s.placementBadgeText}>{p.toUpperCase()}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Actions */}
+                      <View style={s.cardFooter}>
+                        <TouchableOpacity onPress={() => openEditBannerModal(b)} style={s.actionBtn}>
+                          <Ionicons name="pencil" size={11} color={L.navyHeader} />
+                          <Text style={s.actionBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => deleteBanner(b.id)} style={[s.actionBtn, { borderColor: L.coralBorder, backgroundColor: L.coralBg }]}>
+                          <Ionicons name="trash-outline" size={11} color={L.coral} />
+                          <Text style={[s.actionBtnText, { color: L.coral }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+
+          {/* TAB 2: PARTNERS */}
+          {activeTab === 'partners' && (
+            <View>
+              {partners.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Ionicons name="briefcase-outline" size={28} color={L.goldDk} />
+                  <Text style={s.emptyTitle}>No Partners Listed</Text>
+                  <Text style={s.emptySub}>Add network providers, payment gateways, and banking partners.</Text>
+                </View>
+              ) : (
+                partners.map(p => (
+                  <View key={p.id} style={s.partnerCard}>
+                    <Image source={{ uri: p.logo_url }} style={s.partnerLogo} resizeMode="contain" />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={s.partnerName}>{p.name}</Text>
+                      <Text style={s.partnerSub}>Sort Order: {p.sort_order || 1}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity onPress={() => openEditPartnerModal(p)} style={s.iconBtn}>
+                        <Ionicons name="pencil" size={12} color={L.navyHeader} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deletePartner(p.id)} style={[s.iconBtn, { backgroundColor: L.coralBg, borderColor: L.coralBorder }]}>
+                        <Ionicons name="trash-outline" size={12} color={L.coral} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+
+          {/* TAB 3: ANNOUNCEMENT */}
+          {activeTab === 'announcements' && (
+            <View style={s.announcementCard}>
+              <View style={s.announcementHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="megaphone" size={14} color={L.goldAmber} />
+                  <Text style={s.announcementTitle}>Global User Announcement</Text>
+                </View>
+                <Switch
+                  value={announcementActive}
+                  onValueChange={setAnnouncementActive}
+                  trackColor={{ false: '#CBD5E1', true: L.emerald }}
+                  thumbColor="#FFFFFF"
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+              </View>
+
+              <Text style={s.inputLabel}>Announcement Headline / Message</Text>
+              <TextInput
+                placeholder="Important service update or promo message..."
+                placeholderTextColor="#94A3B8"
+                style={s.textArea}
+                value={announcementText}
+                onChangeText={setAnnouncementText}
+                multiline
+              />
+
+              <Text style={s.inputLabel}>Attached Media (Optional Image / Video)</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                <TouchableOpacity onPress={pickAnnouncementMedia} style={s.mediaPickBtn} activeOpacity={0.8}>
+                  <Ionicons name="cloud-upload-outline" size={14} color={L.navyHeader} />
+                  <Text style={s.mediaPickBtnText}>Select Media from Gallery</Text>
                 </TouchableOpacity>
+                {announcementUrl ? (
+                  <TouchableOpacity onPress={() => setAnnouncementUrl('')} style={s.mediaClearBtn}>
+                    <Ionicons name="close" size={14} color={L.coral} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
-                <TouchableOpacity 
-                    onPress={() => setActiveTab('partners')}
-                    className={`flex-1 py-2.5 items-center justify-center rounded-xl flex-row gap-1.5 ${activeTab === 'partners' ? 'bg-[#F5A623]' : 'bg-transparent'}`}
-                >
-                    <Ionicons name="briefcase" size={14} color={activeTab === 'partners' ? '#0D1B3E' : '#94A3B8'} />
-                    <Text className={`text-xs font-bold ${activeTab === 'partners' ? 'text-[#0D1B3E]' : 'text-slate-400'}`}>Partners</Text>
-                </TouchableOpacity>
+              {announcementUrl ? (
+                <View style={s.announcementPreviewBox}>
+                  <Image source={{ uri: announcementUrl }} style={s.announcementPreviewImg} resizeMode="cover" />
+                  <Text style={s.announcementTypeTag}>{announcementType.toUpperCase()}</Text>
+                </View>
+              ) : null}
 
-                <TouchableOpacity 
-                    onPress={() => setActiveTab('announcements')}
-                    className={`flex-1 py-2.5 items-center justify-center rounded-xl flex-row gap-1.5 ${activeTab === 'announcements' ? 'bg-[#F5A623]' : 'bg-transparent'}`}
-                >
-                    <Ionicons name="megaphone" size={14} color={activeTab === 'announcements' ? '#0D1B3E' : '#94A3B8'} />
-                    <Text className={`text-xs font-bold ${activeTab === 'announcements' ? 'text-[#0D1B3E]' : 'text-slate-400'}`}>Alerts</Text>
-                </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveAnnouncement}
+                disabled={savingAnnouncement}
+                style={s.saveMainBtn}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={['#0F172A', '#1E293B']} style={s.saveMainGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  {savingAnnouncement ? (
+                    <ActivityIndicator size="small" color={L.gold} />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={14} color={L.gold} />
+                      <Text style={s.saveMainText}>Publish Announcement</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
-                <TouchableOpacity 
-                    onPress={() => setActiveTab('settings')}
-                    className={`flex-1 py-2.5 items-center justify-center rounded-xl flex-row gap-1.5 ${activeTab === 'settings' ? 'bg-[#F5A623]' : 'bg-transparent'}`}
-                >
-                    <Ionicons name="settings" size={14} color={activeTab === 'settings' ? '#0D1B3E' : '#94A3B8'} />
-                    <Text className={`text-xs font-bold ${activeTab === 'settings' ? 'text-[#0D1B3E]' : 'text-slate-400'}`}>Config</Text>
-                </TouchableOpacity>
+          {/* TAB 4: SYSTEM */}
+          {activeTab === 'settings' && (
+            <View style={s.settingsCard}>
+              <View style={s.systemSettingRow}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="construct" size={14} color={L.coral} />
+                    <Text style={s.settingTitle}>Maintenance Mode</Text>
+                  </View>
+                  <Text style={s.settingDesc}>
+                    When active, non-admin users will see a maintenance screen and cannot make transactions.
+                  </Text>
+                </View>
+                <Switch
+                  value={maintenanceMode}
+                  onValueChange={toggleMaintenanceMode}
+                  trackColor={{ false: '#CBD5E1', true: L.coral }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* BANNER CREATE / EDIT MODAL */}
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={closeModal}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{editingBannerId ? 'Edit Promo Banner' : 'Create New Banner'}</Text>
+              <TouchableOpacity onPress={closeModal} style={s.modalCloseBtn}>
+                <Ionicons name="close" size={16} color={L.navyHeader} />
+              </TouchableOpacity>
             </View>
 
-            <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 100 }}>
-                {/* --- BANNERS TAB --- */}
-                {activeTab === 'banners' && (
-                    <View>
-                        <TouchableOpacity 
-                            onPress={() => setShowModal(true)} 
-                            className="bg-[#0D1B3E] p-4 rounded-2xl flex-row items-center justify-center mb-4 shadow-sm border border-slate-800"
-                        >
-                            <Ionicons name="add-circle" size={20} color="#F5A623" />
-                            <Text className="text-white font-bold text-sm ml-2">Add New Banner</Text>
-                        </TouchableOpacity>
-
-                        {banners.map((b) => (
-                            <View key={b.id} className="bg-white rounded-2xl mb-4 overflow-hidden border border-slate-200 shadow-sm">
-                                <Image source={{ uri: b.image_url }} className="w-full h-36 bg-slate-200" resizeMode="cover" />
-                                <View className="p-4 flex-row items-center justify-between bg-white">
-                                    <View className="flex-1 mr-2">
-                                        <Text className="font-bold text-sm text-[#0D1B3E]" numberOfLines={1}>{b.title || 'Untitled Banner'}</Text>
-                                        <Text className="text-xs text-[#2563EB] font-bold mt-0.5">Destinations: {b.placement || 'dashboard'}</Text>
-                                        {b.target_url ? <Text className="text-xs text-slate-500 font-mono mt-0.5" numberOfLines={1}>Link: {b.target_url}</Text> : null}
-                                    </View>
-                                    <View className="flex-row items-center gap-2">
-                                        <TouchableOpacity onPress={() => openEditModal(b)} className="p-2 bg-slate-100 rounded-lg">
-                                            <Ionicons name="pencil" size={16} color="#2563EB" />
-                                        </TouchableOpacity>
-                                        <Switch value={b.is_active} onValueChange={() => toggleBanner(b.id, b.is_active)} />
-                                        <TouchableOpacity onPress={() => deleteBanner(b.id)} className="p-2 bg-red-50 rounded-lg">
-                                            <Ionicons name="trash" size={16} color="#EF4444" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Image Preview & Picker */}
+              <TouchableOpacity onPress={pickImage} style={s.imagePickerBox} activeOpacity={0.8}>
+                {selectedImage ? (
+                  <Image source={{ uri: selectedImage.uri }} style={s.modalImagePreview} resizeMode="cover" />
+                ) : existingImageUrl ? (
+                  <Image source={{ uri: existingImageUrl }} style={s.modalImagePreview} resizeMode="cover" />
+                ) : (
+                  <View style={s.imagePickerPlaceholder}>
+                    <Ionicons name="image-outline" size={24} color={L.goldDk} />
+                    <Text style={s.imagePickerText}>Tap to Upload Banner Image (16:9)</Text>
+                  </View>
                 )}
+              </TouchableOpacity>
 
-                {/* --- PARTNERS TAB --- */}
-                {activeTab === 'partners' && (
-                    <View>
-                        <TouchableOpacity 
-                            onPress={() => setShowPartnerModal(true)} 
-                            className="bg-[#0D1B3E] p-4 rounded-2xl flex-row items-center justify-center mb-4 shadow-sm border border-slate-800"
-                        >
-                            <Ionicons name="add-circle" size={20} color="#F5A623" />
-                            <Text className="text-white font-bold text-sm ml-2">Add New Partner Logo</Text>
-                        </TouchableOpacity>
+              <Text style={s.inputLabel}>Banner Title</Text>
+              <TextInput
+                placeholder="e.g. 50% Airtime Discount Promo"
+                placeholderTextColor="#94A3B8"
+                style={s.modalInput}
+                value={newTitle}
+                onChangeText={setNewTitle}
+              />
 
-                        <View className="flex-row flex-wrap justify-between">
-                            {partners.map((p) => (
-                                <View key={p.id} className="w-[48%] bg-white rounded-2xl p-4 mb-4 border border-slate-200 shadow-sm items-center relative">
-                                    <View className="w-16 h-16 bg-slate-50 rounded-xl items-center justify-center mb-2 border border-slate-100 p-2">
-                                        <Image source={{ uri: p.logo_url }} className="w-full h-full" resizeMode="contain" />
-                                    </View>
-                                    <Text className="font-bold text-xs text-[#0D1B3E] text-center mb-3" numberOfLines={1}>{p.name}</Text>
+              <Text style={s.inputLabel}>Target Route / Web Link (Optional)</Text>
+              <TextInput
+                placeholder="e.g. /airtime or https://..."
+                placeholderTextColor="#94A3B8"
+                style={s.modalInput}
+                value={newTargetUrl}
+                onChangeText={setNewTargetUrl}
+              />
 
-                                    <View className="flex-row items-center gap-2">
-                                        <TouchableOpacity onPress={() => openEditPartnerModal(p)} className="p-2 bg-slate-100 rounded-lg flex-row items-center gap-1">
-                                            <Ionicons name="pencil" size={14} color="#2563EB" />
-                                            <Text className="text-xs text-[#2563EB] font-bold">Edit</Text>
-                                        </TouchableOpacity>
+              {/* Placement Selector */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 4 }}>
+                <Text style={s.inputLabel}>Show On Screens</Text>
+                <TouchableOpacity onPress={toggleSelectAllPlacements}>
+                  <Text style={s.selectAllText}>
+                    {newPlacements.length === AVAILABLE_PLACEMENTS.length ? 'Clear All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-                                        <TouchableOpacity onPress={() => deletePartner(p.id)} className="p-2 bg-red-50 rounded-lg">
-                                            <Ionicons name="trash" size={14} color="#EF4444" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
+              <View style={s.placementSelectorRow}>
+                {AVAILABLE_PLACEMENTS.map(p => {
+                  const isChecked = newPlacements.includes(p);
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      onPress={() => togglePlacement(p)}
+                      style={[s.placementSelectChip, isChecked && s.placementSelectChipActive]}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name={isChecked ? "checkbox" : "square-outline"} size={11} color={isChecked ? '#0F172A' : L.textMuted} />
+                      <Text style={[s.placementSelectText, isChecked && s.placementSelectTextActive]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-                {/* --- ANNOUNCEMENTS TAB --- */}
-                {activeTab === 'announcements' && (
-                    <View className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-200">
-                        <View className="flex-row items-center justify-between mb-5 border-b border-slate-100 pb-4">
-                            <View className="flex-row items-center flex-1">
-                                <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-3 border border-blue-200">
-                                    <Ionicons name="megaphone" size={18} color="#2563EB" />
-                                </View>
-                                <View>
-                                    <Text className="font-bold text-base text-[#0D1B3E]">Global Announcement</Text>
-                                    <Text className="text-xs text-slate-500 font-medium">Show banner popup to all users on app launch</Text>
-                                </View>
-                            </View>
-                            <Switch value={announcementActive} onValueChange={setAnnouncementActive} />
-                        </View>
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Announcement Message Text</Text>
-                        <TextInput
-                            placeholder="Type your announcement message here..."
-                            placeholderTextColor="#94A3B8"
-                            value={announcementText}
-                            onChangeText={setAnnouncementText}
-                            multiline
-                            className="bg-slate-50 border border-slate-300 rounded-xl p-4 text-sm min-h-[100px] mb-4 text-[#0D1B3E] font-medium"
-                            textAlignVertical="top"
-                        />
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Banner Media (Image / Video URL or Upload)</Text>
-                        <View className="flex-row items-center gap-2 mb-4">
-                            <TextInput
-                                placeholder="https://... or tap upload button ->"
-                                placeholderTextColor="#94A3B8"
-                                value={announcementUrl}
-                                onChangeText={setAnnouncementUrl}
-                                className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs font-mono text-[#0D1B3E]"
-                            />
-                            <TouchableOpacity 
-                                onPress={pickAnnouncementMedia}
-                                disabled={uploadingAnnouncement}
-                                className="bg-indigo-600 px-4 py-3 rounded-xl flex-row items-center justify-center shadow-sm"
-                            >
-                                {uploadingAnnouncement ? (
-                                    <ActivityIndicator size="small" color="#F5A623" />
-                                ) : (
-                                    <Ionicons name="cloud-upload" size={18} color="#ffffff" />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Media Type</Text>
-                        <View className="flex-row gap-3 mb-4">
-                            <TouchableOpacity 
-                                onPress={() => setAnnouncementType('image')} 
-                                className={`flex-1 py-2.5 rounded-xl border flex-row items-center justify-center gap-2 ${announcementType === 'image' ? 'bg-[#0D1B3E] border-[#0D1B3E]' : 'bg-slate-50 border-slate-200'}`}
-                            >
-                                <Ionicons name="image" size={16} color={announcementType === 'image' ? '#ffffff' : '#64748b'} />
-                                <Text className={`font-bold text-xs ${announcementType === 'image' ? 'text-white' : 'text-slate-600'}`}>Image Banner</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity 
-                                onPress={() => setAnnouncementType('video')} 
-                                className={`flex-1 py-2.5 rounded-xl border flex-row items-center justify-center gap-2 ${announcementType === 'video' ? 'bg-[#0D1B3E] border-[#0D1B3E]' : 'bg-slate-50 border-slate-200'}`}
-                            >
-                                <Ionicons name="videocam" size={16} color={announcementType === 'video' ? '#ffffff' : '#64748b'} />
-                                <Text className={`font-bold text-xs ${announcementType === 'video' ? 'text-white' : 'text-slate-600'}`}>Video Banner</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* RECOMMENDED SPECIFICATIONS GUIDE */}
-                        <View className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl mb-4">
-                            <View className="flex-row items-center gap-1.5 mb-1">
-                                <Ionicons name="information-circle" size={16} color="#d97706" />
-                                <Text className="font-bold text-xs text-amber-800 uppercase tracking-wide">Recommended Sleek Banner Dimensions</Text>
-                            </View>
-                            <Text className="text-xs text-amber-900 leading-4 font-medium">
-                                • <Text className="font-bold">Recommended Resolution:</Text> 1200 x 480 px (or 1080 x 430 px){'\n'}
-                                • <Text className="font-bold">Aspect Ratio:</Text> 2.5 : 1 (Sleek Wide Landscape Banner){'\n'}
-                                • <Text className="font-bold">Format:</Text> High quality JPG, PNG, or WEBP (Under 2 MB)
-                            </Text>
-                        </View>
-
-                        {/* LIVE CROPPED BANNER PREVIEW */}
-                        {announcementUrl ? (
-                            <View className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 mb-5">
-                                <View className="h-32 bg-slate-800 overflow-hidden">
-                                    <Image 
-                                        source={{ uri: announcementUrl }} 
-                                        className="w-full h-full" 
-                                        resizeMode="cover" 
-                                    />
-                                </View>
-                                <View className="p-3 items-center">
-                                    <Text className="text-amber-400 font-extrabold text-xs uppercase tracking-wider">Sleek Cropped Banner Preview (180px Display) ✨</Text>
-                                    {announcementText ? (
-                                        <Text className="text-white font-medium text-xs mt-1 text-center" numberOfLines={2}>
-                                            {announcementText}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                            </View>
-                        ) : null}
-
-                        <TouchableOpacity onPress={saveAnnouncement} className="bg-[#0D1B3E] py-3.5 rounded-xl items-center flex-row justify-center shadow-sm">
-                            {savingAnnouncement ? <ActivityIndicator size="small" color="#F5A623" /> : (
-                                <>
-                                    <Ionicons name="save" size={16} color="#F5A623" />
-                                    <Text className="text-white font-bold text-sm ml-2">Save Announcement</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* --- SETTINGS --- */}
-                {activeTab === 'settings' && (
-                    <View className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-200">
-                        <View className="flex-row items-center justify-between mb-2">
-                            <View className="flex-row items-center flex-1">
-                                <View className="w-10 h-10 bg-red-100 rounded-full items-center justify-center mr-3 border border-red-200">
-                                    <Ionicons name="build" size={18} color="#DC2626" />
-                                </View>
-                                <View>
-                                    <Text className="font-bold text-base text-[#0D1B3E]">Maintenance Mode</Text>
-                                    <Text className="text-xs text-slate-500 font-medium">Lock down the entire app</Text>
-                                </View>
-                            </View>
-                            <Switch value={maintenanceMode} onValueChange={toggleMaintenanceMode} trackColor={{ true: '#EF4444' }} />
-                        </View>
-                    </View>
-                )}
+              <TouchableOpacity onPress={saveBanner} disabled={uploading} style={s.saveModalBtn} activeOpacity={0.85}>
+                <LinearGradient colors={['#0F172A', '#1E293B']} style={s.saveMainGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  {uploading ? (
+                    <ActivityIndicator size="small" color={L.gold} />
+                  ) : (
+                    <Text style={s.saveMainText}>{editingBannerId ? 'Update Banner' : 'Save & Publish Banner'}</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
             </ScrollView>
-
-            {/* BANNERS MODAL */}
-            <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-                <View className="flex-1 bg-slate-50">
-                    <View className="flex-row items-center justify-between p-5 border-b border-slate-200 bg-white z-10 shadow-sm">
-                        <TouchableOpacity onPress={closeModal} className="p-1"><Text className="text-slate-500 font-bold text-sm">Cancel</Text></TouchableOpacity>
-                        <Text className="font-black text-[#0D1B3E] text-lg">{editingBannerId ? 'Edit Banner' : 'New Banner'}</Text>
-                        <TouchableOpacity onPress={saveBanner} className="bg-[#0D1B3E] px-4 py-2 rounded-full">
-                            {uploading ? <ActivityIndicator size="small" color="#F5A623" /> : <Text className="text-white font-bold text-xs uppercase tracking-wider">Save</Text>}
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView className="p-5" contentContainerStyle={{ paddingBottom: 100 }}>
-                        <TouchableOpacity onPress={pickImage} className="h-32 bg-white rounded-2xl border-2 border-slate-300 items-center justify-center mb-6 border-dashed overflow-hidden">
-                            {selectedImage ? (
-                                <Image source={{ uri: selectedImage.uri }} className="w-full h-full" resizeMode="cover" />
-                            ) : existingImageUrl ? (
-                                <Image source={{ uri: existingImageUrl }} className="w-full h-full" resizeMode="cover" />
-                            ) : (
-                                <View className="items-center">
-                                    <Ionicons name="cloud-upload" size={28} color="#94A3B8" />
-                                    <Text className="text-slate-500 font-bold text-xs mt-1">Tap to select banner image</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Banner Title</Text>
-                        <TextInput
-                            placeholder="e.g. Special Discount Offer"
-                            placeholderTextColor="#94A3B8"
-                            value={newTitle}
-                            onChangeText={setNewTitle}
-                            className="bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm mb-4 text-[#0D1B3E]"
-                        />
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Target Route / URL (Optional)</Text>
-                        <TextInput
-                            placeholder="e.g. /data or https://example.com"
-                            placeholderTextColor="#94A3B8"
-                            value={newTargetUrl}
-                            onChangeText={setNewTargetUrl}
-                            className="bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm mb-4 text-[#0D1B3E]"
-                        />
-
-                        <View className="flex-row items-center justify-between mb-2 ml-1">
-                            <Text className="font-bold text-xs text-[#0D1B3E]">Display Placements</Text>
-                            <TouchableOpacity onPress={toggleSelectAllPlacements}>
-                                <Text className="text-xs font-bold text-[#2563EB]">
-                                    {newPlacements.length === AVAILABLE_PLACEMENTS.length ? 'Deselect All' : 'Select All'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View className="flex-row flex-wrap gap-2 mb-6">
-                            {AVAILABLE_PLACEMENTS.map((p) => {
-                                const isSelected = newPlacements.includes(p);
-                                return (
-                                    <TouchableOpacity 
-                                        key={p} 
-                                        onPress={() => togglePlacement(p)}
-                                        className={`px-3 py-2 rounded-xl border ${isSelected ? 'bg-[#0D1B3E] border-[#0D1B3E]' : 'bg-white border-slate-300'}`}
-                                    >
-                                        <Text className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-600'}`}>{p}</Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </ScrollView>
-                </View>
-            </Modal>
-
-            {/* PARTNER MODAL */}
-            <Modal visible={showPartnerModal} animationType="slide" presentationStyle="pageSheet">
-                <View className="flex-1 bg-slate-50">
-                    <View className="flex-row items-center justify-between p-5 border-b border-slate-200 bg-white z-10 shadow-sm">
-                        <TouchableOpacity onPress={closePartnerModal} className="p-1"><Text className="text-slate-500 font-bold text-sm">Cancel</Text></TouchableOpacity>
-                        <Text className="font-black text-[#0D1B3E] text-lg">{editingPartnerId ? 'Edit Partner' : 'New Partner'}</Text>
-                        <TouchableOpacity onPress={savePartner} className="bg-[#0D1B3E] px-4 py-2 rounded-full">
-                            {uploading ? <ActivityIndicator size="small" color="#F5A623" /> : <Text className="text-white font-bold text-xs uppercase tracking-wider">Save</Text>}
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView className="p-5">
-                        <TouchableOpacity onPress={pickPartnerLogo} className="h-32 bg-white rounded-2xl border-2 border-slate-300 items-center justify-center mb-6 border-dashed overflow-hidden">
-                            {newPartnerLogo ? (
-                                <Image source={{ uri: newPartnerLogo.uri }} className="w-20 h-20" resizeMode="contain" />
-                            ) : existingPartnerLogoUrl ? (
-                                <Image source={{ uri: existingPartnerLogoUrl }} className="w-20 h-20" resizeMode="contain" />
-                            ) : (
-                                <View className="items-center">
-                                    <Ionicons name="cloud-upload" size={28} color="#94A3B8" />
-                                    <Text className="text-slate-500 font-bold text-xs mt-1">Tap to select partner logo (1:1)</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        <Text className="font-bold text-xs text-[#0D1B3E] mb-2 ml-1">Partner Name</Text>
-                        <TextInput
-                            placeholder="e.g. MTN Nigeria"
-                            placeholderTextColor="#94A3B8"
-                            value={newPartnerName}
-                            onChangeText={setNewPartnerName}
-                            className="bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm mb-4 text-[#0D1B3E]"
-                        />
-                    </ScrollView>
-                </View>
-            </Modal>
+          </View>
         </View>
-    );
+      </Modal>
+
+      {/* PARTNER CREATE / EDIT MODAL */}
+      <Modal visible={showPartnerModal} transparent animationType="slide" onRequestClose={closePartnerModal}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{editingPartnerId ? 'Edit Partner Brand' : 'Add Partner Brand'}</Text>
+              <TouchableOpacity onPress={closePartnerModal} style={s.modalCloseBtn}>
+                <Ionicons name="close" size={16} color={L.navyHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity onPress={pickPartnerLogo} style={s.partnerLogoPicker} activeOpacity={0.8}>
+                {newPartnerLogo ? (
+                  <Image source={{ uri: newPartnerLogo.uri }} style={s.partnerLogoPreview} resizeMode="contain" />
+                ) : existingPartnerLogoUrl ? (
+                  <Image source={{ uri: existingPartnerLogoUrl }} style={s.partnerLogoPreview} resizeMode="contain" />
+                ) : (
+                  <View style={{ alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="cloud-upload-outline" size={20} color={L.goldDk} />
+                    <Text style={s.imagePickerText}>Upload Square Logo (PNG/JPG)</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={s.inputLabel}>Partner Name</Text>
+              <TextInput
+                placeholder="e.g. MTN Nigeria, Monnify, Paystack"
+                placeholderTextColor="#94A3B8"
+                style={s.modalInput}
+                value={newPartnerName}
+                onChangeText={setNewPartnerName}
+              />
+
+              <TouchableOpacity onPress={savePartner} disabled={uploading} style={s.saveModalBtn} activeOpacity={0.85}>
+                <LinearGradient colors={['#0F172A', '#1E293B']} style={s.saveMainGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  {uploading ? (
+                    <ActivityIndicator size="small" color={L.gold} />
+                  ) : (
+                    <Text style={s.saveMainText}>{editingPartnerId ? 'Update Partner' : 'Add Partner'}</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
 }
+
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: L.bg,
+  },
+  topBar: {
+    backgroundColor: L.navyHeader,
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 44 : 32,
+    paddingBottom: 8,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomWidth: 1.5,
+    borderColor: L.goldDk,
+  },
+  topBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: L.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13.5,
+  },
+  topBarSub: {
+    color: L.goldLight,
+    fontSize: 8.5,
+    fontWeight: '600',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.gold,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  addBtnText: {
+    color: '#0F172A',
+    fontWeight: '900',
+    fontSize: 9.5,
+  },
+  tabBarRow: {
+    flexDirection: 'row',
+    backgroundColor: '#060B19',
+    borderRadius: 10,
+    padding: 2,
+    gap: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(218, 165, 32, 0.25)',
+  },
+  tabPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  tabPillActive: {
+    backgroundColor: L.gold,
+  },
+  tabPillText: {
+    color: L.goldLight,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  tabPillTextActive: {
+    color: '#0F172A',
+    fontWeight: '900',
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 12,
+    paddingBottom: 60,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 40,
+  },
+  loadingText: {
+    color: L.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: L.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    marginTop: 10,
+    gap: 4,
+  },
+  emptyTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  emptySub: {
+    color: L.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: L.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    marginBottom: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  bannerImagePreview: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#E2E8F0',
+  },
+  cardBody: {
+    padding: 10,
+  },
+  cardTitle: {
+    color: L.navyHeader,
+    fontWeight: '800',
+    fontSize: 11.5,
+  },
+  cardUrl: {
+    color: L.goldAmber,
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  placementsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  placementBadge: {
+    backgroundColor: L.bg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  placementBadgeText: {
+    color: L.textMuted,
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 6,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.bg,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  actionBtnText: {
+    color: L.navyHeader,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  partnerCard: {
+    backgroundColor: L.card,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  partnerLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: L.bg,
+  },
+  partnerName: {
+    color: L.navyHeader,
+    fontWeight: '800',
+    fontSize: 11.5,
+  },
+  partnerSub: {
+    color: L.textMuted,
+    fontSize: 8.5,
+  },
+  iconBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  announcementCard: {
+    backgroundColor: L.card,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  announcementTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  inputLabel: {
+    color: L.navyHeader,
+    fontSize: 9.5,
+    fontWeight: '800',
+    marginBottom: 3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  textArea: {
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    borderRadius: 10,
+    padding: 8,
+    color: L.textPrimary,
+    fontSize: 11,
+    minHeight: 60,
+    marginBottom: 10,
+    textAlignVertical: 'top',
+  },
+  mediaPickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  mediaPickBtnText: {
+    color: L.navyHeader,
+    fontWeight: '800',
+    fontSize: 9.5,
+  },
+  mediaClearBtn: {
+    width: 32,
+    backgroundColor: L.coralBg,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: L.coralBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  announcementPreviewBox: {
+    position: 'relative',
+    height: 100,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  announcementPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  announcementTypeTag: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    color: '#FFFFFF',
+    fontSize: 7.5,
+    fontWeight: '900',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  saveMainBtn: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  saveMainGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+  },
+  saveMainText: {
+    color: L.gold,
+    fontWeight: '900',
+    fontSize: 11,
+  },
+  settingsCard: {
+    backgroundColor: L.card,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  systemSettingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  settingDesc: {
+    color: L.textMuted,
+    fontSize: 9,
+    marginTop: 2,
+    lineHeight: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: L.card,
+    borderRadius: 16,
+    padding: 14,
+    maxHeight: '90%',
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    color: L.navyHeader,
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  modalCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: L.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePickerBox: {
+    height: 110,
+    backgroundColor: L.bg,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  modalImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePickerPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  imagePickerText: {
+    color: L.textMuted,
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  modalInput: {
+    backgroundColor: L.bg,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    color: L.textPrimary,
+    fontSize: 11,
+    marginBottom: 8,
+  },
+  selectAllText: {
+    color: L.goldAmber,
+    fontSize: 8.5,
+    fontWeight: '800',
+  },
+  placementSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 12,
+  },
+  placementSelectChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: L.bg,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+  },
+  placementSelectChipActive: {
+    backgroundColor: L.goldLight,
+    borderColor: L.goldDk,
+  },
+  placementSelectText: {
+    color: L.textMuted,
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  placementSelectTextActive: {
+    color: '#0F172A',
+    fontWeight: '900',
+  },
+  saveModalBtn: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  partnerLogoPicker: {
+    height: 80,
+    backgroundColor: L.bg,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: L.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  partnerLogoPreview: {
+    width: 60,
+    height: 60,
+  },
+});
