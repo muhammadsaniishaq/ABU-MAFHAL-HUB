@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -10,81 +10,261 @@ import {
     Modal,
     ScrollView,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
+
+// Executive Color Tokens
+const L = {
+    bg: '#F8FAFC',
+    card: '#FFFFFF',
+    cardBorder: '#E2E8F0',
+    navyHeader: '#0F172A',
+    navyMid: '#1E293B',
+    gold: '#FFD700',
+    goldDk: '#DAA520',
+    goldAmber: '#D97706',
+    goldLight: '#FEF3C7',
+    emerald: '#10B981',
+    emeraldBg: '#ECFDF5',
+    emeraldBorder: '#A7F3D0',
+    sky: '#0EA5E9',
+    skyBg: '#F0F9FF',
+    coral: '#EF4444',
+    coralBg: '#FFF1F2',
+    purple: '#8B5CF6',
+    purpleBg: '#F5F3FF',
+    textPrimary: '#0F172A',
+    textSecondary: '#334155',
+    textMuted: '#64748B',
+};
+
+const FILTER_TABS = [
+    { id: 'All', label: 'All' },
+    { id: 'Telecom', label: '📱 Airtime/Data' },
+    { id: 'Verification', label: '📜 NIN / BVN / CAC' },
+    { id: 'Deposits', label: '⬇️ Deposits' },
+    { id: 'Transfers', label: '⬆️ Transfers' },
+    { id: 'Bills', label: '⚡ Utilities' },
+    { id: 'Pending', label: '⏳ Pending' },
+];
 
 export default function HistoryScreen() {
     const router = useRouter();
     const [history, setHistory] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string>('');
     const { settings } = useAppSettings();
 
+    const currentUserIdRef = useRef('');
+
     useEffect(() => {
-        fetchHistory();
+        initHistory();
     }, []);
 
-    const fetchHistory = async () => {
+    const initHistory = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false });
-
-                if (data) {
-                    const mapped = data.map(tx => {
-                        const amount = parseFloat(tx.amount.toString());
-                        const isIncome = tx.type === 'deposit' || (tx.type !== 'withdrawal' && tx.type !== 'transfer' && amount > 0);
-                        let icon = 'receipt-outline';
-                        let color = '#F59E0B';
-
-                        if (tx.type === 'transfer') { icon = 'send-outline'; color = '#3B82F6'; }
-                        else if (tx.type === 'withdrawal') { icon = 'card-outline'; color = '#EF4444'; }
-                        else if (tx.type === 'deposit') { icon = 'arrow-down-circle-outline'; color = '#10B981'; }
-                        else if (tx.description?.toLowerCase().includes('airtime')) { icon = 'phone-portrait-outline'; color = '#10B981'; }
-                        else if (tx.description?.toLowerCase().includes('data')) { icon = 'wifi-outline'; color = '#3B82F6'; }
-                        else if (tx.description?.toLowerCase().includes('cable') || tx.description?.toLowerCase().includes('dstv')) { icon = 'tv-outline'; color = '#8B5CF6'; }
-
-                        return {
-                            ...tx,
-                            displayAmount: `${isIncome ? '+' : '-'}₦${Math.abs(amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-                            rawAmount: Math.abs(amount),
-                            isIncome,
-                            icon,
-                            color,
-                            dateObj: new Date(tx.created_at)
-                        };
-                    });
-                    setHistory(mapped);
-                }
+                setCurrentUserId(user.id);
+                currentUserIdRef.current = user.id;
+                // 1. Instant Cache Load (0ms Render)
+                await loadCachedHistory(user.id);
+                // 2. Fresh Network Sync
+                await fetchLiveHistory(user.id);
+                // 3. Realtime Subscription Setup
+                setupRealtimeListener(user.id);
             }
-        } catch (error) {
-            console.error("Error fetching history:", error);
+        } catch (e) {
+            console.warn('History init error:', e);
         } finally {
-            setRefreshing(false);
+            setLoading(false);
         }
     };
 
-    const handleRefresh = () => {
+    const loadCachedHistory = async (userId: string) => {
+        try {
+            const cachedStr = await AsyncStorage.getItem(`@user_tx_history_v3_${userId}`);
+            if (cachedStr) {
+                const parsed = JSON.parse(cachedStr);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setHistory(parsed);
+                    setLoading(false);
+                }
+            }
+        } catch (e) {}
+    };
+
+    const saveCachedHistory = async (userId: string, data: any[]) => {
+        try {
+            await AsyncStorage.setItem(`@user_tx_history_v3_${userId}`, JSON.stringify(data));
+        } catch (e) {}
+    };
+
+    const mapTransactionRecord = (tx: any) => {
+        const rawAmount = Math.abs(parseFloat(tx.amount?.toString() || '0'));
+        const typeStr = (tx.type || '').toLowerCase();
+        const descStr = (tx.description || '').toLowerCase();
+        const isIncome = typeStr === 'deposit' || typeStr === 'credit' || (typeStr !== 'withdrawal' && typeStr !== 'transfer' && parseFloat(tx.amount || '0') > 0);
+
+        let icon = 'receipt-outline';
+        let color = '#F59E0B';
+        let category = 'Services';
+
+        if (typeStr === 'transfer') {
+            icon = 'send-outline';
+            color = '#3B82F6';
+            category = 'Transfers';
+        } else if (typeStr === 'withdrawal') {
+            icon = 'card-outline';
+            color = '#EF4444';
+            category = 'Transfers';
+        } else if (typeStr === 'deposit' || typeStr === 'credit') {
+            icon = 'arrow-down-circle-outline';
+            color = '#10B981';
+            category = 'Deposits';
+        } else if (descStr.includes('airtime') || typeStr === 'airtime') {
+            icon = 'phone-portrait-outline';
+            color = '#10B981';
+            category = 'Telecom';
+        } else if (descStr.includes('data') || typeStr === 'data') {
+            icon = 'wifi-outline';
+            color = '#3B82F6';
+            category = 'Telecom';
+        } else if (descStr.includes('nin') || descStr.includes('bvn') || descStr.includes('cac') || descStr.includes('slip') || descStr.includes('verification') || typeStr.includes('nin') || typeStr.includes('bvn') || typeStr.includes('cac')) {
+            icon = 'document-text-outline';
+            color = '#8B5CF6';
+            category = 'Verification';
+        } else if (descStr.includes('cable') || descStr.includes('dstv') || descStr.includes('gotv') || descStr.includes('electricity') || descStr.includes('bill')) {
+            icon = 'flash-outline';
+            color = '#F59E0B';
+            category = 'Bills';
+        }
+
+        const dateObj = new Date(tx.created_at || Date.now());
+
+        return {
+            ...tx,
+            displayAmount: `${isIncome ? '+' : '-'}₦${rawAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            rawAmount,
+            isIncome,
+            icon,
+            color,
+            category,
+            dateObj,
+            statusNormalized: (tx.status || 'success').toLowerCase()
+        };
+    };
+
+    const fetchLiveHistory = async (userId: string) => {
+        try {
+            // Parallel Fetch: Standard Transactions + Verification Services History
+            const [txRes, verifRes] = await Promise.allSettled([
+                supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(200),
+                supabase
+                    .from('verification_history')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(100)
+            ]);
+
+            const standardTxList = txRes.status === 'fulfilled' && txRes.value.data ? txRes.value.data : [];
+            const verifTxList = verifRes.status === 'fulfilled' && verifRes.value.data ? verifRes.value.data : [];
+
+            // Transform verification records into standard format if not already mirrored in transactions
+            const mappedVerif = verifTxList.map(v => ({
+                id: v.id || `verif-${v.reference || Date.now()}`,
+                user_id: v.user_id,
+                type: (v.service_type || 'verification').toLowerCase(),
+                amount: v.amount_paid || v.price || 0,
+                status: v.status || 'completed',
+                description: `${(v.service_type || 'Verification').toUpperCase()}: ${v.identifier || v.nin || v.bvn || v.cac_name || 'Slip Search'}`,
+                reference: v.reference || v.id,
+                created_at: v.created_at,
+                metadata: {
+                    slip_url: v.slip_url || v.pdf_url || v.download_url,
+                    result_data: v.result_data || v.data_payload,
+                    service_type: v.service_type,
+                    identifier: v.identifier || v.nin || v.bvn
+                }
+            }));
+
+            // Merge and deduplicate by reference or ID
+            const seenKeys = new Set<string>();
+            const combinedRaw = [...standardTxList, ...mappedVerif].filter(item => {
+                const key = item.reference || item.id;
+                if (!key || seenKeys.has(key)) return false;
+                seenKeys.add(key);
+                return true;
+            });
+
+            const mappedCombined = combinedRaw.map(mapTransactionRecord).sort(
+                (a, b) => b.dateObj.getTime() - a.dateObj.getTime()
+            );
+
+            setHistory(mappedCombined);
+            saveCachedHistory(userId, mappedCombined);
+        } catch (error) {
+            console.error('Error fetching live history:', error);
+        } finally {
+            setRefreshing(false);
+            setLoading(false);
+        }
+    };
+
+    const setupRealtimeListener = (userId: string) => {
+        const channel = supabase
+            .channel(`user_tx_sync_${userId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, (payload: any) => {
+                if (payload.new) {
+                    const newMapped = mapTransactionRecord(payload.new);
+                    setHistory(prev => {
+                        const updated = [newMapped, ...prev.filter(t => t.id !== newMapped.id && t.reference !== newMapped.reference)];
+                        saveCachedHistory(userId, updated);
+                        return updated;
+                    });
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'verification_history', filter: `user_id=eq.${userId}` }, () => {
+                fetchLiveHistory(userId);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    };
+
+    const handleRefresh = useCallback(() => {
         setRefreshing(true);
         if (Platform.OS !== 'web') {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-        fetchHistory();
-    };
+        if (currentUserIdRef.current) {
+            fetchLiveHistory(currentUserIdRef.current);
+        } else {
+            initHistory();
+        }
+    }, []);
 
     const copyToClipboard = async (text: string, label: string = 'Reference') => {
         await Clipboard.setStringAsync(text);
@@ -92,7 +272,7 @@ export default function HistoryScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         if (Platform.OS === 'web') alert(`${label} Copied to Clipboard!`);
-        else Alert.alert("Copied!", `${label} copied to clipboard.`);
+        else Alert.alert('Copied!', `${label} copied to clipboard.`);
     };
 
     const contactSupport = (tx: any) => {
@@ -101,17 +281,20 @@ export default function HistoryScreen() {
         const message = `Hello Support, I need assistance regarding my Transaction:\n\n• Type: ${tx.type}\n• Amount: ${tx.displayAmount}\n• Reference: ${tx.reference || tx.id}\n• Status: ${tx.status}\n• Date: ${tx.dateObj.toLocaleString()}`;
         const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         Linking.openURL(url).catch(() => {
-            Alert.alert("Error", "Could not launch WhatsApp. Please try again.");
+            Alert.alert('Error', 'Could not launch WhatsApp. Please try again.');
         });
     };
 
+    // Fast Filtering & Search
     const filteredHistory = useMemo(() => {
         return history.filter(tx => {
             let matchesFilter = true;
-            if (filter === 'Deposits') matchesFilter = tx.isIncome;
-            else if (filter === 'Withdrawals') matchesFilter = tx.type === 'withdrawal' || tx.type === 'transfer';
-            else if (filter === 'Services') matchesFilter = !tx.isIncome && tx.type !== 'withdrawal' && tx.type !== 'transfer';
-            else if (filter === 'Pending/Failed') matchesFilter = tx.status !== 'success';
+            if (filter === 'Telecom') matchesFilter = tx.category === 'Telecom';
+            else if (filter === 'Verification') matchesFilter = tx.category === 'Verification';
+            else if (filter === 'Deposits') matchesFilter = tx.category === 'Deposits';
+            else if (filter === 'Transfers') matchesFilter = tx.category === 'Transfers';
+            else if (filter === 'Bills') matchesFilter = tx.category === 'Bills';
+            else if (filter === 'Pending') matchesFilter = tx.statusNormalized === 'pending' || tx.statusNormalized === 'processing';
 
             let matchesSearch = true;
             if (searchQuery.trim() !== '') {
@@ -119,7 +302,8 @@ export default function HistoryScreen() {
                 const desc = (tx.description || '').toLowerCase();
                 const ref = (tx.reference || tx.id || '').toLowerCase();
                 const amt = tx.rawAmount.toString();
-                matchesSearch = desc.includes(query) || ref.includes(query) || amt.includes(query);
+                const typeName = (tx.type || '').toLowerCase();
+                matchesSearch = desc.includes(query) || ref.includes(query) || amt.includes(query) || typeName.includes(query);
             }
 
             return matchesFilter && matchesSearch;
@@ -168,205 +352,260 @@ export default function HistoryScreen() {
 
                     <Text style={s.headerTitleText}>Transaction History</Text>
 
-                    <TouchableOpacity onPress={() => fetchHistory()} style={s.refreshBtn} activeOpacity={0.8}>
-                        <Ionicons name="reload-outline" size={16} color="#F59E0B" />
+                    <TouchableOpacity onPress={handleRefresh} style={s.refreshBtn} activeOpacity={0.8}>
+                        <Ionicons name="reload-outline" size={16} color={L.gold} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Summary Metrics Pill Bar */}
                 <View style={s.summaryPillRow}>
                     <View style={s.summaryPill}>
-                        <Ionicons name="receipt" size={13} color="#F59E0B" />
+                        <Ionicons name="receipt" size={13} color={L.gold} />
                         <Text style={s.summaryPillText}>
-                            {filteredHistory.length} {filteredHistory.length === 1 ? 'Record' : 'Records'}
+                            {filteredHistory.length} Record{filteredHistory.length === 1 ? '' : 's'}
                         </Text>
                     </View>
 
-                    <View style={s.summaryPill}>
-                        <Ionicons name="analytics" size={13} color="#10B981" />
-                        <Text style={s.summaryPillText}>
-                            Total: ₦{totalVolume.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    <View style={[s.summaryPill, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.4)' }]}>
+                        <Ionicons name="wallet" size={13} color={L.emerald} />
+                        <Text style={[s.summaryPillText, { color: L.emerald }]}>
+                            Vol: ₦{totalVolume.toLocaleString('en-NG', { maximumFractionDigits: 0 })}
                         </Text>
+                    </View>
+
+                    <View style={[s.summaryPill, { backgroundColor: 'rgba(255, 215, 0, 0.15)', borderColor: 'rgba(255, 215, 0, 0.4)' }]}>
+                        <Ionicons name="flash" size={13} color={L.gold} />
+                        <Text style={[s.summaryPillText, { color: L.gold }]}>Live Realtime</Text>
                     </View>
                 </View>
-            </LinearGradient>
 
-            {/* Search & Filter Container */}
-            <View style={s.searchFilterBox}>
-                {/* Search Input Bar */}
-                <View style={s.searchBarInputContainer}>
-                    <Ionicons name="search-outline" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
+                {/* Search Bar */}
+                <View style={s.searchBarWrap}>
+                    <Ionicons name="search-outline" size={16} color="#94A3B8" />
                     <TextInput
+                        style={s.searchInput}
+                        placeholder="Search type, reference, description..."
+                        placeholderTextColor="#94A3B8"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        placeholder="Search ref, service, amount..."
-                        placeholderTextColor="#94A3B8"
-                        style={s.searchBarInput}
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 2 }}>
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
                             <Ionicons name="close-circle" size={16} color="#94A3B8" />
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* Category Filter Chips */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterChipsScroll}>
-                    {['All', 'Deposits', 'Withdrawals', 'Services', 'Pending/Failed'].map(f => (
-                        <TouchableOpacity
-                            key={f}
-                            style={[s.filterChip, filter === f && s.filterChipActive]}
-                            onPress={() => {
-                                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setFilter(f);
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={[s.filterChipText, filter === f && s.filterChipTextActive]}>{f}</Text>
-                        </TouchableOpacity>
-                    ))}
+                {/* Filter Tabs Scroll */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterTabsScroll}>
+                    {FILTER_TABS.map(tab => {
+                        const isSelected = filter === tab.id;
+                        return (
+                            <TouchableOpacity
+                                key={tab.id}
+                                onPress={() => setFilter(tab.id)}
+                                style={[s.filterTabBtn, isSelected && s.filterTabBtnActive]}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[s.filterTabBtnText, isSelected && s.filterTabBtnTextActive]}>
+                                    {tab.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </ScrollView>
-            </View>
+            </LinearGradient>
 
-            {/* Transaction Section List */}
-            <SectionList
-                sections={sections}
-                keyExtractor={(item) => item.id || Math.random().toString()}
-                contentContainerStyle={s.listPadding}
-                onRefresh={handleRefresh}
-                refreshing={refreshing}
-                showsVerticalScrollIndicator={false}
-                stickySectionHeadersEnabled={false}
-                initialNumToRender={15}
-                maxToRenderPerBatch={10}
-                windowSize={7}
-                removeClippedSubviews={Platform.OS !== 'web'}
-                renderSectionHeader={({ section: { title } }) => (
-                    <Text style={s.sectionHeaderTitle}>{title}</Text>
-                )}
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={s.txItemCard}
-                        onPress={() => {
-                            if (Platform.OS !== 'web') Haptics.selectionAsync();
-                            setSelectedTx(item);
-                        }}
-                        activeOpacity={0.75}
-                    >
-                        <View style={s.txCardLeft}>
-                            <View style={[s.txIconBox, { backgroundColor: item.color + '18' }]}>
-                                <Ionicons name={item.icon as any} size={16} color={item.color} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={s.txTitleText} numberOfLines={1}>
-                                    {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                                </Text>
-                                <Text style={s.txSubText} numberOfLines={1}>
-                                    {item.description || item.reference || 'Wallet transaction'}
-                                </Text>
-                            </View>
+            {/* Content List Section */}
+            {loading && history.length === 0 ? (
+                <View style={s.centerBox}>
+                    <ActivityIndicator size="large" color={L.goldDk} />
+                    <Text style={s.loadingText}>Syncing transaction ledger...</Text>
+                </View>
+            ) : filteredHistory.length === 0 ? (
+                <View style={s.emptyBox}>
+                    <Ionicons name="receipt-outline" size={44} color={L.goldDk} />
+                    <Text style={s.emptyTitle}>No Transactions Found</Text>
+                    <Text style={s.emptySub}>
+                        {searchQuery
+                            ? `No records match "${searchQuery}".`
+                            : 'All your recharge, bill payments, and transfers will appear here automatically.'}
+                    </Text>
+                </View>
+            ) : (
+                <SectionList
+                    sections={sections}
+                    keyExtractor={(item, index) => item.id || `tx-${index}`}
+                    contentContainerStyle={s.listContent}
+                    stickySectionHeadersEnabled={false}
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    showsVerticalScrollIndicator={false}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <View style={s.sectionHeader}>
+                            <Text style={s.sectionHeaderText}>{title}</Text>
+                        </View>
+                    )}
+                    renderItem={({ item }) => {
+                        const isSuccess = item.statusNormalized === 'success' || item.statusNormalized === 'completed';
+                        const isPending = item.statusNormalized === 'pending' || item.statusNormalized === 'processing';
+                        const isFailed = item.statusNormalized === 'failed' || item.statusNormalized === 'reversed';
+
+                        return (
+                            <TouchableOpacity
+                                onPress={() => setSelectedTx(item)}
+                                style={s.txItemCard}
+                                activeOpacity={0.75}
+                            >
+                                <View style={[s.txIconBox, { backgroundColor: `${item.color}15`, borderColor: `${item.color}40` }]}>
+                                    <Ionicons name={item.icon as any} size={18} color={item.color} />
+                                </View>
+
+                                <View style={s.txMainCol}>
+                                    <Text style={s.txTitle} numberOfLines={1}>
+                                        {item.description || item.type?.toUpperCase() || 'Transaction'}
+                                    </Text>
+                                    <Text style={s.txDateText}>
+                                        {item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Ref: {(item.reference || item.id || '').slice(-8)}
+                                    </Text>
+                                </View>
+
+                                <View style={s.txAmountCol}>
+                                    <Text style={[s.txAmountText, { color: item.isIncome ? L.emerald : L.navyHeader }]}>
+                                        {item.displayAmount}
+                                    </Text>
+                                    <View style={[
+                                        s.statusBadge,
+                                        isSuccess && s.statusSuccess,
+                                        isPending && s.statusPending,
+                                        isFailed && s.statusFailed
+                                    ]}>
+                                        <Text style={[
+                                            s.statusBadgeText,
+                                            isSuccess && { color: L.emerald },
+                                            isPending && { color: L.goldAmber },
+                                            isFailed && { color: L.coral }
+                                        ]}>
+                                            {isSuccess ? 'SUCCESS' : isPending ? 'PENDING' : 'FAILED'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
+                />
+            )}
+
+            {/* TRANSACTION DETAIL MODAL SHEET */}
+            <Modal visible={!!selectedTx} transparent animationType="slide" onRequestClose={() => setSelectedTx(null)}>
+                <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setSelectedTx(null)}>
+                    <View style={s.modalSheet}>
+                        <View style={s.modalDragBar} />
+
+                        <View style={s.modalHeader}>
+                            <Text style={s.modalHeaderTitle}>Transaction Receipt</Text>
+                            <TouchableOpacity onPress={() => setSelectedTx(null)} style={s.modalCloseBtn}>
+                                <Ionicons name="close" size={18} color={L.navyHeader} />
+                            </TouchableOpacity>
                         </View>
 
-                        <View style={s.txCardRight}>
-                            <Text style={[s.txAmountText, { color: item.isIncome ? '#10B981' : '#0F172A' }]}>
-                                {item.displayAmount}
-                            </Text>
-
-                            <View style={s.statusRow}>
-                                <View style={[s.statusDotSmall, { backgroundColor: item.status === 'success' ? '#10B981' : item.status === 'failed' ? '#EF4444' : '#F59E0B' }]} />
-                                <Text style={s.txTimeText}>
-                                    {item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                )}
-                ListEmptyComponent={() => (
-                    <View style={s.emptyBox}>
-                        <Ionicons name="document-text-outline" size={32} color="#CBD5E1" />
-                        <Text style={s.emptyTitle}>No Transactions Found</Text>
-                        <Text style={s.emptySub}>
-                            {searchQuery ? 'Try matching another keyword or filter.' : 'Your transactions history will appear here.'}
-                        </Text>
-                    </View>
-                )}
-            />
-
-            {/* INTERACTIVE TRANSACTION DETAILS MODAL SHEET */}
-            <Modal
-                visible={!!selectedTx}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setSelectedTx(null)}
-            >
-                {selectedTx && (
-                    <View style={s.modalBackdrop}>
-                        <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedTx(null)} activeOpacity={1} />
-
-                        <View style={s.modalSheet}>
-                            <View style={s.modalDragBar} />
-
-                            <View style={s.modalHeader}>
-                                <Text style={s.modalHeaderTitle}>Transaction Details</Text>
-                                <TouchableOpacity onPress={() => setSelectedTx(null)} style={s.modalCloseBtn}>
-                                    <Ionicons name="close" size={18} color="#64748B" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                                {/* Big Amount Badge */}
+                        {selectedTx && (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {/* Amount Card */}
                                 <View style={s.detailAmountCard}>
-                                    <Text style={[s.detailAmountText, { color: selectedTx.isIncome ? '#10B981' : '#0F172A' }]}>
+                                    <Text style={[s.detailAmountText, { color: selectedTx.isIncome ? L.emerald : L.navyHeader }]}>
                                         {selectedTx.displayAmount}
                                     </Text>
-
-                                    <View style={[s.detailStatusPill, { backgroundColor: selectedTx.status === 'success' ? '#ECFDF5' : selectedTx.status === 'failed' ? '#FEF2F2' : '#FEF3C7' }]}>
+                                    <View style={[
+                                        s.detailStatusPill,
+                                        selectedTx.statusNormalized === 'success' || selectedTx.statusNormalized === 'completed'
+                                            ? { backgroundColor: L.emeraldBg, borderColor: L.emeraldBorder, borderWidth: 1 }
+                                            : selectedTx.statusNormalized === 'pending'
+                                                ? { backgroundColor: L.goldLight, borderColor: L.goldDk, borderWidth: 1 }
+                                                : { backgroundColor: L.coralBg, borderColor: L.coral, borderWidth: 1 }
+                                    ]}>
                                         <Ionicons
-                                            name={selectedTx.status === 'success' ? 'checkmark-circle' : selectedTx.status === 'failed' ? 'close-circle' : 'time-sharp'}
-                                            size={14}
-                                            color={selectedTx.status === 'success' ? '#047857' : selectedTx.status === 'failed' ? '#B91C1C' : '#B45309'}
+                                            name={
+                                                selectedTx.statusNormalized === 'success' || selectedTx.statusNormalized === 'completed'
+                                                    ? 'checkmark-circle'
+                                                    : selectedTx.statusNormalized === 'pending'
+                                                        ? 'time'
+                                                        : 'alert-circle'
+                                            }
+                                            size={12}
+                                            color={
+                                                selectedTx.statusNormalized === 'success' || selectedTx.statusNormalized === 'completed'
+                                                    ? L.emerald
+                                                    : selectedTx.statusNormalized === 'pending'
+                                                        ? L.goldAmber
+                                                        : L.coral
+                                            }
                                         />
-                                        <Text style={[s.detailStatusPillText, { color: selectedTx.status === 'success' ? '#047857' : selectedTx.status === 'failed' ? '#B91C1C' : '#B45309' }]}>
-                                            {selectedTx.status ? selectedTx.status.toUpperCase() : 'SUCCESS'}
+                                        <Text style={[
+                                            s.detailStatusPillText,
+                                            {
+                                                color: selectedTx.statusNormalized === 'success' || selectedTx.statusNormalized === 'completed'
+                                                    ? L.emerald
+                                                    : selectedTx.statusNormalized === 'pending'
+                                                        ? L.goldAmber
+                                                        : L.coral
+                                            }
+                                        ]}>
+                                            {(selectedTx.status || 'COMPLETED').toUpperCase()}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {/* Key-Value Details Card */}
+                                {/* Info Card */}
                                 <View style={s.detailInfoCard}>
                                     <View style={s.infoRow}>
-                                        <Text style={s.infoLabel}>Transaction Type</Text>
-                                        <Text style={s.infoValue}>{selectedTx.type.toUpperCase()}</Text>
+                                        <Text style={s.infoLabel}>Service Description</Text>
+                                        <Text style={s.infoValue}>{selectedTx.description || selectedTx.type}</Text>
                                     </View>
 
                                     <View style={s.infoRow}>
-                                        <Text style={s.infoLabel}>Description</Text>
-                                        <Text style={s.infoValue} numberOfLines={2}>{selectedTx.description || 'Wallet Transaction'}</Text>
+                                        <Text style={s.infoLabel}>Category</Text>
+                                        <Text style={s.infoValue}>{selectedTx.category || 'Payment'}</Text>
                                     </View>
 
                                     <View style={s.infoRow}>
-                                        <Text style={s.infoLabel}>Date & Time</Text>
+                                        <Text style={s.infoLabel}>Transaction Date</Text>
                                         <Text style={s.infoValue}>{selectedTx.dateObj.toLocaleString()}</Text>
                                     </View>
 
-                                    <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
-                                        <Text style={s.infoLabel}>Reference ID</Text>
-                                        <TouchableOpacity onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id)} style={s.refCopyRow}>
-                                            <Text style={s.refText} numberOfLines={1}>{selectedTx.reference || selectedTx.id}</Text>
-                                            <Ionicons name="copy-outline" size={13} color="#F59E0B" />
+                                    <View style={s.infoRow}>
+                                        <Text style={s.infoLabel}>Reference Code</Text>
+                                        <TouchableOpacity
+                                            onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id, 'Reference')}
+                                            style={s.refCopyRow}
+                                        >
+                                            <Text style={s.refText}>{selectedTx.reference || selectedTx.id}</Text>
+                                            <Ionicons name="copy-outline" size={13} color={L.goldAmber} />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
 
+                                {/* Slip Download Button (For NIN / BVN / CAC) */}
+                                {selectedTx.metadata?.slip_url && (
+                                    <TouchableOpacity
+                                        onPress={() => Linking.openURL(selectedTx.metadata.slip_url)}
+                                        style={s.slipDownloadBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="download-outline" size={16} color="#0F172A" />
+                                        <Text style={s.slipDownloadBtnText}>Download Verification Slip (PDF)</Text>
+                                    </TouchableOpacity>
+                                )}
+
                                 {/* Action Buttons */}
                                 <View style={s.modalActionsCol}>
                                     <TouchableOpacity
-                                        onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id, 'Transaction Reference')}
+                                        onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id, 'Reference')}
                                         style={s.copyRefBtn}
-                                        activeOpacity={0.85}
+                                        activeOpacity={0.8}
                                     >
-                                        <Ionicons name="copy-outline" size={16} color="#0F172A" />
-                                        <Text style={s.copyRefBtnText}>Copy Reference ID</Text>
+                                        <Ionicons name="copy-outline" size={15} color={L.navyHeader} />
+                                        <Text style={s.copyRefBtnText}>Copy Transaction Reference</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -375,13 +614,13 @@ export default function HistoryScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                                        <Text style={s.whatsappSupportBtnText}>Need Help? WhatsApp Support</Text>
+                                        <Text style={s.whatsappSupportBtnText}>Get Help on WhatsApp</Text>
                                     </TouchableOpacity>
                                 </View>
                             </ScrollView>
-                        </View>
+                        )}
                     </View>
-                )}
+                </TouchableOpacity>
             </Modal>
         </View>
     );
@@ -390,218 +629,236 @@ export default function HistoryScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: L.bg,
     },
     topAccentLine: {
-        height: 2.5,
-        backgroundColor: '#F59E0B',
+        height: 3,
+        backgroundColor: L.gold,
+        width: '100%',
     },
     headerContainer: {
-        paddingTop: Platform.OS === 'android' ? 32 : 42,
-        paddingBottom: 16,
-        paddingHorizontal: 16,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
-        borderBottomWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
+        paddingTop: Platform.OS === 'ios' ? 44 : 32,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
+        borderBottomWidth: 1.5,
+        borderColor: L.goldDk,
     },
     headerNavRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     backBtn: {
         width: 32,
         height: 32,
-        borderRadius: 16,
+        borderRadius: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.35)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitleText: {
         color: '#FFFFFF',
-        fontSize: 16,
         fontWeight: '900',
-        letterSpacing: -0.3,
+        fontSize: 15,
+        letterSpacing: 0.2,
     },
     refreshBtn: {
         width: 32,
         height: 32,
-        borderRadius: 16,
+        borderRadius: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(245, 158, 11, 0.3)',
         borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.35)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     summaryPillRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
+        marginBottom: 8,
+        flexWrap: 'wrap',
     },
     summaryPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        gap: 4,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 3.5,
+        borderRadius: 6,
         borderWidth: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 10,
+        borderColor: 'rgba(255, 215, 0, 0.25)',
     },
     summaryPillText: {
         color: '#FFFFFF',
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '800',
     },
-    searchFilterBox: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 4,
-    },
-    searchBarInputContainer: {
+    searchBarWrap: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderColor: '#E2E8F0',
+        backgroundColor: '#060B19',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        height: 32,
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        height: 38,
-        marginBottom: 10,
+        borderColor: 'rgba(218, 165, 32, 0.3)',
+        marginBottom: 8,
     },
-    searchBarInput: {
+    searchInput: {
         flex: 1,
-        fontSize: 12,
-        color: '#0F172A',
-        fontWeight: '600',
-    },
-    filterChipsScroll: {
-        flexDirection: 'row',
-        gap: 6,
-        paddingBottom: 4,
-    },
-    filterChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    filterChipActive: {
-        backgroundColor: '#0F172A',
-        borderColor: '#F59E0B',
-    },
-    filterChipText: {
-        color: '#64748B',
+        color: '#FFFFFF',
         fontSize: 11,
+        marginLeft: 6,
+    },
+    filterTabsScroll: {
+        flexDirection: 'row',
+        gap: 5,
+        paddingVertical: 2,
+    },
+    filterTabBtn: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        paddingHorizontal: 9,
+        paddingVertical: 4.5,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    filterTabBtnActive: {
+        backgroundColor: L.gold,
+        borderColor: L.goldDk,
+    },
+    filterTabBtnText: {
+        color: '#E2E8F0',
+        fontSize: 9.5,
         fontWeight: '700',
     },
-    filterChipTextActive: {
-        color: '#F59E0B',
+    filterTabBtnTextActive: {
+        color: '#0F172A',
         fontWeight: '900',
     },
-    listPadding: {
-        paddingHorizontal: 16,
-        paddingBottom: 40,
-    },
-    sectionHeaderTitle: {
-        fontSize: 10.5,
-        fontWeight: '800',
-        color: '#94A3B8',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginTop: 12,
-        marginBottom: 6,
-        marginLeft: 2,
-    },
-    txItemCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
-        padding: 10,
-        borderRadius: 14,
-        marginBottom: 6,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    txCardLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    centerBox: {
         flex: 1,
-        gap: 8,
-    },
-    txIconBox: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
+        padding: 20,
+        gap: 8,
     },
-    txTitleText: {
-        color: '#0F172A',
+    loadingText: {
+        color: L.textMuted,
         fontSize: 12,
-        fontWeight: '800',
-    },
-    txSubText: {
-        color: '#64748B',
-        fontSize: 10,
-        fontWeight: '500',
-        marginTop: 1,
-    },
-    txCardRight: {
-        alignItems: 'flex-end',
-    },
-    txAmountText: {
-        fontSize: 12,
-        fontWeight: '900',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        marginTop: 2,
-    },
-    statusDotSmall: {
-        width: 5,
-        height: 5,
-        borderRadius: 2.5,
-    },
-    txTimeText: {
-        color: '#94A3B8',
-        fontSize: 9.5,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     emptyBox: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 40,
+        padding: 30,
+        margin: 16,
+        backgroundColor: L.card,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: L.cardBorder,
+        gap: 6,
     },
     emptyTitle: {
-        color: '#0F172A',
-        fontSize: 13,
-        fontWeight: '800',
-        marginTop: 6,
+        color: L.navyHeader,
+        fontWeight: '900',
+        fontSize: 14,
     },
     emptySub: {
-        color: '#94A3B8',
+        color: L.textMuted,
         fontSize: 11,
+        textAlign: 'center',
+        lineHeight: 15,
+    },
+    listContent: {
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        paddingBottom: 40,
+        maxWidth: 700,
+        width: '100%',
+        alignSelf: 'center',
+    },
+    sectionHeader: {
+        paddingVertical: 6,
+        backgroundColor: L.bg,
+    },
+    sectionHeaderText: {
+        color: L.textMuted,
+        fontWeight: '900',
+        fontSize: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    txItemCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: L.card,
+        borderRadius: 12,
+        padding: 10,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: L.cardBorder,
+        shadowColor: '#000',
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    txIconBox: {
+        width: 34,
+        height: 34,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    txMainCol: {
+        flex: 1,
+        marginLeft: 10,
+        marginRight: 6,
+    },
+    txTitle: {
+        color: L.navyHeader,
+        fontWeight: '800',
+        fontSize: 11.5,
+    },
+    txDateText: {
+        color: L.textMuted,
+        fontSize: 9,
         marginTop: 2,
     },
-
-    // MODAL SHEET STYLES
+    txAmountCol: {
+        alignItems: 'flex-end',
+    },
+    txAmountText: {
+        fontWeight: '900',
+        fontSize: 12,
+    },
+    statusBadge: {
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        marginTop: 2,
+    },
+    statusSuccess: {
+        backgroundColor: L.emeraldBg,
+    },
+    statusPending: {
+        backgroundColor: L.goldLight,
+    },
+    statusFailed: {
+        backgroundColor: L.coralBg,
+    },
+    statusBadgeText: {
+        fontSize: 7.5,
+        fontWeight: '900',
+    },
     modalBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(2, 6, 23, 0.65)',
@@ -609,93 +866,96 @@ const s = StyleSheet.create({
     },
     modalSheet: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 16,
-        borderTopWidth: 2.5,
-        borderColor: '#F59E0B',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 14,
+        borderTopWidth: 2,
+        borderColor: L.goldDk,
         maxHeight: '80%',
+        maxWidth: 550,
+        width: '100%',
+        alignSelf: 'center',
     },
     modalDragBar: {
-        width: 36,
-        height: 4,
+        width: 32,
+        height: 3.5,
         backgroundColor: '#CBD5E1',
         borderRadius: 2,
         alignSelf: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 14,
+        marginBottom: 12,
     },
     modalHeaderTitle: {
-        color: '#0F172A',
-        fontSize: 16,
+        color: L.navyHeader,
+        fontSize: 14,
         fontWeight: '900',
     },
     modalCloseBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: '#F1F5F9',
         alignItems: 'center',
         justifyContent: 'center',
     },
     detailAmountCard: {
         backgroundColor: '#F8FAFC',
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 12,
+        padding: 12,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        marginBottom: 14,
+        marginBottom: 10,
     },
     detailAmountText: {
-        fontSize: 26,
+        fontSize: 22,
         fontWeight: '900',
-        letterSpacing: -0.5,
-        marginBottom: 6,
+        letterSpacing: -0.3,
+        marginBottom: 4,
     },
     detailStatusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 10,
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 8,
     },
     detailStatusPillText: {
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '900',
     },
     detailInfoCard: {
         backgroundColor: '#FFFFFF',
         borderColor: '#E2E8F0',
         borderWidth: 1,
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        marginBottom: 14,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        marginBottom: 10,
     },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 10,
+        paddingVertical: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
     },
     infoLabel: {
         color: '#64748B',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
     },
     infoValue: {
-        color: '#0F172A',
-        fontSize: 11.5,
+        color: L.navyHeader,
+        fontSize: 10.5,
         fontWeight: '800',
-        maxWidth: 200,
+        maxWidth: 220,
         textAlign: 'right',
     },
     refCopyRow: {
@@ -704,42 +964,58 @@ const s = StyleSheet.create({
         gap: 4,
     },
     refText: {
-        color: '#0F172A',
-        fontSize: 11,
+        color: L.navyHeader,
+        fontSize: 10,
         fontWeight: '800',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
-    modalActionsCol: {
-        gap: 8,
-    },
-    copyRefBtn: {
-        backgroundColor: '#F1F5F9',
-        height: 42,
-        borderRadius: 12,
+    slipDownloadBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
+        backgroundColor: L.gold,
+        paddingVertical: 9,
+        borderRadius: 10,
+        marginBottom: 8,
+    },
+    slipDownloadBtnText: {
+        color: '#0F172A',
+        fontWeight: '900',
+        fontSize: 11,
+    },
+    modalActionsCol: {
+        gap: 6,
+        marginBottom: 10,
+    },
+    copyRefBtn: {
+        backgroundColor: '#F1F5F9',
+        height: 38,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
     },
     copyRefBtnText: {
-        color: '#0F172A',
-        fontSize: 12,
+        color: L.navyHeader,
+        fontSize: 11,
         fontWeight: '800',
     },
     whatsappSupportBtn: {
         backgroundColor: '#0F172A',
         borderColor: '#25D366',
-        borderWidth: 1.2,
-        height: 42,
-        borderRadius: 12,
+        borderWidth: 1,
+        height: 38,
+        borderRadius: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 5,
     },
     whatsappSupportBtnText: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
     },
 });

@@ -143,9 +143,29 @@ export default function Dashboard() {
       })
       .subscribe();
 
+    let profileChannel: any = null;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        profileChannel = supabase.channel(`dashboard-profile-${user.id}`)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, (payload: any) => {
+            if (payload.new) {
+              setUserData(prev => prev ? { ...prev, ...payload.new } : payload.new);
+              saveCache({ userData: payload.new });
+            }
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` }, (payload: any) => {
+            if (payload.new) {
+              setTransactions(prev => [payload.new, ...prev.filter(t => t.id !== payload.new.id).slice(0, 7)]);
+            }
+          })
+          .subscribe();
+      }
+    });
+
     return () => { 
       supabase.removeChannel(channel); 
       supabase.removeChannel(settingsChannel);
+      if (profileChannel) supabase.removeChannel(profileChannel);
     };
   }, []);
 

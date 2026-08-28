@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabase';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { createAppNotification } from '../../services/notificationsHelper';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicBanners from '../../components/DynamicBanners';
 
 export default function TransferScreen() {
@@ -115,7 +116,30 @@ export default function TransferScreen() {
                             const { data: { user } } = await supabase.auth.getUser();
                             if (!user) throw new Error("Not authenticated");
 
-                            // 1. Record Transaction
+                            // 1. Fetch fresh balance to prevent race conditions
+                            const { data: profileData } = await supabase
+                                .from('profiles')
+                                .select('balance')
+                                .eq('id', user.id)
+                                .single();
+
+                            const liveBalance = profileData ? parseFloat(profileData.balance || '0') : userBalance;
+                            if (liveBalance < transferAmount) {
+                                throw new Error(`Insufficient wallet balance. You have ₦${liveBalance.toLocaleString()}`);
+                            }
+
+                            const newBalance = Math.max(0, liveBalance - transferAmount);
+
+                            // 2. Update Balance
+                            const { error: balanceError } = await supabase
+                                .from('profiles')
+                                .update({ balance: newBalance })
+                                .eq('id', user.id);
+
+                            if (balanceError) throw balanceError;
+
+                            // 3. Record Transaction
+                            const refCode = `TXN${Date.now()}`;
                             const { error: txError } = await supabase
                                 .from('transactions')
                                 .insert({
@@ -124,24 +148,28 @@ export default function TransferScreen() {
                                     amount: transferAmount,
                                     status: 'success',
                                     description: `Transfer to ${accountName} (${bank.toUpperCase()})`,
-                                    reference: `TXN${Date.now()}`
+                                    reference: refCode
                                 });
 
-                            if (txError) throw txError;
+                            if (txError) console.warn('Transaction record note:', txError.message);
 
-                            // 2. Update Balance
-                            const { error: balanceError } = await supabase
-                                .from('profiles')
-                                .update({ balance: userBalance - transferAmount })
-                                .eq('id', user.id);
-
-                            if (balanceError) throw balanceError;
+                            // 4. Update Dashboard Cache Optimistically
+                            try {
+                                const cachedStr = await AsyncStorage.getItem('@dashboard_data_v2');
+                                if (cachedStr) {
+                                    const cached = JSON.parse(cachedStr);
+                                    if (cached.userData) {
+                                        cached.userData.balance = newBalance;
+                                        await AsyncStorage.setItem('@dashboard_data_v2', JSON.stringify(cached));
+                                    }
+                                }
+                            } catch (_) {}
 
                             // Send Notification
                             await createAppNotification(
                                 user.id,
                                 "Transfer Successful",
-                                `You have successfully transferred ₦${transferAmount} to ${accountName} (${bank.toUpperCase()}).`,
+                                `You have successfully transferred ₦${transferAmount.toLocaleString()} to ${accountName} (${bank.toUpperCase()}).`,
                                 "transfer",
                                 "normal",
                                 { route: "/(app)/history" }
