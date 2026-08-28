@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { trackGooglePurchaseConversion } from '../services/googleAds';
-import { downloadReceiptAsPDF } from '../services/receiptGenerator';
+import { ReceiptData } from '../services/receiptGenerator';
+import ReceiptExportModal from '../components/ReceiptExportModal';
 
 const G = {
   navyDark: '#020617',
@@ -21,7 +22,7 @@ export default function SuccessScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { amount, type, id, reference, description } = params;
-    const [generatingPdf, setGeneratingPdf] = useState(false);
+    const [exportModalVisible, setExportModalVisible] = useState(false);
 
     // Trigger Google Ads conversion tracking on successful purchase
     useEffect(() => {
@@ -39,23 +40,14 @@ export default function SuccessScreen() {
         return () => backHandler.remove();
     }, []);
 
-    const handleDownloadReceipt = async () => {
-        try {
-            setGeneratingPdf(true);
-            await downloadReceiptAsPDF({
-                reference: String(reference || id || `TXN-${Date.now()}`),
-                type: String(type || 'Payment Service'),
-                description: String(description || `${type || 'Service'} Completed Successfully`),
-                amount: String(amount || '0'),
-                status: 'SUCCESSFUL',
-                date: new Date(),
-                paymentMethod: 'Wallet Balance'
-            });
-        } catch (e) {
-            console.error('PDF error:', e);
-        } finally {
-            setGeneratingPdf(false);
-        }
+    const receiptPayload: ReceiptData = {
+        reference: String(reference || id || `TXN-${Date.now()}`),
+        type: String(type || 'Payment Service'),
+        description: String(description || `${type || 'Service'} Completed Successfully`),
+        amount: String(amount || '0'),
+        status: 'SUCCESSFUL',
+        date: new Date(),
+        paymentMethod: 'Wallet Balance'
     };
 
     return (
@@ -89,21 +81,14 @@ export default function SuccessScreen() {
                 )}
             </View>
 
-            {/* Download PDF Receipt Button */}
+            {/* Download Receipt Button (PDF / PNG Modal) */}
             <TouchableOpacity
                 style={s.pdfBtn}
-                onPress={handleDownloadReceipt}
-                disabled={generatingPdf}
+                onPress={() => setExportModalVisible(true)}
                 activeOpacity={0.85}
             >
-                {generatingPdf ? (
-                    <ActivityIndicator size="small" color="#0F172A" />
-                ) : (
-                    <>
-                        <Ionicons name="document-text-outline" size={18} color="#0F172A" />
-                        <Text style={s.pdfBtnText}>Download PDF Receipt</Text>
-                    </>
-                )}
+                <Ionicons name="download-outline" size={18} color="#0F172A" />
+                <Text style={s.pdfBtnText}>Download Receipt (PDF / PNG)</Text>
             </TouchableOpacity>
 
             {/* Back to Home Button */}
@@ -122,6 +107,13 @@ export default function SuccessScreen() {
             >
                 <Text style={s.historyBtnText}>View in Transaction History →</Text>
             </TouchableOpacity>
+
+            {/* DUAL FORMAT RECEIPT EXPORT MODAL */}
+            <ReceiptExportModal
+                visible={exportModalVisible}
+                onClose={() => setExportModalVisible(false)}
+                receiptData={receiptPayload}
+            />
         </LinearGradient>
     );
 }

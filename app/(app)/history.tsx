@@ -22,7 +22,8 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
-import { downloadReceiptAsPDF } from '../../services/receiptGenerator';
+import { ReceiptData } from '../../services/receiptGenerator';
+import ReceiptExportModal from '../../components/ReceiptExportModal';
 
 // Executive Color Tokens
 const L = {
@@ -70,6 +71,8 @@ export default function HistoryScreen() {
     const [filter, setFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
+    const [exportModalVisible, setExportModalVisible] = useState(false);
+    const [exportReceiptData, setExportReceiptData] = useState<ReceiptData | null>(null);
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const { settings } = useAppSettings();
 
@@ -609,27 +612,24 @@ export default function HistoryScreen() {
                                 {/* Action Buttons */}
                                 <View style={s.modalActionsCol}>
                                     <TouchableOpacity
-                                        onPress={async () => {
-                                            try {
-                                                await downloadReceiptAsPDF({
-                                                    reference: selectedTx.reference || selectedTx.id,
-                                                    type: selectedTx.type || selectedTx.category || 'Transaction',
-                                                    description: selectedTx.description,
-                                                    amount: selectedTx.rawAmount,
-                                                    status: selectedTx.statusNormalized || selectedTx.status || 'SUCCESSFUL',
-                                                    date: selectedTx.dateObj,
-                                                    paymentMethod: selectedTx.payment_method || 'Wallet Balance',
-                                                    beneficiary: selectedTx.metadata?.identifier || selectedTx.metadata?.phone || selectedTx.metadata?.account_number || selectedTx.metadata?.link
-                                                });
-                                            } catch (e) {
-                                                console.error('PDF receipt error:', e);
-                                            }
+                                        onPress={() => {
+                                            setExportReceiptData({
+                                                reference: selectedTx.reference || selectedTx.id,
+                                                type: selectedTx.type || selectedTx.category || 'Transaction',
+                                                description: selectedTx.description,
+                                                amount: selectedTx.rawAmount,
+                                                status: selectedTx.statusNormalized || selectedTx.status || 'SUCCESSFUL',
+                                                date: selectedTx.dateObj,
+                                                paymentMethod: selectedTx.payment_method || 'Wallet Balance',
+                                                beneficiary: selectedTx.metadata?.identifier || selectedTx.metadata?.phone || selectedTx.metadata?.account_number || selectedTx.metadata?.link
+                                            });
+                                            setExportModalVisible(true);
                                         }}
                                         style={s.pdfReceiptBtn}
                                         activeOpacity={0.85}
                                     >
-                                        <Ionicons name="document-text-outline" size={16} color="#0F172A" />
-                                        <Text style={s.pdfReceiptBtnText}>Download Modern PDF Receipt</Text>
+                                        <Ionicons name="download-outline" size={16} color="#0F172A" />
+                                        <Text style={s.pdfReceiptBtnText}>Download Receipt (PDF / PNG)</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -655,6 +655,13 @@ export default function HistoryScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            {/* DUAL FORMAT RECEIPT EXPORT MODAL (PDF / PNG) */}
+            <ReceiptExportModal
+                visible={exportModalVisible}
+                onClose={() => setExportModalVisible(false)}
+                receiptData={exportReceiptData}
+            />
         </View>
     );
 }

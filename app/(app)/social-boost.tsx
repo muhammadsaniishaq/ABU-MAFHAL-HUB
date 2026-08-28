@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicBanners from '../../components/DynamicBanners';
 import { api } from '../../services/api';
 import * as Clipboard from 'expo-clipboard';
-import { downloadReceiptAsPDF } from '../../services/receiptGenerator';
+import ReceiptExportModal from '../../components/ReceiptExportModal';
 import { createAppNotification } from '../../services/notificationsHelper';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -73,7 +73,7 @@ export default function SocialBoostScreen() {
 
   // Custom Decorated Alert Modal State
   const [lastReceiptData, setLastReceiptData] = useState<any | null>(null);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
   const [alertModal, setAlertModal] = useState<{
     visible: boolean;
     type: 'success' | 'error' | 'info';
@@ -1012,17 +1012,7 @@ export default function SocialBoostScreen() {
 
             {alertModal.type === 'success' && lastReceiptData && (
               <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    setDownloadingPdf(true);
-                    await downloadReceiptAsPDF(lastReceiptData);
-                  } catch (err) {
-                    console.error("Receipt error:", err);
-                  } finally {
-                    setDownloadingPdf(false);
-                  }
-                }}
-                disabled={downloadingPdf}
+                onPress={() => setExportModalVisible(true)}
                 style={{
                   backgroundColor: T.gold,
                   width: '100%',
@@ -1036,14 +1026,8 @@ export default function SocialBoostScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                {downloadingPdf ? (
-                  <ActivityIndicator size="small" color={T.navyDark} />
-                ) : (
-                  <>
-                    <Ionicons name="document-text-outline" size={15} color={T.navyDark} />
-                    <Text style={{ color: T.navyDark, fontSize: 11, fontWeight: '900' }}>Download PDF Receipt</Text>
-                  </>
-                )}
+                <Ionicons name="download-outline" size={15} color={T.navyDark} />
+                <Text style={{ color: T.navyDark, fontSize: 11, fontWeight: '900' }}>Download Receipt (PDF / PNG)</Text>
               </TouchableOpacity>
             )}
 
@@ -1080,6 +1064,13 @@ export default function SocialBoostScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* DUAL FORMAT RECEIPT EXPORT MODAL (PDF / PNG) */}
+      <ReceiptExportModal
+        visible={exportModalVisible}
+        onClose={() => setExportModalVisible(false)}
+        receiptData={lastReceiptData}
+      />
     </View>
   );
 }
