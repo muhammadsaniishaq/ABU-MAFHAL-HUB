@@ -97,33 +97,36 @@ export default function HistoryScreen() {
                 currentUserIdRef.current = user.id;
                 // 1. Instant Cache Load (0ms Render)
                 await loadCachedHistory(user.id);
-                // 2. Fresh Network Sync
-                await fetchLiveHistory(user.id);
+                // 2. Fresh Network Sync in background
+                fetchLiveHistory(user.id);
                 // 3. Realtime Subscription Setup
                 setupRealtimeListener(user.id);
+            } else {
+                setLoading(false);
             }
         } catch (e) {
             console.warn('History init error:', e);
-        } finally {
             setLoading(false);
         }
     };
 
     const loadCachedHistory = async (userId: string) => {
         try {
-            const cachedStr = await AsyncStorage.getItem(`@user_tx_history_v4_${userId}`);
+            let cachedStr = await AsyncStorage.getItem(`@user_tx_history_v4_${userId}`);
+            if (!cachedStr) {
+                cachedStr = await AsyncStorage.getItem(`@user_tx_history_v3_${userId}`);
+            }
             if (cachedStr) {
                 const parsed = JSON.parse(cachedStr);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    const rehydrated = parsed.map(tx => ({
-                        ...tx,
-                        dateObj: toSafeDate(tx.dateObj || tx.created_at)
-                    }));
+                    const rehydrated = parsed.map(mapTransactionRecord);
                     setHistory(rehydrated);
                     setLoading(false);
                 }
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn('Cache read note:', e);
+        }
     };
 
     const saveCachedHistory = async (userId: string, data: any[]) => {
@@ -132,11 +135,22 @@ export default function HistoryScreen() {
         } catch (e) {}
     };
 
+    const extractAmount = (tx: any): number => {
+        const val = tx.amount ?? tx.price ?? tx.amount_paid ?? tx.cost ?? tx.total_amount ?? tx.rawAmount ?? 0;
+        if (typeof val === 'number') return Math.abs(val);
+        if (typeof val === 'string') {
+            const cleaned = val.replace(/[^0-9.-]+/g, '');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : Math.abs(parsed);
+        }
+        return 0;
+    };
+
     const mapTransactionRecord = (tx: any) => {
-        const rawAmount = Math.abs(parseFloat(tx.amount?.toString() || '0'));
+        const rawAmount = extractAmount(tx);
         const typeStr = (tx.type || '').toLowerCase();
         const descStr = (tx.description || '').toLowerCase();
-        const isIncome = typeStr === 'deposit' || typeStr === 'credit' || (typeStr !== 'withdrawal' && typeStr !== 'transfer' && parseFloat(tx.amount || '0') > 0);
+        const isIncome = typeStr === 'deposit' || typeStr === 'credit' || typeStr === 'topup' || typeStr === 'refund' || descStr.includes('deposit') || descStr.includes('funded') || descStr.includes('credit');
 
         let icon = 'receipt-outline';
         let color = '#F59E0B';
@@ -150,7 +164,7 @@ export default function HistoryScreen() {
             icon = 'card-outline';
             color = '#EF4444';
             category = 'Transfers';
-        } else if (typeStr === 'deposit' || typeStr === 'credit') {
+        } else if (isIncome) {
             icon = 'arrow-down-circle-outline';
             color = '#10B981';
             category = 'Deposits';
