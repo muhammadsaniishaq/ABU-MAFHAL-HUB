@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator,
-  Modal, Alert, StyleSheet, Platform, Dimensions, StatusBar, Linking, KeyboardAvoidingView
+  Modal, Alert, StyleSheet, Platform, Dimensions, StatusBar, Linking, KeyboardAvoidingView,
+  BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -200,6 +201,55 @@ export default function RealtimeEnterpriseTeamSuite() {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+
+  // Unified Smooth Back Navigation
+  const handleBack = () => {
+    if (activeMeetingUrl) {
+      closeInAppMeeting();
+      return;
+    }
+    if (activeDmUser) {
+      setActiveDmUser(null);
+      setActiveTab('chat');
+      return;
+    }
+    if (activeTab !== 'chat') {
+      setActiveTab('chat');
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)');
+    }
+  };
+
+  useEffect(() => {
+    const backAction = () => {
+      if (activeMeetingUrl) {
+        closeInAppMeeting();
+        return true;
+      }
+      if (activeDmUser) {
+        setActiveDmUser(null);
+        setActiveTab('chat');
+        return true;
+      }
+      if (activeTab !== 'chat') {
+        setActiveTab('chat');
+        return true;
+      }
+      if (router.canGoBack()) {
+        router.back();
+        return true;
+      }
+      router.replace('/(app)');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [activeMeetingUrl, activeDmUser, activeTab]);
 
   useEffect(() => {
     fetchCurrentAdminProfile();
@@ -1447,23 +1497,10 @@ export default function RealtimeEnterpriseTeamSuite() {
       {/* EXECUTIVE TOP BAR (MOBILE-FIRST RESPONSIVE WRAPPER) */}
       <View style={s.topBar}>
         <View style={s.topBarRow}>
-          {/* Back Button */}
-          {activeDmUser ? (
-            <TouchableOpacity
-              onPress={() => {
-                setActiveDmUser(null);
-                setActiveTab('chat');
-              }}
-              style={s.backBtn}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="arrow-back" size={16} color={L.gold} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
-              <Ionicons name="arrow-back" size={16} color={L.gold} />
-            </TouchableOpacity>
-          )}
+          {/* Unified Smooth Back Button */}
+          <TouchableOpacity onPress={handleBack} style={s.backBtn} activeOpacity={0.75}>
+            <Ionicons name="arrow-back" size={16} color={L.gold} />
+          </TouchableOpacity>
 
           {/* Channel / DM Selector Pill */}
           <TouchableOpacity
@@ -1475,28 +1512,23 @@ export default function RealtimeEnterpriseTeamSuite() {
             <Text style={s.channelSelectorTitle} numberOfLines={1}>
               {activeDmUser ? `@${activeDmUser.name.split(' ')[0]}` : `#${activeChannelObj.name}`}
             </Text>
-            <Ionicons name={activeDmUser ? 'close-circle' : 'chevron-down'} size={13} color={L.goldLight} />
+            <View style={s.channelRoleTag}>
+              <Text style={s.channelRoleTagText}>{isSuperAdmin ? 'SUPER' : 'ADMIN'}</Text>
+            </View>
+            <Ionicons name={activeDmUser ? 'close-circle' : 'chevron-down'} size={12} color={L.goldLight} />
           </TouchableOpacity>
 
           {/* Right Action Icons Group */}
           <View style={s.topActionsGroup}>
-            <View style={s.superAdminPill}>
-              <Ionicons name="ribbon" size={11} color="#0F172A" />
-              <Text style={s.superAdminPillText}>{isSuperAdmin ? 'SUPER' : 'ADMIN'}</Text>
-            </View>
-
             <TouchableOpacity onPress={() => setShowSearchBar(!showSearchBar)} style={s.topIconBtn} activeOpacity={0.8}>
               <Ionicons name="search" size={13} color={L.gold} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => handleAskCortexAI('summary')} disabled={aiAnalyzing} style={s.aiCopilotBtn} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => handleAskCortexAI('summary')} disabled={aiAnalyzing} style={s.topIconBtn} activeOpacity={0.85}>
               {aiAnalyzing ? (
-                <ActivityIndicator size="small" color="#0F172A" />
+                <ActivityIndicator size="small" color={L.gold} />
               ) : (
-                <>
-                  <Ionicons name="sparkles" size={12} color="#0F172A" />
-                  <Text style={s.aiCopilotBtnText}>AI</Text>
-                </>
+                <Ionicons name="sparkles" size={13} color={L.gold} />
               )}
             </TouchableOpacity>
 
@@ -2890,6 +2922,18 @@ const s = StyleSheet.create({
     fontWeight: '900',
     fontSize: 11.5,
     flexShrink: 1,
+  },
+  channelRoleTag: {
+    backgroundColor: L.gold,
+    paddingHorizontal: 4,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    marginLeft: 2,
+  },
+  channelRoleTagText: {
+    color: '#0F172A',
+    fontWeight: '900',
+    fontSize: 7.5,
   },
   topActionsGroup: {
     flexDirection: 'row',
