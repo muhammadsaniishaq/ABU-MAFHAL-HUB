@@ -1230,32 +1230,46 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // Vote on Poll (Instant Real-time Percentage Update)
+  // Vote on Poll (Instant Real-time Percentage Update & Robust Multi-Admin Sync)
   const votePoll = async (msgId: string, optionIdx: number) => {
-    const targetMsg = messages.find(m => m.id === msgId);
-    if (!targetMsg || !targetMsg.metadata || !targetMsg.metadata.options) return;
+    const voterKey = currentUserId || currentUserName || 'admin_user';
 
-    const voterId = currentUserId || currentUserName || 'admin_user';
+    let updatedMetadata: any = null;
 
-    const newOptions = targetMsg.metadata.options.map((opt: any, idx: number) => {
-      let votes = Array.isArray(opt.votes) ? [...opt.votes] : [];
-      votes = votes.filter((id: string) => id !== voterId && id !== currentUserId && id !== currentUserName);
-      if (idx === optionIdx) {
-        votes.push(voterId);
-      }
-      return { ...opt, votes };
-    });
-
-    const updatedMetadata = { ...targetMsg.metadata, options: newOptions };
     setMessages(prev => {
-      const updated = prev.map(m => (m.id === msgId ? { ...m, metadata: updatedMetadata } : m));
+      const updated = prev.map(m => {
+        if (m.id !== msgId) return m;
+        const metadata = m.metadata || {};
+        const options = Array.isArray(metadata.options) ? metadata.options : [];
+
+        const newOptions = options.map((opt: any, idx: number) => {
+          let votes = Array.isArray(opt.votes) ? [...opt.votes] : [];
+          // Remove voter from all options first
+          votes = votes.filter((v: string) => v !== voterKey && v !== currentUserId && v !== currentUserName && v !== 'admin_user');
+          if (idx === optionIdx) {
+            votes.push(voterKey);
+          }
+          return { ...opt, votes };
+        });
+
+        updatedMetadata = { ...metadata, options: newOptions };
+        return {
+          ...m,
+          metadata: updatedMetadata
+        };
+      });
+
       persistMessagesToStorage(currentRoomId, updated);
       return updated;
     });
 
-    try {
-      await supabase.from('team_messages').update({ metadata: updatedMetadata }).eq('id', msgId);
-    } catch (e) {}
+    if (updatedMetadata) {
+      try {
+        await supabase.from('team_messages').update({ metadata: updatedMetadata }).eq('id', msgId);
+      } catch (e) {
+        console.warn("Poll vote db update error:", e);
+      }
+    }
   };
 
   // 20. Create Real Task with Priority (Instant Optimistic Display)
@@ -1784,9 +1798,13 @@ export default function RealtimeEnterpriseTeamSuite() {
                       <Text style={s.pollQuestionTitle}>{pData.question || msg.content}</Text>
 
                       {options.map((opt: any, optIdx: number) => {
-                        const optVotes = opt.votes?.length || 0;
+                        const optVotes = Array.isArray(opt.votes) ? opt.votes.length : 0;
                         const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-                        const hasVoted = (opt.votes || []).includes(currentUserId) || (opt.votes || []).includes(currentUserName);
+                        const hasVoted = Array.isArray(opt.votes) && (
+                          (Boolean(currentUserId) && opt.votes.includes(currentUserId)) ||
+                          (Boolean(currentUserName) && opt.votes.includes(currentUserName)) ||
+                          opt.votes.includes('admin_user')
+                        );
 
                         return (
                           <TouchableOpacity
@@ -1797,13 +1815,16 @@ export default function RealtimeEnterpriseTeamSuite() {
                           >
                             <View style={[s.pollBarFill, { width: `${pct}%` }]} />
                             <View style={s.pollOptionContent}>
-                              <Text style={[s.pollOptionText, hasVoted && s.pollOptionTextVoted]} numberOfLines={1}>{opt.text}</Text>
-                              <Text style={s.pollOptionPct}>{pct}% ({optVotes})</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+                                <Ionicons name={hasVoted ? "radio-button-on" : "radio-button-off"} size={13} color={hasVoted ? L.goldAmber : '#94A3B8'} />
+                                <Text style={[s.pollOptionText, hasVoted && s.pollOptionTextVoted]} numberOfLines={1}>{opt.text}</Text>
+                              </View>
+                              <Text style={[s.pollOptionPct, hasVoted && { color: L.navyHeader, fontWeight: '900' }]}>{pct}% ({optVotes})</Text>
                             </View>
                           </TouchableOpacity>
                         );
                       })}
-                      <Text style={s.pollTotalFooter}>{totalVotes} total admin votes</Text>
+                      <Text style={s.pollTotalFooter}>{totalVotes} total admin vote{totalVotes === 1 ? '' : 's'}</Text>
                     </View>
                   );
                 }
