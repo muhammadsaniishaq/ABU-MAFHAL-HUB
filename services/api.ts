@@ -81,29 +81,43 @@ export const api = {
 
             if (txnError) throw new Error(`Transaction Init Failed: ${txnError.message}`);
 
-            // 2. Call Bills Payment Edge Function
-            const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
-                body: {
-                    type: 'airtime',
-                    network: params.network, // '01', '02' mapping might be needed if ClubKonnect uses diff codes, but let's assume UI IDs match or we map them here.
-                    phone: params.phone,
-                    amount: params.amount
-                }
-            });
+            try {
+                // 2. Call Bills Payment Edge Function
+                const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
+                    body: {
+                        type: 'airtime',
+                        network: params.network,
+                        phone: params.phone,
+                        amount: params.amount
+                    }
+                });
 
-            if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
-            if (!result.success) throw new Error(result.error || "Purchase Failed at Provider");
+                if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
+                if (!result?.success) throw new Error(result?.error || "Purchase Failed at Provider");
 
-            // 3. Update Transaction Status
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: result.data?.orderid || result.requestId // ClubKonnect returns 'orderid'
-                })
-                .eq('id', txn.id);
+                // 3. Update Transaction Status to Success
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: result.data?.orderid || result.requestId || `AIR-${Date.now()}`
+                    })
+                    .eq('id', txn.id);
 
-            return { success: true, reference: result.data?.orderid || result.requestId };
+                return { success: true, reference: result.data?.orderid || result.requestId || `AIR-${Date.now()}` };
+            } catch (err: any) {
+                // Update Transaction Status to Failed so user is never charged / record is accurate
+                const failureMsg = err.message || "Transaction failed";
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'failed',
+                        reference: `FAIL-${Date.now()}`,
+                        description: `Airtime Purchase: ${params.network.toUpperCase()} ${params.phone} (Failed)`
+                    })
+                    .eq('id', txn.id);
+                throw new Error(failureMsg);
+            }
         }
     },
 
@@ -204,31 +218,44 @@ export const api = {
 
             if (txnError) throw new Error(`Transaction Init Failed: ${txnError.message}`);
 
-            // 2. Call Bills Payment Edge Function
-            const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
-                body: {
-                    type: 'data',
-                    network: params.network,
-                    phone: params.phone,
-                    planId: params.planId,
-                    amount: params.amount,
-                    vendor: params.vendor || 'bilalsadasub'
-                }
-            });
-            
-            if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
-            if (!result.success) throw new Error(result.error || "Purchase Failed at Provider");
+            try {
+                // 2. Call Bills Payment Edge Function
+                const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
+                    body: {
+                        type: 'data',
+                        network: params.network,
+                        phone: params.phone,
+                        planId: params.planId,
+                        amount: params.amount,
+                        vendor: params.vendor || 'bilalsadasub'
+                    }
+                });
+                
+                if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
+                if (!result?.success) throw new Error(result?.error || "Purchase Failed at Provider");
 
-            // 3. Update Transaction
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: result.data?.orderid || result.requestId
-                })
-                .eq('id', txn.id);
+                // 3. Update Transaction to Success
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: result.data?.orderid || result.requestId || `DATA-${Date.now()}`
+                    })
+                    .eq('id', txn.id);
 
-            return { success: true, reference: result.data?.orderid || result.requestId };
+                return { success: true, reference: result.data?.orderid || result.requestId || `DATA-${Date.now()}` };
+            } catch (err: any) {
+                const failureMsg = err.message || "Transaction failed";
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'failed',
+                        reference: `FAIL-${Date.now()}`,
+                        description: `Data Bundle: ${params.network.toUpperCase()} ${params.planName} -> ${params.phone} (Failed)`
+                    })
+                    .eq('id', txn.id);
+                throw new Error(failureMsg);
+            }
         }
     },
 
@@ -508,28 +535,41 @@ export const api = {
 
             if (txnError) throw new Error(`Transaction Init Failed: ${txnError.message}`);
 
-            const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
-                body: {
-                    type: 'electricity',
-                    provider: params.provider,
-                    meterNumber: params.meterNumber,
-                    amount: params.amount,
-                    meterType: params.meterType || 'prepaid'
-                }
-            });
-            
-            if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
-            if (!result.success) throw new Error(result.error || "Purchase Failed at Provider");
+            try {
+                const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
+                    body: {
+                        type: 'electricity',
+                        provider: params.provider,
+                        meterNumber: params.meterNumber,
+                        amount: params.amount,
+                        meterType: params.meterType || 'prepaid'
+                    }
+                });
+                
+                if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
+                if (!result?.success) throw new Error(result?.error || "Purchase Failed at Provider");
 
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: result.data?.orderid || result.requestId || `ELEC-${Date.now()}`
-                })
-                .eq('id', txn.id);
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: result.data?.orderid || result.requestId || `ELEC-${Date.now()}`
+                    })
+                    .eq('id', txn.id);
 
-            return { success: true, reference: result.data?.orderid || result.requestId || `ELEC-${Date.now()}`, token: result.data?.token || result.token || "1234-5678-9012-3456" };
+                return { success: true, reference: result.data?.orderid || result.requestId || `ELEC-${Date.now()}`, token: result.data?.token || result.token || "1234-5678-9012-3456" };
+            } catch (err: any) {
+                const failureMsg = err.message || "Transaction failed";
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'failed',
+                        reference: `FAIL-${Date.now()}`,
+                        description: `Electricity: ${params.provider.toUpperCase()} Meter: ${params.meterNumber} (Failed)`
+                    })
+                    .eq('id', txn.id);
+                throw new Error(failureMsg);
+            }
         }
     },
 
@@ -635,36 +675,46 @@ export const api = {
 
             if (txnError) throw new Error(`Transaction Init Failed: ${txnError.message}`);
 
-            const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
-                body: {
-                    type: 'tv',
-                    provider: params.provider,
-                    smartCard: params.smartCard,
-                    packageId: params.packageId,
-                    amount: params.amount
-                }
-            });
-            
-            if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
-            if (!result.success) throw new Error(result.error || "Purchase Failed at Provider");
+            try {
+                const { data: result, error: funcError } = await supabase.functions.invoke('bills-payment', {
+                    body: {
+                        type: 'tv',
+                        provider: params.provider,
+                        smartCard: params.smartCard,
+                        packageId: params.packageId,
+                        amount: params.amount
+                    }
+                });
+                
+                if (funcError) throw new Error(`Purchase Failed: ${funcError.message}`);
+                if (!result?.success) throw new Error(result?.error || "Purchase Failed at Provider");
 
-            await supabase
-                .from('transactions')
-                .update({
-                    status: 'success',
-                    reference: result.data?.orderid || result.requestId || `TV-${Date.now()}`
-                })
-                .eq('id', txn.id);
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'success',
+                        reference: result.data?.orderid || result.requestId || `TV-${Date.now()}`
+                    })
+                    .eq('id', txn.id);
 
-            return { success: true, reference: result.data?.orderid || result.requestId || `TV-${Date.now()}` };
+                return { success: true, reference: result.data?.orderid || result.requestId || `TV-${Date.now()}` };
+            } catch (err: any) {
+                const failureMsg = err.message || "Transaction failed";
+                await supabase
+                    .from('transactions')
+                    .update({
+                        status: 'failed',
+                        reference: `FAIL-${Date.now()}`,
+                        description: `TV Sub: ${params.provider.toUpperCase()} - ${params.packageName} (${params.smartCard}) (Failed)`
+                    })
+                    .eq('id', txn.id);
+                throw new Error(failureMsg);
+            }
         }
     },
 
      education: {
         getPrices: async () => {
-             // Use provider to fetch or fallback to defaults
-             // We can type cast provider here if we define a proper interface for education provider later
-             // For now, we know ClubKonnectProvider has it
              try {
                  if ('getExamPrices' in ClubKonnectProvider) {
                      return await ClubKonnectProvider.getExamPrices();
@@ -696,31 +746,44 @@ export const api = {
 
              if (txnError) throw new Error(`Txn Init Failed: ${txnError.message}`);
 
-             // 2. Call Edge Function (bills-payment)
-             const { data: result, error: edgeError } = await supabase.functions.invoke('bills-payment', {
-                 body: {
-                     type: 'education',
-                     examType: params.examType,
-                     quantity: params.quantity,
-                     amount: params.amount,
-                     phone: params.phone || '08000000000',
-                     profileId: params.profileId,
-                     requestId: txn.id
+             try {
+                 // 2. Call Edge Function (bills-payment)
+                 const { data: result, error: edgeError } = await supabase.functions.invoke('bills-payment', {
+                     body: {
+                         type: 'education',
+                         examType: params.examType,
+                         quantity: params.quantity,
+                         amount: params.amount,
+                         phone: params.phone || '08000000000',
+                         profileId: params.profileId,
+                         requestId: txn.id
+                     }
+                 });
+
+                 if (edgeError || !result || !result.success) {
+                     const errMsg = edgeError?.message || result?.error || "Provider Error";
+                     throw new Error(errMsg);
                  }
-             });
 
-             if (edgeError || !result || !result.success) {
-                 const errMsg = edgeError?.message || result?.error || "Provider Error";
-                 throw new Error(errMsg);
+                 // 3. Update to success
+                 await supabase
+                    .from('transactions')
+                    .update({ status: 'success', reference: result.reference || txn.id })
+                    .eq('id', txn.id);
+                
+                 return { success: true, reference: result.reference || txn.id, pin: result.pin };
+             } catch (err: any) {
+                 const failureMsg = err.message || "Transaction failed";
+                 await supabase
+                     .from('transactions')
+                     .update({
+                         status: 'failed',
+                         reference: `FAIL-${Date.now()}`,
+                         description: `Education PIN: ${params.examType.toUpperCase()} (x${params.quantity}) (Failed)`
+                     })
+                     .eq('id', txn.id);
+                 throw new Error(failureMsg);
              }
-
-             // 3. Update
-             await supabase
-                .from('transactions')
-                .update({ status: 'success', reference: result.reference || txn.id })
-                .eq('id', txn.id);
-            
-             return { success: true, reference: result.reference || txn.id, pin: result.pin };
         }
     },
 

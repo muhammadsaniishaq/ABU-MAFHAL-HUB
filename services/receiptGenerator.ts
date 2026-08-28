@@ -1,6 +1,5 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { ABU_MAFHAL_LOGO_B64 } from '../assets/images/logoB64';
 
@@ -20,7 +19,8 @@ export interface ReceiptData {
 }
 
 /**
- * Generate ultra-luxurious HTML template for ABU MAFHAL SUB (ABU MAFHAL LTD - RC-8979939)
+ * Generate ultra-luxurious full-bleed A5 HTML template for ABU MAFHAL SUB (ABU MAFHAL LTD - RC-8979939)
+ * Formatted edge-to-edge without excess margins to fill the A5 paper perfectly.
  */
 export function generateModernReceiptHTML(data: ReceiptData): string {
   const ref = String(data.reference || `TXN-${Date.now()}`);
@@ -39,7 +39,12 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Receipt_${ref}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap');
+    
+    @page {
+      size: A5 portrait;
+      margin: 0;
+    }
     
     * {
       box-sizing: border-box;
@@ -47,32 +52,35 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
       padding: 0;
     }
     
-    body {
+    html, body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #0B0F19;
+      background-color: #FFFFFF;
       color: #0F172A;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     
     #receipt-card {
       width: 100%;
-      max-width: 520px;
+      min-height: 100%;
       background: #FFFFFF;
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px #E2E8F0;
-      position: relative;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
     }
     
     /* Header Gradient */
     .receipt-header {
       background: linear-gradient(135deg, #020617 0%, #0F172A 45%, #1E293B 100%);
       color: #FFFFFF;
-      padding: 28px 24px 24px;
+      padding: 24px 22px 20px;
       position: relative;
       border-bottom: 3.5px solid #DAA520;
     }
@@ -81,7 +89,7 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
     
     .brand-left {
@@ -91,14 +99,14 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     }
     
     .brand-logo-img {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       object-fit: cover;
       border: 1.5px solid #DAA520;
       background: #FFFFFF;
       padding: 2px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     
     .brand-titles {
@@ -107,104 +115,140 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     }
     
     .brand-name {
-      font-size: 19px;
+      font-size: 18px;
       font-weight: 900;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
       color: #FFFFFF;
       text-transform: uppercase;
     }
     
     .brand-sub {
-      font-size: 10px;
+      font-size: 9.5px;
       color: #FFD700;
       font-weight: 800;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
       margin-top: 1px;
     }
     
-    .brand-cac {
-      font-size: 9.5px;
+    .company-reg {
+      font-size: 8px;
       color: #94A3B8;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      margin-top: 1px;
     }
     
-    .verified-seal {
+    .seal-badge {
       background: rgba(16, 185, 129, 0.15);
       border: 1px solid #10B981;
-      color: #10B981;
-      padding: 5px 11px;
-      border-radius: 20px;
-      font-size: 10.5px;
-      font-weight: 900;
+      padding: 5px 9px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       gap: 5px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
     
-    .amount-box {
-      text-align: center;
-      padding: 10px 0 2px;
+    .seal-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+    }
+    
+    .seal-text {
+      font-size: 8.5px;
+      font-weight: 800;
+      color: #10B981;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+    
+    .amount-hero {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
     }
     
     .amount-label {
-      font-size: 11px;
+      font-size: 9.5px;
+      font-weight: 700;
       color: #94A3B8;
-      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 3px;
+      letter-spacing: 0.6px;
+      margin-bottom: 2px;
     }
     
-    .amount-value {
-      font-size: 34px;
+    .amount-val {
+      font-size: 26px;
       font-weight: 900;
-      color: #FFD700;
+      color: #FFFFFF;
       letter-spacing: -0.5px;
-      text-shadow: 0 2px 10px rgba(255, 215, 0, 0.2);
-    }
-    
-    .status-badge-row {
-      display: flex;
-      justify-content: center;
-      margin-top: 8px;
+      font-family: 'JetBrains+Mono', monospace;
     }
     
     .status-pill {
-      background: ${isSuccess ? '#ECFDF5' : '#FEF2F2'};
-      color: ${isSuccess ? '#059669' : '#DC2626'};
-      border: 1px solid ${isSuccess ? '#A7F3D0' : '#FECDD3'};
-      padding: 4px 14px;
-      border-radius: 12px;
-      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 9.5px;
       font-weight: 900;
+      text-transform: uppercase;
       letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
-
+    
+    .status-success {
+      background: #10B981;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+    
+    .status-other {
+      background: #F59E0B;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+    
     /* Body Details */
     .receipt-body {
-      padding: 22px 24px;
+      padding: 20px 22px 14px;
+      flex: 1;
     }
     
     .section-title {
-      font-size: 10.5px;
-      color: #64748B;
+      font-size: 10px;
       font-weight: 800;
+      color: #64748B;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #E2E8F0;
     }
     
     .details-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
     
     .details-table tr {
-      border-bottom: 1px dashed #E2E8F0;
+      border-bottom: 1px solid #F1F5F9;
     }
     
     .details-table tr:last-child {
@@ -212,117 +256,93 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     }
     
     .details-table td {
-      padding: 10px 0;
-      font-size: 12px;
+      padding: 9px 0;
+      font-size: 11px;
+      vertical-align: middle;
     }
     
-    .label-col {
+    .td-label {
       color: #64748B;
       font-weight: 600;
       width: 38%;
     }
     
-    .val-col {
+    .td-value {
       color: #0F172A;
-      font-weight: 800;
+      font-weight: 700;
       text-align: right;
       width: 62%;
       word-break: break-word;
     }
     
-    .monospace {
-      font-family: 'JetBrains Mono', monospace;
+    .mono-val {
+      font-family: 'JetBrains+Mono', monospace;
+      font-size: 10.5px;
       color: #0F172A;
-      font-size: 11px;
-      font-weight: 700;
     }
-
-    /* QR Code & Verification Row */
-    .verification-row {
+    
+    .qr-card {
       background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      border-radius: 14px;
-      padding: 14px;
+      border: 1px dashed #CBD5E1;
+      border-radius: 12px;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 16px;
+      justify-content: space-between;
+      margin-top: 6px;
     }
     
-    .qr-box {
-      width: 68px;
-      height: 68px;
-      border-radius: 10px;
-      background: #FFFFFF;
-      padding: 4px;
-      border: 1px solid #CBD5E1;
+    .qr-left {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      flex-direction: column;
+      gap: 3px;
+      max-width: 70%;
     }
     
-    .qr-box img {
-      width: 100%;
-      height: 100%;
-      border-radius: 6px;
-    }
-    
-    .verif-info {
-      flex: 1;
-    }
-    
-    .verif-title {
-      font-size: 11.5px;
+    .qr-title {
+      font-size: 10.5px;
       font-weight: 800;
       color: #0F172A;
-      margin-bottom: 2px;
     }
     
-    .verif-desc {
-      font-size: 9.5px;
+    .qr-desc {
+      font-size: 8.5px;
       color: #64748B;
-      line-height: 14px;
+      line-height: 12px;
+    }
+    
+    .qr-img {
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      border: 1px solid #E2E8F0;
+      background: #FFFFFF;
+      padding: 2px;
     }
     
     /* Footer */
     .receipt-footer {
       background: #F8FAFC;
       border-top: 1px solid #E2E8F0;
-      padding: 16px 24px;
+      padding: 14px 22px 16px;
       text-align: center;
     }
     
-    .footer-note {
+    .footer-company {
       font-size: 9.5px;
-      color: #94A3B8;
-      line-height: 14px;
-      margin-bottom: 4px;
-    }
-    
-    .corporate-line {
-      font-size: 10px;
       font-weight: 800;
       color: #0F172A;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
     
-    .support-link {
-      color: #D97706;
-      font-weight: 800;
-      text-decoration: none;
-      font-size: 10.5px;
+    .footer-company span {
+      color: #B45309;
     }
     
-    @media print {
-      body {
-        background: #FFFFFF;
-        padding: 0;
-      }
-      #receipt-card {
-        box-shadow: none;
-        max-width: 100%;
-      }
+    .footer-note {
+      font-size: 8px;
+      color: #94A3B8;
+      line-height: 12px;
     }
   </style>
 </head>
@@ -332,87 +352,95 @@ export function generateModernReceiptHTML(data: ReceiptData): string {
     <div class="receipt-header">
       <div class="brand-row">
         <div class="brand-left">
-          <img src="${ABU_MAFHAL_LOGO_B64}" alt="Logo" class="brand-logo-img" />
+          <img class="brand-logo-img" src="${ABU_MAFHAL_LOGO_B64}" alt="Abu Mafhal Logo" />
           <div class="brand-titles">
             <div class="brand-name">ABU MAFHAL SUB</div>
-            <div class="brand-sub">ABU MAFHAL LTD</div>
-            <div class="brand-cac">CAC: RC-8979939</div>
+            <div class="brand-sub">Premium Digital Infrastructure</div>
+            <div class="company-reg">ABU MAFHAL LTD • RC-8979939</div>
           </div>
         </div>
-        <div class="verified-seal">
-          <span>✓</span> VERIFIED
+        <div class="seal-badge">
+          <div class="seal-dot"></div>
+          <div class="seal-text">${isSuccess ? 'VERIFIED' : 'PENDING'}</div>
         </div>
       </div>
       
-      <div class="amount-box">
-        <div class="amount-label">Total Amount Paid</div>
-        <div class="amount-value">${formattedAmount}</div>
-      </div>
-      
-      <div class="status-badge-row">
-        <div class="status-pill">${statusUpper}</div>
+      <div class="amount-hero">
+        <div>
+          <div class="amount-label">Transaction Total</div>
+          <div class="amount-val">${formattedAmount}</div>
+        </div>
+        <div class="status-pill ${isSuccess ? 'status-success' : 'status-other'}">
+          ${statusUpper}
+        </div>
       </div>
     </div>
     
-    <!-- Body -->
+    <!-- Body Details -->
     <div class="receipt-body">
-      <div class="section-title">Transaction Ledger Details</div>
+      <div class="section-title">Transaction Information</div>
       <table class="details-table">
         <tr>
-          <td class="label-col">Reference ID</td>
-          <td class="val-col monospace">${ref}</td>
+          <td class="td-label">Transaction Reference</td>
+          <td class="td-value mono-val">${ref}</td>
         </tr>
         <tr>
-          <td class="label-col">Service Category</td>
-          <td class="val-col">${data.type ? data.type.toUpperCase() : 'TRANSACTION'}</td>
+          <td class="td-label">Service Description</td>
+          <td class="td-value">${data.description || data.type}</td>
         </tr>
         <tr>
-          <td class="label-col">Description</td>
-          <td class="val-col">${data.description || 'Digital Payment Service'}</td>
+          <td class="td-label">Service Category</td>
+          <td class="td-value">${data.type?.toUpperCase() || 'PAYMENT'}</td>
+        </tr>
+        <tr>
+          <td class="td-label">Payment Date & Time</td>
+          <td class="td-value">${dateStr}</td>
+        </tr>
+        <tr>
+          <td class="td-label">Payment Channel</td>
+          <td class="td-value">${data.paymentMethod || 'Wallet Balance'}</td>
         </tr>
         ${data.beneficiary ? `
         <tr>
-          <td class="label-col">Beneficiary / Link</td>
-          <td class="val-col monospace">${data.beneficiary}</td>
-        </tr>` : ''}
-        <tr>
-          <td class="label-col">Payment Channel</td>
-          <td class="val-col">${data.paymentMethod || 'Wallet Balance'}</td>
+          <td class="td-label">Beneficiary / Target</td>
+          <td class="td-value mono-val">${data.beneficiary}</td>
         </tr>
+        ` : ''}
+        ${data.customerPhone ? `
         <tr>
-          <td class="label-col">Date & Time</td>
-          <td class="val-col">${dateStr}</td>
+          <td class="td-label">Customer Phone</td>
+          <td class="td-value">${data.customerPhone}</td>
         </tr>
+        ` : ''}
       </table>
       
-      <!-- QR Verification -->
-      <div class="verification-row">
-        <div class="qr-box">
-          <img src="${qrUrl}" alt="Verification QR Code" />
+      <div class="qr-card">
+        <div class="qr-left">
+          <div class="qr-title">Official Cryptographic Receipt</div>
+          <div class="qr-desc">Scan this QR code to verify this transaction directly on the Abu Mafhal secure verification portal.</div>
         </div>
-        <div class="verif-info">
-          <div class="verif-title">Authentic Secure Receipt</div>
-          <div class="verif-desc">Issued by <b>ABU MAFHAL LTD (RC-8979939)</b>. Scan to verify transaction authenticity on the master ledger.</div>
-        </div>
+        <img class="qr-img" src="${qrUrl}" alt="QR Verification" />
       </div>
     </div>
     
     <!-- Footer -->
     <div class="receipt-footer">
-      <div class="corporate-line">ABU MAFHAL LTD • RC-8979939</div>
-      <div class="footer-note">Official Electronic Transaction Receipt • Issued under federal regulations</div>
-      <div>
-        <a href="https://abumafhal.com.ng" class="support-link">abumafhal.com.ng</a> • 24/7 Support Desk
+      <div class="footer-company">
+        Issued by <span>ABU MAFHAL LTD</span> (CAC: RC-8979939)
+      </div>
+      <div class="footer-note">
+        This document serves as an authentic electronic proof of payment issued by ABU MAFHAL SUB.<br/>
+        Support Hotline: support@abumafhal.com.ng • https://abumafhal.com.ng
       </div>
     </div>
   </div>
 </body>
 </html>
-`;
+  `.trim();
 }
 
 /**
- * Download PDF Receipt directly to phone / device
+ * Download PDF Receipt directly to phone / device (A5 Full Bleed)
  */
 export async function downloadReceiptAsPDF(data: ReceiptData): Promise<string | null> {
   const html = generateModernReceiptHTML(data);
@@ -420,53 +448,21 @@ export async function downloadReceiptAsPDF(data: ReceiptData): Promise<string | 
 
   try {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return new Promise((resolve) => {
-        const generate = () => {
-          const opt = {
-            margin: 0,
-            filename: fileName,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 3, useCORS: true, logging: false },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-          };
-
-          const container = document.createElement('div');
-          container.innerHTML = html;
-          const element = container.querySelector('#receipt-card') || container;
-          document.body.appendChild(container);
-
-          (window as any).html2pdf().from(element).set(opt).save().then(() => {
-            document.body.removeChild(container);
-            resolve(fileName);
-          }).catch((err: any) => {
-            console.error('html2pdf save error:', err);
-            document.body.removeChild(container);
-            resolve(null);
-          });
-        };
-
-        if ((window as any).html2pdf) {
-          generate();
-        } else {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = generate;
-          script.onerror = () => {
-            const printWin = window.open('', '_blank');
-            if (printWin) {
-              printWin.document.write(html);
-              printWin.document.close();
-              printWin.print();
-            }
-            resolve(null);
-          };
-          document.head.appendChild(script);
-        }
-      });
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        setTimeout(() => {
+          printWindow.print();
+        }, 400);
+      }
+      return fileName;
     } else {
-      // Native (iOS / Android)
+      // Native A5 Print
       const { uri } = await Print.printToFileAsync({
         html,
+        width: 420,  // Exact A5 width in points (148mm)
+        height: 595, // Exact A5 height in points (210mm)
         base64: false,
       });
 
@@ -486,7 +482,7 @@ export async function downloadReceiptAsPDF(data: ReceiptData): Promise<string | 
 }
 
 /**
- * Download PNG Image Receipt directly to phone / device
+ * Download PNG Image Receipt directly to phone / device (A5 Full Bleed)
  */
 export async function downloadReceiptAsPNG(data: ReceiptData): Promise<string | null> {
   const html = generateModernReceiptHTML(data);
@@ -500,16 +496,19 @@ export async function downloadReceiptAsPNG(data: ReceiptData): Promise<string | 
           container.style.position = 'fixed';
           container.style.left = '-9999px';
           container.style.top = '0';
-          container.style.width = '520px';
+          container.style.width = '420px';
+          container.style.minHeight = '595px';
           container.innerHTML = html;
           const element = container.querySelector('#receipt-card') as HTMLElement || container;
           document.body.appendChild(container);
 
           (window as any).html2canvas(element, {
-            scale: 3,
+            scale: 2.5,
             useCORS: true,
             logging: false,
-            backgroundColor: '#0B0F19'
+            width: 420,
+            windowWidth: 420,
+            backgroundColor: '#FFFFFF'
           }).then((canvas: HTMLCanvasElement) => {
             const imgData = canvas.toDataURL('image/png');
             const link = document.createElement('a');
@@ -536,9 +535,11 @@ export async function downloadReceiptAsPNG(data: ReceiptData): Promise<string | 
         }
       });
     } else {
-      // Native Image generation via high-res PDF Print & Share as Image format
+      // Native Image generation via high-res A5 Print & Share
       const { uri } = await Print.printToFileAsync({
         html,
+        width: 420,
+        height: 595,
         base64: false,
       });
 
