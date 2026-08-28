@@ -135,28 +135,29 @@ export default function HistoryScreen() {
     const getTransactionAmount = (tx: any): number => {
         if (!tx) return 0;
 
-        // 1. Direct PostgreSQL column 'amount' (True primary database field)
+        // 1. Direct PostgreSQL column 'amount'
         if (tx.amount !== undefined && tx.amount !== null && tx.amount !== '') {
             const parsed = typeof tx.amount === 'number' ? tx.amount : parseFloat(String(tx.amount).replace(/[^0-9.-]+/g, ''));
-            if (!isNaN(parsed)) return Math.abs(parsed);
+            if (!isNaN(parsed) && parsed > 0) return parsed;
         }
 
-        // 2. Alternative database columns
+        // 2. Nested details or metadata object (e.g. verification records)
+        const nested = tx.details || tx.metadata;
+        if (nested && typeof nested === 'object') {
+            for (const k of ['amount', 'price', 'amount_paid', 'fee', 'cost', 'rawAmount']) {
+                if (nested[k] !== undefined && nested[k] !== null && nested[k] !== '') {
+                    const parsed = typeof nested[k] === 'number' ? nested[k] : parseFloat(String(nested[k]).replace(/[^0-9.-]+/g, ''));
+                    if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+            }
+        }
+
+        // 3. Alternative direct columns
         const keys = ['price', 'amount_paid', 'cost', 'fee', 'total_amount', 'rawAmount'];
         for (const key of keys) {
             if (tx[key] !== undefined && tx[key] !== null && tx[key] !== '') {
                 const parsed = typeof tx[key] === 'number' ? tx[key] : parseFloat(String(tx[key]).replace(/[^0-9.-]+/g, ''));
-                if (!isNaN(parsed) && parsed > 0) return Math.abs(parsed);
-            }
-        }
-
-        // 3. Metadata fields
-        if (tx.metadata && typeof tx.metadata === 'object') {
-            for (const key of ['amount', 'price', 'amount_paid', 'fee', 'cost']) {
-                if (tx.metadata[key] !== undefined && tx.metadata[key] !== null && tx.metadata[key] !== '') {
-                    const parsed = typeof tx.metadata[key] === 'number' ? tx.metadata[key] : parseFloat(String(tx.metadata[key]).replace(/[^0-9.-]+/g, ''));
-                    if (!isNaN(parsed) && parsed > 0) return Math.abs(parsed);
-                }
+                if (!isNaN(parsed) && parsed > 0) return parsed;
             }
         }
 
@@ -183,7 +184,7 @@ export default function HistoryScreen() {
 
     const mapTransactionRecord = (tx: any) => {
         let desc = tx.description || tx.type || 'Transaction';
-        let metadata = tx.metadata || {};
+        let metadata = tx.metadata || tx.details || {};
         let rawAmount = getTransactionAmount(tx);
 
         // 1. If description is a JSON string, parse it
@@ -229,14 +230,19 @@ export default function HistoryScreen() {
     const fetchLiveHistory = async (userId: string) => {
         try {
             // Fetch Standard Transactions
-            const { data: standardTxList, error: txErr } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(200);
-
-            if (txErr) console.warn('Transactions query warning:', txErr.message);
+            let standardTxList: any[] = [];
+            try {
+                const { data, error: txErr } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (data) standardTxList = data;
+                if (txErr) console.warn('Transactions query notice:', txErr.message);
+            } catch (err) {
+                console.warn('Transactions fetch error:', err);
+            }
 
             // Fetch Verification History safely in background
             let verifTxList: any[] = [];
@@ -246,27 +252,36 @@ export default function HistoryScreen() {
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(80);
+                    .limit(100);
                 if (vData) verifTxList = vData;
             } catch (_) {}
 
-            // Transform verification records into standard format if not already mirrored in transactions
-            const mappedVerif = verifTxList.map(v => ({
-                id: v.id || `verif-${v.reference || Date.now()}`,
-                user_id: v.user_id,
-                type: (v.service_type || 'verification').toLowerCase(),
-                amount: v.amount_paid || v.price || 0,
-                status: v.status || 'completed',
-                description: `${(v.service_type || 'Verification').toUpperCase()}: ${v.identifier || v.nin || v.bvn || v.cac_name || 'Slip Search'}`,
-                reference: v.reference || v.id,
-                created_at: v.created_at,
-                metadata: {
-                    slip_url: v.slip_url || v.pdf_url || v.download_url,
-                    result_data: v.result_data || v.data_payload,
-                    service_type: v.service_type,
-                    identifier: v.identifier || v.nin || v.bvn
-                }
-            }));
+            // Transform verification records into standard format with true extracted amount
+            const mappedVerif = verifTxList.map(v => {
+                const d = v.details || {};
+                const exactAmount = d.amount ?? d.price ?? d.fee ?? d.amount_paid ?? v.amount_paid ?? v.price ?? v.amount ?? 0;
+                const desc = d.description || (v.holder_name ? `${(v.service_type || v.service_category || 'Verification').toUpperCase()}: ${v.holder_name}` : `${(v.service_type || 'Verification').toUpperCase()}: ${v.search_number || v.identifier || 'Search'}`);
+                const ref = d.reference || v.search_number || v.reference || v.id;
+                const type = (d.type || v.service_type || v.service_category || 'payment').toLowerCase();
+
+                return {
+                    id: v.id || `verif-${ref || Date.now()}`,
+                    user_id: v.user_id,
+                    type: type,
+                    amount: exactAmount,
+                    status: d.status || v.status || 'completed',
+                    description: desc,
+                    reference: ref,
+                    created_at: v.created_at,
+                    metadata: {
+                        ...d,
+                        slip_url: v.slip_url || v.pdf_url || v.download_url || d.slip_url,
+                        result_data: v.result_data || v.data_payload || d,
+                        service_type: v.service_type,
+                        identifier: v.search_number || v.identifier
+                    }
+                };
+            });
 
             // Merge and deduplicate by reference or ID
             const seenKeys = new Set<string>();
