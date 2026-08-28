@@ -13,7 +13,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -63,6 +63,15 @@ const FILTER_TABS = [
     { id: 'Pending', label: '⏳ Pending' },
 ];
 
+const toSafeDate = (d: any): Date => {
+    if (d instanceof Date && !isNaN(d.getTime())) return d;
+    if (typeof d === 'string' || typeof d === 'number') {
+        const parsed = new Date(d);
+        if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+};
+
 export default function HistoryScreen() {
     const router = useRouter();
     const [history, setHistory] = useState<any[]>([]);
@@ -73,7 +82,6 @@ export default function HistoryScreen() {
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [exportReceiptData, setExportReceiptData] = useState<ReceiptData | null>(null);
-    const [currentUserId, setCurrentUserId] = useState<string>('');
     const { settings } = useAppSettings();
 
     const currentUserIdRef = useRef('');
@@ -86,7 +94,6 @@ export default function HistoryScreen() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                setCurrentUserId(user.id);
                 currentUserIdRef.current = user.id;
                 // 1. Instant Cache Load (0ms Render)
                 await loadCachedHistory(user.id);
@@ -104,11 +111,15 @@ export default function HistoryScreen() {
 
     const loadCachedHistory = async (userId: string) => {
         try {
-            const cachedStr = await AsyncStorage.getItem(`@user_tx_history_v3_${userId}`);
+            const cachedStr = await AsyncStorage.getItem(`@user_tx_history_v4_${userId}`);
             if (cachedStr) {
                 const parsed = JSON.parse(cachedStr);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    setHistory(parsed);
+                    const rehydrated = parsed.map(tx => ({
+                        ...tx,
+                        dateObj: toSafeDate(tx.dateObj || tx.created_at)
+                    }));
+                    setHistory(rehydrated);
                     setLoading(false);
                 }
             }
@@ -117,7 +128,7 @@ export default function HistoryScreen() {
 
     const saveCachedHistory = async (userId: string, data: any[]) => {
         try {
-            await AsyncStorage.setItem(`@user_tx_history_v3_${userId}`, JSON.stringify(data));
+            await AsyncStorage.setItem(`@user_tx_history_v4_${userId}`, JSON.stringify(data));
         } catch (e) {}
     };
 
@@ -165,7 +176,7 @@ export default function HistoryScreen() {
             category = 'Social Boost';
         }
 
-        const dateObj = new Date(tx.created_at || Date.now());
+        const dateObj = toSafeDate(tx.created_at || tx.dateObj);
 
         return {
             ...tx,
@@ -182,24 +193,27 @@ export default function HistoryScreen() {
 
     const fetchLiveHistory = async (userId: string) => {
         try {
-            // Parallel Fetch: Standard Transactions + Verification Services History
-            const [txRes, verifRes] = await Promise.allSettled([
-                supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .order('created_at', { ascending: false })
-                    .limit(200),
-                supabase
+            // Fetch Standard Transactions
+            const { data: standardTxList, error: txErr } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(200);
+
+            if (txErr) console.warn('Transactions query warning:', txErr.message);
+
+            // Fetch Verification History safely in background
+            let verifTxList: any[] = [];
+            try {
+                const { data: vData } = await supabase
                     .from('verification_history')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(100)
-            ]);
-
-            const standardTxList = txRes.status === 'fulfilled' && txRes.value.data ? txRes.value.data : [];
-            const verifTxList = verifRes.status === 'fulfilled' && verifRes.value.data ? verifRes.value.data : [];
+                    .limit(80);
+                if (vData) verifTxList = vData;
+            } catch (_) {}
 
             // Transform verification records into standard format if not already mirrored in transactions
             const mappedVerif = verifTxList.map(v => ({
@@ -221,7 +235,7 @@ export default function HistoryScreen() {
 
             // Merge and deduplicate by reference or ID
             const seenKeys = new Set<string>();
-            const combinedRaw = [...standardTxList, ...mappedVerif].filter(item => {
+            const combinedRaw = [...(standardTxList || []), ...mappedVerif].filter(item => {
                 const key = item.reference || item.id;
                 if (!key || seenKeys.has(key)) return false;
                 seenKeys.add(key);
@@ -289,7 +303,8 @@ export default function HistoryScreen() {
     const contactSupport = (tx: any) => {
         const supportPhone = settings?.support_whatsapp || '2348000000000';
         const cleanPhone = supportPhone.replace(/[^0-9]/g, '');
-        const message = `Hello Support, I need assistance regarding my Transaction:\n\n• Type: ${tx.type}\n• Amount: ${tx.displayAmount}\n• Reference: ${tx.reference || tx.id}\n• Status: ${tx.status}\n• Date: ${tx.dateObj.toLocaleString()}`;
+        const dateString = tx.dateObj ? toSafeDate(tx.dateObj).toLocaleString() : new Date().toLocaleString();
+        const message = `Hello Support, I need assistance regarding my Transaction:\n\n• Type: ${tx.type}\n• Amount: ${tx.displayAmount}\n• Reference: ${tx.reference || tx.id}\n• Status: ${tx.status}\n• Date: ${dateString}`;
         const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         Linking.openURL(url).catch(() => {
             Alert.alert('Error', 'Could not launch WhatsApp. Please try again.');
@@ -313,7 +328,7 @@ export default function HistoryScreen() {
                 const query = searchQuery.toLowerCase();
                 const desc = (tx.description || '').toLowerCase();
                 const ref = (tx.reference || tx.id || '').toLowerCase();
-                const amt = tx.rawAmount.toString();
+                const amt = tx.rawAmount?.toString() || '';
                 const typeName = (tx.type || '').toLowerCase();
                 matchesSearch = desc.includes(query) || ref.includes(query) || amt.includes(query) || typeName.includes(query);
             }
@@ -323,19 +338,21 @@ export default function HistoryScreen() {
     }, [history, filter, searchQuery]);
 
     const totalVolume = useMemo(() => {
-        return filteredHistory.reduce((acc, tx) => acc + tx.rawAmount, 0);
+        return filteredHistory.reduce((acc, tx) => acc + (tx.rawAmount || 0), 0);
     }, [filteredHistory]);
 
     const sections = useMemo(() => {
         const groups: { [key: string]: any[] } = {};
-        const today = new Date().setHours(0, 0, 0, 0);
-        const yesterday = new Date(today - 86400000).setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterday = today - 86400000;
 
         filteredHistory.forEach(tx => {
-            const txDate = new Date(tx.dateObj).setHours(0, 0, 0, 0);
-            let title = tx.dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            if (txDate === today) title = 'Today';
-            else if (txDate === yesterday) title = 'Yesterday';
+            const d = toSafeDate(tx.dateObj || tx.created_at);
+            const txDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            let title = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            if (txDay === today) title = 'Today';
+            else if (txDay === yesterday) title = 'Yesterday';
 
             if (!groups[title]) groups[title] = [];
             groups[title].push(tx);
@@ -447,12 +464,16 @@ export default function HistoryScreen() {
             ) : (
                 <SectionList
                     sections={sections}
-                    keyExtractor={(item, index) => item.id || `tx-${index}`}
+                    keyExtractor={(item, index) => item.id || item.reference || `tx-${index}`}
                     contentContainerStyle={s.listContent}
                     stickySectionHeadersEnabled={false}
                     refreshing={refreshing}
                     onRefresh={handleRefresh}
                     showsVerticalScrollIndicator={false}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={15}
+                    windowSize={7}
+                    removeClippedSubviews={Platform.OS !== 'web'}
                     renderSectionHeader={({ section: { title } }) => (
                         <View style={s.sectionHeader}>
                             <Text style={s.sectionHeaderText}>{title}</Text>
@@ -462,6 +483,7 @@ export default function HistoryScreen() {
                         const isSuccess = item.statusNormalized === 'success' || item.statusNormalized === 'completed';
                         const isPending = item.statusNormalized === 'pending' || item.statusNormalized === 'processing';
                         const isFailed = item.statusNormalized === 'failed' || item.statusNormalized === 'reversed';
+                        const itemDate = toSafeDate(item.dateObj || item.created_at);
 
                         return (
                             <TouchableOpacity
@@ -478,7 +500,7 @@ export default function HistoryScreen() {
                                         {item.description || item.type?.toUpperCase() || 'Transaction'}
                                     </Text>
                                     <Text style={s.txDateText}>
-                                        {item.dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Ref: {(item.reference || item.id || '').slice(-8)}
+                                        {itemDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Ref: {(item.reference || item.id || '').slice(-8)}
                                     </Text>
                                 </View>
 
@@ -582,7 +604,7 @@ export default function HistoryScreen() {
 
                                     <View style={s.infoRow}>
                                         <Text style={s.infoLabel}>Transaction Date</Text>
-                                        <Text style={s.infoValue}>{selectedTx.dateObj.toLocaleString()}</Text>
+                                        <Text style={s.infoValue}>{toSafeDate(selectedTx.dateObj || selectedTx.created_at).toLocaleString()}</Text>
                                     </View>
 
                                     <View style={s.infoRow}>
@@ -619,7 +641,7 @@ export default function HistoryScreen() {
                                                 description: selectedTx.description,
                                                 amount: selectedTx.rawAmount,
                                                 status: selectedTx.statusNormalized || selectedTx.status || 'SUCCESSFUL',
-                                                date: selectedTx.dateObj,
+                                                date: toSafeDate(selectedTx.dateObj || selectedTx.created_at),
                                                 paymentMethod: selectedTx.payment_method || 'Wallet Balance',
                                                 beneficiary: selectedTx.metadata?.identifier || selectedTx.metadata?.phone || selectedTx.metadata?.account_number || selectedTx.metadata?.link
                                             });
