@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { downloadReceiptAsPDF } from '../../services/receiptGenerator';
 
 // Executive Color Tokens
 const L = {
@@ -43,6 +44,8 @@ const L = {
     coralBg: '#FFF1F2',
     purple: '#8B5CF6',
     purpleBg: '#F5F3FF',
+    pink: '#EC4899',
+    pinkBg: '#FDF2F8',
     textPrimary: '#0F172A',
     textSecondary: '#334155',
     textMuted: '#64748B',
@@ -51,6 +54,7 @@ const L = {
 const FILTER_TABS = [
     { id: 'All', label: 'All' },
     { id: 'Telecom', label: '📱 Airtime/Data' },
+    { id: 'Boost', label: '🚀 Social Boost' },
     { id: 'Verification', label: '📜 NIN / BVN / CAC' },
     { id: 'Deposits', label: '⬇️ Deposits' },
     { id: 'Transfers', label: '⬆️ Transfers' },
@@ -152,6 +156,10 @@ export default function HistoryScreen() {
             icon = 'flash-outline';
             color = '#F59E0B';
             category = 'Bills';
+        } else if (descStr.includes('boost') || typeStr.includes('boost') || typeStr.includes('smm')) {
+            icon = 'rocket-outline';
+            color = '#EC4899';
+            category = 'Social Boost';
         }
 
         const dateObj = new Date(tx.created_at || Date.now());
@@ -290,6 +298,7 @@ export default function HistoryScreen() {
         return history.filter(tx => {
             let matchesFilter = true;
             if (filter === 'Telecom') matchesFilter = tx.category === 'Telecom';
+            else if (filter === 'Boost') matchesFilter = tx.category === 'Social Boost';
             else if (filter === 'Verification') matchesFilter = tx.category === 'Verification';
             else if (filter === 'Deposits') matchesFilter = tx.category === 'Deposits';
             else if (filter === 'Transfers') matchesFilter = tx.category === 'Transfers';
@@ -599,6 +608,30 @@ export default function HistoryScreen() {
 
                                 {/* Action Buttons */}
                                 <View style={s.modalActionsCol}>
+                                    <TouchableOpacity
+                                        onPress={async () => {
+                                            try {
+                                                await downloadReceiptAsPDF({
+                                                    reference: selectedTx.reference || selectedTx.id,
+                                                    type: selectedTx.type || selectedTx.category || 'Transaction',
+                                                    description: selectedTx.description,
+                                                    amount: selectedTx.rawAmount,
+                                                    status: selectedTx.statusNormalized || selectedTx.status || 'SUCCESSFUL',
+                                                    date: selectedTx.dateObj,
+                                                    paymentMethod: selectedTx.payment_method || 'Wallet Balance',
+                                                    beneficiary: selectedTx.metadata?.identifier || selectedTx.metadata?.phone || selectedTx.metadata?.account_number || selectedTx.metadata?.link
+                                                });
+                                            } catch (e) {
+                                                console.error('PDF receipt error:', e);
+                                            }
+                                        }}
+                                        style={s.pdfReceiptBtn}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Ionicons name="document-text-outline" size={16} color="#0F172A" />
+                                        <Text style={s.pdfReceiptBtnText}>Download Modern PDF Receipt</Text>
+                                    </TouchableOpacity>
+
                                     <TouchableOpacity
                                         onPress={() => copyToClipboard(selectedTx.reference || selectedTx.id, 'Reference')}
                                         style={s.copyRefBtn}
@@ -987,6 +1020,27 @@ const s = StyleSheet.create({
     modalActionsCol: {
         gap: 6,
         marginBottom: 10,
+    },
+    pdfReceiptBtn: {
+        backgroundColor: L.gold,
+        height: 40,
+        borderRadius: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: L.goldDk,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    pdfReceiptBtnText: {
+        color: '#0F172A',
+        fontSize: 11.5,
+        fontWeight: '900',
+        letterSpacing: 0.2,
     },
     copyRefBtn: {
         backgroundColor: '#F1F5F9',

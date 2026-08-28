@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DynamicBanners from '../../components/DynamicBanners';
 import { api } from '../../services/api';
 import * as Clipboard from 'expo-clipboard';
+import { downloadReceiptAsPDF } from '../../services/receiptGenerator';
+import { createAppNotification } from '../../services/notificationsHelper';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -70,6 +72,8 @@ export default function SocialBoostScreen() {
   const [walletBalance, setWalletBalance] = useState(0);
 
   // Custom Decorated Alert Modal State
+  const [lastReceiptData, setLastReceiptData] = useState<any | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [alertModal, setAlertModal] = useState<{
     visible: boolean;
     type: 'success' | 'error' | 'info';
@@ -340,7 +344,53 @@ export default function SocialBoostScreen() {
         throw new Error(data.error);
       }
 
-      showAlert("Boost Order Launched! 🚀", `Order #${data.order || 'SUCCESS'} has been placed successfully.`, "success", String(data.order || ''));
+      const orderRef = data.reference || `SMM-${data.order || Date.now()}`;
+      const chargedPrice = data.price !== undefined ? parseFloat(data.price) : totalPrice;
+      const newBal = data.newBalance !== undefined ? parseFloat(data.newBalance) : Math.max(0, walletBalance - chargedPrice);
+      setWalletBalance(newBal);
+
+      // 1. Optimistic Cache Sync
+      try {
+        const cachedStr = await AsyncStorage.getItem('@dashboard_data_v2');
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr);
+          if (cached.userData) {
+            cached.userData.balance = newBal;
+            await AsyncStorage.setItem('@dashboard_data_v2', JSON.stringify(cached));
+          }
+        }
+      } catch (_) {}
+
+      // 2. Notification
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await createAppNotification(
+          user.id,
+          "Social Boost Order Launched",
+          `Order #${data.order || 'SUCCESS'} for ${selectedService?.name} (${quantity} units) has been confirmed and placed on the network.`,
+          "service",
+          "normal",
+          { route: "/(app)/history" }
+        );
+      }
+
+      setLastReceiptData({
+        reference: orderRef,
+        type: 'Social Boost',
+        description: `${selectedService?.name} (${quantity} units)`,
+        amount: chargedPrice,
+        status: 'SUCCESSFUL',
+        date: new Date(),
+        beneficiary: link.trim(),
+        paymentMethod: 'Wallet Balance'
+      });
+
+      showAlert(
+        "Boost Order Launched! 🚀", 
+        `Order #${data.order || 'SUCCESS'} has been placed successfully.\nTotal charged: ₦${chargedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 
+        "success", 
+        String(data.order || '')
+      );
       
       setLink('');
       setQuantity('');
@@ -348,7 +398,7 @@ export default function SocialBoostScreen() {
       await fetchUserBalance();
     } catch (error: any) {
       const msg = error.message || "Could not place order";
-      showAlert("Order Failed ❌", msg, "error");
+      showAlert("Order Failed ❌", `${msg}\n\nNote: Your wallet balance was NOT charged.`, "error");
     } finally {
       setIsSubmitting(false);
       setConfirmModal(false);
@@ -958,6 +1008,43 @@ export default function SocialBoostScreen() {
                   <Text style={s.copyBtnText}>Copy</Text>
                 </TouchableOpacity>
               </View>
+            )}
+
+            {alertModal.type === 'success' && lastReceiptData && (
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    setDownloadingPdf(true);
+                    await downloadReceiptAsPDF(lastReceiptData);
+                  } catch (err) {
+                    console.error("Receipt error:", err);
+                  } finally {
+                    setDownloadingPdf(false);
+                  }
+                }}
+                disabled={downloadingPdf}
+                style={{
+                  backgroundColor: T.gold,
+                  width: '100%',
+                  height: 38,
+                  borderRadius: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 10,
+                  gap: 6
+                }}
+                activeOpacity={0.85}
+              >
+                {downloadingPdf ? (
+                  <ActivityIndicator size="small" color={T.navyDark} />
+                ) : (
+                  <>
+                    <Ionicons name="document-text-outline" size={15} color={T.navyDark} />
+                    <Text style={{ color: T.navyDark, fontSize: 11, fontWeight: '900' }}>Download PDF Receipt</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
 
             <View style={s.alertBtnRow}>

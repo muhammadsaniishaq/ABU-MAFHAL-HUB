@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
             const txRef = `SMM-${orderResult.order}-${Date.now()}`;
             await supabaseAdmin.from('transactions').insert({
                 user_id: user.id,
-                type: 'payment',
+                type: 'social_boost',
                 amount: finalPrice,
                 status: 'success',
                 reference: txRef,
@@ -202,6 +202,8 @@ Deno.serve(async (req) => {
                 success: true, 
                 message: "Order placed successfully",
                 order: orderResult.order,
+                reference: txRef,
+                price: finalPrice,
                 newBalance
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
