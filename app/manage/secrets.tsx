@@ -78,7 +78,10 @@ const REQUIRED_SECRETS = [
     { key: 'ZOHO_EMAIL', aliases: ['SMTP_USER'], desc: 'Zoho / SMTP Email Address (e.g. support@abumafhal.com)', provider: 'Email & Notifications' },
     { key: 'ZOHO_PASSWORD', aliases: ['SMTP_PASS'], desc: 'Zoho / SMTP Password or App Password', provider: 'Email & Notifications' },
     { key: 'SMTP_HOST', aliases: ['ZOHO_HOST'], desc: 'SMTP Host Server (Default: smtp.zoho.com)', provider: 'Email & Notifications' },
-    { key: 'SMTP_PORT', aliases: ['ZOHO_PORT'], desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' }
+    { key: 'SMTP_PORT', aliases: ['ZOHO_PORT'], desc: 'SMTP Server Port (Default: 465)', provider: 'Email & Notifications' },
+    { key: 'LIVEKIT_URL', aliases: ['LIVEKIT_WS_URL'], desc: 'LiveKit Cloud WebSocket URL (e.g. wss://abu-mafhal-sub-ndlajsjm.livekit.cloud)', provider: 'LiveKit Meetings' },
+    { key: 'LIVEKIT_API_KEY', aliases: ['LIVEKIT_KEY'], desc: 'LiveKit Cloud API Key (e.g. APIiTbTpxxxGdtV)', provider: 'LiveKit Meetings' },
+    { key: 'LIVEKIT_API_SECRET', aliases: ['LIVEKIT_SECRET'], desc: 'LiveKit Cloud API Secret for Video Conference JWT Tokens', provider: 'LiveKit Meetings' }
 ];
 
 export default function SecretsManager() {
