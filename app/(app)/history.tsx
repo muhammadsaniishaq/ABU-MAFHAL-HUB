@@ -112,10 +112,7 @@ export default function HistoryScreen() {
 
     const loadCachedHistory = async (userId: string) => {
         try {
-            let cachedStr = await AsyncStorage.getItem(`@user_tx_history_v6_${userId}`);
-            if (!cachedStr) {
-                cachedStr = await AsyncStorage.getItem(`@user_tx_history_v5_${userId}`) || await AsyncStorage.getItem(`@user_tx_history_v4_${userId}`);
-            }
+            const cachedStr = await AsyncStorage.getItem(`@user_tx_history_v7_${userId}`);
             if (cachedStr) {
                 const parsed = JSON.parse(cachedStr);
                 if (Array.isArray(parsed) && parsed.length > 0) {
@@ -131,68 +128,65 @@ export default function HistoryScreen() {
 
     const saveCachedHistory = async (userId: string, data: any[]) => {
         try {
-            await AsyncStorage.setItem(`@user_tx_history_v6_${userId}`, JSON.stringify(data));
+            await AsyncStorage.setItem(`@user_tx_history_v7_${userId}`, JSON.stringify(data));
         } catch (e) {}
     };
 
-    const extractAmount = (tx: any): number => {
+    const getTransactionAmount = (tx: any): number => {
         if (!tx) return 0;
-        
-        // Priority list of keys: we pick the first non-zero number or non-zero string
-        const candidates = [
-            tx.amount,
-            tx.price,
-            tx.amount_paid,
-            tx.cost,
-            tx.fee,
-            tx.total_amount,
-            tx.plan_amount,
-            tx.package_amount,
-            tx.rawAmount,
-            tx.metadata?.amount,
-            tx.metadata?.price,
-            tx.metadata?.fee,
-            tx.metadata?.cost,
-            tx.metadata?.amount_paid,
-        ];
 
-        for (const val of candidates) {
-            if (typeof val === 'number' && !isNaN(val) && val > 0) {
-                return val;
-            }
-            if (typeof val === 'string' && val.trim() !== '') {
-                const cleaned = val.replace(/[^0-9.]+/g, '');
-                const parsed = parseFloat(cleaned);
-                if (!isNaN(parsed) && parsed > 0) {
-                    return parsed;
-                }
+        // 1. Direct PostgreSQL column 'amount' (True primary database field)
+        if (tx.amount !== undefined && tx.amount !== null && tx.amount !== '') {
+            const parsed = typeof tx.amount === 'number' ? tx.amount : parseFloat(String(tx.amount).replace(/[^0-9.-]+/g, ''));
+            if (!isNaN(parsed)) return Math.abs(parsed);
+        }
+
+        // 2. Alternative database columns
+        const keys = ['price', 'amount_paid', 'cost', 'fee', 'total_amount', 'rawAmount'];
+        for (const key of keys) {
+            if (tx[key] !== undefined && tx[key] !== null && tx[key] !== '') {
+                const parsed = typeof tx[key] === 'number' ? tx[key] : parseFloat(String(tx[key]).replace(/[^0-9.-]+/g, ''));
+                if (!isNaN(parsed) && parsed > 0) return Math.abs(parsed);
             }
         }
 
-        // Try to find numbers in description like "Airtime 500" or "MTN 1000" or "₦500"
-        if (typeof tx.description === 'string') {
-            const desc = tx.description;
-            const nairaMatch = desc.match(/[₦N]\s*([0-9,]+(\.[0-9]+)?)/i);
-            if (nairaMatch && nairaMatch[1]) {
-                const parsed = parseFloat(nairaMatch[1].replace(/,/g, ''));
-                if (!isNaN(parsed) && parsed > 0) return parsed;
-            }
-            const numMatches = desc.match(/\b(100|200|300|400|500|600|700|800|900|1000|1500|2000|2500|3000|5000|10000)\b/);
-            if (numMatches && numMatches[1]) {
-                const parsed = parseFloat(numMatches[1]);
-                if (!isNaN(parsed) && parsed > 0) return parsed;
+        // 3. Metadata fields
+        if (tx.metadata && typeof tx.metadata === 'object') {
+            for (const key of ['amount', 'price', 'amount_paid', 'fee', 'cost']) {
+                if (tx.metadata[key] !== undefined && tx.metadata[key] !== null && tx.metadata[key] !== '') {
+                    const parsed = typeof tx.metadata[key] === 'number' ? tx.metadata[key] : parseFloat(String(tx.metadata[key]).replace(/[^0-9.-]+/g, ''));
+                    if (!isNaN(parsed) && parsed > 0) return Math.abs(parsed);
+                }
             }
         }
 
         return 0;
     };
 
+    const getCategoryDetails = (typeStr: string, descStr: string, isIncome: boolean) => {
+        if (typeStr === 'transfer') return { icon: 'send-outline', color: '#3B82F6', category: 'Transfers' };
+        if (typeStr === 'withdrawal') return { icon: 'card-outline', color: '#EF4444', category: 'Transfers' };
+        if (isIncome) return { icon: 'arrow-down-circle-outline', color: '#10B981', category: 'Deposits' };
+        if (descStr.includes('airtime') || typeStr === 'airtime') return { icon: 'phone-portrait-outline', color: '#10B981', category: 'Telecom' };
+        if (descStr.includes('data') || typeStr === 'data') return { icon: 'wifi-outline', color: '#3B82F6', category: 'Telecom' };
+        if (descStr.includes('nin') || descStr.includes('bvn') || descStr.includes('cac') || descStr.includes('slip') || descStr.includes('verification') || typeStr.includes('nin') || typeStr.includes('bvn') || typeStr.includes('cac')) {
+            return { icon: 'document-text-outline', color: '#8B5CF6', category: 'Verification' };
+        }
+        if (descStr.includes('cable') || descStr.includes('dstv') || descStr.includes('gotv') || descStr.includes('electricity') || descStr.includes('bill')) {
+            return { icon: 'flash-outline', color: '#F59E0B', category: 'Bills' };
+        }
+        if (descStr.includes('boost') || typeStr.includes('boost') || typeStr.includes('smm')) {
+            return { icon: 'rocket-outline', color: '#EC4899', category: 'Social Boost' };
+        }
+        return { icon: 'receipt-outline', color: '#F59E0B', category: 'Services' };
+    };
+
     const mapTransactionRecord = (tx: any) => {
         let desc = tx.description || tx.type || 'Transaction';
         let metadata = tx.metadata || {};
-        let rawAmount = extractAmount(tx);
+        let rawAmount = getTransactionAmount(tx);
 
-        // 1. If description is JSON string, parse it
+        // 1. If description is a JSON string, parse it
         if (typeof desc === 'string' && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
             try {
                 const parsed = JSON.parse(desc);
@@ -201,92 +195,32 @@ export default function HistoryScreen() {
                     desc = `${(parsed.service_type || parsed.service_category || 'Verification').toUpperCase()}: ${parsed.holder_name || parsed.name || parsed.search_number}`;
                 }
                 if (rawAmount === 0) {
-                    rawAmount = extractAmount(parsed);
+                    rawAmount = getTransactionAmount(parsed);
                 }
             } catch (_) {}
         }
 
-        // 2. If rawAmount is still 0, check metadata
+        // 2. If rawAmount is 0, check metadata
         if (rawAmount === 0 && metadata) {
-            rawAmount = extractAmount(metadata);
+            rawAmount = getTransactionAmount(metadata);
         }
 
         const typeStr = (tx.type || metadata.service_type || '').toLowerCase();
         const descStr = desc.toLowerCase();
-
-        // 3. Fallback for zero amounts based on service type & description
-        if (rawAmount === 0) {
-            if (descStr.includes('cac') || typeStr.includes('cac')) {
-                rawAmount = 500;
-            } else if (descStr.includes('nin') || descStr.includes('bvn') || descStr.includes('ipe') || typeStr.includes('nin') || typeStr.includes('bvn') || typeStr.includes('verification')) {
-                rawAmount = 300;
-            } else if (descStr.includes('boost') || typeStr.includes('boost') || typeStr.includes('smm')) {
-                rawAmount = 250;
-            } else if (descStr.includes('data') || typeStr.includes('data')) {
-                rawAmount = 350;
-            } else if (descStr.includes('airtime') || typeStr.includes('airtime')) {
-                rawAmount = 100;
-            } else if (descStr.includes('transfer') || typeStr.includes('transfer')) {
-                rawAmount = 1000;
-            } else if (descStr.includes('cable') || descStr.includes('dstv') || descStr.includes('gotv') || descStr.includes('electricity') || descStr.includes('bill')) {
-                rawAmount = 1500;
-            } else {
-                rawAmount = 100; // Guaranteed positive floor so zero is never displayed
-            }
-        }
-
         const isIncome = typeStr === 'deposit' || typeStr === 'credit' || typeStr === 'topup' || typeStr === 'refund' || descStr.includes('deposit') || descStr.includes('funded') || descStr.includes('credit');
-
-        let icon = 'receipt-outline';
-        let color = '#F59E0B';
-        let category = 'Services';
-
-        if (typeStr === 'transfer') {
-            icon = 'send-outline';
-            color = '#3B82F6';
-            category = 'Transfers';
-        } else if (typeStr === 'withdrawal') {
-            icon = 'card-outline';
-            color = '#EF4444';
-            category = 'Transfers';
-        } else if (isIncome) {
-            icon = 'arrow-down-circle-outline';
-            color = '#10B981';
-            category = 'Deposits';
-        } else if (descStr.includes('airtime') || typeStr === 'airtime') {
-            icon = 'phone-portrait-outline';
-            color = '#10B981';
-            category = 'Telecom';
-        } else if (descStr.includes('data') || typeStr === 'data') {
-            icon = 'wifi-outline';
-            color = '#3B82F6';
-            category = 'Telecom';
-        } else if (descStr.includes('nin') || descStr.includes('bvn') || descStr.includes('cac') || descStr.includes('slip') || descStr.includes('verification') || typeStr.includes('nin') || typeStr.includes('bvn') || typeStr.includes('cac')) {
-            icon = 'document-text-outline';
-            color = '#8B5CF6';
-            category = 'Verification';
-        } else if (descStr.includes('cable') || descStr.includes('dstv') || descStr.includes('gotv') || descStr.includes('electricity') || descStr.includes('bill')) {
-            icon = 'flash-outline';
-            color = '#F59E0B';
-            category = 'Bills';
-        } else if (descStr.includes('boost') || typeStr.includes('boost') || typeStr.includes('smm')) {
-            icon = 'rocket-outline';
-            color = '#EC4899';
-            category = 'Social Boost';
-        }
-
+        const cat = getCategoryDetails(typeStr, descStr, isIncome);
         const dateObj = toSafeDate(tx.created_at || tx.dateObj);
 
         return {
             ...tx,
             description: desc,
             metadata,
-            displayAmount: `${isIncome ? '+' : '-'}₦${rawAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             rawAmount,
+            displayAmount: `${isIncome ? '+' : '-'}₦${rawAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             isIncome,
-            icon,
-            color,
-            category,
+            icon: cat.icon,
+            color: cat.color,
+            category: cat.category,
             dateObj,
             statusNormalized: (tx.status || 'success').toLowerCase()
         };
