@@ -16,7 +16,7 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../services/supabase';
 import { AIService } from '../../services/ai';
 
-const { width: W } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Platinum Executive Theme Tokens
 const L = {
@@ -1412,9 +1412,10 @@ export default function RealtimeEnterpriseTeamSuite() {
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* EXECUTIVE TOP BAR */}
+      {/* EXECUTIVE TOP BAR (MOBILE-FIRST RESPONSIVE WRAPPER) */}
       <View style={s.topBar}>
         <View style={s.topBarRow}>
+          {/* Back Button */}
           {activeDmUser ? (
             <TouchableOpacity
               onPress={() => {
@@ -1424,37 +1425,36 @@ export default function RealtimeEnterpriseTeamSuite() {
               style={s.backBtn}
               activeOpacity={0.75}
             >
-              <Ionicons name="arrow-back" size={18} color={L.gold} />
+              <Ionicons name="arrow-back" size={16} color={L.gold} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.75}>
-              <Ionicons name="arrow-back" size={18} color={L.gold} />
+              <Ionicons name="arrow-back" size={16} color={L.gold} />
             </TouchableOpacity>
           )}
 
-          {/* Channel / DM Selector */}
+          {/* Channel / DM Selector Pill */}
           <TouchableOpacity
             onPress={() => (activeDmUser ? setActiveDmUser(null) : setShowChannelDrawer(true))}
             style={s.channelSelectorBtn}
             activeOpacity={0.8}
           >
-            <Ionicons name={activeDmUser ? 'person-circle' : (activeChannelObj.icon as any)} size={16} color={L.gold} />
+            <Ionicons name={activeDmUser ? 'person-circle' : (activeChannelObj.icon as any)} size={15} color={L.gold} />
             <Text style={s.channelSelectorTitle} numberOfLines={1}>
               {activeDmUser ? `@${activeDmUser.name.split(' ')[0]}` : `#${activeChannelObj.name}`}
             </Text>
-            <Ionicons name={activeDmUser ? 'close-circle' : 'chevron-down'} size={14} color={L.goldLight} />
+            <Ionicons name={activeDmUser ? 'close-circle' : 'chevron-down'} size={13} color={L.goldLight} />
           </TouchableOpacity>
 
-          {/* Super Admin Indicator */}
-          <View style={s.superAdminPill}>
-            <Ionicons name="ribbon" size={12} color="#0F172A" />
-            <Text style={s.superAdminPillText}>{isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN'}</Text>
-          </View>
+          {/* Right Action Icons Group */}
+          <View style={s.topActionsGroup}>
+            <View style={s.superAdminPill}>
+              <Ionicons name="ribbon" size={11} color="#0F172A" />
+              <Text style={s.superAdminPillText}>{isSuperAdmin ? 'SUPER' : 'ADMIN'}</Text>
+            </View>
 
-          {/* Fast Top Action Tools */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <TouchableOpacity onPress={() => setShowSearchBar(!showSearchBar)} style={s.topIconBtn} activeOpacity={0.8}>
-              <Ionicons name="search" size={14} color={L.gold} />
+              <Ionicons name="search" size={13} color={L.gold} />
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => handleAskCortexAI('summary')} disabled={aiAnalyzing} style={s.aiCopilotBtn} activeOpacity={0.85}>
@@ -1462,14 +1462,14 @@ export default function RealtimeEnterpriseTeamSuite() {
                 <ActivityIndicator size="small" color="#0F172A" />
               ) : (
                 <>
-                  <Ionicons name="sparkles" size={13} color="#0F172A" />
+                  <Ionicons name="sparkles" size={12} color="#0F172A" />
                   <Text style={s.aiCopilotBtnText}>AI</Text>
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => startInstantMeeting(activeDmUser)} style={s.videoMeetingBtn} activeOpacity={0.85}>
-              <Ionicons name="videocam" size={14} color="#0F172A" />
+              <Ionicons name="videocam" size={13} color="#0F172A" />
               <Text style={s.videoMeetingBtnText}>{activeDmUser ? 'Call' : 'Meet'}</Text>
             </TouchableOpacity>
           </View>
@@ -1478,7 +1478,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         {/* EXPANDABLE SEARCH BAR */}
         {showSearchBar && (
           <View style={s.searchWrap}>
-            <Ionicons name="search" size={14} color={L.goldDk} />
+            <Ionicons name="search" size={13} color={L.goldDk} />
             <TextInput
               style={s.searchTextInput}
               placeholder="Search stream keywords, code, directives..."
@@ -1488,18 +1488,22 @@ export default function RealtimeEnterpriseTeamSuite() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={15} color="#94A3B8" />
+                <Ionicons name="close-circle" size={14} color="#94A3B8" />
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {/* SUB TABS NAVIGATION */}
+        {/* SUB TABS NAVIGATION (FULL WIDTH SMOOTH SCROLL) */}
         <View style={s.subHeaderRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subTabsWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.subTabsWrap}
+          >
             {[
-              { id: 'chat', label: activeDmUser ? `@${activeDmUser.name.split(' ')[0]} (DM)` : 'HQ Stream', icon: 'chatbubbles' },
-              { id: 'meetings', label: `Video Hub (${meetings.length})`, icon: 'videocam' },
+              { id: 'chat', label: activeDmUser ? `@${activeDmUser.name.split(' ')[0]}` : 'HQ Stream', icon: 'chatbubbles' },
+              { id: 'meetings', label: `Video Matrix (${meetings.length})`, icon: 'videocam' },
               { id: 'dms', label: `Staff DMs (${otherAdminsList.length})`, icon: 'people-outline' },
               { id: 'shifts', label: isOnDuty ? `Duty (${dutyElapsed})` : 'Duty & Shifts', icon: 'time-outline' },
               { id: 'bookmarks', label: `Saved (${bookmarks.length})`, icon: 'star-outline' },
@@ -1515,28 +1519,12 @@ export default function RealtimeEnterpriseTeamSuite() {
                   style={[s.subTab, isActive && s.subTabActive]}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name={tab.icon as any} size={12} color={isActive ? '#0F172A' : L.goldLight} />
+                  <Ionicons name={tab.icon as any} size={11} color={isActive ? '#0F172A' : L.goldLight} />
                   <Text style={[s.subTabText, isActive && s.subTabTextActive]}>{tab.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
-
-          {/* Super Admin Executive Action Tools */}
-          <View style={s.toolShortcutsRow}>
-            <TouchableOpacity onPress={broadcastSystemMetrics} style={s.toolIconBtn} activeOpacity={0.8}>
-              <Ionicons name="speedometer-outline" size={13} color={L.gold} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowDirectivesModal(true)} style={s.toolIconBtn} activeOpacity={0.8}>
-              <Ionicons name="flash-outline" size={13} color={L.gold} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowCodeSnippetModal(true)} style={s.toolIconBtn} activeOpacity={0.8}>
-              <Ionicons name="code-slash" size={13} color={L.gold} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={clearChannelMessages} style={s.purgeChannelBtn} activeOpacity={0.75}>
-              <Ionicons name="trash-outline" size={13} color={L.coral} />
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
@@ -1654,7 +1642,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                   return (
                     <View key={msg.id || index} style={s.metricsCardBubble}>
                       <View style={s.metricsHeader}>
-                        <Ionicons name="speedometer" size={15} color={L.gold} />
+                        <Ionicons name="speedometer" size={14} color={L.gold} />
                         <Text style={s.metricsTitle}>OPERATIONS HEALTH SNAPSHOT</Text>
                         <Text style={s.msgTime}>{timeStr}</Text>
                       </View>
@@ -1687,8 +1675,8 @@ export default function RealtimeEnterpriseTeamSuite() {
                   return (
                     <View key={msg.id || index} style={s.codeCardBubble}>
                       <View style={s.codeHeader}>
-                        <Ionicons name="code-slash" size={14} color={L.gold} />
-                        <Text style={s.codeTitle}>{cData.title || 'Technical Query'}</Text>
+                        <Ionicons name="code-slash" size={13} color={L.gold} />
+                        <Text style={s.codeTitle} numberOfLines={1}>{cData.title || 'Technical Query'}</Text>
                         <TouchableOpacity
                           onPress={() => {
                             Clipboard.setStringAsync(cData.code || '');
@@ -1696,7 +1684,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                           }}
                           style={s.codeCopyBtn}
                         >
-                          <Ionicons name="copy-outline" size={13} color={L.gold} />
+                          <Ionicons name="copy-outline" size={12} color={L.gold} />
                           <Text style={s.codeCopyText}>Copy</Text>
                         </TouchableOpacity>
                       </View>
@@ -1745,7 +1733,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                           >
                             <View style={[s.pollBarFill, { width: `${pct}%` }]} />
                             <View style={s.pollOptionContent}>
-                              <Text style={[s.pollOptionText, hasVoted && s.pollOptionTextVoted]}>{opt.text}</Text>
+                              <Text style={[s.pollOptionText, hasVoted && s.pollOptionTextVoted]} numberOfLines={1}>{opt.text}</Text>
                               <Text style={s.pollOptionPct}>{pct}% ({optVotes})</Text>
                             </View>
                           </TouchableOpacity>
@@ -1765,9 +1753,9 @@ export default function RealtimeEnterpriseTeamSuite() {
                   return (
                     <View key={msg.id || index} style={s.taskCardBubble}>
                       <TouchableOpacity onPress={() => toggleTask(msg.id)} style={s.taskCheckRow} activeOpacity={0.75}>
-                        <Ionicons name={isDone ? 'checkbox' : 'square-outline'} size={20} color={isDone ? L.emerald : L.goldDk} />
+                        <Ionicons name={isDone ? 'checkbox' : 'square-outline'} size={18} color={isDone ? L.emerald : L.goldDk} />
                         <View style={{ flex: 1, marginLeft: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <Text style={[s.taskTitleText, isDone && s.taskTitleDone]}>{tData.title || msg.content}</Text>
                             <View style={[s.priorityTag, priority === 'CRITICAL' ? s.priorityCritical : s.priorityHigh]}>
                               <Text style={s.priorityTagText}>{priority}</Text>
@@ -1799,11 +1787,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                           onPress={() => playAudioSound(msg.id, msg.media_url)}
                           style={s.voicePlayBtn}
                         >
-                          <Ionicons name={isPlaying ? 'pause' : 'play'} size={15} color="#0F172A" />
+                          <Ionicons name={isPlaying ? 'pause' : 'play'} size={14} color="#0F172A" />
                         </TouchableOpacity>
                         <View style={s.waveformBars}>
                           {[40, 80, 100, 60, 90, 50, 75, 40, 85, 60, 90, 45].map((h, i) => (
-                            <View key={i} style={[s.waveformBar, { height: (h / 100) * 18 }]} />
+                            <View key={i} style={[s.waveformBar, { height: (h / 100) * 16 }]} />
                           ))}
                         </View>
                         <TouchableOpacity onPress={cycleAudioRate} style={s.speedRateBtn}>
@@ -1833,12 +1821,12 @@ export default function RealtimeEnterpriseTeamSuite() {
                         style={s.docAttachBox}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="document-text" size={22} color={L.goldAmber} />
+                        <Ionicons name="document-text" size={20} color={L.goldAmber} />
                         <View style={{ flex: 1, marginLeft: 8 }}>
                           <Text style={s.docNameText} numberOfLines={1}>{msg.metadata?.fileName || 'Document'}</Text>
                           <Text style={s.docSizeText}>{msg.metadata?.fileSize || 'Tap to open'}</Text>
                         </View>
-                        <Ionicons name="cloud-download-outline" size={18} color={L.navyHeader} />
+                        <Ionicons name="cloud-download-outline" size={16} color={L.navyHeader} />
                       </TouchableOpacity>
                     </View>
                   );
@@ -1919,9 +1907,9 @@ export default function RealtimeEnterpriseTeamSuite() {
           {isRecordingAudio ? (
             <View style={s.recordingStrip}>
               <View style={s.recordingLiveDot} />
-              <Text style={s.recordingText}>Recording Audio Memo: {recordingSeconds}s</Text>
+              <Text style={s.recordingText} numberOfLines={1}>Recording Audio Memo: {recordingSeconds}s</Text>
               <TouchableOpacity onPress={stopAndSendRealAudioRecording} style={s.recordingSendBtn}>
-                <Ionicons name="send" size={14} color="#0F172A" />
+                <Ionicons name="send" size={13} color="#0F172A" />
                 <Text style={s.recordingSendText}>Send</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1932,36 +1920,32 @@ export default function RealtimeEnterpriseTeamSuite() {
                 }}
                 style={s.recordingCancelBtn}
               >
-                <Ionicons name="trash-outline" size={16} color={L.coral} />
+                <Ionicons name="trash-outline" size={15} color={L.coral} />
               </TouchableOpacity>
             </View>
           ) : (
-            /* CHAT INPUT STRIP (MOBILE-FIRST SAFE AREA FIT) */
+            /* CHAT INPUT STRIP (MOBILE-FIRST FIT WITH NO SIDE OVERFLOW) */
             <View style={s.inputStrip}>
               {/* Executive Plus (+) Action Button */}
               <TouchableOpacity onPress={() => setShowActionSheet(true)} style={s.actionPlusBtn} activeOpacity={0.8}>
-                <Ionicons name="add-circle" size={26} color={L.goldAmber} />
+                <Ionicons name="add-circle" size={24} color={L.goldAmber} />
               </TouchableOpacity>
 
               <TouchableOpacity onPress={pickAndUploadImage} disabled={uploadingMedia} style={s.attachBtn} activeOpacity={0.75}>
                 {uploadingMedia ? (
                   <ActivityIndicator size="small" color={L.goldDk} />
                 ) : (
-                  <Ionicons name="camera-outline" size={18} color={L.navyHeader} />
+                  <Ionicons name="camera-outline" size={16} color={L.navyHeader} />
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={pickAndUploadDocument} disabled={uploadingMedia} style={s.attachBtn} activeOpacity={0.75}>
-                <Ionicons name="document-attach-outline" size={18} color={L.navyHeader} />
-              </TouchableOpacity>
-
               <TouchableOpacity onPress={startRealAudioRecording} style={s.attachBtn} activeOpacity={0.75}>
-                <Ionicons name="mic-outline" size={18} color={L.navyHeader} />
+                <Ionicons name="mic-outline" size={16} color={L.navyHeader} />
               </TouchableOpacity>
 
               <TextInput
                 style={s.chatTextInput}
-                placeholder={activeDmUser ? `Private message to @${activeDmUser.name.split(' ')[0]}...` : `Message #${activeChannelObj.name}...`}
+                placeholder={activeDmUser ? `Message @${activeDmUser.name.split(' ')[0]}...` : `Message #${activeChannelObj.name}...`}
                 placeholderTextColor="#94A3B8"
                 value={newMessage}
                 onChangeText={setNewMessage}
@@ -1973,14 +1957,14 @@ export default function RealtimeEnterpriseTeamSuite() {
 
               <TouchableOpacity onPress={sendMessage} disabled={!newMessage.trim() || sending} style={s.sendBtn} activeOpacity={0.85}>
                 <LinearGradient colors={['#0F172A', '#1E293B']} style={s.sendBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <Ionicons name="send" size={15} color={L.gold} />
+                  <Ionicons name="send" size={14} color={L.gold} />
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
         </KeyboardAvoidingView>
       ) : activeTab === 'meetings' ? (
-        /* TAB 2: ULTRA-MODERN FUTURISTIC QUANTUM VIDEO & AUDIO CONFERENCE SUITE */
+        /* TAB 2: ULTRA-MODERN FUTURISTIC QUANTUM VIDEO & AUDIO CONFERENCE SUITE (CLEAN ALIGNMENT & ZERO OVERFLOW) */
         <ScrollView style={s.meetingsScroll} contentContainerStyle={s.meetingsContent} showsVerticalScrollIndicator={false}>
           
           {/* HERO QUANTUM COMMAND MATRIX CARD */}
@@ -1995,39 +1979,39 @@ export default function RealtimeEnterpriseTeamSuite() {
               <View style={s.quantumHeaderRow}>
                 <View style={s.radarSignalBox}>
                   <View style={s.pulsingSignalDot} />
-                  <Text style={s.radarSignalText}>P2P QUANTUM ENCRYPTED WebRTC</Text>
+                  <Text style={s.radarSignalText}>P2P ENCRYPTED WebRTC</Text>
                 </View>
                 <View style={s.bitratePill}>
-                  <Ionicons name="shield-checkmark" size={11} color={L.emerald} />
-                  <Text style={s.bitrateText}>1080p 60FPS • 0% LOSS</Text>
+                  <Ionicons name="shield-checkmark" size={10} color={L.emerald} />
+                  <Text style={s.bitrateText}>1080p 60FPS</Text>
                 </View>
               </View>
 
               <Text style={s.quantumHeroTitle}>Executive Conference Matrix</Text>
               <Text style={s.quantumHeroSubtitle}>
-                Zero-delay encrypted in-app video & spatial audio. Screen sharing, real-time minutes & zero external app store prompts.
+                Zero-delay encrypted in-app video & spatial audio. Screen sharing, live minutes & zero app store prompts.
               </Text>
 
-              {/* Main 1-Tap Conference Launch Buttons */}
+              {/* Main 1-Tap Conference Launch Buttons (Balanced Equal Grid) */}
               <View style={s.heroButtonRow}>
                 <TouchableOpacity onPress={() => startInstantMeeting(null, false)} style={s.heroLaunchBtn} activeOpacity={0.85}>
-                  <LinearGradient colors={['#FFD700', '#DAA520', '#B45309']} style={s.heroLaunchGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                    <Ionicons name="videocam" size={18} color="#0F172A" />
-                    <Text style={s.heroLaunchBtnText}>Instant Video Room</Text>
+                  <LinearGradient colors={['#FFD700', '#DAA520']} style={s.heroLaunchGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Ionicons name="videocam" size={16} color="#0F172A" />
+                    <Text style={s.heroLaunchBtnText} numberOfLines={1}>Video Room</Text>
                   </LinearGradient>
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => startInstantMeeting(null, true)} style={s.heroAudioOnlyBtn} activeOpacity={0.85}>
                   <LinearGradient colors={['#1E293B', '#0F172A']} style={s.heroAudioOnlyGrad}>
-                    <Ionicons name="mic" size={16} color={L.gold} />
-                    <Text style={s.heroAudioOnlyText}>VIP Voice Stage</Text>
+                    <Ionicons name="mic" size={15} color={L.gold} />
+                    <Text style={s.heroAudioOnlyText} numberOfLines={1}>Voice Stage</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
 
               {/* Quick Connect by Room Code Bar */}
               <View style={s.quickJoinBar}>
-                <Ionicons name="keypad-outline" size={15} color={L.gold} />
+                <Ionicons name="keypad-outline" size={14} color={L.gold} />
                 <TextInput
                   style={s.quickJoinInput}
                   placeholder="Enter Room Code or Topic..."
@@ -2037,7 +2021,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 />
                 <TouchableOpacity onPress={joinCustomRoom} style={s.quickJoinSubmitBtn} activeOpacity={0.8}>
                   <Text style={s.quickJoinSubmitText}>Join</Text>
-                  <Ionicons name="arrow-forward" size={12} color="#0F172A" />
+                  <Ionicons name="arrow-forward" size={11} color="#0F172A" />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -2048,7 +2032,7 @@ export default function RealtimeEnterpriseTeamSuite() {
             {[
               { id: 'all', label: 'All Rooms' },
               { id: 'presets', label: '🛡️ War Rooms' },
-              { id: 'live', label: '🔴 Active Syncs' },
+              { id: 'live', label: '🔴 Live Syncs' },
               { id: 'scheduled', label: '📅 Scheduled' },
             ].map(f => {
               const active = meetingFilter === f.id;
@@ -2065,15 +2049,15 @@ export default function RealtimeEnterpriseTeamSuite() {
             })}
           </View>
 
-          {/* PRESET STRATEGIC WAR ROOMS (1-TAP DIRECT ACCESS) */}
+          {/* PRESET STRATEGIC WAR ROOMS (1-TAP DIRECT ACCESS WITH 100% VISIBILITY) */}
           {(meetingFilter === 'all' || meetingFilter === 'presets') && (
-            <View style={{ marginBottom: 16 }}>
+            <View style={{ marginBottom: 14 }}>
               <View style={s.sectionHeaderRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="shield-half" size={16} color={L.navyHeader} />
-                  <Text style={s.sectionTitle}>Executive Strategic Rooms</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Ionicons name="shield-half" size={15} color={L.navyHeader} />
+                  <Text style={s.sectionTitle}>Strategic War Rooms</Text>
                 </View>
-                <Text style={s.sectionCount}>{EXECUTIVE_PRESET_ROOMS.length} Dedicated Hubs</Text>
+                <Text style={s.sectionCount}>{EXECUTIVE_PRESET_ROOMS.length} Dedicated</Text>
               </View>
 
               {EXECUTIVE_PRESET_ROOMS.map(room => {
@@ -2088,11 +2072,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                     >
                       <View style={s.presetRoomTop}>
                         <View style={[s.presetIconBox, { borderColor: room.color }]}>
-                          <Ionicons name={room.icon as any} size={18} color={room.color} />
+                          <Ionicons name={room.icon as any} size={16} color={room.color} />
                         </View>
-                        <View style={{ flex: 1, marginLeft: 10 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={s.presetRoomTitle}>{room.title}</Text>
+                        <View style={{ flex: 1, marginLeft: 9 }}>
+                          <View style={s.presetTitleTagRow}>
+                            <Text style={s.presetRoomTitle} numberOfLines={1}>{room.title}</Text>
                             <View style={[s.presetTagBadge, { borderColor: room.color }]}>
                               <Text style={[s.presetTagText, { color: room.color }]}>{room.tag}</Text>
                             </View>
@@ -2104,10 +2088,10 @@ export default function RealtimeEnterpriseTeamSuite() {
                       <View style={s.presetRoomBottom}>
                         <View style={s.presetRoomHash}>
                           <Ionicons name="lock-closed" size={10} color="#94A3B8" />
-                          <Text style={s.presetRoomHashText}>#{room.roomCode}</Text>
+                          <Text style={s.presetRoomHashText} numberOfLines={1}>#{room.roomCode}</Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={s.presetActionsRow}>
                           <TouchableOpacity
                             onPress={() => {
                               Clipboard.setStringAsync(roomUrl);
@@ -2116,7 +2100,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                             style={s.presetCopyBtn}
                             activeOpacity={0.8}
                           >
-                            <Ionicons name="copy-outline" size={12} color={L.gold} />
+                            <Ionicons name="copy-outline" size={11} color={L.gold} />
                             <Text style={s.presetCopyText}>Link</Text>
                           </TouchableOpacity>
 
@@ -2126,8 +2110,8 @@ export default function RealtimeEnterpriseTeamSuite() {
                             activeOpacity={0.85}
                           >
                             <LinearGradient colors={['#FFD700', '#DAA520']} style={s.presetEnterGrad}>
-                              <Ionicons name="videocam" size={13} color="#0F172A" />
-                              <Text style={s.presetEnterText}>Enter Room</Text>
+                              <Ionicons name="videocam" size={12} color="#0F172A" />
+                              <Text style={s.presetEnterText}>Enter</Text>
                             </LinearGradient>
                           </TouchableOpacity>
                         </View>
@@ -2143,21 +2127,21 @@ export default function RealtimeEnterpriseTeamSuite() {
           {(meetingFilter === 'all' || meetingFilter === 'live' || meetingFilter === 'scheduled') && (
             <View>
               <View style={s.sectionHeaderRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="calendar" size={16} color={L.navyHeader} />
-                  <Text style={s.sectionTitle}>Operations Schedule & Active Syncs</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Ionicons name="calendar" size={15} color={L.navyHeader} />
+                  <Text style={s.sectionTitle}>Operations Schedule</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowMeetingModal(true)} style={s.scheduleNewBtn}>
-                  <Ionicons name="add" size={14} color="#0F172A" />
-                  <Text style={s.scheduleNewBtnText}>Schedule Sync</Text>
+                  <Ionicons name="add" size={13} color="#0F172A" />
+                  <Text style={s.scheduleNewBtnText}>Schedule</Text>
                 </TouchableOpacity>
               </View>
 
               {meetings.length === 0 ? (
                 <View style={s.emptyBox}>
-                  <Ionicons name="calendar-outline" size={32} color={L.goldDk} />
+                  <Ionicons name="calendar-outline" size={30} color={L.goldDk} />
                   <Text style={s.emptyTitle}>No Live or Scheduled Syncs</Text>
-                  <Text style={s.emptySub}>Tap "Schedule Sync" or launch an Instant War Room above.</Text>
+                  <Text style={s.emptySub}>Tap "Schedule" or launch an Instant War Room above.</Text>
                 </View>
               ) : (
                 meetings.map(m => {
@@ -2165,13 +2149,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                   return (
                     <View key={m.id} style={[s.meetingListItem, isLive && s.meetingListItemLive]}>
                       <View style={s.meetingListHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={[s.meetingTag, isLive && { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: L.coral }]}>
-                            {isLive && <View style={s.liveDot} />}
-                            <Text style={[s.meetingTagText, isLive && { color: L.coral, fontWeight: '900' }]}>
-                              {isLive ? '🔴 LIVE NOW' : `#${m.channel?.toUpperCase() || 'HQ'}`}
-                            </Text>
-                          </View>
+                        <View style={[s.meetingTag, isLive && { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: L.coral }]}>
+                          {isLive && <View style={s.liveDot} />}
+                          <Text style={[s.meetingTagText, isLive && { color: L.coral, fontWeight: '900' }]}>
+                            {isLive ? '🔴 LIVE NOW' : `#${m.channel?.toUpperCase() || 'HQ'}`}
+                          </Text>
                         </View>
                         <Text style={s.meetingDateText}>
                           {new Date(m.scheduled_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -2179,10 +2161,10 @@ export default function RealtimeEnterpriseTeamSuite() {
                       </View>
 
                       <Text style={s.meetingListTitle}>{m.title}</Text>
-                      {m.description ? <Text style={s.meetingListDesc}>{m.description}</Text> : null}
+                      {m.description ? <Text style={s.meetingListDesc} numberOfLines={2}>{m.description}</Text> : null}
 
                       <View style={s.meetingListFooter}>
-                        <Text style={s.meetingHost}>Host: {m.created_by_name || 'Admin'}</Text>
+                        <Text style={s.meetingHost} numberOfLines={1}>Host: {m.created_by_name || 'Admin'}</Text>
                         
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           {isSuperAdmin && (
@@ -2195,8 +2177,8 @@ export default function RealtimeEnterpriseTeamSuite() {
                             style={s.joinListBtn}
                             activeOpacity={0.8}
                           >
-                            <Ionicons name="videocam" size={13} color="#0F172A" />
-                            <Text style={s.joinListBtnText}>Join Room</Text>
+                            <Ionicons name="videocam" size={12} color="#0F172A" />
+                            <Text style={s.joinListBtnText}>Join</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -2211,13 +2193,13 @@ export default function RealtimeEnterpriseTeamSuite() {
           <TouchableOpacity onPress={() => handleAskCortexAI('meeting')} disabled={aiAnalyzing} style={s.aiMeetingBanner} activeOpacity={0.85}>
             <LinearGradient colors={['#1E1B4B', '#0F172A']} style={s.aiMeetingGrad}>
               <View style={s.aiMeetingIconCircle}>
-                <Ionicons name="sparkles" size={18} color={L.gold} />
+                <Ionicons name="sparkles" size={16} color={L.gold} />
               </View>
-              <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flex: 1, marginLeft: 9 }}>
                 <Text style={s.aiMeetingTitle}>Nexus Cortex AI Agenda & Minutes Assistant</Text>
-                <Text style={s.aiMeetingSub}>Tap to analyze recent operations context and auto-generate executive meeting talking points.</Text>
+                <Text style={s.aiMeetingSub} numberOfLines={2}>Tap to analyze recent operations context and auto-generate executive meeting talking points.</Text>
               </View>
-              {aiAnalyzing ? <ActivityIndicator size="small" color={L.gold} /> : <Ionicons name="chevron-forward" size={18} color={L.gold} />}
+              {aiAnalyzing ? <ActivityIndicator size="small" color={L.gold} /> : <Ionicons name="chevron-forward" size={16} color={L.gold} />}
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
@@ -2246,41 +2228,41 @@ export default function RealtimeEnterpriseTeamSuite() {
                     <Text style={s.dmAvatarText}>{admin.name.slice(0, 2).toUpperCase()}</Text>
                   </View>
                 )}
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.dmName}>{admin.name}</Text>
-                  <Text style={s.dmRole}>{admin.role} • {admin.email}</Text>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={s.dmName} numberOfLines={1}>{admin.name}</Text>
+                  <Text style={s.dmRole} numberOfLines={1}>{admin.role} • {admin.email}</Text>
                 </View>
 
-                {/* 1-Tap 1-on-1 Direct Video Call */}
-                <TouchableOpacity
-                  onPress={() => startInstantMeeting(admin, false)}
-                  style={s.dmCallBtn}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="videocam" size={15} color="#0F172A" />
-                </TouchableOpacity>
+                {/* Direct Action Buttons */}
+                <View style={s.dmActionsRow}>
+                  <TouchableOpacity
+                    onPress={() => startInstantMeeting(admin, false)}
+                    style={s.dmCallBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="videocam" size={14} color="#0F172A" />
+                  </TouchableOpacity>
 
-                {/* 1-Tap 1-on-1 Voice Call */}
-                <TouchableOpacity
-                  onPress={() => startInstantMeeting(admin, true)}
-                  style={s.dmVoiceBtn}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="call" size={14} color="#0F172A" />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => startInstantMeeting(admin, true)}
+                    style={s.dmVoiceBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="call" size={13} color="#0F172A" />
+                  </TouchableOpacity>
 
-                {/* Direct DM Chat */}
-                <TouchableOpacity
-                  onPress={() => {
-                    setActiveDmUser(admin);
-                    setActiveTab('chat');
-                  }}
-                  style={s.dmChatBtn}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="chatbubble-ellipses" size={14} color="#0F172A" />
-                  <Text style={s.dmChatBtnText}>Chat</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setActiveDmUser(admin);
+                      setActiveTab('chat');
+                    }}
+                    style={s.dmChatBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={13} color="#0F172A" />
+                    <Text style={s.dmChatBtnText}>Chat</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -2290,30 +2272,30 @@ export default function RealtimeEnterpriseTeamSuite() {
         <ScrollView style={s.meetingsScroll} contentContainerStyle={s.meetingsContent} showsVerticalScrollIndicator={false}>
           <View style={s.dutyStatusCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View>
+              <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={s.dutyStatusTitle}>Operational Duty Status</Text>
-                <Text style={s.dutyStatusSub}>Active Shift Duration: {isOnDuty ? dutyElapsed : 'Offline'}</Text>
+                <Text style={s.dutyStatusSub}>Active Shift: {isOnDuty ? dutyElapsed : 'Offline'}</Text>
               </View>
               <TouchableOpacity onPress={toggleDutyShift} style={[s.clockInBtn, isOnDuty && { backgroundColor: L.coral }]} activeOpacity={0.85}>
-                <Ionicons name={isOnDuty ? 'stop-circle' : 'play-circle'} size={16} color="#FFFFFF" />
+                <Ionicons name={isOnDuty ? 'stop-circle' : 'play-circle'} size={15} color="#FFFFFF" />
                 <Text style={s.clockInBtnText}>{isOnDuty ? 'Clock Out' : 'Clock In'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10 }}>
             <Text style={s.sectionTitle}>Shift AI Handover Tools</Text>
             <TouchableOpacity onPress={() => handleAskCortexAI('shift')} disabled={aiAnalyzing} style={s.scheduleNewBtn}>
               <Ionicons name="sparkles" size={12} color="#0F172A" />
-              <Text style={s.scheduleNewBtnText}>Generate Handover</Text>
+              <Text style={s.scheduleNewBtnText}>Handover</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[s.sectionTitle, { marginTop: 12, marginBottom: 8 }]}>On-Duty Executive Roster</Text>
+          <Text style={[s.sectionTitle, { marginTop: 10, marginBottom: 8 }]}>On-Duty Executive Roster</Text>
           {adminDirectory.map(admin => (
             <View key={admin.id} style={s.rosterItem}>
               <View style={[s.rosterDot, { backgroundColor: L.emerald }]} />
-              <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flex: 1, marginLeft: 9 }}>
                 <Text style={s.rosterName}>{admin.name} {admin.id === currentUserId ? '(You)' : ''}</Text>
                 <Text style={s.rosterRole}>{admin.role}</Text>
               </View>
@@ -2363,7 +2345,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 activeOpacity={0.8}
               >
                 <View style={[s.actionSheetTileIcon, { backgroundColor: L.purpleBg, borderColor: L.purpleBorder }]}>
-                  <Ionicons name="pie-chart" size={20} color={L.purple} />
+                  <Ionicons name="pie-chart" size={18} color={L.purple} />
                 </View>
                 <Text style={s.actionSheetTileText}>Create Poll</Text>
               </TouchableOpacity>
@@ -2377,7 +2359,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 activeOpacity={0.8}
               >
                 <View style={[s.actionSheetTileIcon, { backgroundColor: L.emeraldBg, borderColor: L.emeraldBorder }]}>
-                  <Ionicons name="checkbox" size={20} color={L.emerald} />
+                  <Ionicons name="checkbox" size={18} color={L.emerald} />
                 </View>
                 <Text style={s.actionSheetTileText}>Action Item</Text>
               </TouchableOpacity>
@@ -2391,7 +2373,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 activeOpacity={0.8}
               >
                 <View style={[s.actionSheetTileIcon, { backgroundColor: L.skyBg, borderColor: L.skyBorder }]}>
-                  <Ionicons name="code-slash" size={20} color={L.sky} />
+                  <Ionicons name="code-slash" size={18} color={L.sky} />
                 </View>
                 <Text style={s.actionSheetTileText}>Share Code</Text>
               </TouchableOpacity>
@@ -2405,23 +2387,37 @@ export default function RealtimeEnterpriseTeamSuite() {
                 activeOpacity={0.8}
               >
                 <View style={[s.actionSheetTileIcon, { backgroundColor: L.goldLight, borderColor: L.goldDk }]}>
-                  <Ionicons name="flash" size={20} color={L.goldAmber} />
+                  <Ionicons name="flash" size={18} color={L.goldAmber} />
                 </View>
                 <Text style={s.actionSheetTileText}>Directives</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={broadcastSystemMetrics} style={s.actionSheetTile} activeOpacity={0.8}>
                 <View style={[s.actionSheetTileIcon, { backgroundColor: '#0F172A', borderColor: L.goldDk }]}>
-                  <Ionicons name="speedometer" size={20} color={L.gold} />
+                  <Ionicons name="speedometer" size={18} color={L.gold} />
                 </View>
                 <Text style={s.actionSheetTileText}>Live Metrics</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => handleAskCortexAI('checklist')} style={s.actionSheetTile} activeOpacity={0.8}>
                 <View style={[s.actionSheetTileIcon, { backgroundColor: L.gold, borderColor: L.goldDk }]}>
-                  <Ionicons name="sparkles" size={20} color="#0F172A" />
+                  <Ionicons name="sparkles" size={18} color="#0F172A" />
                 </View>
                 <Text style={s.actionSheetTileText}>AI Checklist</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={pickAndUploadDocument} style={s.actionSheetTile} activeOpacity={0.8}>
+                <View style={[s.actionSheetTileIcon, { backgroundColor: L.bg, borderColor: L.cardBorder }]}>
+                  <Ionicons name="document-attach" size={18} color={L.navyHeader} />
+                </View>
+                <Text style={s.actionSheetTileText}>Attach Doc</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={clearChannelMessages} style={s.actionSheetTile} activeOpacity={0.8}>
+                <View style={[s.actionSheetTileIcon, { backgroundColor: L.coralBg, borderColor: L.coralBorder }]}>
+                  <Ionicons name="trash" size={18} color={L.coral} />
+                </View>
+                <Text style={[s.actionSheetTileText, { color: L.coral }]}>Purge Stream</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2434,18 +2430,18 @@ export default function RealtimeEnterpriseTeamSuite() {
           <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
           
           <View style={s.videoModalHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
               <View style={s.liveDot} />
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={s.videoModalTitle} numberOfLines={1}>{activeMeetingTitle}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={s.videoModalTimer}>{meetingCallElapsed}</Text>
-                  <Text style={s.videoModalSecure}>• 🔒 256-bit WebRTC</Text>
+                  <Text style={s.videoModalSecure}>• 🔒 256-bit</Text>
                 </View>
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <TouchableOpacity
                 onPress={() => {
                   if (activeMeetingUrl) {
@@ -2456,7 +2452,7 @@ export default function RealtimeEnterpriseTeamSuite() {
                 style={s.copyLinkHeaderBtn}
                 activeOpacity={0.8}
               >
-                <Ionicons name="copy-outline" size={13} color={L.gold} />
+                <Ionicons name="copy-outline" size={12} color={L.gold} />
                 <Text style={s.copyLinkHeaderText}>Copy</Text>
               </TouchableOpacity>
 
@@ -2473,12 +2469,11 @@ export default function RealtimeEnterpriseTeamSuite() {
                 style={s.openBrowserHeaderBtn}
                 activeOpacity={0.8}
               >
-                <Ionicons name="open-outline" size={13} color={L.gold} />
-                <Text style={s.openBrowserHeaderText}>Browser</Text>
+                <Ionicons name="open-outline" size={12} color={L.gold} />
               </TouchableOpacity>
 
               <TouchableOpacity onPress={closeInAppMeeting} style={s.endCallBtn} activeOpacity={0.8}>
-                <Ionicons name="call" size={14} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+                <Ionicons name="call" size={13} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
                 <Text style={s.endCallBtnText}>Leave</Text>
               </TouchableOpacity>
             </View>
@@ -2813,11 +2808,11 @@ const s = StyleSheet.create({
   },
   topBar: {
     backgroundColor: L.navyHeader,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingTop: Platform.OS === 'ios' ? 48 : (StatusBar.currentHeight || 28) + 6,
-    paddingBottom: 8,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    paddingBottom: 6,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
     borderBottomWidth: 1.5,
     borderColor: L.goldDk,
   },
@@ -2825,53 +2820,62 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
+    gap: 6,
   },
   backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: L.gold,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   channelSelectorBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.35)',
-    maxWidth: 150,
+    flex: 1,
   },
   channelSelectorTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12,
+    fontSize: 11.5,
+    flexShrink: 1,
+  },
+  topActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
   },
   superAdminPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.gold,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 3.5,
+    borderRadius: 6,
   },
   superAdminPillText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9.5,
+    fontSize: 8.5,
   },
   topIconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.35)',
@@ -2881,66 +2885,66 @@ const s = StyleSheet.create({
   aiCopilotBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
+    borderRadius: 6,
   },
   aiCopilotBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   videoMeetingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
+    borderRadius: 6,
   },
   videoMeetingBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#060B19',
-    borderRadius: 9,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.35)',
-    paddingHorizontal: 10,
-    height: 32,
+    paddingHorizontal: 8,
+    height: 30,
     marginBottom: 6,
   },
   searchTextInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 11.5,
-    marginLeft: 6,
+    fontSize: 11,
+    marginLeft: 5,
   },
   subHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    width: '100%',
   },
   subTabsWrap: {
     flexDirection: 'row',
     backgroundColor: '#060B19',
     borderRadius: 8,
-    padding: 3,
+    padding: 2.5,
     gap: 3,
   },
   subTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4.5,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
     borderRadius: 6,
   },
   subTabActive: {
@@ -2948,49 +2952,24 @@ const s = StyleSheet.create({
   },
   subTabText: {
     color: L.goldLight,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '700',
   },
   subTabTextActive: {
     color: '#0F172A',
     fontWeight: '900',
   },
-  toolShortcutsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  purgeChannelBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: L.coralBg,
-    borderWidth: 1,
-    borderColor: L.coralBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolIconBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(218, 165, 32, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   filterChipsBar: {
     backgroundColor: L.card,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderBottomWidth: 1,
     borderColor: L.cardBorder,
   },
   filterChip: {
     backgroundColor: L.bg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -3000,7 +2979,7 @@ const s = StyleSheet.create({
   },
   filterChipText: {
     color: L.textMuted,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
   },
   filterChipTextActive: {
@@ -3009,26 +2988,26 @@ const s = StyleSheet.create({
   pinnedStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: L.goldLight,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
     borderBottomWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.3)',
   },
   pinnedText: {
     flex: 1,
     color: L.navyMid,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
   },
   chatScroll: {
     flex: 1,
   },
   chatScrollContent: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 24,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 20,
     maxWidth: 700,
     width: '100%',
     alignSelf: 'center',
@@ -3047,31 +3026,31 @@ const s = StyleSheet.create({
   emptyBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 20,
     backgroundColor: L.card,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: L.cardBorder,
-    marginTop: 14,
-    gap: 5,
+    marginTop: 12,
+    gap: 4,
   },
   emptyTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 13,
+    fontSize: 12.5,
     textAlign: 'center',
   },
   emptySub: {
     color: L.textMuted,
-    fontSize: 10.5,
+    fontSize: 10,
     textAlign: 'center',
-    lineHeight: 15,
+    lineHeight: 14,
   },
   msgBubble: {
-    borderRadius: 14,
-    padding: 10,
-    marginBottom: 8,
-    maxWidth: '85%',
+    borderRadius: 12,
+    padding: 9,
+    marginBottom: 7,
+    maxWidth: '88%',
     borderWidth: 1,
   },
   msgBubbleOther: {
@@ -3087,36 +3066,37 @@ const s = StyleSheet.create({
   bubbleMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 3,
+    gap: 4,
+    marginBottom: 2,
+    flexWrap: 'wrap',
   },
   senderName: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   roleBadge: {
     backgroundColor: L.bg,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: 4,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   roleBadgeText: {
     color: L.textMuted,
-    fontSize: 7.5,
+    fontSize: 7,
     fontWeight: '800',
   },
   msgTime: {
     color: '#94A3B8',
-    fontSize: 8.5,
+    fontSize: 8,
     marginLeft: 'auto',
   },
   msgText: {
     color: L.textPrimary,
-    fontSize: 12,
-    lineHeight: 16.5,
+    fontSize: 11.5,
+    lineHeight: 15.5,
   },
   msgTextMe: {
     color: L.navyHeader,
@@ -3125,16 +3105,17 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginTop: 6,
+    marginTop: 5,
+    flexWrap: 'wrap',
   },
   reactionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -3143,20 +3124,21 @@ const s = StyleSheet.create({
     borderColor: L.goldDk,
   },
   reactionEmoji: {
-    fontSize: 9.5,
+    fontSize: 9,
   },
   reactionCount: {
     color: L.navyHeader,
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '800',
   },
   meetingCardBubble: {
     backgroundColor: '#0F172A',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 7,
     borderWidth: 1.5,
     borderColor: L.goldDk,
+    width: '100%',
   },
   meetingBubbleHeader: {
     flexDirection: 'row',
@@ -3167,39 +3149,39 @@ const s = StyleSheet.create({
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: L.coral,
   },
   liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: L.coral,
   },
   liveBadgeText: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 8.5,
+    fontSize: 8,
   },
   meetingBubbleTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12.5,
-    marginBottom: 3,
+    fontSize: 12,
+    marginBottom: 2,
   },
   meetingBubbleDesc: {
     color: '#94A3B8',
-    fontSize: 9.5,
-    lineHeight: 13,
-    marginBottom: 7,
+    fontSize: 9,
+    lineHeight: 12.5,
+    marginBottom: 6,
   },
   joinMeetingBtn: {
-    borderRadius: 9,
+    borderRadius: 8,
     overflow: 'hidden',
     marginTop: 2,
   },
@@ -3207,124 +3189,126 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
+    gap: 5,
+    paddingVertical: 7,
     backgroundColor: L.gold,
   },
   joinMeetingText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   metricsCardBubble: {
     backgroundColor: '#060B19',
     borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: L.goldDk,
+    width: '100%',
   },
   metricsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 6,
   },
   metricsTitle: {
     color: L.gold,
     fontWeight: '900',
-    fontSize: 10,
-    letterSpacing: 0.5,
+    fontSize: 9.5,
+    letterSpacing: 0.3,
   },
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 5,
   },
   metricTile: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 7,
-    padding: 6,
-    flex: 1,
-    minWidth: '45%',
+    borderRadius: 6,
+    padding: 5,
+    width: '48%',
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.2)',
   },
   metricLabel: {
     color: L.textMuted,
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '700',
   },
   metricVal: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 10.5,
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 1,
   },
   codeCardBubble: {
     backgroundColor: '#060B19',
     borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.35)',
+    width: '100%',
   },
   codeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   codeTitle: {
     color: L.gold,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
     flex: 1,
-    marginLeft: 5,
+    marginLeft: 4,
   },
   codeCopyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2.5,
+    borderRadius: 4,
   },
   codeCopyText: {
     color: L.gold,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '800',
   },
   codeBox: {
     backgroundColor: '#020617',
-    padding: 8,
-    borderRadius: 7,
+    padding: 6,
+    borderRadius: 6,
   },
   codeMonospaceText: {
     color: '#38BDF8',
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   pollCardBubble: {
     backgroundColor: L.card,
-    borderRadius: 14,
-    padding: 11,
-    marginBottom: 8,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: L.cardBorder,
+    width: '100%',
   },
   pollQuestionTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 12,
-    marginVertical: 4,
+    fontSize: 11.5,
+    marginVertical: 3,
   },
   pollOptionRow: {
     position: 'relative',
-    height: 30,
+    height: 28,
     backgroundColor: L.bg,
-    borderRadius: 7,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: L.cardBorder,
     overflow: 'hidden',
@@ -3345,12 +3329,13 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
   },
   pollOptionText: {
     color: L.navyHeader,
     fontWeight: '700',
-    fontSize: 10,
+    fontSize: 9.5,
+    flex: 1,
   },
   pollOptionTextVoted: {
     fontWeight: '900',
@@ -3358,22 +3343,24 @@ const s = StyleSheet.create({
   pollOptionPct: {
     color: L.textMuted,
     fontWeight: '800',
-    fontSize: 9,
+    fontSize: 8.5,
+    marginLeft: 6,
   },
   pollTotalFooter: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '700',
-    marginTop: 3,
+    marginTop: 2,
     textAlign: 'right',
   },
   taskCardBubble: {
     backgroundColor: L.card,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
+    borderRadius: 11,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: L.cardBorder,
+    width: '100%',
   },
   taskCheckRow: {
     flexDirection: 'row',
@@ -3382,16 +3369,16 @@ const s = StyleSheet.create({
   taskTitleText: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 11.5,
+    fontSize: 11,
   },
   taskTitleDone: {
     textDecorationLine: 'line-through',
     color: L.textMuted,
   },
   priorityTag: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
   },
   priorityCritical: {
     backgroundColor: L.coralBg,
@@ -3405,24 +3392,24 @@ const s = StyleSheet.create({
   },
   priorityTagText: {
     color: L.navyHeader,
-    fontSize: 7.5,
+    fontSize: 7,
     fontWeight: '900',
   },
   taskAssigneeText: {
     color: L.textMuted,
-    fontSize: 8.5,
-    marginTop: 2,
+    fontSize: 8,
+    marginTop: 1,
   },
   voiceMemoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    marginTop: 4,
+    gap: 6,
+    marginTop: 3,
   },
   voicePlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: L.gold,
     alignItems: 'center',
     justifyContent: 'center',
@@ -3430,78 +3417,78 @@ const s = StyleSheet.create({
   waveformBars: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2.5,
     flex: 1,
   },
   waveformBar: {
-    width: 3,
+    width: 2.5,
     backgroundColor: L.goldDk,
-    borderRadius: 1.5,
+    borderRadius: 1.2,
   },
   speedRateBtn: {
     backgroundColor: L.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   speedRateText: {
     color: L.navyHeader,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '800',
   },
   voiceDurationText: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '800',
   },
   docAttachBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: L.bg,
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 5,
+    padding: 7,
+    borderRadius: 7,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   docNameText: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 10.5,
+    fontSize: 10,
   },
   docSizeText: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
   },
   chatImageAttachment: {
-    width: 210,
-    height: 140,
-    borderRadius: 9,
-    marginTop: 4,
+    width: 190,
+    height: 125,
+    borderRadius: 8,
+    marginTop: 3,
   },
   inputStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 10,
     backgroundColor: L.card,
     borderTopWidth: 1,
     borderTopColor: L.cardBorder,
-    gap: 5,
+    gap: 4,
     maxWidth: 700,
     width: '100%',
     alignSelf: 'center',
   },
   actionPlusBtn: {
-    padding: 3,
+    padding: 2,
   },
   attachBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     backgroundColor: L.bg,
     borderWidth: 1,
     borderColor: L.cardBorder,
@@ -3511,19 +3498,19 @@ const s = StyleSheet.create({
   chatTextInput: {
     flex: 1,
     backgroundColor: L.bg,
-    borderRadius: 9,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: L.cardBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     color: L.textPrimary,
-    fontSize: 12,
-    maxHeight: 70,
+    fontSize: 11.5,
+    maxHeight: 65,
   },
   sendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     overflow: 'hidden',
   },
   sendBtnGrad: {
@@ -3535,52 +3522,52 @@ const s = StyleSheet.create({
   recordingStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 10,
     backgroundColor: L.coralBg,
     borderTopWidth: 1,
     borderTopColor: L.coralBorder,
-    gap: 8,
+    gap: 6,
     maxWidth: 700,
     width: '100%',
     alignSelf: 'center',
   },
   recordingLiveDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: L.coral,
   },
   recordingText: {
     flex: 1,
     color: L.coral,
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   recordingSendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.gold,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   recordingSendText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   recordingCancelBtn: {
-    padding: 5,
+    padding: 4,
   },
   meetingsScroll: {
     flex: 1,
   },
   meetingsContent: {
-    padding: 12,
-    paddingBottom: 70,
+    padding: 10,
+    paddingBottom: 60,
     maxWidth: 700,
     width: '100%',
     alignSelf: 'center',
@@ -3588,106 +3575,104 @@ const s = StyleSheet.create({
   
   // QUANTUM HERO COMMAND CARD STYLES
   quantumHeroCard: {
-    borderRadius: 18,
+    borderRadius: 14,
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
     borderWidth: 1.5,
     borderColor: L.goldDk,
     shadowColor: '#000',
     shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 3,
   },
   quantumHeroGrad: {
-    padding: 14,
+    padding: 12,
   },
   quantumHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   radarSignalBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.4)',
   },
   pulsingSignalDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: L.emerald,
   },
   radarSignalText: {
     color: L.emerald,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   bitratePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.25)',
   },
   bitrateText: {
     color: '#E2E8F0',
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '800',
   },
   quantumHeroTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 16,
-    letterSpacing: 0.3,
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
   quantumHeroSubtitle: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 14.5,
-    marginTop: 3,
-    marginBottom: 12,
+    fontSize: 9.5,
+    lineHeight: 13.5,
+    marginTop: 2,
+    marginBottom: 10,
   },
   heroButtonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
+    marginBottom: 8,
   },
   heroLaunchBtn: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: L.goldDk,
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
   },
   heroLaunchGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   heroLaunchBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 12,
+    fontSize: 11,
   },
   heroAudioOnlyBtn: {
-    borderRadius: 10,
+    flex: 1,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.4)',
@@ -3695,9 +3680,10 @@ const s = StyleSheet.create({
   heroAudioOnlyGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   heroAudioOnlyText: {
     color: L.gold,
@@ -3708,45 +3694,45 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    height: 36,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    height: 32,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.3)',
-    gap: 6,
+    gap: 5,
   },
   quickJoinInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
   },
   quickJoinSubmitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 5,
   },
   quickJoinSubmitText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9.5,
   },
 
   // MEETING FILTERS
   meetingFilterBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    gap: 5,
+    marginBottom: 10,
   },
   meetingFilterChip: {
     flex: 1,
     backgroundColor: L.card,
-    borderRadius: 8,
-    paddingVertical: 6,
+    borderRadius: 7,
+    paddingVertical: 5,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: L.cardBorder,
@@ -3757,7 +3743,7 @@ const s = StyleSheet.create({
   },
   meetingFilterChipText: {
     color: L.textMuted,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
   },
   meetingFilterChipTextActive: {
@@ -3769,57 +3755,65 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   sectionCount: {
     color: L.textMuted,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
   },
   presetRoomCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 7,
     borderWidth: 1.2,
     borderColor: 'rgba(218, 165, 32, 0.25)',
   },
   presetRoomGrad: {
-    padding: 11,
+    padding: 9,
   },
   presetRoomTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   presetIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  presetTitleTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
   },
   presetRoomTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12,
+    fontSize: 11.5,
+    flex: 1,
   },
   presetTagBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
     borderWidth: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   presetTagText: {
-    fontSize: 7,
+    fontSize: 6.5,
     fontWeight: '900',
   },
   presetRoomDesc: {
     color: '#94A3B8',
-    fontSize: 9,
-    lineHeight: 12.5,
+    fontSize: 8.5,
+    lineHeight: 11.5,
     marginTop: 2,
   },
   presetRoomBottom: {
@@ -3828,57 +3822,66 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingTop: 6,
+    paddingTop: 5,
+    gap: 6,
   },
   presetRoomHash: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    flex: 1,
   },
   presetRoomHashText: {
     color: '#94A3B8',
-    fontSize: 8.5,
+    fontSize: 8,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    flexShrink: 1,
+  },
+  presetActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 0,
   },
   presetCopyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3.5,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   presetCopyText: {
     color: L.gold,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
   },
   presetEnterBtn: {
-    borderRadius: 6,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   presetEnterGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
   },
   presetEnterText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9.5,
+    fontSize: 9,
   },
 
   // SCHEDULED LIST
   meetingListItem: {
     backgroundColor: L.card,
-    borderRadius: 12,
-    padding: 11,
-    marginBottom: 8,
+    borderRadius: 11,
+    padding: 9,
+    marginBottom: 7,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -3890,39 +3893,39 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   meetingTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   meetingTagText: {
     color: L.textMuted,
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: '800',
   },
   meetingDateText: {
     color: L.goldAmber,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
   },
   meetingListTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 12,
-    marginBottom: 3,
+    fontSize: 11.5,
+    marginBottom: 2,
   },
   meetingListDesc: {
     color: L.textMuted,
-    fontSize: 9.5,
-    marginBottom: 6,
+    fontSize: 9,
+    marginBottom: 5,
   },
   meetingListFooter: {
     flexDirection: 'row',
@@ -3930,49 +3933,51 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    paddingTop: 6,
+    paddingTop: 5,
+    gap: 6,
   },
   meetingHost: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '700',
+    flex: 1,
   },
   deleteMeetingBtn: {
-    padding: 4,
+    padding: 3,
   },
   joinListBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: L.gold,
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 5,
   },
   joinListBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9.5,
+    fontSize: 9,
   },
 
   // AI MEETING BANNER
   aiMeetingBanner: {
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.4)',
   },
   aiMeetingGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
   },
   aiMeetingIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     borderWidth: 1,
     borderColor: L.purple,
@@ -3982,11 +3987,11 @@ const s = StyleSheet.create({
   aiMeetingTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   aiMeetingSub: {
     color: '#94A3B8',
-    fontSize: 8.5,
+    fontSize: 8,
     marginTop: 1,
   },
 
@@ -3994,36 +3999,36 @@ const s = StyleSheet.create({
   sectionTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 12.5,
+    fontSize: 12,
   },
   scheduleNewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: L.gold,
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   scheduleNewBtnText: {
     color: '#0F172A',
     fontWeight: '900',
-    fontSize: 9.5,
+    fontSize: 9,
   },
   dmContactCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: L.card,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 6,
+    borderRadius: 11,
+    padding: 8,
+    marginBottom: 5,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   dmAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   dmAvatarFallback: {
     backgroundColor: L.navyMid,
@@ -4033,120 +4038,124 @@ const s = StyleSheet.create({
   dmAvatarText: {
     color: L.gold,
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10,
   },
   dmName: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 11.5,
+    fontSize: 11,
   },
   dmRole: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '700',
   },
+  dmActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
   dmCallBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     backgroundColor: L.gold,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
   },
   dmVoiceBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     backgroundColor: L.emeraldBg,
     borderWidth: 1,
     borderColor: L.emeraldBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
   },
   dmChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.bg,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   dmChatBtnText: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 9.5,
+    fontSize: 9,
   },
   dutyStatusCard: {
     backgroundColor: '#0F172A',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: L.goldDk,
   },
   dutyStatusTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12.5,
+    fontSize: 12,
   },
   dutyStatusSub: {
     color: L.goldLight,
-    fontSize: 9.5,
-    marginTop: 2,
+    fontSize: 9,
+    marginTop: 1,
   },
   clockInBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.emerald,
-    paddingHorizontal: 11,
-    paddingVertical: 5.5,
-    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 6,
   },
   clockInBtnText: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 9.5,
   },
   rosterItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: L.card,
-    borderRadius: 9,
-    padding: 8,
-    marginBottom: 5,
+    borderRadius: 8,
+    padding: 7,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   rosterDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   rosterName: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   rosterRole: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
   },
   rosterStatus: {
     color: L.emerald,
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '900',
   },
   bookmarkCard: {
     backgroundColor: L.card,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 7,
+    borderRadius: 11,
+    padding: 9,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -4155,57 +4164,59 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 14,
+    padding: 12,
   },
   actionSheetCard: {
     width: '100%',
     maxWidth: 420,
     backgroundColor: L.card,
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: L.cardBorder,
     shadowColor: '#000',
     shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   actionSheetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+    gap: 6,
+    marginTop: 6,
+    justifyContent: 'space-between',
   },
   actionSheetTile: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '30%',
-    paddingVertical: 12,
+    width: '23%',
+    paddingVertical: 10,
     backgroundColor: L.bg,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   actionSheetTileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   actionSheetTileText: {
     color: L.navyHeader,
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontWeight: '800',
+    textAlign: 'center',
   },
   channelDrawerCard: {
     width: '100%',
     maxWidth: 400,
     backgroundColor: L.card,
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 14,
+    padding: 10,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -4213,22 +4224,22 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-    paddingBottom: 6,
+    marginBottom: 8,
+    paddingBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   drawerTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 13,
+    fontSize: 12.5,
   },
   channelDrawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 9,
-    marginBottom: 4,
+    padding: 7,
+    borderRadius: 8,
+    marginBottom: 3,
     backgroundColor: L.bg,
     borderWidth: 1,
     borderColor: L.cardBorder,
@@ -4238,9 +4249,9 @@ const s = StyleSheet.create({
     borderColor: L.goldDk,
   },
   channelDrawerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
+    width: 26,
+    height: 26,
+    borderRadius: 6,
     backgroundColor: L.card,
     alignItems: 'center',
     justifyContent: 'center',
@@ -4248,28 +4259,28 @@ const s = StyleSheet.create({
   channelDrawerName: {
     color: L.navyHeader,
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   channelDrawerNameActive: {
     fontWeight: '900',
   },
   channelDrawerDesc: {
     color: L.textMuted,
-    fontSize: 8.5,
+    fontSize: 8,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 14,
+    padding: 12,
   },
   modalCard: {
     width: '100%',
     maxWidth: 420,
     backgroundColor: L.card,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
@@ -4277,40 +4288,40 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-    paddingBottom: 6,
+    marginBottom: 8,
+    paddingBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   modalTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 13,
+    fontSize: 12.5,
   },
   directiveItem: {
     backgroundColor: L.bg,
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 6,
+    padding: 7,
+    borderRadius: 7,
+    marginBottom: 5,
     borderWidth: 1,
     borderColor: L.cardBorder,
   },
   directiveTitle: {
     color: L.navyHeader,
     fontWeight: '900',
-    fontSize: 11,
-    marginBottom: 2,
+    fontSize: 10.5,
+    marginBottom: 1,
   },
   directiveText: {
     color: L.textSecondary,
-    fontSize: 9.5,
-    lineHeight: 12.5,
+    fontSize: 9,
+    lineHeight: 12,
   },
   prioritySelectBtn: {
     flex: 1,
     backgroundColor: L.bg,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingVertical: 4.5,
+    borderRadius: 5,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: L.cardBorder,
@@ -4321,55 +4332,55 @@ const s = StyleSheet.create({
   },
   prioritySelectText: {
     color: L.textMuted,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '700',
   },
   inputLabel: {
     color: L.navyHeader,
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
     textTransform: 'uppercase',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   modalInput: {
     backgroundColor: L.bg,
-    borderRadius: 8,
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: L.cardBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     color: L.textPrimary,
-    fontSize: 11,
-    marginBottom: 8,
+    fontSize: 10.5,
+    marginBottom: 6,
   },
   addOptionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    marginBottom: 10,
+    gap: 3,
+    paddingVertical: 3,
+    marginBottom: 8,
   },
   addOptionText: {
     color: L.goldAmber,
     fontWeight: '800',
-    fontSize: 9.5,
+    fontSize: 9,
   },
   modalActionBtn: {
-    borderRadius: 9,
+    borderRadius: 8,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 3,
   },
   modalActionGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
+    gap: 4,
+    paddingVertical: 8,
   },
   modalActionText: {
     color: L.gold,
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10.5,
   },
   zoomBackdrop: {
     flex: 1,
@@ -4397,70 +4408,64 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0F172A',
-    paddingHorizontal: 12,
-    paddingTop: Platform.OS === 'ios' ? 48 : 32,
-    paddingBottom: 10,
+    paddingHorizontal: 10,
+    paddingTop: Platform.OS === 'ios' ? 48 : 30,
+    paddingBottom: 8,
     borderBottomWidth: 1.5,
     borderBottomColor: L.goldDk,
   },
   videoModalTitle: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 12.5,
+    fontSize: 11.5,
   },
   videoModalTimer: {
     color: L.gold,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '900',
   },
   videoModalSecure: {
     color: '#94A3B8',
-    fontSize: 8.5,
+    fontSize: 8,
   },
   copyLinkHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.4)',
   },
   copyLinkHeaderText: {
     color: L.gold,
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
   },
   openBrowserHeaderBtn: {
-    flexDirection: 'row',
+    width: 26,
+    height: 26,
     alignItems: 'center',
-    gap: 3,
+    justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: 'rgba(218, 165, 32, 0.4)',
-  },
-  openBrowserHeaderText: {
-    color: L.gold,
-    fontSize: 9,
-    fontWeight: '800',
   },
   endCallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: L.coral,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 6,
   },
   endCallBtnText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '900',
   },
   videoLoadingCenter: {
@@ -4468,15 +4473,15 @@ const s = StyleSheet.create({
     backgroundColor: '#0B1120',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   videoLoadingText: {
     color: L.goldLight,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   videoLoadingSub: {
     color: '#94A3B8',
-    fontSize: 9.5,
+    fontSize: 9,
   },
 });
