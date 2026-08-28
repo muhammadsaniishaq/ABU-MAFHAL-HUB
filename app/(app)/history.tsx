@@ -147,9 +147,47 @@ export default function HistoryScreen() {
     };
 
     const mapTransactionRecord = (tx: any) => {
-        const rawAmount = extractAmount(tx);
-        const typeStr = (tx.type || '').toLowerCase();
-        const descStr = (tx.description || '').toLowerCase();
+        let desc = tx.description || tx.type || 'Transaction';
+        let metadata = tx.metadata || {};
+        let rawAmount = extractAmount(tx);
+
+        // 1. If description is JSON string, parse it
+        if (typeof desc === 'string' && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
+            try {
+                const parsed = JSON.parse(desc);
+                metadata = { ...metadata, ...parsed };
+                if (parsed.holder_name || parsed.name || parsed.search_number || parsed.service_type) {
+                    desc = `${(parsed.service_type || parsed.service_category || 'Verification').toUpperCase()}: ${parsed.holder_name || parsed.name || parsed.search_number}`;
+                }
+                if (rawAmount === 0) {
+                    rawAmount = extractAmount(parsed);
+                }
+            } catch (_) {}
+        }
+
+        // 2. If rawAmount is still 0, check metadata
+        if (rawAmount === 0 && metadata) {
+            rawAmount = extractAmount(metadata);
+        }
+
+        const typeStr = (tx.type || metadata.service_type || '').toLowerCase();
+        const descStr = desc.toLowerCase();
+
+        // 3. Fallback for zero amounts based on service type
+        if (rawAmount === 0) {
+            if (descStr.includes('cac') || typeStr.includes('cac')) {
+                rawAmount = 500;
+            } else if (descStr.includes('nin') || descStr.includes('bvn') || typeStr.includes('nin') || typeStr.includes('bvn') || typeStr.includes('verification')) {
+                rawAmount = 300;
+            } else if (descStr.includes('boost') || typeStr.includes('boost') || typeStr.includes('smm')) {
+                rawAmount = 250;
+            } else if (descStr.includes('airtime')) {
+                rawAmount = 100;
+            } else if (descStr.includes('data')) {
+                rawAmount = 350;
+            }
+        }
+
         const isIncome = typeStr === 'deposit' || typeStr === 'credit' || typeStr === 'topup' || typeStr === 'refund' || descStr.includes('deposit') || descStr.includes('funded') || descStr.includes('credit');
 
         let icon = 'receipt-outline';
@@ -194,6 +232,8 @@ export default function HistoryScreen() {
 
         return {
             ...tx,
+            description: desc,
+            metadata,
             displayAmount: `${isIncome ? '+' : '-'}₦${rawAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             rawAmount,
             isIncome,

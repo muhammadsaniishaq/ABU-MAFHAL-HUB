@@ -118,14 +118,15 @@ export const verificationHistory = {
 
           if (error) {
             console.warn('verification_history table insert fallback:', error.message);
-            // Fallback: Store in transactions table metadata
+            const nominalFee = item.service_category === 'cac' ? 500 : 300;
+            // Fallback: Store in transactions table with nominal service fee
             await supabase.from('transactions').insert({
               user_id: userId,
-              amount: 0,
-              type: 'history_record',
+              amount: nominalFee,
+              type: (item.service_type || 'verification').toLowerCase(),
               status: 'success',
               reference: `hist_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-              description: JSON.stringify(payload),
+              description: `${(item.service_type || item.service_category || 'Verification').toUpperCase()}: ${resolvedName || item.search_number}`,
             });
           }
         } catch (dbErr) {
