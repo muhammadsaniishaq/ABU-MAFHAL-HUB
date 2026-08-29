@@ -122,7 +122,9 @@ export default function SignupScreen() {
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showGoogleAuthModal, setShowGoogleAuthModal] = useState(false);
-    const [googleAuthUrl, setGoogleAuthUrl] = useState<string | null>(null);
+    const [googleEmailInput, setGoogleEmailInput] = useState('');
+    const [googleModalLoading, setGoogleModalLoading] = useState(false);
+
 
     // Listen for Auth State changes (e.g. from Google OAuth popup completion)
     useEffect(() => {
@@ -712,8 +714,74 @@ export default function SignupScreen() {
         }
     };
 
+    const handleGoogleOtpSignUp = async () => {
+        const cleanEmail = googleEmailInput.trim().toLowerCase();
+        if (!cleanEmail || !cleanEmail.includes('@')) {
+            Alert.alert('Invalid Email', 'Please enter a valid Google email address (e.g. name@gmail.com).');
+            return;
+        }
+        setGoogleModalLoading(true);
+        try {
+            const redirectUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+                ? window.location.origin
+                : Linking.createURL('/login');
+
+            const { error } = await supabase.auth.signInWithOtp({
+                email: cleanEmail,
+                options: {
+                    emailRedirectTo: redirectUrl,
+                    shouldCreateUser: true,
+                    data: referralCode ? { referral_code: referralCode.trim() } : undefined,
+                },
+            });
+            if (error) throw error;
+
+            setShowGoogleAuthModal(false);
+            setGoogleEmailInput('');
+            router.push({
+                pathname: '/(auth)/otp' as any,
+                params: { email: cleanEmail, mode: 'signup' },
+            });
+        } catch (err: any) {
+            Alert.alert('Google Registration', err.message || 'Failed to send Google registration code.');
+        } finally {
+            setGoogleModalLoading(false);
+        }
+    };
+
+    const handleGoogleDirectOAuth = async () => {
+        setGoogleModalLoading(true);
+        try {
+            const redirectUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+                ? window.location.origin
+                : Linking.createURL('/login');
+
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: redirectUrl,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'select_account',
+                    },
+                    data: referralCode ? { referral_code: referralCode.trim() } : undefined,
+                },
+            });
+            if (error) throw error;
+        } catch (err: any) {
+            Alert.alert('Google Registration', err.message || 'Failed to connect with Google.');
+        } finally {
+            setGoogleModalLoading(false);
+        }
+    };
+
     // Social Provider Handler
     const handleSocialAuth = async (provider: 'google' | 'apple' | 'facebook' | 'twitter' | 'github') => {
+        if (provider === 'google') {
+            setShowGoogleAuthModal(true);
+            return;
+        }
+
         if (socialLoading) return;
         setSocialLoading(provider);
         try {
@@ -732,129 +800,13 @@ export default function SignupScreen() {
                 data: refCodeToPass ? { referral_code: refCodeToPass } : undefined,
             };
 
-            if (Platform.OS === 'web') {
-                const popupWidth = 500;
-                const popupHeight = 620;
-                const left = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenX + (window.outerWidth - popupWidth) / 2)) : 50;
-                const top = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenY + (window.outerHeight - popupHeight) / 2)) : 50;
-
-                // Open centered popup synchronously to prevent browser popup blocking
-                let popup: Window | null = null;
-                if (typeof window !== 'undefined') {
-                    popup = window.open(
-                        'about:blank',
-                        'GoogleAuthPopup',
-                        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`
-                    );
-                    if (popup && popup.document) {
-                        try {
-                            popup.document.write(`
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                    <title>ABUMAFHAL - Google Secure Authentication</title>
-                                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                                    <style>
-                                        body { margin: 0; padding: 0; background: #0F172A; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
-                                        .card { background: #1E293B; border: 1px solid #334155; border-radius: 18px; padding: 24px; max-width: 320px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
-                                        .spinner { width: 34px; height: 34px; border: 3px solid rgba(245, 158, 11, 0.2); border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 16px auto; }
-                                        @keyframes spin { to { transform: rotate(360deg); } }
-                                    </style>
-                                </head>
-                                <body>
-                                    <div class="card">
-                                        <div style="font-size: 32px; margin-bottom: 8px;">👑</div>
-                                        <div style="font-weight: 900; font-size: 16px; color: #F59E0B; letter-spacing: 0.5px;">ABUMAFHAL</div>
-                                        <div style="font-size: 10px; font-weight: 800; color: #94A3B8; margin-bottom: 12px;">ROYAL FINTECH</div>
-                                        <div style="font-size: 13px; font-weight: 700; color: #F8FAFC; margin-bottom: 4px;">Connecting to Google...</div>
-                                        <div style="font-size: 11px; color: #94A3B8;">Secure 256-bit encrypted authentication</div>
-                                        <div class="spinner"></div>
-                                    </div>
-                                </body>
-                                </html>
-                            `);
-                        } catch (e) {}
-                    }
-                }
-
-                setShowGoogleAuthModal(true);
-
-                const { data, error } = await supabase.auth.signInWithOAuth({
-                    provider: provider as any,
-                    options: {
-                        ...options,
-                        skipBrowserRedirect: true,
-                    },
-                });
-
-                if (error) {
-                    if (popup && !popup.closed) popup.close();
-                    throw error;
-                }
-
-                if (data?.url) {
-                    setGoogleAuthUrl(data.url);
-                    if (popup && !popup.closed) {
-                        popup.location.href = data.url;
-                        const checkInterval = setInterval(async () => {
-                            if (popup.closed) {
-                                clearInterval(checkInterval);
-                                setSocialLoading(null);
-                                const { data: { session } } = await supabase.auth.getSession();
-                                if (session) {
-                                    setShowGoogleAuthModal(false);
-                                    router.replace('/dashboard' as any);
-                                }
-                            }
-                        }, 800);
-                    }
-                }
-            } else {
-                options.skipBrowserRedirect = true;
-                const { data, error } = await supabase.auth.signInWithOAuth({
-                    provider: provider as any,
-                    options,
-                });
-                if (error) throw error;
-
-                if (data?.url) {
-                    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-                    if (result.type === 'success' && result.url) {
-                        const normalizedUrl = result.url.replace('#', '?');
-                        let codeStr: string | null = null;
-                        let accessTokenStr: string | null = null;
-                        let refreshTokenStr: string | null = null;
-
-                        try {
-                            const urlObj = new URL(normalizedUrl);
-                            codeStr = urlObj.searchParams.get('code');
-                            accessTokenStr = urlObj.searchParams.get('access_token');
-                            refreshTokenStr = urlObj.searchParams.get('refresh_token');
-                        } catch (e) {
-                            const parsed = Linking.parse(normalizedUrl);
-                            const q = parsed.queryParams || {};
-                            codeStr = Array.isArray(q.code) ? q.code[0] : (q.code as string);
-                            accessTokenStr = Array.isArray(q.access_token) ? q.access_token[0] : (q.access_token as string);
-                            refreshTokenStr = Array.isArray(q.refresh_token) ? q.refresh_token[0] : (q.refresh_token as string);
-                        }
-
-                        if (codeStr) {
-                            const { error: exErr } = await supabase.auth.exchangeCodeForSession(codeStr);
-                            if (exErr) throw exErr;
-                        } else if (accessTokenStr && refreshTokenStr) {
-                            const { error: setErr } = await supabase.auth.setSession({
-                                access_token: accessTokenStr,
-                                refresh_token: refreshTokenStr,
-                            });
-                            if (setErr) throw setErr;
-                        }
-
-                        router.replace('/dashboard' as any);
-                    }
-                }
-            }
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: provider as any,
+                options,
+            });
+            if (error) throw error;
         } catch (error: any) {
-            Alert.alert(`${provider.toUpperCase()} Registration Error`, error.message || 'Failed to register with Google.');
+            Alert.alert(`${provider.toUpperCase()} Registration Error`, error.message || 'Failed to register.');
         } finally {
             setSocialLoading(null);
         }
@@ -1526,20 +1478,20 @@ export default function SignupScreen() {
                 </SafeAreaView>
             </Modal>
 
-            {/* Centered Google Auth Modal with App Logo & Name */}
+            {/* Centered In-App Google Auth Modal with App Logo & Name */}
             <Modal
                 visible={showGoogleAuthModal}
                 transparent={true}
                 animationType="fade"
                 onRequestClose={() => {
                     setShowGoogleAuthModal(false);
-                    setSocialLoading(null);
+                    setGoogleModalLoading(false);
                 }}
             >
                 <View style={styles.modalOverlay}>
                     <View style={[styles.googleAuthModalCard, { backgroundColor: isDark ? '#0F172A' : '#FFFFFF', borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#E2E8F0' }]}>
                         {/* App Logo & Brand Header */}
-                        <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                        <View style={{ alignItems: 'center', marginBottom: 12 }}>
                             <Image 
                                 source={getLogoSource()} 
                                 style={{ width: 50, height: 50, marginBottom: 6 }} 
@@ -1553,55 +1505,78 @@ export default function SignupScreen() {
                             </Text>
                         </View>
 
-                        {/* Google Auth Status Box */}
-                        <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', marginBottom: 12 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                                <Image 
-                                    source={require('../../assets/images/google-g.png')} 
-                                    style={{ width: 20, height: 20 }} 
-                                    resizeMode="contain" 
-                                />
-                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: theme.textPrimary }}>
-                                    Google Secure Sign-Up
-                                </Text>
-                            </View>
-                            <ActivityIndicator size="small" color="#F59E0B" style={{ marginVertical: 6 }} />
-                            <Text style={{ fontSize: 10.5, color: theme.textSecondary, textAlign: 'center', lineHeight: 15 }}>
-                                A centered Google authorization popup is open. Please choose your Google account to create your account securely.
+                        {/* Google Registration Title */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                            <Image 
+                                source={require('../../assets/images/google-g.png')} 
+                                style={{ width: 18, height: 18 }} 
+                                resizeMode="contain" 
+                            />
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>
+                                Google Fast Registration
                             </Text>
                         </View>
 
-                        {/* Fallback Action to Re-Open Window */}
-                        {googleAuthUrl && (
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                                        const popupWidth = 500;
-                                        const popupHeight = 620;
-                                        const left = Math.max(0, Math.floor(window.screenX + (window.outerWidth - popupWidth) / 2));
-                                        const top = Math.max(0, Math.floor(window.screenY + (window.outerHeight - popupHeight) / 2));
-                                        window.open(googleAuthUrl, 'GoogleAuthPopup', `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`);
-                                    }
-                                }}
-                                style={{ backgroundColor: '#F59E0B', height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 11.5 }}>
-                                    Re-open Centered Window 🪟
-                                </Text>
-                            </TouchableOpacity>
-                        )}
+                        <Text style={{ fontSize: 10.5, color: theme.textSecondary, textAlign: 'center', marginBottom: 12, lineHeight: 14 }}>
+                            Yi sabuwar rijista ta Google ba tare da barin wannan shafin ba.
+                        </Text>
+
+                        {/* Gmail Address Input */}
+                        <View style={{ height: 38, borderRadius: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#CBD5E1', backgroundColor: isDark ? '#1E293B' : '#F8FAFC', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                            <Ionicons name="mail-outline" size={16} color="#F59E0B" style={{ marginRight: 6 }} />
+                            <TextInput 
+                                value={googleEmailInput}
+                                onChangeText={setGoogleEmailInput}
+                                placeholder="name@gmail.com"
+                                placeholderTextColor={theme.textMuted}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                style={{ flex: 1, color: theme.textPrimary, fontSize: 11.5, fontWeight: '600' }}
+                            />
+                        </View>
+
+                        {/* Instant Google Code Registration Button */}
+                        <TouchableOpacity 
+                            onPress={handleGoogleOtpSignUp}
+                            disabled={googleModalLoading}
+                            style={{ backgroundColor: '#F59E0B', height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8, flexDirection: 'row', gap: 6 }}
+                            activeOpacity={0.85}
+                        >
+                            {googleModalLoading ? (
+                                <ActivityIndicator size="small" color="#0F172A" />
+                            ) : (
+                                <>
+                                    <Ionicons name="flash" size={15} color="#0F172A" />
+                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 11.5 }}>
+                                        Register with Google Code ⚡
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Direct Google Connect Button */}
+                        <TouchableOpacity 
+                            onPress={handleGoogleDirectOAuth}
+                            disabled={googleModalLoading}
+                            style={{ backgroundColor: isDark ? '#1E293B' : '#F1F5F9', height: 36, borderRadius: 10, borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 10, flexDirection: 'row', gap: 6 }}
+                            activeOpacity={0.8}
+                        >
+                            <Image source={require('../../assets/images/google-g.png')} style={{ width: 15, height: 15 }} resizeMode="contain" />
+                            <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 11 }}>
+                                Connect Google Account 🚀
+                            </Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity 
                             onPress={() => {
                                 setShowGoogleAuthModal(false);
-                                setSocialLoading(null);
+                                setGoogleModalLoading(false);
                             }}
-                            style={{ paddingVertical: 6, alignItems: 'center' }}
+                            style={{ paddingVertical: 4, alignItems: 'center' }}
                             activeOpacity={0.7}
                         >
                             <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700' }}>
-                                Cancel
+                                Cancel / Rufe
                             </Text>
                         </TouchableOpacity>
                     </View>
