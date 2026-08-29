@@ -12,7 +12,7 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../services/supabase';
@@ -89,6 +89,16 @@ export default function HistoryScreen() {
     useEffect(() => {
         initHistory();
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (currentUserIdRef.current) {
+                fetchLiveHistory(currentUserIdRef.current);
+            } else {
+                initHistory();
+            }
+        }, [])
+    );
 
     const initHistory = async () => {
         try {
@@ -229,7 +239,7 @@ export default function HistoryScreen() {
 
     const fetchLiveHistory = async (userId: string) => {
         try {
-            // Fetch Standard Transactions
+            // 1. Fetch Standard Transactions (Airtime, Data, Bills, Deposits, Transfers, Cards, etc.)
             let standardTxList: any[] = [];
             try {
                 const { data, error: txErr } = await supabase
@@ -237,14 +247,14 @@ export default function HistoryScreen() {
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(200);
+                    .limit(300);
                 if (data) standardTxList = data;
                 if (txErr) console.warn('Transactions query notice:', txErr.message);
             } catch (err) {
                 console.warn('Transactions fetch error:', err);
             }
 
-            // Fetch Verification History safely in background
+            // 2. Fetch Verification History (NIN, BVN, CAC, Slips)
             let verifTxList: any[] = [];
             try {
                 const { data: vData } = await supabase
@@ -252,8 +262,20 @@ export default function HistoryScreen() {
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(100);
+                    .limit(150);
                 if (vData) verifTxList = vData;
+            } catch (_) {}
+
+            // 3. Fetch Social Boost Orders (SMM)
+            let smmOrdersList: any[] = [];
+            try {
+                const { data: sData } = await supabase
+                    .from('smm_orders')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                if (sData) smmOrdersList = sData;
             } catch (_) {}
 
             // Transform verification records into standard format with true extracted amount
@@ -262,7 +284,7 @@ export default function HistoryScreen() {
                 const exactAmount = d.amount ?? d.price ?? d.fee ?? d.amount_paid ?? v.amount_paid ?? v.price ?? v.amount ?? 0;
                 const desc = d.description || (v.holder_name ? `${(v.service_type || v.service_category || 'Verification').toUpperCase()}: ${v.holder_name}` : `${(v.service_type || 'Verification').toUpperCase()}: ${v.search_number || v.identifier || 'Search'}`);
                 const ref = d.reference || v.search_number || v.reference || v.id;
-                const type = (d.type || v.service_type || v.service_category || 'payment').toLowerCase();
+                const type = (d.type || v.service_type || v.service_category || 'verification').toLowerCase();
 
                 return {
                     id: v.id || `verif-${ref || Date.now()}`,
@@ -283,9 +305,27 @@ export default function HistoryScreen() {
                 };
             });
 
+            // Transform SMM orders into standard format
+            const mappedSmm = smmOrdersList.map(s => ({
+                id: s.id || `smm-${s.order_id || Date.now()}`,
+                user_id: s.user_id,
+                type: 'social_boost',
+                amount: Number(s.price || s.amount || 0),
+                status: (s.status || 'pending').toLowerCase(),
+                description: `Social Boost #${s.order_id || s.id}: ${s.service_name || 'Boost Service'} (${s.quantity || ''} units)`,
+                reference: s.order_id ? `SMM-${s.order_id}` : `SMM-${s.id}`,
+                created_at: s.created_at,
+                metadata: {
+                    link: s.link,
+                    quantity: s.quantity,
+                    service_name: s.service_name,
+                    service_id: s.service_id,
+                }
+            }));
+
             // Merge and deduplicate by reference or ID
             const seenKeys = new Set<string>();
-            const combinedRaw = [...(standardTxList || []), ...mappedVerif].filter(item => {
+            const combinedRaw = [...(standardTxList || []), ...mappedVerif, ...mappedSmm].filter(item => {
                 const key = item.reference || item.id;
                 if (!key || seenKeys.has(key)) return false;
                 seenKeys.add(key);
@@ -308,18 +348,14 @@ export default function HistoryScreen() {
 
     const setupRealtimeListener = (userId: string) => {
         const channel = supabase
-            .channel(`user_tx_sync_${userId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, (payload: any) => {
-                if (payload.new) {
-                    const newMapped = mapTransactionRecord(payload.new);
-                    setHistory(prev => {
-                        const updated = [newMapped, ...prev.filter(t => t.id !== newMapped.id && t.reference !== newMapped.reference)];
-                        saveCachedHistory(userId, updated);
-                        return updated;
-                    });
-                }
+            .channel(`user_tx_sync_${userId}_${Date.now()}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
+                fetchLiveHistory(userId);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'verification_history', filter: `user_id=eq.${userId}` }, () => {
+                fetchLiveHistory(userId);
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'smm_orders', filter: `user_id=eq.${userId}` }, () => {
                 fetchLiveHistory(userId);
             })
             .subscribe();
@@ -329,7 +365,9 @@ export default function HistoryScreen() {
         };
     };
 
+
     const handleRefresh = useCallback(() => {
+
         setRefreshing(true);
         if (Platform.OS !== 'web') {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

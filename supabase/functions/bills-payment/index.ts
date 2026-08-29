@@ -173,14 +173,15 @@ Deno.serve(async (req: Request) => {
                         amount: -creditedAmount
                     });
 
-                    await rpcClient.from('wallet_transactions').insert({
+                    await rpcClient.from('transactions').insert({
                         user_id: userId,
-                        type: 'credit',
+                        type: 'deposit',
                         amount: creditedAmount,
-                        status: 'completed',
+                        status: 'success',
                         reference: step3Res.transid || `AC_${Date.now()}`,
                         description: `Airtime to Cash (${phone}) -> +₦${creditedAmount.toLocaleString()}`
                     });
+
                 }
 
                 return new Response(JSON.stringify({ success: true, data: step3Res }), {
@@ -422,19 +423,20 @@ Deno.serve(async (req: Request) => {
                     };
                     const planInfo = pinPlanInfo[Number(planId)] || { network: 'MTN', denom: '₦100', size: '100' };
 
-                    // Save to wallet_transactions (main history)
+                    // Save to transactions (main history)
                     try {
-                        await rpcClient.from('wallet_transactions').insert({
+                        await rpcClient.from('transactions').insert({
                             user_id: userId,
-                            type: 'debit',
+                            type: 'payment',
                             amount: amountToCharge,
-                            status: 'completed',
+                            status: 'success',
                             reference: txId,
                             description: `${planInfo.network} ${planInfo.denom} Recharge PIN x${qty} - ${bName}`
                         });
                     } catch (histErr) {
-                        console.warn('[Bills] wallet_transactions insert note:', histErr);
+                        console.warn('[Bills] transactions insert note:', histErr);
                     }
+
 
                     // Save to recharge_pins table (pin-specific history)
                     try {
