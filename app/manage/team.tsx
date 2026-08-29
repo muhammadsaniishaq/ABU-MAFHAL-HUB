@@ -252,16 +252,26 @@ export default function RealtimeEnterpriseTeamSuite() {
   }, [activeMeetingUrl, activeDmUser, activeTab]);
 
   useEffect(() => {
+    // 0ms Cache-First Load
+    loadCachedAdminProfile();
+    loadCachedAdminDirectory();
     fetchCurrentAdminProfile();
     fetchLiveAdminDirectory();
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    // Load cache immediately
     loadCachedMessages();
+    loadCachedMeetings();
+    
+    // Background sync
     fetchLiveMessages();
     fetchLiveMeetings();
+
     const cleanup = setupRealtimeSubscription();
     return () => {
+      isMounted = false;
       cleanup();
       if (soundObject) {
         soundObject.unloadAsync().catch(() => {});
@@ -280,10 +290,51 @@ export default function RealtimeEnterpriseTeamSuite() {
     return activeChannel;
   }, [activeChannel, activeDmUser, currentUserId]);
 
+  // 0ms Cache Loaders
+  const loadCachedAdminProfile = async () => {
+    try {
+      const cached = await AsyncStorage.getItem('@team_admin_profile_cache');
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p.id) setCurrentUserId(p.id);
+        if (p.email) setCurrentUserEmail(p.email);
+        if (p.name) setCurrentUserName(p.name);
+        if (p.role) setCurrentUserRole(p.role);
+        if (p.avatar) setCurrentUserAvatar(p.avatar);
+        if (p.isSuper !== undefined) setIsSuperAdmin(p.isSuper);
+        setAuthChecking(false);
+      }
+    } catch (_) {}
+  };
+
+  const loadCachedAdminDirectory = async () => {
+    try {
+      const cached = await AsyncStorage.getItem('@team_admin_dir_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAdminDirectory(parsed);
+          setLoadingAdmins(false);
+        }
+      }
+    } catch (_) {}
+  };
+
+  const loadCachedMeetings = async () => {
+    try {
+      const cached = await AsyncStorage.getItem('@team_meetings_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMeetings(parsed);
+        }
+      }
+    } catch (_) {}
+  };
+
   // 1. Fetch Current User & Verify Admin / Super Admin Authorization
   const fetchCurrentAdminProfile = async () => {
     try {
-      setAuthChecking(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
@@ -298,14 +349,26 @@ export default function RealtimeEnterpriseTeamSuite() {
 
         const role = (profile?.role || user.user_metadata?.role || 'admin').toLowerCase();
         const roleUpper = role.toUpperCase();
-        setCurrentUserRole(roleUpper);
-        setCurrentUserName(profile?.full_name || email.split('@')[0] || 'Super Admin');
-        setCurrentUserAvatar(profile?.avatar_url || null);
+        const name = profile?.full_name || email.split('@')[0] || 'Super Admin';
+        const avatar = profile?.avatar_url || null;
 
         const isSuper = role === 'super_admin' || role === 'superadmin' || role === 'owner' ||
                         email === 'sale.abumafhal@gmail.com' || email === 'abumafhal@gmail.com' ||
                         role === 'admin';
+
+        setCurrentUserRole(roleUpper);
+        setCurrentUserName(name);
+        setCurrentUserAvatar(avatar);
         setIsSuperAdmin(isSuper);
+
+        AsyncStorage.setItem('@team_admin_profile_cache', JSON.stringify({
+          id: user.id,
+          email,
+          name,
+          role: roleUpper,
+          avatar,
+          isSuper
+        })).catch(() => {});
       }
     } catch (e) {
     } finally {
@@ -313,14 +376,14 @@ export default function RealtimeEnterpriseTeamSuite() {
     }
   };
 
-  // 2. Fetch Live Admin Directory (STRICTLY ONLY ADMINS AND SUPER ADMINS)
+  // 2. Fetch Live Admin Directory (OPTIMIZED: Fast query with local cache)
   const fetchLiveAdminDirectory = async () => {
     try {
-      setLoadingAdmins(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, role, avatar_url, updated_at')
-        .order('role', { ascending: true });
+        .order('role', { ascending: true })
+        .limit(100);
 
       if (!error && data) {
         const adminProfiles = data.filter(u => {
@@ -340,6 +403,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           lastActive: u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'Active'
         }));
         setAdminDirectory(mappedAdmins);
+        AsyncStorage.setItem('@team_admin_dir_cache', JSON.stringify(mappedAdmins)).catch(() => {});
       }
     } catch (e) {
       console.warn("Error loading live admin directory:", e);
@@ -369,6 +433,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+          setLoading(false);
         }
       }
     } catch (e) {}
@@ -383,13 +448,12 @@ export default function RealtimeEnterpriseTeamSuite() {
   // 4. Fetch Live Messages Strictly for Active Channel or Active Private DM
   const fetchLiveMessages = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('team_messages')
         .select('*')
         .eq('channel', currentRoomId)
         .order('created_at', { ascending: true })
-        .limit(150);
+        .limit(100);
 
       if (!error && data && data.length > 0) {
         setMessages(prev => {
@@ -406,23 +470,18 @@ export default function RealtimeEnterpriseTeamSuite() {
     } catch (e) {
     } finally {
       setLoading(false);
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 200);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
     }
   };
 
-  // 5. Fetch Live Meetings
+  // 5. Fetch Live Meetings (Fast query with limit)
   const fetchLiveMeetings = async () => {
     try {
-      const cached = await AsyncStorage.getItem('@team_meetings_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) setMeetings(parsed);
-      }
-
       const { data, error } = await supabase
         .from('team_meetings')
         .select('*')
-        .order('scheduled_at', { ascending: false });
+        .order('scheduled_at', { ascending: false })
+        .limit(30);
 
       if (!error && data) {
         setMeetings(data);
@@ -430,6 +489,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       }
     } catch (e) {}
   };
+
 
   // 6. Supabase Realtime Subscription
   const setupRealtimeSubscription = () => {
