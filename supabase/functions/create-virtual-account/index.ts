@@ -1,4 +1,3 @@
-// Removed std/http/server.ts import
 import { createClient } from "@supabase/supabase-js";
 import { createPayvesselDVA } from "../_shared/payvessel.ts";
 
@@ -20,7 +19,8 @@ Deno.serve(async (req) => {
             throw new Error("Missing Internal Configuration: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
         }
 
-        const { userId, bvn } = await req.json();
+        const requestBody = await req.json().catch(() => ({}));
+        const { userId, bvn, forceSecondAccount, forceUpdate } = requestBody;
         const safeBvn = bvn ? String(bvn).trim() : undefined;
 
         if (!userId) {
@@ -41,21 +41,46 @@ Deno.serve(async (req) => {
             throw new Error("Profile not found: " + (profileError?.message || 'Unknown'));
         }
 
-        // 2. Check if already has virtual account
-        const { data: existingAccount } = await supabaseAdmin
+        // 2. Fetch all existing virtual accounts for user
+        const { data: existingAccounts } = await supabaseAdmin
             .from('virtual_accounts')
-            .select('id, user_id, provider, bank_name, account_number, account_name, currency')
+            .select('id, user_id, provider, bank_name, account_number, account_name, currency, metadata, created_at')
             .eq('user_id', userId)
-            .maybeSingle();
+            .order('created_at', { ascending: true });
 
-        if (existingAccount) {
-            return new Response(JSON.stringify(existingAccount), {
+        const existingList = existingAccounts || [];
+
+        // If user already has 2 or more accounts and not explicitly forcing update with a new BVN
+        if (existingList.length >= 2 && !forceUpdate && !safeBvn) {
+            return new Response(JSON.stringify({
+                status: "success",
+                message: "Virtual accounts already active",
+                accounts: existingList,
+                primary: existingList[0],
+                secondary: existingList[1] || null,
+                ...existingList[0]
+            }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
         }
 
-        // 3. BVN and NIN Retrieval logic
+        // If user already has 1 account and didn't provide a BVN / force second account
+        if (existingList.length === 1 && !safeBvn && !forceSecondAccount && !forceUpdate && !profile.bvn) {
+            return new Response(JSON.stringify({
+                status: "success",
+                message: "Primary virtual account active",
+                accounts: existingList,
+                primary: existingList[0],
+                secondary: null,
+                ...existingList[0]
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        // 3. BVN and NIN Retrieval & Profile sync
         let userBVN = profile.bvn;
         let userNIN = null;
 
@@ -64,7 +89,7 @@ Deno.serve(async (req) => {
             console.log("BVN provided in request. Updating profile...");
             const { error: updateError } = await supabaseAdmin
                 .from('profiles')
-                .update({ bvn: safeBvn })
+                .update({ bvn: safeBvn, kyc_tier: Math.max(Number(profile.kyc_tier) || 1, 2) })
                 .eq('id', userId);
             
             if (updateError) {
@@ -74,7 +99,6 @@ Deno.serve(async (req) => {
         }
 
         if (!userBVN) {
-             console.log("BVN missing in profile, searching kyc_requests...");
              // Check if they have a 'bvn' or 'nin' record in kyc_requests
              const { data: kycs } = await supabaseAdmin
                 .from('kyc_requests')
@@ -84,53 +108,37 @@ Deno.serve(async (req) => {
                 .order('created_at', { ascending: false });
 
              if (kycs && kycs.length > 0) {
-                 // Try to retrieve BVN
                  const bvnKyc = kycs.find(k => k.document_type === 'bvn');
                  if (bvnKyc) {
                      if (bvnKyc.document_number && bvnKyc.document_number.length >= 10) {
                          userBVN = bvnKyc.document_number;
-                         console.log("BVN found in kyc_requests document_number. Auto-repairing profile...");
                          await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
                      } else {
                          const match = bvnKyc.admin_note?.match(/ID:\s*(\d{11})/);
                          if (match && match[1]) {
                              userBVN = match[1];
-                             console.log("BVN found in KYC logs (admin_note). Auto-repairing profile...");
                              await supabaseAdmin.from('profiles').update({ bvn: userBVN }).eq('id', userId);
                          }
                      }
                  }
 
-                 // Try to retrieve NIN if BVN not found
                  if (!userBVN) {
                      const ninKyc = kycs.find(k => k.document_type === 'nin');
                      if (ninKyc) {
                          if (ninKyc.document_number && ninKyc.document_number.length >= 10) {
                              userNIN = ninKyc.document_number;
-                             console.log("NIN found in kyc_requests document_number.");
                          } else {
                              const match = ninKyc.admin_note?.match(/ID:\s*(\d{11})/);
                              if (match && match[1]) {
                                  userNIN = match[1];
-                                 console.log("NIN found in KYC logs (admin_note).");
                              }
                          }
                      }
                  }
              }
-
-             if (!userBVN && !userNIN) {
-                return new Response(JSON.stringify({ 
-                    error: "BVN Required", 
-                    message: "Please complete your BVN or NIN verification to generate a virtual account." 
-                }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 200, 
-                });
-             }
         }
 
-        // 3.5 Fetch Payvessel Credentials from DB
+        // 4. Fetch Payvessel Credentials from DB
         const { data: secrets } = await supabaseAdmin
             .from('system_secrets')
             .select('key, value')
@@ -144,47 +152,120 @@ Deno.serve(async (req) => {
             businessId: getSecret('PAYVESSEL_BUSINESS_ID'),
         };
 
-        // 4. Create Payvessel DVA
+        // 5. Create Payvessel DVA (Requests both 9PSB 120001 & PalmPay 999991)
         const userEmail = profile.email;
-        const userName = profile.full_name || 'Valued User';
+        const userName = profile.full_name || 'Valued Customer';
         const userPhone = profile.phone || '08000000000';
 
-        console.log(`Creating Payvessel DVA for ${userEmail}`);
+        console.log(`Creating Payvessel DVA for ${userEmail} (BVN: ${userBVN ? 'present' : 'none'})`);
         const payvesselRes = await createPayvesselDVA({
             email: userEmail,
             name: userName,
             phone: userPhone,
             bvn: userBVN || undefined,
-            nin: userNIN || undefined
+            nin: userNIN || undefined,
+            bankcode: ["120001", "999991"] // 9PSB and PalmPay
         }, pvConfig);
 
         if (!payvesselRes.status || !payvesselRes.banks || payvesselRes.banks.length === 0) {
+            console.error("Payvessel DVA response warning:", payvesselRes.message);
+            // If already have at least 1 account, return it instead of failing
+            if (existingList.length > 0) {
+                return new Response(JSON.stringify({
+                    status: "partial_success",
+                    message: payvesselRes.message || "Using existing virtual account",
+                    accounts: existingList,
+                    primary: existingList[0],
+                    secondary: existingList[1] || null,
+                    ...existingList[0]
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200,
+                });
+            }
             throw new Error(payvesselRes.message || "Payvessel account creation failed");
         }
 
-        // 5. Save to DB (Primary Bank)
-        const primaryBank = payvesselRes.banks[0];
-        const virtualAccountData = {
-            user_id: userId,
-            provider: 'payvessel',
-            bank_name: primaryBank.bankName,
-            account_number: primaryBank.accountNumber,
-            account_name: primaryBank.accountName,
-            currency: 'NGN', 
-            metadata: payvesselRes // Keep the full array and response payload
-        };
+        // 6. Save/Update All Returned Banks to DB
+        const savedAccounts = [];
+        for (const bank of payvesselRes.banks) {
+            const bankAccountData = {
+                user_id: userId,
+                provider: 'payvessel',
+                bank_name: bank.bankName,
+                account_number: bank.accountNumber,
+                account_name: bank.accountName || userName.toUpperCase(),
+                currency: 'NGN',
+                metadata: { ...bank, full_response: payvesselRes }
+            };
 
-        const { data: newAccount, error: insertError } = await supabaseAdmin
-            .from('virtual_accounts')
-            .insert(virtualAccountData)
-            .select('id, user_id, provider, bank_name, account_number, account_name, currency')
-            .single();
+            // Check if this account number already exists
+            const { data: existingBank } = await supabaseAdmin
+                .from('virtual_accounts')
+                .select('id, account_number')
+                .eq('account_number', bank.accountNumber)
+                .maybeSingle();
 
-        if (insertError) {
-            throw new Error("DB Insert Error: " + insertError.message);
+            if (existingBank) {
+                const { data: updated } = await supabaseAdmin
+                    .from('virtual_accounts')
+                    .update(bankAccountData)
+                    .eq('id', existingBank.id)
+                    .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
+                    .single();
+                if (updated) savedAccounts.push(updated);
+            } else {
+                // Check if user already has an entry for this bank_name
+                const { data: existingUserBank } = await supabaseAdmin
+                    .from('virtual_accounts')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('bank_name', bank.bankName)
+                    .maybeSingle();
+
+                if (existingUserBank) {
+                    const { data: updated } = await supabaseAdmin
+                        .from('virtual_accounts')
+                        .update(bankAccountData)
+                        .eq('id', existingUserBank.id)
+                        .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
+                        .single();
+                    if (updated) savedAccounts.push(updated);
+                } else {
+                    const { data: inserted, error: insertErr } = await supabaseAdmin
+                        .from('virtual_accounts')
+                        .insert(bankAccountData)
+                        .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
+                        .single();
+
+                    if (insertErr) {
+                        console.warn(`Insert virtual account error (${bank.bankName}):`, insertErr.message);
+                    } else if (inserted) {
+                        savedAccounts.push(inserted);
+                    }
+                }
+            }
         }
 
-        return new Response(JSON.stringify(newAccount), {
+        // Fetch authoritative refreshed list of user accounts
+        const { data: finalAccounts } = await supabaseAdmin
+            .from('virtual_accounts')
+            .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: true });
+
+        const resultAccounts = (finalAccounts && finalAccounts.length > 0) ? finalAccounts : savedAccounts;
+        const primaryAccount = resultAccounts[0] || null;
+        const secondaryAccount = resultAccounts[1] || null;
+
+        return new Response(JSON.stringify({
+            status: "success",
+            message: `Successfully generated ${resultAccounts.length} virtual account(s)`,
+            accounts: resultAccounts,
+            primary: primaryAccount,
+            secondary: secondaryAccount,
+            ...(primaryAccount || {})
+        }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
         });
@@ -201,3 +282,4 @@ Deno.serve(async (req) => {
         });
     }
 });
+

@@ -306,6 +306,15 @@ export default function OTP() {
                 try {
                     await supabase.from('profiles').update({ status: 'active' }).eq('id', user.id);
                 } catch (e) {}
+
+                // Trigger Automatic Virtual Account Generation in Background
+                try {
+                    supabase.functions.invoke('create-virtual-account', {
+                        body: { userId: user.id }
+                    }).catch(e => console.log('Auto virtual account notice in OTP:', e));
+                } catch (vaErr) {
+                    console.log('Background VA dispatch in OTP notice:', vaErr);
+                }
             }
             if (user && params.tempFullName) {
                 await supabase.from('profiles').insert({

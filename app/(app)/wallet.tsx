@@ -27,6 +27,8 @@ export default function WalletScreen() {
     const router = useRouter();
     const [balance, setBalance] = useState(0);
     const [virtualAccount, setVirtualAccount] = useState<any>(null);
+    const [virtualAccounts, setVirtualAccounts] = useState<any[]>([]);
+    const [userBvn, setUserBvn] = useState<string | null>(null);
     const [totalIn, setTotalIn] = useState(0);
     const [totalOut, setTotalOut] = useState(0);
     const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
@@ -65,9 +67,9 @@ export default function WalletScreen() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const [profileRes, vAccountRes, statsRes, recentRes, settingsRes] = await Promise.all([
-                supabase.from('profiles').select('balance').eq('id', user.id).single(),
-                supabase.from('virtual_accounts').select('bank_name, account_number, account_name').eq('user_id', user.id).maybeSingle(),
+            const [profileRes, vAccountsRes, statsRes, recentRes, settingsRes] = await Promise.all([
+                supabase.from('profiles').select('balance, bvn, kyc_tier').eq('id', user.id).single(),
+                supabase.from('virtual_accounts').select('id, bank_name, account_number, account_name, created_at').eq('user_id', user.id).order('created_at', { ascending: true }),
                 supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('status', 'success').order('created_at', { ascending: false }).limit(200),
                 supabase.from('transactions').select('id, amount, type, status, description, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
                 supabase.from('app_settings').select('key, value').in('key', ['funding_fee_fixed_threshold', 'funding_fee_under_threshold', 'funding_fee_above_threshold'])
@@ -91,9 +93,39 @@ export default function WalletScreen() {
 
             if (profileRes.data) {
                 setBalance(profileRes.data.balance || 0);
+                setUserBvn(profileRes.data.bvn || null);
             }
 
-            setVirtualAccount(vAccountRes.data);
+            const accounts = vAccountsRes.data || [];
+            setVirtualAccounts(accounts);
+            setVirtualAccount(accounts[0] || null);
+
+            // Auto-trigger creation if user has no virtual account
+            if (accounts.length === 0) {
+                supabase.functions.invoke('create-virtual-account', { body: { userId: user.id } })
+                    .then(async (res) => {
+                        if (res.data?.accounts && res.data.accounts.length > 0) {
+                            setVirtualAccounts(res.data.accounts);
+                            setVirtualAccount(res.data.accounts[0]);
+                        } else {
+                            const { data: refreshed } = await supabase.from('virtual_accounts').select('id, bank_name, account_number, account_name, created_at').eq('user_id', user.id).order('created_at', { ascending: true });
+                            if (refreshed && refreshed.length > 0) {
+                                setVirtualAccounts(refreshed);
+                                setVirtualAccount(refreshed[0]);
+                            }
+                        }
+                    })
+                    .catch(console.error);
+            } else if (accounts.length === 1 && profileRes.data?.bvn) {
+                // If user has BVN and only 1 account, trigger 2nd account generation
+                supabase.functions.invoke('create-virtual-account', { body: { userId: user.id, bvn: profileRes.data.bvn, forceSecondAccount: true } })
+                    .then(async (res) => {
+                        if (res.data?.accounts && res.data.accounts.length > 1) {
+                            setVirtualAccounts(res.data.accounts);
+                        }
+                    })
+                    .catch(console.error);
+            }
 
             const transactions = statsRes.data;
             if (transactions) {
@@ -316,53 +348,90 @@ export default function WalletScreen() {
                 {/* Dynamic Banners */}
                 <DynamicBanners placement="wallet" />
 
-                {/* Ultra-Compact Decorated Virtual Bank Account Card */}
+                {/* Automated Dedicated Bank Accounts (Dual / Multi Bank Support) */}
                 <View style={s.sectionBox}>
-                    <Text style={s.sectionHeaderTitle}>Automated Dedicated Bank Account</Text>
-
-                    {virtualAccount ? (
-                        <View style={s.virtualBankCard}>
-                            <View style={s.vCardTopRow}>
-                                <View style={s.bankNamePill}>
-                                    <Ionicons name="business-outline" size={11} color="#F59E0B" style={{ marginRight: 4 }} />
-                                    <Text style={s.bankNameText}>{virtualAccount.bank_name}</Text>
-                                </View>
-
-                                <View style={s.instantDepositTag}>
-                                    <View style={s.greenLiveDot} />
-                                    <Text style={s.instantDepositText}>Instant Auto-Credit</Text>
-                                </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={s.sectionHeaderTitle}>
+                            Automated Dedicated Bank Account{virtualAccounts.length > 1 ? 's' : ''}
+                        </Text>
+                        {virtualAccounts.length > 1 && (
+                            <View style={[s.instantDepositTag, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                                <Text style={[s.instantDepositText, { color: '#047857' }]}>{virtualAccounts.length} Active Accounts</Text>
                             </View>
+                        )}
+                    </View>
 
-                            <View style={s.acctNumRowCompact}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={s.acctNumLabel}>ACCOUNT NUMBER</Text>
-                                    <Text style={s.acctNumTextCompact}>
-                                        {virtualAccount.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3')}
-                                    </Text>
-                                    <Text style={s.acctHolderNameSub} numberOfLines={1}>
-                                        Holder: {virtualAccount.account_name}
-                                    </Text>
+                    {virtualAccounts.length > 0 ? (
+                        <View style={{ gap: 10 }}>
+                            {virtualAccounts.map((va, idx) => (
+                                <View key={va.id || idx} style={s.virtualBankCard}>
+                                    <View style={s.vCardTopRow}>
+                                        <View style={s.bankNamePill}>
+                                            <Ionicons name="business-outline" size={11} color="#F59E0B" style={{ marginRight: 4 }} />
+                                            <Text style={s.bankNameText}>
+                                                {va.bank_name} {idx === 0 ? '(Account 1)' : idx === 1 ? '(Account 2)' : ''}
+                                            </Text>
+                                        </View>
+
+                                        <View style={s.instantDepositTag}>
+                                            <View style={s.greenLiveDot} />
+                                            <Text style={s.instantDepositText}>Instant Auto-Credit</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={s.acctNumRowCompact}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.acctNumLabel}>ACCOUNT NUMBER</Text>
+                                            <Text style={s.acctNumTextCompact}>
+                                                {va.account_number ? va.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : '•••• •••• ••'}
+                                            </Text>
+                                            <Text style={s.acctHolderNameSub} numberOfLines={1}>
+                                                Holder: {va.account_name || 'ABU MAFHAL SUB'}
+                                            </Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            onPress={() => copyToClipboard(va.account_number)}
+                                            style={s.copyPillBtn}
+                                            activeOpacity={0.75}
+                                        >
+                                            <Ionicons name="copy-outline" size={12} color="#F59E0B" style={{ marginRight: 3 }} />
+                                            <Text style={s.copyPillBtnText}>Copy</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
+                            ))}
 
+                            {/* Prompt to unlock 2nd account if user only has 1 account and no BVN yet */}
+                            {virtualAccounts.length === 1 && !userBvn && (
                                 <TouchableOpacity
-                                    onPress={() => copyToClipboard(virtualAccount.account_number)}
-                                    style={s.copyPillBtn}
-                                    activeOpacity={0.75}
+                                    onPress={() => router.push('/kyc')}
+                                    style={s.bvnUnlockCard}
+                                    activeOpacity={0.85}
                                 >
-                                    <Ionicons name="copy-outline" size={12} color="#F59E0B" style={{ marginRight: 3 }} />
-                                    <Text style={s.copyPillBtnText}>Copy</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={s.bvnIconBadge}>
+                                            <Ionicons name="sparkles" size={14} color="#D97706" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={s.bvnUnlockTitle}>Unlock 2nd Bank Account (PalmPay / 9PSB)</Text>
+                                            <Text style={s.bvnUnlockSub}>
+                                                Verify your BVN in KYC to instantly generate your 2nd dedicated account number!
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={16} color="#D97706" />
+                                    </View>
                                 </TouchableOpacity>
-                            </View>
+                            )}
                         </View>
                     ) : (
                         <View style={s.noVirtualAcctCard}>
                             <View style={s.noAcctIconBox}>
                                 <Ionicons name="shield-checkmark" size={20} color="#64748B" />
                             </View>
-                            <Text style={s.noAcctTitle}>No Dedicated Virtual Account Yet</Text>
+                            <Text style={s.noAcctTitle}>Generating Dedicated Virtual Account...</Text>
                             <Text style={s.noAcctSubtitle}>
-                                Verify your identity to generate a dedicated automated funding bank account.
+                                Your dedicated automated funding bank account is being provisioned. Tap below to verify KYC or refresh.
                             </Text>
                             <TouchableOpacity
                                 onPress={() => router.push('/kyc')}
@@ -385,6 +454,7 @@ export default function WalletScreen() {
                         </View>
                     </View>
                 </View>
+
 
                 {/* Compact Financial KPI Summary */}
                 <View style={s.kpiGridRow}>
@@ -517,10 +587,39 @@ export default function WalletScreen() {
                         {fundMethod === 'transfer' ? (
                             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
                                 <Text style={s.modalInstructionText}>
-                                    Transfer directly to your dedicated automated account below. Wallet credits instantly!
+                                    Transfer directly to any of your dedicated automated accounts below. Wallet credits instantly!
                                 </Text>
 
-                                {virtualAccount ? (
+                                {virtualAccounts.length > 0 ? (
+                                    <View style={{ gap: 12, marginBottom: 12 }}>
+                                        {virtualAccounts.map((va, idx) => (
+                                            <View key={va.id || idx} style={s.modalBankCard}>
+                                                <View style={s.mBankPill}>
+                                                    <Text style={s.mBankPillText}>
+                                                        {va.bank_name} {idx === 0 ? '(Account 1)' : idx === 1 ? '(Account 2)' : ''}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={{ marginBottom: 10 }}>
+                                                    <Text style={s.mLabelText}>ACCOUNT NUMBER</Text>
+                                                    <View style={s.mNumRow}>
+                                                        <Text style={s.mNumText}>
+                                                            {va.account_number ? va.account_number.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3') : '•••• •••• ••'}
+                                                        </Text>
+                                                        <TouchableOpacity onPress={() => copyToClipboard(va.account_number)} style={s.mCopyBtn}>
+                                                            <Ionicons name="copy-outline" size={15} color="#F59E0B" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+
+                                                <View>
+                                                    <Text style={s.mLabelText}>ACCOUNT NAME</Text>
+                                                    <Text style={s.mNameText}>{va.account_name || 'ABU MAFHAL SUB'}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                ) : virtualAccount ? (
                                     <View style={s.modalBankCard}>
                                         <View style={s.mBankPill}>
                                             <Text style={s.mBankPillText}>{virtualAccount.bank_name}</Text>
@@ -545,8 +644,8 @@ export default function WalletScreen() {
                                     </View>
                                 ) : (
                                     <View style={s.modalNoAcctBox}>
-                                        <Text style={s.modalNoAcctTitle}>No Dedicated Account</Text>
-                                        <Text style={s.modalNoAcctSub}>Complete your identity verification to generate a bank account.</Text>
+                                        <Text style={s.modalNoAcctTitle}>Generating Dedicated Account...</Text>
+                                        <Text style={s.modalNoAcctSub}>Please complete your identity verification to generate a bank account.</Text>
                                     </View>
                                 )}
 
@@ -559,6 +658,7 @@ export default function WalletScreen() {
                                         </Text>
                                     </View>
                                 </View>
+
                             </ScrollView>
                         ) : (
                             <View style={{ flex: 1 }}>
@@ -998,6 +1098,34 @@ const s = StyleSheet.create({
         color: '#F59E0B',
         fontSize: 10,
         fontWeight: '900',
+    },
+
+    bvnUnlockCard: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#FDE68A',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 4,
+    },
+    bvnIconBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#FEF3C7',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    bvnUnlockTitle: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#B45309',
+    },
+    bvnUnlockSub: {
+        fontSize: 10,
+        color: '#92400E',
+        marginTop: 1,
+        lineHeight: 14,
     },
 
     noVirtualAcctCard: {

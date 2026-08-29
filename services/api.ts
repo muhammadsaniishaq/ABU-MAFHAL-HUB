@@ -1014,32 +1014,100 @@ export const api = {
 
     // --- VIRTUAL ACCOUNTS ---
     virtualAccount: {
-        generate: async (userId: string, userName: string, bvn?: string) => {
+        generate: async (userId: string, userName?: string, bvn?: string, forceSecondAccount?: boolean) => {
             // 1. Check existing
-            const { data: existing } = await supabase
+            const { data: existingList } = await supabase
                 .from('virtual_accounts')
                 .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
                 .eq('user_id', userId)
-                .maybeSingle();
+                .order('created_at', { ascending: true });
 
-            if (existing) return existing;
-
-            // 2. Call Edge Function to create real Paystack Account
-            const { data: newAccount, error } = await supabase.functions.invoke('create-virtual-account', {
-                body: { userId, bvn }
-            });
-
-            if (error) throw new Error(`Virtual Account Generation Failed: ${error.message}`);
-            
-            // Handle soft error (200 OK but with error field)
-            if (newAccount && newAccount.error) {
-                 throw new Error(newAccount.error);
+            if (existingList && existingList.length >= 2 && !bvn && !forceSecondAccount) {
+                return {
+                    status: 'success',
+                    accounts: existingList,
+                    primary: existingList[0],
+                    secondary: existingList[1],
+                    ...existingList[0]
+                };
             }
 
+            if (existingList && existingList.length === 1 && !bvn && !forceSecondAccount) {
+                return {
+                    status: 'success',
+                    accounts: existingList,
+                    primary: existingList[0],
+                    secondary: null,
+                    ...existingList[0]
+                };
+            }
+
+            // 2. Call Edge Function to create/upgrade Payvessel Virtual Accounts
+            const { data: result, error } = await supabase.functions.invoke('create-virtual-account', {
+                body: { userId, bvn, forceSecondAccount }
+            });
+
+            if (error) {
+                console.warn(`Virtual Account Generation notice: ${error.message}`);
+                if (existingList && existingList.length > 0) {
+                    return {
+                        status: 'partial_success',
+                        accounts: existingList,
+                        primary: existingList[0],
+                        secondary: existingList[1] || null,
+                        ...existingList[0]
+                    };
+                }
+                throw new Error(`Virtual Account Generation Failed: ${error.message}`);
+            }
             
-            return newAccount;
+            // Handle soft error (200 OK but with error field)
+            if (result && result.error && !result.accounts) {
+                 throw new Error(result.error);
+            }
+            
+            return result;
+        },
+
+        getUserAccounts: async (userId: string) => {
+            const { data, error } = await supabase
+                .from('virtual_accounts')
+                .select('id, user_id, provider, bank_name, account_number, account_name, currency, created_at')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+        },
+
+        batchGenerateMissing: async (userIds: string[], onProgress?: (completed: number, total: number, currentUser: string) => void) => {
+            const results = {
+                total: userIds.length,
+                success: 0,
+                failed: 0,
+                details: [] as { userId: string; status: 'success' | 'failed'; message: string }[]
+            };
+
+            for (let i = 0; i < userIds.length; i++) {
+                const uId = userIds[i];
+                if (onProgress) onProgress(i + 1, userIds.length, uId);
+                try {
+                    const res = await supabase.functions.invoke('create-virtual-account', {
+                        body: { userId: uId }
+                    });
+                    if (res.error) throw new Error(res.error.message);
+                    results.success++;
+                    results.details.push({ userId: uId, status: 'success', message: 'Account generated/confirmed' });
+                } catch (e: any) {
+                    results.failed++;
+                    results.details.push({ userId: uId, status: 'failed', message: e.message || 'Unknown error' });
+                }
+            }
+
+            return results;
         }
     },
+
 
     // --- SOCIAL BOOST / SMM SERVICES ---
     smm: {

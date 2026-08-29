@@ -2,9 +2,9 @@ export interface PayvesselBank {
     bankName: string;
     accountNumber: string;
     accountName: string;
-    account_type: string;
+    account_type?: string;
     expire_date?: string;
-    trackingReference: string;
+    trackingReference?: string;
 }
 
 export interface PayvesselDVAResponse {
@@ -30,6 +30,7 @@ export async function createPayvesselDVA(
         phone: string;
         bvn?: string;
         nin?: string;
+        bankcode?: string[];
     },
     config: PayvesselConfig
 ): Promise<PayvesselDVAResponse> {
@@ -38,14 +39,14 @@ export async function createPayvesselDVA(
     const businessId = (config.businessId || '').trim();
     const baseUrl = (config.url || 'https://api.payvessel.com').trim().replace(/\/+$/, '');
 
-    console.log(`Creating Payvessel STATIC DVA for ${params.email} (BVN: ${params.bvn ? 'present' : 'absent'}, NIN: ${params.nin ? 'present' : 'absent'})`);
+    console.log(`Creating Payvessel DVA for ${params.email} (BVN: ${params.bvn ? 'present' : 'absent'}, NIN: ${params.nin ? 'present' : 'absent'})`);
 
     if (!apiKey || !apiSecret || !businessId) {
         console.warn("Payvessel credentials (API Key, Secret, or Business ID) are not completely configured.");
         return {
             status: false,
             service: "CREATE_VIRTUAL_ACCOUNT",
-            message: "Payvessel is not properly configured in Admin Settings. Please add API keys in API Vault.",
+            message: "Payvessel credentials are not configured in system_secrets.",
         };
     }
 
@@ -56,17 +57,20 @@ export async function createPayvesselDVA(
             cleanPhone = '0' + cleanPhone.slice(3);
         }
 
+        const requestedBanks = params.bankcode && params.bankcode.length > 0
+            ? params.bankcode
+            : ["120001", "999991"]; // 9PSB (120001) and PalmPay (999991)
+
         const payload: Record<string, any> = {
             email: params.email.trim(),
             name: params.name.toUpperCase().trim(),
             phoneNumber: cleanPhone || '08000000000',
-            bankcode: ["120001", "999991"], // 9PSB (120001) and PalmPay (999991)
+            bankcode: requestedBanks,
             account_type: "STATIC",
             businessid: businessId,
             business_id: businessId,
         };
 
-        // Static accounts require BVN or NIN
         if (params.bvn) {
             payload.bvn = params.bvn.replace(/\D/g, '').trim();
         }
@@ -91,10 +95,19 @@ export async function createPayvesselDVA(
         console.log("Payvessel Raw Response:", JSON.stringify(result));
 
         // Parse banks from response (supports direct banks property or nested in data)
-        const extractedBanks: PayvesselBank[] = result.banks || 
-                                              result.data?.banks || 
-                                              (Array.isArray(result.data) ? result.data : []) || 
-                                              [];
+        const rawBanks: any[] = result.banks || 
+                               result.data?.banks || 
+                               (Array.isArray(result.data) ? result.data : []) || 
+                               [];
+
+        const extractedBanks: PayvesselBank[] = rawBanks.map((b: any) => ({
+            bankName: b.bankName || b.bank_name || (b.bankcode === '999991' ? 'PalmPay' : b.bankcode === '120001' ? '9Payment Service Bank' : 'Bank'),
+            accountNumber: String(b.accountNumber || b.account_number || b.accountNo || '').trim(),
+            accountName: b.accountName || b.account_name || params.name.toUpperCase().trim(),
+            account_type: b.account_type || 'STATIC',
+            expire_date: b.expire_date || b.expireDate,
+            trackingReference: b.trackingReference || b.tracking_reference || ''
+        })).filter(b => b.accountNumber.length >= 8);
 
         if (!response.ok || (!result.status && result.status !== 'success' && result.code !== 200) || extractedBanks.length === 0) {
             console.error("Payvessel DVA Creation Failed Response:", JSON.stringify(result));
@@ -123,3 +136,4 @@ export async function createPayvesselDVA(
         };
     }
 }
+

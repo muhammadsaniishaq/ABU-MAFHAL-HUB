@@ -432,6 +432,15 @@ export default function SignupScreen() {
             }
 
             if (data.user) {
+                // Trigger Automatic Virtual Account Creation in Background
+                try {
+                    supabase.functions.invoke('create-virtual-account', {
+                        body: { userId: data.user.id }
+                    }).catch(e => console.log('Auto virtual account notice:', e));
+                } catch (vaErr) {
+                    console.log('Background VA dispatch notice:', vaErr);
+                }
+
                 // 1. Save credentials locally for automatic session establishment upon OTP verification
                 const cleanEmailLower = cleanEmail.toLowerCase().trim();
                 await AsyncStorage.setItem('pending_auth_email', cleanEmailLower);

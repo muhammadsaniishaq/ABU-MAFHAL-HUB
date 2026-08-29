@@ -47,6 +47,7 @@ export default function UserKYCScreen() {
     const [pendingRequest, setPendingRequest] = useState<any>(null);
     const [verifying, setVerifying] = useState(false);
     const [virtualAcc, setVirtualAcc] = useState<any>(null);
+    const [virtualAccs, setVirtualAccs] = useState<any[]>([]);
 
     // Active Selected Document Type
     const [selectedDocType, setSelectedDocType] = useState<string>('bvn');
@@ -68,14 +69,17 @@ export default function UserKYCScreen() {
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
             setUserData({ ...profile, id: user.id });
 
-            // Fetch User Virtual Account
-            const { data: vAcc } = await supabase
+            // Fetch User Virtual Accounts
+            const { data: vAccs } = await supabase
                 .from('virtual_accounts')
                 .select('*')
                 .eq('user_id', user.id)
-                .maybeSingle();
+                .order('created_at', { ascending: true });
 
-            if (vAcc) setVirtualAcc(vAcc);
+            if (vAccs && vAccs.length > 0) {
+                setVirtualAcc(vAccs[0]);
+                setVirtualAccs(vAccs);
+            }
 
             const { data: pending } = await supabase
                 .from('kyc_requests')
@@ -236,12 +240,16 @@ export default function UserKYCScreen() {
 
                 await supabase.from('profiles').update(updatePayload).eq('id', user.id);
 
-                // Auto Create Dedicated Virtual Account on Tier 1 (BVN) / Tier 2
+                // Auto Create / Upgrade Dedicated Virtual Accounts (Account #1 & Account #2)
                 if (selectedDocType === 'bvn' || selectedDocType === 'nin' || selectedDocType === 'drivers_license') {
                     try {
-                        await supabase.functions.invoke('create-virtual-account', {
-                            body: { userId: user.id, bvn: idNumberInput.trim() }
+                        const vaRes = await supabase.functions.invoke('create-virtual-account', {
+                            body: { userId: user.id, bvn: idNumberInput.trim(), forceSecondAccount: true, forceUpdate: true }
                         });
+                        if (vaRes.data?.accounts && vaRes.data.accounts.length > 0) {
+                            setVirtualAccs(vaRes.data.accounts);
+                            setVirtualAcc(vaRes.data.accounts[0]);
+                        }
                     } catch (dvaErr) {
                         console.warn("DVA trigger warning:", dvaErr);
                     }
@@ -250,7 +258,9 @@ export default function UserKYCScreen() {
                 setTier(targetTier);
                 Alert.alert(
                     "Verification Successful! 🎉",
-                    `Your ${selectedDocType.toUpperCase().replace(/_/g, ' ')} has been verified automatically. Account upgraded to Tier ${targetTier}!`
+                    selectedDocType === 'bvn' 
+                        ? `BVN Verified Successfully! Your 2nd Dedicated Virtual Bank Account (PalmPay / 9PSB) has been generated!`
+                        : `Your ${selectedDocType.toUpperCase().replace(/_/g, ' ')} has been verified automatically. Account upgraded to Tier ${targetTier}!`
                 );
                 loadData();
             } else {
@@ -268,6 +278,7 @@ export default function UserKYCScreen() {
             setVerifying(false);
         }
     };
+
 
     // Strict Tier Document Selector Lists
     const tier2DocOptions = [
@@ -338,13 +349,43 @@ export default function UserKYCScreen() {
                         })}
                     </View>
 
-                    {/* Reserved Virtual Bank Account Display Card */}
-                    {virtualAcc && (
+                    {/* Reserved Virtual Dedicated Bank Account(s) Display */}
+                    {virtualAccs.length > 0 ? (
+                        <View style={{ gap: 8, marginBottom: 10 }}>
+                            {virtualAccs.map((va, idx) => (
+                                <View key={va.id || idx} style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.cardBorder, elevation: 2 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <Ionicons name="card" size={14} color={L.goldAmber} />
+                                            <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>
+                                                {va.bank_name} {idx === 0 ? '(Account 1)' : idx === 1 ? '(Account 2)' : ''}
+                                            </Text>
+                                        </View>
+                                        <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
+                                            <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>Active</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
+                                        <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{va.bank_name}</Text></Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                                            <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+                                                {va.account_number}
+                                            </Text>
+                                            <TouchableOpacity onPress={() => Alert.alert("Copied", `Account ${va.account_number} copied!`)} style={{ backgroundColor: L.navyHeader, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: L.gold }}>
+                                                <Text style={{ color: L.gold, fontWeight: '900', fontSize: 8 }}>COPY</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    ) : virtualAcc ? (
                         <View style={{ backgroundColor: L.card, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: L.cardBorder, marginBottom: 10, elevation: 2 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                     <Ionicons name="card" size={14} color={L.goldAmber} />
-                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Reserved Virtual Dedicated Bank Account</Text>
+                                    <Text style={{ color: L.navyHeader, fontWeight: '900', fontSize: 10, textTransform: 'uppercase' }}>Reserved Dedicated Bank Account</Text>
                                 </View>
                                 <View style={{ backgroundColor: L.emeraldBg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: L.emeraldBorder }}>
                                     <Text style={{ color: L.emerald, fontSize: 8, fontWeight: '900' }}>Active</Text>
@@ -352,7 +393,7 @@ export default function UserKYCScreen() {
                             </View>
 
                             <View style={{ backgroundColor: L.bg, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: L.inputBorder }}>
-                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || 'Wema Bank / Payvessel'}</Text></Text>
+                                <Text style={{ color: L.textMuted, fontSize: 8, fontWeight: 'bold' }}>Bank Name: <Text style={{ color: L.navyHeader, fontWeight: '900' }}>{virtualAcc.bank_name || '9Payment Service Bank'}</Text></Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
                                     <Text style={{ color: L.navyHeader, fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
                                         {virtualAcc.account_number}
@@ -363,7 +404,8 @@ export default function UserKYCScreen() {
                                 </View>
                             </View>
                         </View>
-                    )}
+                    ) : null}
+
 
                     {/* STEP 1: BVN FIRST (Tier === 0) */}
                     {tier === 0 && (

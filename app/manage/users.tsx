@@ -207,6 +207,12 @@ export default function UserManagement() {
     });
     const [creatingUser, setCreatingUser] = useState(false);
 
+    // Batch Virtual Account Generation States
+    const [showBatchModal, setShowBatchModal] = useState(false);
+    const [batchProcessing, setBatchProcessing] = useState(false);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentName: '', success: 0, failed: 0 });
+    const [generatingSingleAcc, setGeneratingSingleAcc] = useState(false);
+
     // Dynamic Executive KPIs
     const stats = {
         totalUsers: users.length,
@@ -214,7 +220,96 @@ export default function UserManagement() {
         activeUsers: users.filter(u => u.status === 'active').length,
         verifiedUsers: users.filter(u => u.kyc_verified).length,
         corporateAdmins: users.filter(u => u.corporate_email).length,
-        highRiskCount: users.filter(u => u.status === 'suspended').length
+        highRiskCount: users.filter(u => u.status === 'suspended').length,
+        missingAccounts: users.filter(u => !u.account_number).length,
+    };
+
+    const handleStartBatchGeneration = async () => {
+        const targetUsers = users.filter(u => !u.account_number);
+        const usersToProcess = targetUsers.length > 0 ? targetUsers : users;
+
+        if (usersToProcess.length === 0) {
+            Alert.alert("All Set! 🏦", "There are no users to process.");
+            return;
+        }
+
+        setBatchProcessing(true);
+        setBatchProgress({
+            current: 0,
+            total: usersToProcess.length,
+            currentName: '',
+            success: 0,
+            failed: 0,
+        });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < usersToProcess.length; i++) {
+            const user = usersToProcess[i];
+            const userName = user.full_name || user.email || 'User';
+            
+            setBatchProgress({
+                current: i + 1,
+                total: usersToProcess.length,
+                currentName: userName,
+                success: successCount,
+                failed: failCount,
+            });
+
+            try {
+                const res = await supabase.functions.invoke('create-virtual-account', {
+                    body: { userId: user.id, bvn: user.bvn }
+                });
+                if (res.error) throw new Error(res.error.message);
+                successCount++;
+            } catch (err) {
+                console.warn(`Batch account generate error for ${user.email}:`, err);
+                failCount++;
+            }
+
+            setBatchProgress(prev => ({
+                ...prev,
+                success: successCount,
+                failed: failCount,
+            }));
+        }
+
+        setBatchProcessing(false);
+        await fetchUsers();
+        Alert.alert(
+            "Batch Account Generation Completed 🎉",
+            `Successfully processed ${usersToProcess.length} users!\n• ${successCount} accounts generated/confirmed\n• ${failCount} failed`
+        );
+    };
+
+    const handleGenerateSingleUserAccount = async (targetUser: UserProfile | null) => {
+        if (!targetUser) return;
+        setGeneratingSingleAcc(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('create-virtual-account', {
+                body: { userId: targetUser.id, bvn: targetUser.bvn, forceSecondAccount: true }
+            });
+            if (error) throw error;
+            if (data?.error && !data.accounts) throw new Error(data.error);
+
+            const newAcc = data?.accounts?.[0]?.account_number || data?.account_number;
+            const newBank = data?.accounts?.[0]?.bank_name || data?.bank_name;
+
+            Alert.alert(
+                "Account Generated Successfully 🏦",
+                `Virtual account generated!\nBank: ${newBank || '9Payment Service Bank / PalmPay'}\nAccount: ${newAcc || 'Active'}`
+            );
+
+            await fetchUsers();
+            if (selectedUser?.id === targetUser.id) {
+                setSelectedUser(prev => prev ? { ...prev, account_number: newAcc, bank_name: newBank } : null);
+            }
+        } catch (e: any) {
+            Alert.alert("Generation Failed", e.message || "Failed to generate virtual account.");
+        } finally {
+            setGeneratingSingleAcc(false);
+        }
     };
 
     useEffect(() => {
@@ -990,11 +1085,41 @@ Metadata:
                                 <View style={s.walletCard}>
                                     <Text style={s.walletLabel}>Vault Balance</Text>
                                     <Text style={s.walletValue}>₦{(selectedUser?.credit_balance || selectedUser?.balance || 0).toLocaleString()}</Text>
-                                    <View style={s.accountChip}>
-                                        <Ionicons name="card" size={12} color={T.gold} />
-                                        <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap', gap: 6 }}>
+                                        <View style={s.accountChip}>
+                                            <Ionicons name="card" size={12} color={T.gold} />
+                                            <Text style={s.accountChipText}>{selectedUser?.account_number || 'No Virtual Account'}</Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            onPress={() => handleGenerateSingleUserAccount(selectedUser)}
+                                            disabled={generatingSingleAcc}
+                                            style={{
+                                                backgroundColor: T.goldBg,
+                                                borderColor: T.goldDark,
+                                                borderWidth: 1,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 4,
+                                                borderRadius: 8,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            {generatingSingleAcc ? (
+                                                <ActivityIndicator size="small" color={T.goldDark} />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="flash" size={11} color={T.goldDark} />
+                                                    <Text style={{ color: T.goldDark, fontSize: 10, fontWeight: '900' }}>
+                                                        {selectedUser?.account_number ? 'Refresh/Add 2nd' : '⚡ Generate Account'}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
                                     </View>
-                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || 'Wema Bank'}</Text>
+                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Bank: {selectedUser?.bank_name || '9Payment Service Bank / PalmPay'}</Text>
                                 </View>
 
                                 {/* High Contrast Wallet Funding Section */}
@@ -1422,8 +1547,134 @@ Metadata:
         </Modal>
     );
 
+    // Executive Batch Virtual Account Generator Modal
+    const renderBatchModal = () => {
+        const missingCount = users.filter(u => !u.account_number).length;
+
+        return (
+            <Modal
+                visible={showBatchModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => !batchProcessing && setShowBatchModal(false)}
+            >
+                <BlurView intensity={Platform.OS === 'ios' ? 80 : 90} tint="dark" style={s.modalOverlay}>
+                    <View style={s.batchModalContainer}>
+                        {/* Header */}
+                        <View style={s.batchModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={s.batchModalIconCircle}>
+                                    <Ionicons name="flash" size={18} color={T.gold} />
+                                </View>
+                                <View>
+                                    <Text style={s.batchModalTitle}>Virtual Account Engine 🏦</Text>
+                                    <Text style={s.batchModalSubtitle}>Automatic Bank Account Provisioning</Text>
+                                </View>
+                            </View>
+                            {!batchProcessing && (
+                                <TouchableOpacity onPress={() => setShowBatchModal(false)} style={s.iconCircleBtn}>
+                                    <Ionicons name="close" size={18} color={T.navyDark} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        <View style={s.batchModalBody}>
+                            {/* Stats Summary Box */}
+                            <View style={s.batchSummaryBox}>
+                                <View style={s.batchStatCol}>
+                                    <Text style={s.batchStatNum}>{users.length}</Text>
+                                    <Text style={s.batchStatLabel}>Total Users</Text>
+                                </View>
+                                <View style={s.batchStatDivider} />
+                                <View style={s.batchStatCol}>
+                                    <Text style={[s.batchStatNum, { color: T.success }]}>
+                                        {users.filter(u => !!u.account_number).length}
+                                    </Text>
+                                    <Text style={s.batchStatLabel}>With Account</Text>
+                                </View>
+                                <View style={s.batchStatDivider} />
+                                <View style={s.batchStatCol}>
+                                    <Text style={[s.batchStatNum, { color: missingCount > 0 ? T.danger : T.success }]}>
+                                        {missingCount}
+                                    </Text>
+                                    <Text style={s.batchStatLabel}>Missing Account</Text>
+                                </View>
+                            </View>
+
+                            {batchProcessing ? (
+                                <View style={s.batchProgressBox}>
+                                    <ActivityIndicator size="large" color={T.goldDark} style={{ marginBottom: 10 }} />
+                                    <Text style={s.batchProgressTitle}>
+                                        Generating Account {batchProgress.current} of {batchProgress.total}...
+                                    </Text>
+                                    <Text style={s.batchProgressUser} numberOfLines={1}>
+                                        User: {batchProgress.currentName}
+                                    </Text>
+                                    
+                                    {/* Animated Progress Bar */}
+                                    <View style={s.progressBarTrack}>
+                                        <View 
+                                            style={[
+                                                s.progressBarFill, 
+                                                { width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }
+                                            ]} 
+                                        />
+                                    </View>
+
+                                    <View style={s.batchLiveStats}>
+                                        <Text style={{ color: T.success, fontSize: 11, fontWeight: '700' }}>✓ {batchProgress.success} Generated</Text>
+                                        <Text style={{ color: T.danger, fontSize: 11, fontWeight: '700' }}>✗ {batchProgress.failed} Failed</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={{ marginVertical: 10 }}>
+                                    <Text style={s.batchModalDesc}>
+                                        {missingCount > 0
+                                            ? `This automated batch engine will iterate through all ${missingCount} user(s) currently missing virtual accounts and create dedicated PalmPay / 9PSB bank accounts for each of them automatically.`
+                                            : 'All registered users currently have dedicated virtual bank accounts! You can run a batch sync pass anytime to confirm account statuses.'
+                                        }
+                                    </Text>
+                                </View>
+                            )}
+
+                            {/* Actions Row */}
+                            <View style={s.batchActionRow}>
+                                <TouchableOpacity
+                                    onPress={() => setShowBatchModal(false)}
+                                    disabled={batchProcessing}
+                                    style={[s.batchCancelBtn, batchProcessing && { opacity: 0.5 }]}
+                                >
+                                    <Text style={s.batchCancelBtnText}>Close</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={handleStartBatchGeneration}
+                                    disabled={batchProcessing}
+                                    style={[s.batchStartBtn, batchProcessing && { opacity: 0.5 }]}
+                                    activeOpacity={0.85}
+                                >
+                                    {batchProcessing ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="flash" size={14} color="#FFFFFF" />
+                                            <Text style={s.batchStartBtnText}>
+                                                {missingCount > 0 ? `Generate for ${missingCount} Users` : 'Run Batch Sync'}
+                                            </Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </BlurView>
+            </Modal>
+        );
+    };
+
     // Create User Account Modal
     const renderCreateUserModal = () => (
+
         <Modal visible={showCreateUser} transparent animationType="slide" onRequestClose={() => setShowCreateUser(false)}>
             <BlurView intensity={95} tint="light" style={s.modalOverlay}>
                  <View style={s.createUserCard}>
@@ -1552,6 +1803,48 @@ Metadata:
                             <Text style={s.statCardLabel}>CORPORATE</Text>
                             <Text style={s.statCardValue}>{stats.corporateAdmins}</Text>
                         </View>
+                    </View>
+                )}
+
+                {/* Batch Account Generation Executive Trigger Card */}
+                {!isSelectionMode && (
+                    <View style={s.batchTriggerCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                            <View style={s.batchIconCircle}>
+                                <Ionicons name="flash" size={16} color={T.goldDark} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <Text style={s.batchTriggerTitle}>Auto-Generate Virtual Accounts</Text>
+                                    {stats.missingAccounts > 0 ? (
+                                        <View style={s.missingBadge}>
+                                            <Text style={s.missingBadgeText}>{stats.missingAccounts} Missing</Text>
+                                        </View>
+                                    ) : (
+                                        <View style={s.allGoodBadge}>
+                                            <Text style={s.allGoodBadgeText}>100% Active</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={s.batchTriggerSub} numberOfLines={1}>
+                                    {stats.missingAccounts > 0 
+                                        ? `${stats.missingAccounts} user(s) need dedicated bank accounts generated.`
+                                        : 'All users have active virtual bank accounts.'
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={() => setShowBatchModal(true)}
+                            style={s.batchTriggerBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="sparkles" size={12} color="#FFFFFF" />
+                            <Text style={s.batchTriggerBtnText}>
+                                {stats.missingAccounts > 0 ? 'Generate All' : 'Run Batch'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -1722,6 +2015,7 @@ Metadata:
             />
             
             {/* Modals */}
+            {renderBatchModal()}
             {renderUserModal()}
             {renderCreateUserModal()}
 
@@ -2648,4 +2942,239 @@ const s = StyleSheet.create({
         fontWeight: '900',
         textTransform: 'uppercase',
     },
+
+    /* Batch Generator Card & Modal Styles */
+    batchTriggerCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFDF5',
+        borderRadius: 12,
+        padding: 10,
+        marginBottom: 8,
+        borderWidth: 1.5,
+        borderColor: T.gold,
+        shadowColor: T.goldDark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    batchIconCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: T.goldBg,
+        borderWidth: 1,
+        borderColor: T.gold,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    batchTriggerTitle: {
+        color: T.navyDark,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    batchTriggerSub: {
+        color: T.textSub,
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 1,
+    },
+    missingBadge: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+    },
+    missingBadgeText: {
+        color: '#DC2626',
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    allGoodBadge: {
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    allGoodBadgeText: {
+        color: '#059669',
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    batchTriggerBtn: {
+        backgroundColor: T.navyDark,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.gold,
+    },
+    batchTriggerBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10.5,
+        fontWeight: '900',
+    },
+
+    batchModalContainer: {
+        width: '92%',
+        maxHeight: '85%',
+        backgroundColor: T.card,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: T.gold,
+        overflow: 'hidden',
+    },
+    batchModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        backgroundColor: T.bg,
+    },
+    batchModalIconCircle: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: T.navyDark,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    batchModalTitle: {
+        color: T.navyDark,
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    batchModalSubtitle: {
+        color: T.goldDark,
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    batchModalBody: {
+        padding: 14,
+    },
+    batchSummaryBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: T.bg,
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        marginBottom: 10,
+    },
+    batchStatCol: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    batchStatNum: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: T.navyDark,
+    },
+    batchStatLabel: {
+        fontSize: 8.5,
+        color: T.textSub,
+        fontWeight: '700',
+        marginTop: 1,
+        textTransform: 'uppercase',
+    },
+    batchStatDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: T.border,
+    },
+    batchProgressBox: {
+        backgroundColor: T.bg,
+        borderRadius: 10,
+        padding: 14,
+        alignItems: 'center',
+        marginVertical: 8,
+        borderWidth: 1,
+        borderColor: T.gold,
+    },
+    batchProgressTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: T.navyDark,
+        marginBottom: 2,
+    },
+    batchProgressUser: {
+        fontSize: 11,
+        color: T.goldDark,
+        fontWeight: '700',
+        marginBottom: 10,
+    },
+    progressBarTrack: {
+        width: '100%',
+        height: 8,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 4,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: T.goldDark,
+        borderRadius: 4,
+    },
+    batchLiveStats: {
+        flexDirection: 'row',
+        gap: 16,
+        marginTop: 4,
+    },
+    batchModalDesc: {
+        fontSize: 11.5,
+        color: T.textSub,
+        lineHeight: 16,
+        textAlign: 'center',
+    },
+    batchActionRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 12,
+    },
+    batchCancelBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: T.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.bg,
+    },
+    batchCancelBtnText: {
+        color: T.textSub,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    batchStartBtn: {
+        flex: 2,
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: T.navyDark,
+        borderWidth: 1,
+        borderColor: T.gold,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    batchStartBtnText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '900',
+    },
 });
+

@@ -324,11 +324,19 @@ export default function Dashboard() {
       if (data) {
         setUserData(data); saveCache({ userData: data }); setDbError(false);
         setTimeout(async () => {
-          if ((data.kyc_tier && data.kyc_tier >= 2) || data.bvn) {
-            const { data: va } = await supabase.from('virtual_accounts').select('id').eq('user_id', user.id).maybeSingle();
-            if (!va) { supabase.functions.invoke('create-virtual-account', { body: { userId: user.id } }).catch(console.error); }
+          try {
+            const { data: vaList } = await supabase.from('virtual_accounts').select('id').eq('user_id', user.id);
+            const count = vaList?.length || 0;
+            if (count === 0) {
+              supabase.functions.invoke('create-virtual-account', { body: { userId: user.id } }).catch(console.error);
+            } else if (count === 1 && data.bvn) {
+              supabase.functions.invoke('create-virtual-account', { body: { userId: user.id, bvn: data.bvn, forceSecondAccount: true } }).catch(console.error);
+            }
+          } catch (vaErr) {
+            console.log('Dashboard VA check notice:', vaErr);
           }
-        }, 3000);
+        }, 2000);
+
       } else if (error) {
         if (error.message?.includes('recursion') || error.code === '42P17') { setDbError(true); }
         else if (error.code === 'PGRST116') {
