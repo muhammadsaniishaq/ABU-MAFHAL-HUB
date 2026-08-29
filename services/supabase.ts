@@ -126,6 +126,12 @@ export const processOAuthReturn = async (): Promise<boolean> => {
             const { data, error } = await supabase.auth.exchangeCodeForSession(codeStr);
             if (!error && data?.session) {
                 window.history.replaceState({}, document.title, window.location.pathname);
+                if (window.opener) {
+                    try {
+                        window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, '*');
+                    } catch (err) {}
+                    window.close();
+                }
                 return true;
             }
         } else if (accessTokenStr && refreshTokenStr) {
@@ -135,6 +141,12 @@ export const processOAuthReturn = async (): Promise<boolean> => {
             });
             if (!error && data?.session) {
                 window.history.replaceState({}, document.title, window.location.pathname);
+                if (window.opener) {
+                    try {
+                        window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, '*');
+                    } catch (err) {}
+                    window.close();
+                }
                 return true;
             }
         }

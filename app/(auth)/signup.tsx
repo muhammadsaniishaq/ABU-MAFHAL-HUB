@@ -134,8 +134,24 @@ export default function SignupScreen() {
             }
         });
 
+        // Listen for postMessage from Google popup window
+        const handleOAuthMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+                setShowGoogleAuthModal(false);
+                setSocialLoading(null);
+                router.replace('/dashboard' as any);
+            }
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('message', handleOAuthMessage);
+        }
+
         return () => {
             subscription?.unsubscribe();
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('message', handleOAuthMessage);
+            }
         };
     }, []);
 
@@ -717,11 +733,51 @@ export default function SignupScreen() {
             };
 
             if (Platform.OS === 'web') {
-                // Centered popup window geometry
                 const popupWidth = 500;
                 const popupHeight = 620;
                 const left = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenX + (window.outerWidth - popupWidth) / 2)) : 50;
                 const top = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenY + (window.outerHeight - popupHeight) / 2)) : 50;
+
+                // Open centered popup synchronously to prevent browser popup blocking
+                let popup: Window | null = null;
+                if (typeof window !== 'undefined') {
+                    popup = window.open(
+                        'about:blank',
+                        'GoogleAuthPopup',
+                        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`
+                    );
+                    if (popup && popup.document) {
+                        try {
+                            popup.document.write(`
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <title>ABUMAFHAL - Google Secure Authentication</title>
+                                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                                    <style>
+                                        body { margin: 0; padding: 0; background: #0F172A; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
+                                        .card { background: #1E293B; border: 1px solid #334155; border-radius: 18px; padding: 24px; max-width: 320px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
+                                        .spinner { width: 34px; height: 34px; border: 3px solid rgba(245, 158, 11, 0.2); border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 16px auto; }
+                                        @keyframes spin { to { transform: rotate(360deg); } }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="card">
+                                        <div style="font-size: 32px; margin-bottom: 8px;">👑</div>
+                                        <div style="font-weight: 900; font-size: 16px; color: #F59E0B; letter-spacing: 0.5px;">ABUMAFHAL</div>
+                                        <div style="font-size: 10px; font-weight: 800; color: #94A3B8; margin-bottom: 12px;">ROYAL FINTECH</div>
+                                        <div style="font-size: 13px; font-weight: 700; color: #F8FAFC; margin-bottom: 4px;">Connecting to Google...</div>
+                                        <div style="font-size: 11px; color: #94A3B8;">Secure 256-bit encrypted authentication</div>
+                                        <div class="spinner"></div>
+                                    </div>
+                                </body>
+                                </html>
+                            `);
+                        } catch (e) {}
+                    }
+                }
+
+                setShowGoogleAuthModal(true);
 
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
@@ -730,19 +786,16 @@ export default function SignupScreen() {
                         skipBrowserRedirect: true,
                     },
                 });
-                if (error) throw error;
 
-                if (data?.url && typeof window !== 'undefined') {
+                if (error) {
+                    if (popup && !popup.closed) popup.close();
+                    throw error;
+                }
+
+                if (data?.url) {
                     setGoogleAuthUrl(data.url);
-                    setShowGoogleAuthModal(true);
-
-                    const popup = window.open(
-                        data.url,
-                        'GoogleAuthPopup',
-                        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`
-                    );
-
-                    if (popup) {
+                    if (popup && !popup.closed) {
+                        popup.location.href = data.url;
                         const checkInterval = setInterval(async () => {
                             if (popup.closed) {
                                 clearInterval(checkInterval);
