@@ -59,14 +59,19 @@ interface RiskPolicySettings {
     risk_auto_quarantine_above: number;
     risk_vtu_velocity_cap: number;
     risk_crypto_single_max: number;
+    risk_nineboost_max_order: number;
+    risk_agenthub_daily_quota: number;
     risk_require_kyc2_outflows: boolean;
     risk_global_freeze: boolean;
     risk_offhours_alerts: boolean;
     risk_auto_lock_failed_auth: boolean;
-    risk_crypto_killswitch: boolean;
-    risk_vtu_killswitch: boolean;
-    risk_cards_killswitch: boolean;
+    risk_payvessel_killswitch: boolean;
+    risk_bigi_killswitch: boolean;
+    risk_bilal_killswitch: boolean;
+    risk_clubkonnect_killswitch: boolean;
     risk_agenthub_killswitch: boolean;
+    risk_nineboost_killswitch: boolean;
+    risk_crypto_killswitch: boolean;
 }
 
 interface UserProfile {
@@ -109,12 +114,15 @@ interface BlacklistItem {
 }
 
 interface ChannelStatus {
+    id: string;
     name: string;
     provider: string;
     service: string;
+    category: 'VIRTUAL_ACCOUNTS' | 'VTU_DATA' | 'KYC_IDENTITY' | 'SMM_BOOST' | 'CRYPTO' | 'PAYMENT' | 'SMS_OTP';
     status: 'operational' | 'degraded' | 'offline';
     latencyMs: number;
     lastPing: string;
+    killswitchKey: keyof RiskPolicySettings;
 }
 
 export default function RiskControlCenter() {
@@ -136,7 +144,7 @@ export default function RiskControlCenter() {
     const [failedTx24h, setFailedTx24h] = useState(0);
     const [highRiskUsersCount, setHighRiskUsersCount] = useState(0);
     const [pendingFlagsCount, setPendingFlagsCount] = useState(0);
-    const [riskIndexScore, setRiskIndexScore] = useState(16);
+    const [riskIndexScore, setRiskIndexScore] = useState(14);
 
     // Risk Policies State
     const [policies, setPolicies] = useState<RiskPolicySettings>({
@@ -146,14 +154,19 @@ export default function RiskControlCenter() {
         risk_auto_quarantine_above: 100000,
         risk_vtu_velocity_cap: 25000,
         risk_crypto_single_max: 500000,
+        risk_nineboost_max_order: 50000,
+        risk_agenthub_daily_quota: 20,
         risk_require_kyc2_outflows: true,
         risk_global_freeze: false,
         risk_offhours_alerts: true,
         risk_auto_lock_failed_auth: true,
-        risk_crypto_killswitch: false,
-        risk_vtu_killswitch: false,
-        risk_cards_killswitch: false,
+        risk_payvessel_killswitch: false,
+        risk_bigi_killswitch: false,
+        risk_bilal_killswitch: false,
+        risk_clubkonnect_killswitch: false,
         risk_agenthub_killswitch: false,
+        risk_nineboost_killswitch: false,
+        risk_crypto_killswitch: false,
     });
 
     // Form inputs for numeric policy limits
@@ -163,6 +176,8 @@ export default function RiskControlCenter() {
     const [inputQuarantine, setInputQuarantine] = useState('100000');
     const [inputVtuCap, setInputVtuCap] = useState('25000');
     const [inputCryptoMax, setInputCryptoMax] = useState('500000');
+    const [inputNineBoostMax, setInputNineBoostMax] = useState('50000');
+    const [inputAgentHubQuota, setInputAgentHubQuota] = useState('20');
 
     // Transactions Queue
     const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -177,14 +192,16 @@ export default function RiskControlCenter() {
     const [newBlacklistReason, setNewBlacklistReason] = useState('');
     const [showBlacklistModal, setShowBlacklistModal] = useState(false);
 
-    // Channels & Real Platform Providers State (Strictly real app partners)
+    // Exact Platform Providers State (Payvessel, Bigi Sub, BilalSadaSub, ClubKonnect, AgentHub, NineBoost, NOWPayments, Termii, Paystack)
     const [channels, setChannels] = useState<ChannelStatus[]>([
-        { name: 'Virtual Accounts & Bank Rails', provider: 'Payvessel / Paystack', service: 'Inflows & Bank Payouts', status: 'operational', latencyMs: 110, lastPing: 'Live' },
-        { name: 'Virtual Dollar Cards Infrastructure', provider: 'Payvessel Cards Engine', service: 'Card Issuing & Top-up', status: 'operational', latencyMs: 135, lastPing: 'Live' },
-        { name: 'Telecom Airtime & Data Pipeline', provider: 'Bilalsadasub / Clubkonnect', service: 'VTU Subscriptions', status: 'operational', latencyMs: 90, lastPing: 'Live' },
-        { name: 'NIN / BVN / CAC Identity Engine', provider: 'AgentHub KYC Engine', service: 'Government KYC Verification', status: 'operational', latencyMs: 160, lastPing: 'Live' },
-        { name: 'Crypto Liquidity & Web3 Rails', provider: 'NOWPayments Gateways', service: 'Crypto Deposits & Payouts', status: 'operational', latencyMs: 195, lastPing: 'Live' },
-        { name: 'SMS & OTP Delivery Rails', provider: 'Termii Gateway', service: '2FA & Critical Alerts', status: 'operational', latencyMs: 75, lastPing: 'Live' },
+        { id: 'payvessel', name: 'Payvessel Virtual Accounts & Cards', provider: 'Payvessel Engine', service: 'Reserved Accounts, Outward Rails & USD Cards', category: 'VIRTUAL_ACCOUNTS', status: 'operational', latencyMs: 115, lastPing: 'Live (99.9%)', killswitchKey: 'risk_payvessel_killswitch' },
+        { id: 'bigisub', name: 'Bigi Sub Data & VTU Engine', provider: 'Bigi Sub Platform', service: 'SME Data, Airtime & Direct Subscriptions', category: 'VTU_DATA', status: 'operational', latencyMs: 88, lastPing: 'Live (99.9%)', killswitchKey: 'risk_bigi_killswitch' },
+        { id: 'bilalsadasub', name: 'Bilal Sada Sub Telecom Rails', provider: 'BilalSadaSub Gateway', service: 'Airtime, Data Bundles & Utility Routing', category: 'VTU_DATA', status: 'operational', latencyMs: 92, lastPing: 'Live (99.8%)', killswitchKey: 'risk_bilal_killswitch' },
+        { id: 'clubkonnect', name: 'ClubKonnect Utility & Bill Hub', provider: 'ClubKonnect API', service: 'Electricity Tokens, Cable TV & Bills', category: 'VTU_DATA', status: 'operational', latencyMs: 105, lastPing: 'Live (99.7%)', killswitchKey: 'risk_clubkonnect_killswitch' },
+        { id: 'agenthub', name: 'AgentHub Government Identity Engine', provider: 'AgentHub KYC API', service: 'Real-Time NIN, BVN & CAC Verification', category: 'KYC_IDENTITY', status: 'operational', latencyMs: 160, lastPing: 'Live (99.5%)', killswitchKey: 'risk_agenthub_killswitch' },
+        { id: 'nineboost', name: 'NineBoost Social Marketing (SMM)', provider: 'NineBoost Engine', service: 'Followers, Likes, Views & Engagement API', category: 'SMM_BOOST', status: 'operational', latencyMs: 130, lastPing: 'Live (99.9%)', killswitchKey: 'risk_nineboost_killswitch' },
+        { id: 'nowpayments', name: 'NOWPayments Web3 & Crypto Custody', provider: 'NOWPayments Gateways', service: 'USDT, BTC, ETH Deposits & Auto-Payouts', category: 'CRYPTO', status: 'operational', latencyMs: 190, lastPing: 'Live (99.6%)', killswitchKey: 'risk_crypto_killswitch' },
+        { id: 'termii', name: 'Termii High-Priority Messaging', provider: 'Termii SMS Gateway', service: '2FA OTPs, Security Mailer & Alerts', category: 'SMS_OTP', status: 'operational', latencyMs: 70, lastPing: 'Live (100%)', killswitchKey: 'risk_global_freeze' },
     ]);
 
     // Stress Test States
@@ -243,14 +260,19 @@ export default function RiskControlCenter() {
                     risk_auto_quarantine_above: Number(map['risk_auto_quarantine_above']) || 100000,
                     risk_vtu_velocity_cap: Number(map['risk_vtu_velocity_cap']) || 25000,
                     risk_crypto_single_max: Number(map['risk_crypto_single_max']) || 500000,
+                    risk_nineboost_max_order: Number(map['risk_nineboost_max_order']) || 50000,
+                    risk_agenthub_daily_quota: Number(map['risk_agenthub_daily_quota']) || 20,
                     risk_require_kyc2_outflows: map['risk_require_kyc2_outflows'] === true || map['risk_require_kyc2_outflows'] === 'true',
                     risk_global_freeze: map['risk_global_freeze'] === true || map['risk_global_freeze'] === 'true',
                     risk_offhours_alerts: map['risk_offhours_alerts'] === true || map['risk_offhours_alerts'] === 'true',
                     risk_auto_lock_failed_auth: map['risk_auto_lock_failed_auth'] === true || map['risk_auto_lock_failed_auth'] === 'true',
-                    risk_crypto_killswitch: map['risk_crypto_killswitch'] === true || map['risk_crypto_killswitch'] === 'true',
-                    risk_vtu_killswitch: map['risk_vtu_killswitch'] === true || map['risk_vtu_killswitch'] === 'true',
-                    risk_cards_killswitch: map['risk_cards_killswitch'] === true || map['risk_cards_killswitch'] === 'true',
+                    risk_payvessel_killswitch: map['risk_payvessel_killswitch'] === true || map['risk_payvessel_killswitch'] === 'true',
+                    risk_bigi_killswitch: map['risk_bigi_killswitch'] === true || map['risk_bigi_killswitch'] === 'true',
+                    risk_bilal_killswitch: map['risk_bilal_killswitch'] === true || map['risk_bilal_killswitch'] === 'true',
+                    risk_clubkonnect_killswitch: map['risk_clubkonnect_killswitch'] === true || map['risk_clubkonnect_killswitch'] === 'true',
                     risk_agenthub_killswitch: map['risk_agenthub_killswitch'] === true || map['risk_agenthub_killswitch'] === 'true',
+                    risk_nineboost_killswitch: map['risk_nineboost_killswitch'] === true || map['risk_nineboost_killswitch'] === 'true',
+                    risk_crypto_killswitch: map['risk_crypto_killswitch'] === true || map['risk_crypto_killswitch'] === 'true',
                 };
 
                 setPolicies(loaded);
@@ -260,6 +282,8 @@ export default function RiskControlCenter() {
                 setInputQuarantine(loaded.risk_auto_quarantine_above.toString());
                 setInputVtuCap(loaded.risk_vtu_velocity_cap.toString());
                 setInputCryptoMax(loaded.risk_crypto_single_max.toString());
+                setInputNineBoostMax(loaded.risk_nineboost_max_order.toString());
+                setInputAgentHubQuota(loaded.risk_agenthub_daily_quota.toString());
             }
         } catch (e) {
             console.error('Fetch policies error:', e);
@@ -296,7 +320,7 @@ export default function RiskControlCenter() {
                 tx24h.forEach(tx => {
                     const amt = Number(tx.amount) || 0;
                     if (tx.status === 'failed') failedCount++;
-                    if (['transfer', 'withdrawal', 'crypto_buy', 'bill_payment'].includes(tx.type)) {
+                    if (['transfer', 'withdrawal', 'crypto_buy', 'bill_payment', 'smm_order', 'nin_verify', 'bvn_verify'].includes(tx.type)) {
                         outSum += amt;
                     } else if (['deposit', 'credit', 'refund'].includes(tx.type)) {
                         inSum += amt;
@@ -358,7 +382,7 @@ export default function RiskControlCenter() {
                     }
                     if (u && (Number(u.kyc_tier) || 1) < 2 && amt >= 50000) {
                         fraudScore += 30;
-                        reasons.push('Unverified Tier 1 User Large Outflow');
+                        reasons.push('Unverified Tier 1 User Outflow');
                     }
                     if (tx.status === 'failed') {
                         fraudScore += 25;
@@ -465,6 +489,29 @@ export default function RiskControlCenter() {
         ]);
     };
 
+    // 1-Click Toggle Channel Killswitch
+    const handleToggleChannelKillswitch = async (key: keyof RiskPolicySettings, channelName: string) => {
+        const currentVal = !!policies[key];
+        const newVal = !currentVal;
+
+        try {
+            await supabase
+                .from('app_settings')
+                .upsert({
+                    key: String(key),
+                    value: newVal ? 'true' : 'false',
+                }, { onConflict: 'key' });
+
+            setPolicies(p => ({ ...p, [key]: newVal }));
+            Alert.alert(
+                newVal ? 'CHANNEL PAUSED ⛔' : 'CHANNEL RESUMED ✅',
+                `${channelName} is now ${newVal ? 'temporarily disabled to protect platform float.' : 'active and processing normally.'}`
+            );
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
+    };
+
     // Filter Logic
     const applyTxFilter = (list: TransactionItem[], filter: string, search: string) => {
         let result = [...list];
@@ -512,14 +559,19 @@ export default function RiskControlCenter() {
                 risk_auto_quarantine_above: Number(inputQuarantine) || 100000,
                 risk_vtu_velocity_cap: Number(inputVtuCap) || 25000,
                 risk_crypto_single_max: Number(inputCryptoMax) || 500000,
+                risk_nineboost_max_order: Number(inputNineBoostMax) || 50000,
+                risk_agenthub_daily_quota: Number(inputAgentHubQuota) || 20,
                 risk_require_kyc2_outflows: policies.risk_require_kyc2_outflows,
                 risk_global_freeze: policies.risk_global_freeze,
                 risk_offhours_alerts: policies.risk_offhours_alerts,
                 risk_auto_lock_failed_auth: policies.risk_auto_lock_failed_auth,
-                risk_crypto_killswitch: policies.risk_crypto_killswitch,
-                risk_vtu_killswitch: policies.risk_vtu_killswitch,
-                risk_cards_killswitch: policies.risk_cards_killswitch,
+                risk_payvessel_killswitch: policies.risk_payvessel_killswitch,
+                risk_bigi_killswitch: policies.risk_bigi_killswitch,
+                risk_bilal_killswitch: policies.risk_bilal_killswitch,
+                risk_clubkonnect_killswitch: policies.risk_clubkonnect_killswitch,
                 risk_agenthub_killswitch: policies.risk_agenthub_killswitch,
+                risk_nineboost_killswitch: policies.risk_nineboost_killswitch,
+                risk_crypto_killswitch: policies.risk_crypto_killswitch,
             };
 
             const payload = Object.entries(updatedPolicies).map(([key, value]) => ({
@@ -667,7 +719,7 @@ export default function RiskControlCenter() {
                 remainingFloat: remainingBuffer,
                 liquidityHealth: isCritical ? 'DEFICIT_RISK' : 'OPTIMAL_COVERAGE',
                 recommendation: isCritical 
-                    ? 'Recommend deploying Payvessel/Paystack auto-quarantine limits and capping single withdrawals to ₦100,000.'
+                    ? 'Recommend deploying Payvessel auto-quarantine limits and capping single withdrawals to ₦100,000 across Bigi Sub, BilalSadaSub & NOWPayments.'
                     : 'System liquidity buffers adequately cover this outflow surge without gateway throttling.',
             });
             setSimulatingStress(false);
@@ -688,12 +740,15 @@ Active High-Risk Accounts: ${highRiskUsersCount}
 Global Outflow Freeze: ${policies.risk_global_freeze ? 'ACTIVE' : 'INACTIVE'}
 Active Blacklist Rules: ${blacklist.length}
 
-Primary Infrastructure Channels:
-1. Payvessel & Paystack: Reserved Accounts & Virtual Cards Engine
-2. Bilalsadasub & Clubkonnect: Airtime & Data VTU Rails
-3. AgentHub: Realtime NIN / BVN / CAC Identity Verification Engine
-4. NOWPayments: Crypto Custody & Settlement
-5. Termii: SMS 2FA & Critical Dispatch`;
+Actual Integrated Platform Channels:
+1. Payvessel: Reserved Virtual Accounts, Bank Rails & Virtual Dollar Cards
+2. Bigi Sub: SME Data & Direct VTU Pipeline
+3. Bilal Sada Sub: Data Bundles, Airtime & Telecom Routing
+4. ClubKonnect: Utility Bills, Electricity & Cable TV
+5. AgentHub: Real-Time NIN, BVN & CAC Government Verification Engine
+6. NineBoost: Social Media Growth & SMM Order API
+7. NOWPayments: Crypto Web3 Settlements & Automated Payouts
+8. Termii: SMS OTP & Critical Infrastructure Alerts`;
 
         if (Platform.OS === 'web') {
             await Clipboard.setStringAsync(report);
@@ -739,7 +794,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('overview')}
                     style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
                 >
-                    <Ionicons name="pulse" size={15} color={activeTab === 'overview' ? T.gold : T.textSub} />
+                    <Ionicons name="pulse" size={14} color={activeTab === 'overview' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
                         Overview
                     </Text>
@@ -749,7 +804,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('policies')}
                     style={[styles.tabItem, activeTab === 'policies' && styles.tabItemActive]}
                 >
-                    <Ionicons name="shield-checkmark" size={15} color={activeTab === 'policies' ? T.gold : T.textSub} />
+                    <Ionicons name="shield-checkmark" size={14} color={activeTab === 'policies' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'policies' && styles.tabTextActive]}>
                         Policies
                     </Text>
@@ -759,7 +814,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('queue')}
                     style={[styles.tabItem, activeTab === 'queue' && styles.tabItemActive]}
                 >
-                    <Ionicons name="alert-circle" size={15} color={activeTab === 'queue' ? T.gold : T.textSub} />
+                    <Ionicons name="alert-circle" size={14} color={activeTab === 'queue' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>
                         Queue ({pendingFlagsCount})
                     </Text>
@@ -769,7 +824,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('channels')}
                     style={[styles.tabItem, activeTab === 'channels' && styles.tabItemActive]}
                 >
-                    <Ionicons name="git-network" size={15} color={activeTab === 'channels' ? T.gold : T.textSub} />
+                    <Ionicons name="git-network" size={14} color={activeTab === 'channels' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'channels' && styles.tabTextActive]}>
                         Channels
                     </Text>
@@ -779,7 +834,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('blacklist')}
                     style={[styles.tabItem, activeTab === 'blacklist' && styles.tabItemActive]}
                 >
-                    <Ionicons name="ban" size={15} color={activeTab === 'blacklist' ? T.gold : T.textSub} />
+                    <Ionicons name="ban" size={14} color={activeTab === 'blacklist' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'blacklist' && styles.tabTextActive]}>
                         Blacklist ({blacklist.length})
                     </Text>
@@ -789,7 +844,7 @@ Primary Infrastructure Channels:
                     onPress={() => setActiveTab('stress_test')}
                     style={[styles.tabItem, activeTab === 'stress_test' && styles.tabItemActive]}
                 >
-                    <Ionicons name="speedometer" size={15} color={activeTab === 'stress_test' ? T.gold : T.textSub} />
+                    <Ionicons name="speedometer" size={14} color={activeTab === 'stress_test' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'stress_test' && styles.tabTextActive]}>
                         Stress Test
                     </Text>
@@ -864,7 +919,7 @@ Primary Infrastructure Channels:
                                     <Text style={[styles.metricValue, { color: T.success }]}>
                                         +₦{inflow24h > 0 ? (inflow24h / 1000).toFixed(1) : '0'}k
                                     </Text>
-                                    <Text style={styles.metricSub}>Payvessel / Paystack</Text>
+                                    <Text style={styles.metricSub}>Payvessel Deposits</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
@@ -875,7 +930,7 @@ Primary Infrastructure Channels:
                                     <Text style={[styles.metricValue, { color: T.danger }]}>
                                         -₦{outflow24h > 0 ? (outflow24h / 1000).toFixed(1) : '0'}k
                                     </Text>
-                                    <Text style={styles.metricSub}>VTU / Crypto / Cards</Text>
+                                    <Text style={styles.metricSub}>Bigi / Bilal / Crypto</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
@@ -901,20 +956,21 @@ Primary Infrastructure Channels:
                                 </View>
                             </View>
 
-                            {/* Emergency Killswitches */}
-                            <Text style={styles.sectionHeading}>Emergency Service Killswitches</Text>
+                            {/* Emergency Killswitches for All 8 Providers */}
+                            <Text style={styles.sectionHeading}>Emergency Rails Killswitch Matrix</Text>
                             <View style={styles.killswitchGrid}>
+                                {/* Global Freeze */}
                                 <TouchableOpacity
                                     onPress={async () => {
                                         const newVal = !policies.risk_global_freeze;
                                         await supabase.from('app_settings').upsert({ key: 'risk_global_freeze', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
                                         setPolicies(p => ({ ...p, risk_global_freeze: newVal }));
-                                        Alert.alert('System Freeze', newVal ? 'GLOBAL OUTFLOW HALTED ❄️' : 'System Resumed ✅');
+                                        Alert.alert('System Lockdown', newVal ? 'ALL OUTFLOWS HALTED ❄️' : 'System Resumed ✅');
                                     }}
                                     style={[styles.killswitchCard, policies.risk_global_freeze && styles.killswitchActiveRed]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="snow" size={22} color={policies.risk_global_freeze ? "#FFFFFF" : T.danger} />
+                                    <Ionicons name="snow" size={20} color={policies.risk_global_freeze ? "#FFFFFF" : T.danger} />
                                     <Text style={[styles.killswitchTitle, policies.risk_global_freeze && { color: '#FFFFFF' }]}>
                                         Global Freeze
                                     </Text>
@@ -923,60 +979,108 @@ Primary Infrastructure Channels:
                                     </Text>
                                 </TouchableOpacity>
 
+                                {/* Payvessel */}
                                 <TouchableOpacity
-                                    onPress={async () => {
-                                        const newVal = !policies.risk_crypto_killswitch;
-                                        await supabase.from('app_settings').upsert({ key: 'risk_crypto_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
-                                        setPolicies(p => ({ ...p, risk_crypto_killswitch: newVal }));
-                                        Alert.alert('Crypto Guard', newVal ? 'NOWPayments Withdrawals Locked ⛔' : 'Crypto Enabled ✅');
-                                    }}
-                                    style={[styles.killswitchCard, policies.risk_crypto_killswitch && styles.killswitchActiveWarn]}
+                                    onPress={() => handleToggleChannelKillswitch('risk_payvessel_killswitch', 'Payvessel Accounts & Cards')}
+                                    style={[styles.killswitchCard, policies.risk_payvessel_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="logo-bitcoin" size={22} color={policies.risk_crypto_killswitch ? "#FFFFFF" : T.warning} />
-                                    <Text style={[styles.killswitchTitle, policies.risk_crypto_killswitch && { color: '#FFFFFF' }]}>
-                                        Crypto Outflows
+                                    <Ionicons name="card" size={20} color={policies.risk_payvessel_killswitch ? "#FFFFFF" : T.info} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_payvessel_killswitch && { color: '#FFFFFF' }]}>
+                                        Payvessel Cards
                                     </Text>
-                                    <Text style={[styles.killswitchSub, policies.risk_crypto_killswitch && { color: '#FEF3C7' }]}>
-                                        {policies.risk_crypto_killswitch ? 'BLOCKED' : 'Active'}
+                                    <Text style={[styles.killswitchSub, policies.risk_payvessel_killswitch && { color: '#FEF3C7' }]}>
+                                        {policies.risk_payvessel_killswitch ? 'PAUSED' : 'Active'}
                                     </Text>
                                 </TouchableOpacity>
 
+                                {/* Bigi Sub */}
                                 <TouchableOpacity
-                                    onPress={async () => {
-                                        const newVal = !policies.risk_vtu_killswitch;
-                                        await supabase.from('app_settings').upsert({ key: 'risk_vtu_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
-                                        setPolicies(p => ({ ...p, risk_vtu_killswitch: newVal }));
-                                        Alert.alert('VTU Rail', newVal ? 'Bilalsadasub / Clubkonnect Paused ⏸️' : 'VTU Enabled ✅');
-                                    }}
-                                    style={[styles.killswitchCard, policies.risk_vtu_killswitch && styles.killswitchActiveWarn]}
+                                    onPress={() => handleToggleChannelKillswitch('risk_bigi_killswitch', 'Bigi Sub Data Engine')}
+                                    style={[styles.killswitchCard, policies.risk_bigi_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="phone-portrait" size={22} color={policies.risk_vtu_killswitch ? "#FFFFFF" : T.info} />
-                                    <Text style={[styles.killswitchTitle, policies.risk_vtu_killswitch && { color: '#FFFFFF' }]}>
-                                        VTU & Airtime
+                                    <Ionicons name="cellular" size={20} color={policies.risk_bigi_killswitch ? "#FFFFFF" : T.success} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_bigi_killswitch && { color: '#FFFFFF' }]}>
+                                        Bigi Sub VTU
                                     </Text>
-                                    <Text style={[styles.killswitchSub, policies.risk_vtu_killswitch && { color: '#E0F2FE' }]}>
-                                        {policies.risk_vtu_killswitch ? 'PAUSED' : 'Active'}
+                                    <Text style={[styles.killswitchSub, policies.risk_bigi_killswitch && { color: '#DCFCE7' }]}>
+                                        {policies.risk_bigi_killswitch ? 'PAUSED' : 'Active'}
                                     </Text>
                                 </TouchableOpacity>
 
+                                {/* Bilal Sada Sub */}
                                 <TouchableOpacity
-                                    onPress={async () => {
-                                        const newVal = !policies.risk_agenthub_killswitch;
-                                        await supabase.from('app_settings').upsert({ key: 'risk_agenthub_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
-                                        setPolicies(p => ({ ...p, risk_agenthub_killswitch: newVal }));
-                                        Alert.alert('AgentHub Guard', newVal ? 'NIN/BVN API Calls Paused ⏸️' : 'Identity Rails Active ✅');
-                                    }}
+                                    onPress={() => handleToggleChannelKillswitch('risk_bilal_killswitch', 'Bilal Sada Sub Telecom')}
+                                    style={[styles.killswitchCard, policies.risk_bilal_killswitch && styles.killswitchActiveWarn]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="phone-portrait" size={20} color={policies.risk_bilal_killswitch ? "#FFFFFF" : T.gold} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_bilal_killswitch && { color: '#FFFFFF' }]}>
+                                        Bilal Sada Sub
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_bilal_killswitch && { color: '#FEF3C7' }]}>
+                                        {policies.risk_bilal_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* ClubKonnect */}
+                                <TouchableOpacity
+                                    onPress={() => handleToggleChannelKillswitch('risk_clubkonnect_killswitch', 'ClubKonnect Utility & Bills')}
+                                    style={[styles.killswitchCard, policies.risk_clubkonnect_killswitch && styles.killswitchActiveWarn]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="flash" size={20} color={policies.risk_clubkonnect_killswitch ? "#FFFFFF" : T.warning} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_clubkonnect_killswitch && { color: '#FFFFFF' }]}>
+                                        ClubKonnect
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_clubkonnect_killswitch && { color: '#FEF3C7' }]}>
+                                        {policies.risk_clubkonnect_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* AgentHub */}
+                                <TouchableOpacity
+                                    onPress={() => handleToggleChannelKillswitch('risk_agenthub_killswitch', 'AgentHub KYC (NIN/BVN)')}
                                     style={[styles.killswitchCard, policies.risk_agenthub_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="finger-print" size={22} color={policies.risk_agenthub_killswitch ? "#FFFFFF" : T.purple} />
+                                    <Ionicons name="finger-print" size={20} color={policies.risk_agenthub_killswitch ? "#FFFFFF" : T.purple} />
                                     <Text style={[styles.killswitchTitle, policies.risk_agenthub_killswitch && { color: '#FFFFFF' }]}>
-                                        AgentHub API
+                                        AgentHub KYC
                                     </Text>
                                     <Text style={[styles.killswitchSub, policies.risk_agenthub_killswitch && { color: '#F3E8FF' }]}>
                                         {policies.risk_agenthub_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* NineBoost */}
+                                <TouchableOpacity
+                                    onPress={() => handleToggleChannelKillswitch('risk_nineboost_killswitch', 'NineBoost SMM Orders')}
+                                    style={[styles.killswitchCard, policies.risk_nineboost_killswitch && styles.killswitchActiveWarn]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="trending-up" size={20} color={policies.risk_nineboost_killswitch ? "#FFFFFF" : '#EC4899'} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_nineboost_killswitch && { color: '#FFFFFF' }]}>
+                                        NineBoost SMM
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_nineboost_killswitch && { color: '#FCE7F3' }]}>
+                                        {policies.risk_nineboost_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {/* NOWPayments */}
+                                <TouchableOpacity
+                                    onPress={() => handleToggleChannelKillswitch('risk_crypto_killswitch', 'NOWPayments Crypto Outflows')}
+                                    style={[styles.killswitchCard, policies.risk_crypto_killswitch && styles.killswitchActiveWarn]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-bitcoin" size={20} color={policies.risk_crypto_killswitch ? "#FFFFFF" : T.warning} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_crypto_killswitch && { color: '#FFFFFF' }]}>
+                                        NOWPayments
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_crypto_killswitch && { color: '#FEF3C7' }]}>
+                                        {policies.risk_crypto_killswitch ? 'PAUSED' : 'Active'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -991,8 +1095,8 @@ Primary Infrastructure Channels:
                             <View style={styles.cardHeaderBox}>
                                 <Ionicons name="shield-half" size={22} color={T.gold} />
                                 <View style={{ marginLeft: 10 }}>
-                                    <Text style={styles.cardHeaderTitle}>Live Risk Limit Engine</Text>
-                                    <Text style={styles.cardHeaderSub}>Directly enforced across Payvessel, Bilalsadasub & NOWPayments</Text>
+                                    <Text style={styles.cardHeaderTitle}>Universal Risk Limit Engine</Text>
+                                    <Text style={styles.cardHeaderSub}>Live limits applied across Payvessel, Bigi Sub, Bilal, AgentHub & NineBoost</Text>
                                 </View>
                             </View>
 
@@ -1033,11 +1137,29 @@ Primary Infrastructure Channels:
                                     style={styles.numericInput}
                                 />
 
-                                <Text style={styles.inputLabel}>VTU / Airtime Velocity Cap (₦ / 10 Mins)</Text>
+                                <Text style={styles.inputLabel}>Bigi Sub & BilalSadaSub VTU Rate Limit (₦ / 10 Mins)</Text>
                                 <Text style={styles.inputHelper}>Prevents telecom balance drain attacks.</Text>
                                 <TextInput
                                     value={inputVtuCap}
                                     onChangeText={setInputVtuCap}
+                                    keyboardType="numeric"
+                                    style={styles.numericInput}
+                                />
+
+                                <Text style={styles.inputLabel}>NineBoost SMM Single Order Cap (₦)</Text>
+                                <Text style={styles.inputHelper}>Maximum single social boost order value.</Text>
+                                <TextInput
+                                    value={inputNineBoostMax}
+                                    onChangeText={setInputNineBoostMax}
+                                    keyboardType="numeric"
+                                    style={styles.numericInput}
+                                />
+
+                                <Text style={styles.inputLabel}>AgentHub Daily Verification Quota / User</Text>
+                                <Text style={styles.inputHelper}>Prevents automated identity scraping on NIN/BVN.</Text>
+                                <TextInput
+                                    value={inputAgentHubQuota}
+                                    onChangeText={setInputAgentHubQuota}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
                                 />
@@ -1210,25 +1332,38 @@ Primary Infrastructure Channels:
                     {/* ========================================================================= */}
                     {activeTab === 'channels' && (
                         <View>
-                            <Text style={styles.sectionHeading}>Actual App Rails & Integration Health</Text>
-                            {channels.map((ch, idx) => (
-                                <View key={idx} style={styles.channelCard}>
-                                    <View style={styles.channelHeader}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.channelName}>{ch.name}</Text>
-                                            <Text style={styles.channelProvider}>{ch.provider} • {ch.service}</Text>
+                            <Text style={styles.sectionHeading}>Integrated Platform Rails & Gateway Health</Text>
+                            {channels.map((ch) => {
+                                const isPaused = !!policies[ch.killswitchKey];
+                                return (
+                                    <View key={ch.id} style={styles.channelCard}>
+                                        <View style={styles.channelHeader}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.channelName}>{ch.name}</Text>
+                                                <Text style={styles.channelProvider}>{ch.provider} • {ch.service}</Text>
+                                            </View>
+                                            <View style={[styles.channelStatusPill, isPaused && { backgroundColor: T.dangerBg }]}>
+                                                <View style={[styles.statusDotGreen, isPaused && { backgroundColor: T.danger }]} />
+                                                <Text style={[styles.channelStatusText, isPaused && { color: T.danger }]}>
+                                                    {isPaused ? 'PAUSED' : 'OPERATIONAL'}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={styles.channelStatusPill}>
-                                            <View style={styles.statusDotGreen} />
-                                            <Text style={styles.channelStatusText}>{ch.status.toUpperCase()}</Text>
+                                        <View style={styles.channelFooter}>
+                                            <Text style={styles.channelMeta}>Latency: {ch.latencyMs}ms</Text>
+                                            <Text style={styles.channelMeta}>Uptime: {ch.lastPing}</Text>
+                                            <TouchableOpacity
+                                                onPress={() => handleToggleChannelKillswitch(ch.killswitchKey, ch.name)}
+                                                style={[styles.channelToggleBtn, isPaused ? { backgroundColor: T.success } : { backgroundColor: T.danger }]}
+                                            >
+                                                <Text style={styles.channelToggleBtnText}>
+                                                    {isPaused ? 'Resume Rail' : 'Pause Rail'}
+                                                </Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
-                                    <View style={styles.channelFooter}>
-                                        <Text style={styles.channelMeta}>Latency: {ch.latencyMs}ms</Text>
-                                        <Text style={styles.channelMeta}>Status: {ch.lastPing}</Text>
-                                    </View>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
                     )}
 
@@ -1545,14 +1680,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 3,
         paddingVertical: 6,
-        paddingHorizontal: 8,
+        paddingHorizontal: 6,
         borderRadius: 16,
     },
     tabItemActive: {
         backgroundColor: T.goldBg,
     },
     tabText: {
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: '700',
         color: T.textSub,
     },
@@ -1975,6 +2110,7 @@ const styles = StyleSheet.create({
     channelFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         borderTopWidth: 1,
         borderTopColor: 'rgba(51, 65, 85, 0.4)',
         paddingTop: 8,
@@ -1983,6 +2119,16 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: T.textSub,
         fontWeight: '600',
+    },
+    channelToggleBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    channelToggleBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
     },
     addBlacklistBtn: {
         backgroundColor: T.gold,
