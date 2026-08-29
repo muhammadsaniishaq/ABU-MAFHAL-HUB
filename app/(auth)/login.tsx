@@ -654,7 +654,20 @@ export default function LoginScreen() {
                                 </View>
 
                                 {/* Password Input */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 6 }]}>Password</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, marginBottom: 2 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Password</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => setShowPassword(!showPassword)}
+                                        style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
+                                        activeOpacity={0.7}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    >
+                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={13} color={showPassword ? "#F59E0B" : theme.textMuted} />
+                                        <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
+                                            {showPassword ? "Hide 🙈" : "Show 👁️"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <View style={[
                                     styles.inputFieldBox, 
                                     { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? '#F59E0B' : theme.borderPrimary }
@@ -675,8 +688,16 @@ export default function LoginScreen() {
                                         onFocus={() => setFocusedInput('password')}
                                         onBlur={() => setFocusedInput(null)}
                                     />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 2 }}>
-                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={15} color={theme.textMuted} />
+                                    <TouchableOpacity 
+                                        onPress={() => setShowPassword(!showPassword)} 
+                                        style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9', marginLeft: 6 }]}
+                                        activeOpacity={0.7}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={14} color={showPassword ? "#F59E0B" : theme.textMuted} />
+                                        <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
+                                            {showPassword ? "Hide 🙈" : "Show 👁️"}
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -1162,4 +1183,17 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 0.3,
     },
+    eyeTogglePillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    eyeTogglePillBtnText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
 });
+

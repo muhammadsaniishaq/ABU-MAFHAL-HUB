@@ -126,7 +126,18 @@ export default function ChangePasswordScreen() {
                             
                             {/* New Password Input */}
                             <View style={{ marginBottom: 12 }}>
-                                <Text style={{ color: L.textSecondary, fontSize: 9.5, fontWeight: 'bold', marginBottom: 4 }}>New Login Password:</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 9.5, fontWeight: 'bold' }}>New Login Password:</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => setShowNewPassword(!showNewPassword)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: showNewPassword ? 'rgba(245, 158, 11, 0.15)' : 'rgba(148, 163, 184, 0.12)' }}
+                                    >
+                                        <Ionicons name={showNewPassword ? "eye-off" : "eye"} size={12} color={showNewPassword ? "#F59E0B" : L.textMuted} />
+                                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: showNewPassword ? "#F59E0B" : L.textMuted }}>
+                                            {showNewPassword ? "Hide 🙈" : "Show 👁️"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <View style={{ height: 40, backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <Ionicons name="lock-closed-outline" size={16} color={L.navyHeader} />
                                     <TextInput
@@ -137,15 +148,26 @@ export default function ChangePasswordScreen() {
                                         placeholderTextColor="#94A3B8"
                                         style={{ flex: 1, color: L.textPrimary, fontSize: 11, fontWeight: '600' }}
                                     />
-                                    <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
-                                        <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={16} color={L.textMuted} />
+                                    <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={{ padding: 4 }}>
+                                        <Ionicons name={showNewPassword ? "eye-off" : "eye"} size={16} color={showNewPassword ? "#F59E0B" : L.textMuted} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
 
                             {/* Confirm Password Input */}
                             <View style={{ marginBottom: 14 }}>
-                                <Text style={{ color: L.textSecondary, fontSize: 9.5, fontWeight: 'bold', marginBottom: 4 }}>Confirm New Password:</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={{ color: L.textSecondary, fontSize: 9.5, fontWeight: 'bold' }}>Confirm New Password:</Text>
+                                    <TouchableOpacity 
+                                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: showConfirmPassword ? 'rgba(245, 158, 11, 0.15)' : 'rgba(148, 163, 184, 0.12)' }}
+                                    >
+                                        <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={12} color={showConfirmPassword ? "#F59E0B" : L.textMuted} />
+                                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: showConfirmPassword ? "#F59E0B" : L.textMuted }}>
+                                            {showConfirmPassword ? "Hide 🙈" : "Show 👁️"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <View style={{ height: 40, backgroundColor: L.inputBg, borderRadius: 10, borderWidth: 1, borderColor: L.inputBorder, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <Ionicons name="checkmark-done-outline" size={16} color={L.navyHeader} />
                                     <TextInput
@@ -156,8 +178,8 @@ export default function ChangePasswordScreen() {
                                         placeholderTextColor="#94A3B8"
                                         style={{ flex: 1, color: L.textPrimary, fontSize: 11, fontWeight: '600' }}
                                     />
-                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                        <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={16} color={L.textMuted} />
+                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={{ padding: 4 }}>
+                                        <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={16} color={showConfirmPassword ? "#F59E0B" : L.textMuted} />
                                     </TouchableOpacity>
                                 </View>
                             </View>

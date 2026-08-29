@@ -1017,7 +1017,7 @@ export default function SignupScreen() {
 
                                 {/* Password Section Header with "Suggest Strong Password" Action */}
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 2 }}>
-                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Password & Security</Text>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Create Password</Text>
                                     <TouchableOpacity 
                                         onPress={generateStrongPassword} 
                                         style={[styles.suggestPassBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', borderColor: '#F59E0B' }]}
@@ -1028,70 +1028,76 @@ export default function SignupScreen() {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Password & Confirm Password Side-by-Side with Eye Visibility Toggles */}
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
-                                    {/* Password Input */}
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.subInputLabel, { color: theme.textMuted }]}>Password</Text>
-                                        <View style={[
-                                            styles.inputFieldBox, 
-                                            { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
-                                        ]}>
-                                            <TextInput 
-                                                style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="••••••••"
-                                                placeholderTextColor={theme.textMuted}
-                                                secureTextEntry={!showPassword}
-                                                value={password}
-                                                onChangeText={setPassword}
-                                                onFocus={() => setFocusedInput('password')}
-                                                onBlur={() => setFocusedInput(null)}
+                                {/* 1. Main Password Input with Dedicated Hide/Show Toggle */}
+                                <View style={{ marginBottom: 5 }}>
+                                    <View style={[
+                                        styles.inputFieldBox, 
+                                        { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
+                                    ]}>
+                                        <Ionicons name="lock-closed-outline" size={15} color={focusedInput === 'password' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
+                                        <TextInput 
+                                            style={[styles.textInput, { color: theme.textPrimary }]}
+                                            placeholder="Create a strong password (min 8 chars)"
+                                            placeholderTextColor={theme.textMuted}
+                                            secureTextEntry={!showPassword}
+                                            value={password}
+                                            onChangeText={setPassword}
+                                            onFocus={() => setFocusedInput('password')}
+                                            onBlur={() => setFocusedInput(null)}
+                                        />
+                                        <TouchableOpacity 
+                                            onPress={togglePasswordVisibility} 
+                                            style={[styles.eyeTogglePillBtn, { backgroundColor: showPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Ionicons 
+                                                name={showPassword ? "eye-off" : "eye"} 
+                                                size={15} 
+                                                color={showPassword ? "#F59E0B" : theme.textMuted} 
                                             />
-                                            <TouchableOpacity 
-                                                onPress={togglePasswordVisibility} 
-                                                style={{ padding: 4 }}
-                                                activeOpacity={0.7}
-                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                            >
-                                                <Ionicons 
-                                                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                                                    size={16} 
-                                                    color={showPassword ? "#F59E0B" : theme.textMuted} 
-                                                />
-                                            </TouchableOpacity>
-                                        </View>
+                                            <Text style={[styles.eyeTogglePillBtnText, { color: showPassword ? '#F59E0B' : theme.textMuted }]}>
+                                                {showPassword ? "Hide 🙈" : "Show 👁️"}
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
+                                </View>
 
-                                    {/* Confirm Password Input */}
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.subInputLabel, { color: theme.textMuted }]}>Confirm Pass</Text>
-                                        <View style={[
-                                            styles.inputFieldBox, 
-                                            { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
-                                        ]}>
-                                            <TextInput 
-                                                style={[styles.textInput, { color: theme.textPrimary }]}
-                                                placeholder="••••••••"
-                                                placeholderTextColor={theme.textMuted}
-                                                secureTextEntry={!showConfirmPassword}
-                                                value={confirmPassword}
-                                                onChangeText={setConfirmPassword}
-                                                onFocus={() => setFocusedInput('confirmPassword')}
-                                                onBlur={() => setFocusedInput(null)}
+                                {/* 2. Confirm Password Input with Dedicated Hide/Show Toggle */}
+                                <View style={{ marginBottom: 5 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                        <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Confirm Password</Text>
+                                    </View>
+                                    <View style={[
+                                        styles.inputFieldBox, 
+                                        { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
+                                    ]}>
+                                        <Ionicons name="shield-checkmark-outline" size={15} color={focusedInput === 'confirmPassword' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
+                                        <TextInput 
+                                            style={[styles.textInput, { color: theme.textPrimary }]}
+                                            placeholder="Re-enter your password to confirm"
+                                            placeholderTextColor={theme.textMuted}
+                                            secureTextEntry={!showConfirmPassword}
+                                            value={confirmPassword}
+                                            onChangeText={setConfirmPassword}
+                                            onFocus={() => setFocusedInput('confirmPassword')}
+                                            onBlur={() => setFocusedInput(null)}
+                                        />
+                                        <TouchableOpacity 
+                                            onPress={toggleConfirmPasswordVisibility} 
+                                            style={[styles.eyeTogglePillBtn, { backgroundColor: showConfirmPassword ? 'rgba(245, 158, 11, 0.18)' : isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }]}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Ionicons 
+                                                name={showConfirmPassword ? "eye-off" : "eye"} 
+                                                size={15} 
+                                                color={showConfirmPassword ? "#F59E0B" : theme.textMuted} 
                                             />
-                                            <TouchableOpacity 
-                                                onPress={toggleConfirmPasswordVisibility} 
-                                                style={{ padding: 4 }}
-                                                activeOpacity={0.7}
-                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                            >
-                                                <Ionicons 
-                                                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
-                                                    size={16} 
-                                                    color={showConfirmPassword ? "#F59E0B" : theme.textMuted} 
-                                                />
-                                            </TouchableOpacity>
-                                        </View>
+                                            <Text style={[styles.eyeTogglePillBtnText, { color: showConfirmPassword ? '#F59E0B' : theme.textMuted }]}>
+                                                {showConfirmPassword ? "Hide 🙈" : "Show 👁️"}
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
 
@@ -1875,6 +1881,19 @@ const styles = StyleSheet.create({
         color: '#0F172A',
         fontWeight: '900',
         fontSize: 12,
+    },
+    eyeTogglePillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        marginLeft: 6,
+    },
+    eyeTogglePillBtnText: {
+        fontSize: 9.5,
+        fontWeight: '800',
     },
     subInputLabel: {
         fontSize: 9,
