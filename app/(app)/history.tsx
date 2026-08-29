@@ -275,31 +275,38 @@ export default function HistoryScreen() {
         }
 
         try {
-            // Parallelized Fast Fetching (All 3 queries run simultaneously in 1 network roundtrip)
-            const [txRes, verifRes, smmRes] = await Promise.allSettled([
+            // Parallelized High-Capacity Fetching (All 4 ledger tables fetched in 1 roundtrip)
+            const [txRes, verifRes, smmRes, cacRes] = await Promise.allSettled([
                 supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(150),
+                    .limit(500),
                 supabase
                     .from('verification_history')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(80),
+                    .limit(250),
                 supabase
                     .from('smm_orders')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(40),
+                    .limit(100),
+                supabase
+                    .from('cac_requests')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false })
+                    .limit(50),
             ]);
 
             const standardTxList: any[] = (txRes.status === 'fulfilled' && txRes.value.data) ? txRes.value.data : [];
             const verifTxList: any[] = (verifRes.status === 'fulfilled' && verifRes.value.data) ? verifRes.value.data : [];
             const smmOrdersList: any[] = (smmRes.status === 'fulfilled' && smmRes.value.data) ? smmRes.value.data : [];
+            const cacList: any[] = (cacRes.status === 'fulfilled' && cacRes.value.data) ? cacRes.value.data : [];
 
             // Transform verification records into standard format
             const mappedVerif = verifTxList.map(v => {
@@ -346,9 +353,31 @@ export default function HistoryScreen() {
                 }
             }));
 
-            // Merge and deduplicate by reference or ID
+            // Transform CAC requests into standard format
+            const mappedCac = cacList.map(c => {
+                const pNames = c.proposed_names || [];
+                const firstName = Array.isArray(pNames) && pNames.length > 0 ? (pNames[0]?.name || pNames[0]) : 'CAC Registration';
+                return {
+                    id: c.id || `cac-${Date.now()}`,
+                    user_id: c.user_id,
+                    type: 'verification',
+                    amount: Number(c.cost_charged || 0),
+                    status: (c.status || 'pending').toLowerCase(),
+                    description: `CAC: ${c.registration_type || 'Business Reg'} (${firstName})`,
+                    reference: `CAC-${String(c.id).slice(0, 8)}`,
+                    created_at: c.created_at,
+                    metadata: {
+                        certificate_url: c.certificate_url,
+                        status_document_url: c.status_document_url,
+                        business_info: c.business_info,
+                        registration_type: c.registration_type
+                    }
+                };
+            });
+
+            // Merge all live records + previous history to guarantee ZERO loss of older records
             const seenKeys = new Set<string>();
-            const combinedRaw = [...(standardTxList || []), ...mappedVerif, ...mappedSmm].filter(item => {
+            const combinedRaw = [...(standardTxList || []), ...mappedVerif, ...mappedSmm, ...mappedCac, ...(history || [])].filter(item => {
                 const key = item.reference || item.id;
                 if (!key || seenKeys.has(key)) return false;
                 seenKeys.add(key);
@@ -358,6 +387,7 @@ export default function HistoryScreen() {
             const mappedCombined = combinedRaw.map(mapTransactionRecord).sort(
                 (a, b) => b.dateObj.getTime() - a.dateObj.getTime()
             );
+
 
             _memoryTxCache = mappedCombined;
             setHistory(mappedCombined);
