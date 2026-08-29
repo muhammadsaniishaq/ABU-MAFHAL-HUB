@@ -264,7 +264,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     // Load cache immediately
     loadCachedMessages();
     loadCachedMeetings();
-    
+
     // Background sync
     fetchLiveMessages();
     fetchLiveMeetings();
@@ -274,7 +274,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       isMounted = false;
       cleanup();
       if (soundObject) {
-        soundObject.unloadAsync().catch(() => {});
+        soundObject.unloadAsync().catch(() => { });
       }
       if (webAudioRef.current) {
         webAudioRef.current.pause();
@@ -304,7 +304,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         if (p.isSuper !== undefined) setIsSuperAdmin(p.isSuper);
         setAuthChecking(false);
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const loadCachedAdminDirectory = async () => {
@@ -317,7 +317,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           setLoadingAdmins(false);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const loadCachedMeetings = async () => {
@@ -329,7 +329,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           setMeetings(parsed);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // 1. Fetch Current User & Verify Admin / Super Admin Authorization
@@ -353,8 +353,8 @@ export default function RealtimeEnterpriseTeamSuite() {
         const avatar = profile?.avatar_url || null;
 
         const isSuper = role === 'super_admin' || role === 'superadmin' || role === 'owner' ||
-                        email === 'sale.abumafhal@gmail.com' || email === 'abumafhal@gmail.com' ||
-                        role === 'admin';
+          email === 'sale.abumafhal@gmail.com' || email === 'abumafhal@gmail.com' ||
+          role === 'admin';
 
         setCurrentUserRole(roleUpper);
         setCurrentUserName(name);
@@ -368,7 +368,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           role: roleUpper,
           avatar,
           isSuper
-        })).catch(() => {});
+        })).catch(() => { });
       }
     } catch (e) {
     } finally {
@@ -386,15 +386,15 @@ export default function RealtimeEnterpriseTeamSuite() {
         .limit(100);
 
       if (!error && data) {
-        const adminProfiles = data.filter(u => {
+        const adminProfiles = data.filter((u: any) => {
           const r = (u.role || '').toLowerCase();
           const em = (u.email || '').toLowerCase();
           return r === 'admin' || r === 'super_admin' || r === 'superadmin' || r === 'owner' ||
-                 em === 'sale.abumafhal@gmail.com' || em === 'abumafhal@gmail.com' ||
-                 em.endsWith('@abumafhal.com') || em.endsWith('@abumafhal.com.ng');
+            em === 'sale.abumafhal@gmail.com' || em === 'abumafhal@gmail.com' ||
+            em.endsWith('@abumafhal.com') || em.endsWith('@abumafhal.com.ng');
         });
 
-        const mappedAdmins = adminProfiles.map(u => ({
+        const mappedAdmins = adminProfiles.map((u: any) => ({
           id: u.id,
           name: u.full_name || u.email?.split('@')[0] || 'Admin',
           email: u.email,
@@ -403,7 +403,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           lastActive: u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'Active'
         }));
         setAdminDirectory(mappedAdmins);
-        AsyncStorage.setItem('@team_admin_dir_cache', JSON.stringify(mappedAdmins)).catch(() => {});
+        AsyncStorage.setItem('@team_admin_dir_cache', JSON.stringify(mappedAdmins)).catch(() => { });
       }
     } catch (e) {
       console.warn("Error loading live admin directory:", e);
@@ -423,7 +423,7 @@ export default function RealtimeEnterpriseTeamSuite() {
   const persistMessagesToStorage = async (roomId: string, msgs: any[]) => {
     try {
       await AsyncStorage.setItem(`@team_msgs_${roomId}`, JSON.stringify(msgs));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const loadCachedMessages = async () => {
@@ -436,13 +436,13 @@ export default function RealtimeEnterpriseTeamSuite() {
           setLoading(false);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const persistMeetingsToStorage = async (meetList: any[]) => {
     try {
       await AsyncStorage.setItem('@team_meetings_cache', JSON.stringify(meetList));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // 4. Fetch Live Messages Strictly for Active Channel or Active Private DM
@@ -458,10 +458,10 @@ export default function RealtimeEnterpriseTeamSuite() {
       if (!error && data && data.length > 0) {
         setMessages(prev => {
           const map = new Map();
-          prev.forEach(m => map.set(m.id, m));
-          data.forEach(m => map.set(m.id, m));
+          prev.forEach((m: any) => map.set(m.id, m));
+          data.forEach((m: any) => map.set(m.id, m));
           const merged = Array.from(map.values()).sort(
-            (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+            (a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
           );
           persistMessagesToStorage(currentRoomId, merged);
           return merged;
@@ -487,7 +487,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         setMeetings(data);
         persistMeetingsToStorage(data);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
 
@@ -498,9 +498,9 @@ export default function RealtimeEnterpriseTeamSuite() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'team_messages', filter: `channel=eq.${currentRoomId}` },
-        payload => {
+        (payload: any) => {
           setMessages(prev => {
-            if (prev.some(m => m.id === payload.new.id)) return prev;
+            if (prev.some((m: any) => m.id === payload.new.id)) return prev;
             const updated = [...prev, payload.new];
             persistMessagesToStorage(currentRoomId, updated);
             return updated;
@@ -511,9 +511,9 @@ export default function RealtimeEnterpriseTeamSuite() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'team_messages', filter: `channel=eq.${currentRoomId}` },
-        payload => {
+        (payload: any) => {
           setMessages(prev => {
-            const updated = prev.map(m => (m.id === payload.new.id ? payload.new : m));
+            const updated = prev.map((m: any) => (m.id === payload.new.id ? payload.new : m));
             persistMessagesToStorage(currentRoomId, updated);
             return updated;
           });
@@ -522,9 +522,9 @@ export default function RealtimeEnterpriseTeamSuite() {
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'team_messages', filter: `channel=eq.${currentRoomId}` },
-        payload => {
+        (payload: any) => {
           setMessages(prev => {
-            const updated = prev.filter(m => m.id !== payload.old.id);
+            const updated = prev.filter((m: any) => m.id !== payload.old.id);
             persistMessagesToStorage(currentRoomId, updated);
             return updated;
           });
@@ -551,7 +551,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       if (token) {
         return buildLiveKitMeetUrl(token);
       }
-    } catch (e) {}
+    } catch (e) { }
     // Fallback: Open Community WebRTC bridge
     const cleanRoom = roomCode.replace(/[^a-zA-Z0-9_-]/g, '');
     const encodedDisplayName = encodeURIComponent(callerName || currentUserName || 'Executive Admin');
@@ -634,7 +634,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     try {
       await supabase.from('team_meetings').insert(meetingRecord);
       await supabase.from('team_messages').insert(meetingMsg);
-    } catch (e) {}
+    } catch (e) { }
 
     openInAppMeeting(meetingUrl, meetingTitleText);
   };
@@ -737,7 +737,7 @@ export default function RealtimeEnterpriseTeamSuite() {
             });
             try {
               await supabase.from('team_meetings').delete().eq('id', meetingId);
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       ]
@@ -824,7 +824,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
     try {
       await supabase.from('team_messages').insert(metricMsg);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // 12. Post Code or SQL Snippet
@@ -895,7 +895,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
       try {
         await supabase.from('team_messages').insert(finishMsg);
-      } catch (e) {}
+      } catch (e) { }
 
       Alert.alert('Shift Ended', `You clocked out after ${dutyElapsed} on duty.`);
     } else {
@@ -929,7 +929,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
       try {
         await supabase.from('team_messages').insert(checkInMsg);
-      } catch (e) {}
+      } catch (e) { }
 
       Alert.alert('Checked In 🟢', 'You are now marked ON DUTY in the executive roster.');
     }
@@ -953,7 +953,7 @@ export default function RealtimeEnterpriseTeamSuite() {
             });
             try {
               await supabase.from('team_messages').delete().eq('id', msgId);
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       ]
@@ -971,7 +971,7 @@ export default function RealtimeEnterpriseTeamSuite() {
     try {
       await supabase.from('team_messages').update({ is_pinned: isPinned }).eq('id', msg.id);
       Alert.alert(isPinned ? 'Pinned 📌' : 'Unpinned', isPinned ? 'Announcement pinned to top of stream.' : 'Announcement unpinned.');
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // 16. Super Admin: Purge Channel
@@ -991,7 +991,7 @@ export default function RealtimeEnterpriseTeamSuite() {
             try {
               await supabase.from('team_messages').delete().eq('channel', currentRoomId);
               Alert.alert('Channel Cleared', 'All messages have been purged.');
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       ]
@@ -1062,14 +1062,14 @@ export default function RealtimeEnterpriseTeamSuite() {
           recorder.stop();
           recorder.stream.getTracks().forEach((track: any) => track.stop());
         });
-      } catch (e) {}
+      } catch (e) { }
     } else if (recordingObject) {
       try {
         await recordingObject.stopAndUnloadAsync();
         const uri = recordingObject.getURI();
         setRecordingObject(null);
         if (uri) recordedAudioDataUrl = uri;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!recordedAudioDataUrl) {
@@ -1114,7 +1114,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         webAudioRef.current.pause();
       }
       if (soundObject) {
-        await soundObject.stopAsync().catch(() => {});
+        await soundObject.stopAsync().catch(() => { });
       }
       setPlayingAudioId(null);
       return;
@@ -1134,7 +1134,7 @@ export default function RealtimeEnterpriseTeamSuite() {
         await audio.play();
       } else {
         if (soundObject) {
-          await soundObject.unloadAsync().catch(() => {});
+          await soundObject.unloadAsync().catch(() => { });
         }
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
         const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true, rate: audioPlaybackRate, shouldCorrectPitch: true });
@@ -1158,7 +1158,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       webAudioRef.current.playbackRate = nextRate;
     }
     if (soundObject) {
-      await soundObject.setRateAsync(nextRate, true).catch(() => {});
+      await soundObject.setRateAsync(nextRate, true).catch(() => { });
     }
   };
 
@@ -1223,7 +1223,7 @@ export default function RealtimeEnterpriseTeamSuite() {
           type: 'announcement',
           is_pinned: false
         });
-      } catch (insertErr) {}
+      } catch (insertErr) { }
     } catch (e: any) {
       setMessages(prev => {
         const updated = prev.map(m => m.id === aiTempId ? {
@@ -1398,7 +1398,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
     try {
       await supabase.from('team_messages').update({ metadata: updatedMetadata }).eq('id', msgId);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // 21. Pick and Send Document (Instant Optimistic Attachment)
@@ -1520,7 +1520,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
     try {
       await supabase.from('team_messages').update({ metadata: updatedMetadata }).eq('id', msgId);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Stream Filtering & Search Filter
@@ -2115,7 +2115,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       ) : activeTab === 'meetings' ? (
         /* TAB 2: ULTRA-MODERN LIVEKIT CLOUD VIDEO & AUDIO CONFERENCE SUITE (ZERO LOGIN) */
         <ScrollView style={s.meetingsScroll} contentContainerStyle={s.meetingsContent} showsVerticalScrollIndicator={false}>
-          
+
           {/* HERO LIVEKIT CLOUD COMMAND MATRIX CARD */}
           <View style={s.quantumHeroCard}>
             <LinearGradient
@@ -2317,7 +2317,7 @@ export default function RealtimeEnterpriseTeamSuite() {
 
                       <View style={s.meetingListFooter}>
                         <Text style={s.meetingHost} numberOfLines={1}>Host: {m.created_by_name || 'Admin'}</Text>
-                        
+
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           {isSuperAdmin && (
                             <TouchableOpacity onPress={() => deleteMeeting(m.id)} style={s.deleteMeetingBtn}>
@@ -2580,7 +2580,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       <Modal visible={!!activeMeetingUrl} animationType="slide" onRequestClose={closeInAppMeeting}>
         <View style={s.videoModalContainer}>
           <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
-          
+
           <View style={s.videoModalHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
               <View style={s.liveDot} />
@@ -3736,7 +3736,7 @@ const s = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-  
+
   // QUANTUM HERO COMMAND CARD STYLES
   quantumHeroCard: {
     borderRadius: 14,

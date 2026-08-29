@@ -7,6 +7,7 @@ import {
     TextInput,
     ActivityIndicator,
     Alert,
+    FlatList,
     Modal,
     Platform,
     Switch,
@@ -23,38 +24,32 @@ import { supabase } from '../../services/supabase';
 
 const { width } = Dimensions.get('window');
 
-// Executive Bright Light Palette (Modern, Crisp & High-Contrast)
+// Executive Cyber-Dark & Gold Palette
 const T = {
-    bg: '#F8FAFC',
-    card: '#FFFFFF',
-    cardBorder: '#E2E8F0',
-    cardHover: '#F1F5F9',
-    navyDark: '#0A1128',
-    navyMid: '#1E293B',
+    navyDark: '#070D1E',
+    navyMid: '#0F172A',
+    navyCard: '#1E293B',
     navyLight: '#334155',
-    gold: '#D97706',
+    gold: '#F59E0B',
+    goldDark: '#D97706',
     goldLight: '#FEF3C7',
-    goldBg: '#FFFBEB',
-    textMain: '#0F172A',
-    textSub: '#475569',
-    textMuted: '#64748B',
-    border: '#CBD5E1',
-    inputBg: '#F8FAFC',
-    success: '#059669',
-    successBg: '#ECFDF5',
-    successBorder: '#A7F3D0',
-    danger: '#DC2626',
-    dangerBg: '#FEF2F2',
-    dangerBorder: '#FECACA',
-    warning: '#D97706',
-    warningBg: '#FFFBEB',
-    warningBorder: '#FDE68A',
-    info: '#0284C7',
-    infoBg: '#F0F9FF',
-    infoBorder: '#BAE6FD',
-    purple: '#7C3AED',
-    purpleBg: '#F5F3FF',
-    purpleBorder: '#DDD6FE',
+    goldBg: 'rgba(245, 158, 11, 0.12)',
+    bg: '#020617',
+    card: '#0F172A',
+    cardBorder: 'rgba(51, 65, 85, 0.7)',
+    textMain: '#F8FAFC',
+    textSub: '#94A3B8',
+    border: '#334155',
+    success: '#10B981',
+    successBg: 'rgba(16, 185, 129, 0.15)',
+    danger: '#EF4444',
+    dangerBg: 'rgba(239, 68, 68, 0.15)',
+    warning: '#F59E0B',
+    warningBg: 'rgba(245, 158, 11, 0.15)',
+    info: '#38BDF8',
+    infoBg: 'rgba(56, 189, 248, 0.15)',
+    purple: '#A855F7',
+    purpleBg: 'rgba(168, 85, 247, 0.15)',
 };
 
 interface RiskPolicySettings {
@@ -123,12 +118,11 @@ interface ChannelStatus {
     name: string;
     provider: string;
     service: string;
-    category: 'VIRTUAL_ACCOUNTS' | 'VTU_DATA' | 'KYC_IDENTITY' | 'SMM_BOOST' | 'CRYPTO' | 'SMS_OTP';
+    category: 'VIRTUAL_ACCOUNTS' | 'VTU_DATA' | 'KYC_IDENTITY' | 'SMM_BOOST' | 'CRYPTO' | 'PAYMENT' | 'SMS_OTP';
     status: 'operational' | 'degraded' | 'offline';
     latencyMs: number;
     lastPing: string;
     killswitchKey: keyof RiskPolicySettings;
-    icon: string;
 }
 
 export default function RiskControlCenter() {
@@ -198,16 +192,16 @@ export default function RiskControlCenter() {
     const [newBlacklistReason, setNewBlacklistReason] = useState('');
     const [showBlacklistModal, setShowBlacklistModal] = useState(false);
 
-    // Exact Platform Providers State (Payvessel, Bigi Sub, BilalSadaSub, ClubKonnect, AgentHub, NineBoost, NOWPayments, Termii)
+    // Exact Platform Providers State (Payvessel, Bigi Sub, BilalSadaSub, ClubKonnect, AgentHub, NineBoost, NOWPayments, Termii, Paystack)
     const [channels, setChannels] = useState<ChannelStatus[]>([
-        { id: 'payvessel', name: 'Payvessel Virtual Accounts & Cards', provider: 'Payvessel Engine', service: 'Reserved Accounts, Outward Rails & USD Cards', category: 'VIRTUAL_ACCOUNTS', status: 'operational', latencyMs: 115, lastPing: 'Live (99.9%)', killswitchKey: 'risk_payvessel_killswitch', icon: 'card' },
-        { id: 'bigisub', name: 'Bigi Sub Data & VTU Engine', provider: 'Bigi Sub Platform', service: 'SME Data, Airtime & Direct Subscriptions', category: 'VTU_DATA', status: 'operational', latencyMs: 88, lastPing: 'Live (99.9%)', killswitchKey: 'risk_bigi_killswitch', icon: 'cellular' },
-        { id: 'bilalsadasub', name: 'Bilal Sada Sub Telecom Rails', provider: 'BilalSadaSub Gateway', service: 'Airtime, Data Bundles & Utility Routing', category: 'VTU_DATA', status: 'operational', latencyMs: 92, lastPing: 'Live (99.8%)', killswitchKey: 'risk_bilal_killswitch', icon: 'phone-portrait' },
-        { id: 'clubkonnect', name: 'ClubKonnect Utility & Bill Hub', provider: 'ClubKonnect API', service: 'Electricity Tokens, Cable TV & Bills', category: 'VTU_DATA', status: 'operational', latencyMs: 105, lastPing: 'Live (99.7%)', killswitchKey: 'risk_clubkonnect_killswitch', icon: 'flash' },
-        { id: 'agenthub', name: 'AgentHub Government Identity Engine', provider: 'AgentHub KYC API', service: 'Real-Time NIN, BVN & CAC Verification', category: 'KYC_IDENTITY', status: 'operational', latencyMs: 160, lastPing: 'Live (99.5%)', killswitchKey: 'risk_agenthub_killswitch', icon: 'finger-print' },
-        { id: 'nineboost', name: 'NineBoost Social Marketing (SMM)', provider: 'NineBoost Engine', service: 'Followers, Likes, Views & Engagement API', category: 'SMM_BOOST', status: 'operational', latencyMs: 130, lastPing: 'Live (99.9%)', killswitchKey: 'risk_nineboost_killswitch', icon: 'trending-up' },
-        { id: 'nowpayments', name: 'NOWPayments Web3 & Crypto Custody', provider: 'NOWPayments Gateways', service: 'USDT, BTC, ETH Deposits & Auto-Payouts', category: 'CRYPTO', status: 'operational', latencyMs: 190, lastPing: 'Live (99.6%)', killswitchKey: 'risk_crypto_killswitch', icon: 'logo-bitcoin' },
-        { id: 'termii', name: 'Termii High-Priority Messaging', provider: 'Termii SMS Gateway', service: '2FA OTPs, Security Mailer & Alerts', category: 'SMS_OTP', status: 'operational', latencyMs: 70, lastPing: 'Live (100%)', killswitchKey: 'risk_global_freeze', icon: 'chatbubble-ellipses' },
+        { id: 'payvessel', name: 'Payvessel Virtual Accounts & Cards', provider: 'Payvessel Engine', service: 'Reserved Accounts, Outward Rails & USD Cards', category: 'VIRTUAL_ACCOUNTS', status: 'operational', latencyMs: 115, lastPing: 'Live (99.9%)', killswitchKey: 'risk_payvessel_killswitch' },
+        { id: 'bigisub', name: 'Bigi Sub Data & VTU Engine', provider: 'Bigi Sub Platform', service: 'SME Data, Airtime & Direct Subscriptions', category: 'VTU_DATA', status: 'operational', latencyMs: 88, lastPing: 'Live (99.9%)', killswitchKey: 'risk_bigi_killswitch' },
+        { id: 'bilalsadasub', name: 'Bilal Sada Sub Telecom Rails', provider: 'BilalSadaSub Gateway', service: 'Airtime, Data Bundles & Utility Routing', category: 'VTU_DATA', status: 'operational', latencyMs: 92, lastPing: 'Live (99.8%)', killswitchKey: 'risk_bilal_killswitch' },
+        { id: 'clubkonnect', name: 'ClubKonnect Utility & Bill Hub', provider: 'ClubKonnect API', service: 'Electricity Tokens, Cable TV & Bills', category: 'VTU_DATA', status: 'operational', latencyMs: 105, lastPing: 'Live (99.7%)', killswitchKey: 'risk_clubkonnect_killswitch' },
+        { id: 'agenthub', name: 'AgentHub Government Identity Engine', provider: 'AgentHub KYC API', service: 'Real-Time NIN, BVN & CAC Verification', category: 'KYC_IDENTITY', status: 'operational', latencyMs: 160, lastPing: 'Live (99.5%)', killswitchKey: 'risk_agenthub_killswitch' },
+        { id: 'nineboost', name: 'NineBoost Social Marketing (SMM)', provider: 'NineBoost Engine', service: 'Followers, Likes, Views & Engagement API', category: 'SMM_BOOST', status: 'operational', latencyMs: 130, lastPing: 'Live (99.9%)', killswitchKey: 'risk_nineboost_killswitch' },
+        { id: 'nowpayments', name: 'NOWPayments Web3 & Crypto Custody', provider: 'NOWPayments Gateways', service: 'USDT, BTC, ETH Deposits & Auto-Payouts', category: 'CRYPTO', status: 'operational', latencyMs: 190, lastPing: 'Live (99.6%)', killswitchKey: 'risk_crypto_killswitch' },
+        { id: 'termii', name: 'Termii High-Priority Messaging', provider: 'Termii SMS Gateway', service: '2FA OTPs, Security Mailer & Alerts', category: 'SMS_OTP', status: 'operational', latencyMs: 70, lastPing: 'Live (100%)', killswitchKey: 'risk_global_freeze' },
     ]);
 
     // Stress Test States
@@ -724,7 +718,7 @@ export default function RiskControlCenter() {
                 projectedOutflow: projectedSurgeOutflow,
                 remainingFloat: remainingBuffer,
                 liquidityHealth: isCritical ? 'DEFICIT_RISK' : 'OPTIMAL_COVERAGE',
-                recommendation: isCritical 
+                recommendation: isCritical
                     ? 'Recommend deploying Payvessel auto-quarantine limits and capping single withdrawals to ₦100,000 across Bigi Sub, BilalSadaSub & NOWPayments.'
                     : 'System liquidity buffers adequately cover this outflow surge without gateway throttling.',
             });
@@ -769,16 +763,15 @@ Actual Integrated Platform Channels:
             <Stack.Screen
                 options={{
                     title: 'Risk Control & Compliance',
-                    headerStyle: { backgroundColor: '#FFFFFF' },
-                    headerTintColor: T.textMain,
-                    headerShadowVisible: false,
+                    headerStyle: { backgroundColor: T.navyDark },
+                    headerTintColor: '#FFFFFF',
                     headerRight: () => (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 12 }}>
-                            <TouchableOpacity onPress={handleExportAuditReport} style={styles.headerIconBtn}>
-                                <Ionicons name="share-outline" size={20} color={T.textMain} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginRight: 10 }}>
+                            <TouchableOpacity onPress={handleExportAuditReport}>
+                                <Ionicons name="share-outline" size={20} color={T.gold} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={onRefresh} style={styles.headerIconBtn}>
-                                <Ionicons name="refresh" size={20} color={T.textMain} />
+                            <TouchableOpacity onPress={onRefresh}>
+                                <Ionicons name="refresh" size={20} color={T.gold} />
                             </TouchableOpacity>
                         </View>
                     ),
@@ -788,97 +781,97 @@ Actual Integrated Platform Channels:
             {/* Global Freeze Banner */}
             {policies.risk_global_freeze && (
                 <View style={styles.emergencyBanner}>
-                    <Ionicons name="warning" size={20} color="#FFFFFF" />
+                    <Ionicons name="warning" size={18} color="#FFFFFF" />
                     <Text style={styles.emergencyBannerText}>
-                        EMERGENCY OUTFLOW FREEZE ACTIVE — All Outgoing Transfers Blocked
+                        EMERGENCY OUTFLOW FREEZE ACTIVE - All Debits Blocked
                     </Text>
                 </View>
             )}
 
-            {/* Sub-Navigation Pill Bar */}
-            <View style={styles.tabBarWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('overview')}
-                        style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="pulse" size={16} color={activeTab === 'overview' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
-                            Overview
-                        </Text>
-                    </TouchableOpacity>
+            {/* Navigation Tabs */}
+            <View style={styles.tabBar}>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('overview')}
+                    style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
+                >
+                    <Ionicons name="pulse" size={14} color={activeTab === 'overview' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
+                        Overview
+                    </Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('policies')}
-                        style={[styles.tabItem, activeTab === 'policies' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="shield-checkmark" size={16} color={activeTab === 'policies' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'policies' && styles.tabTextActive]}>
-                            Policy Limits
-                        </Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('policies')}
+                    style={[styles.tabItem, activeTab === 'policies' && styles.tabItemActive]}
+                >
+                    <Ionicons name="shield-checkmark" size={14} color={activeTab === 'policies' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'policies' && styles.tabTextActive]}>
+                        Policies
+                    </Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('queue')}
-                        style={[styles.tabItem, activeTab === 'queue' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="alert-circle" size={16} color={activeTab === 'queue' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>
-                            Flagged Queue ({pendingFlagsCount})
-                        </Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('queue')}
+                    style={[styles.tabItem, activeTab === 'queue' && styles.tabItemActive]}
+                >
+                    <Ionicons name="alert-circle" size={14} color={activeTab === 'queue' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>
+                        Queue ({pendingFlagsCount})
+                    </Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('channels')}
-                        style={[styles.tabItem, activeTab === 'channels' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="git-network" size={16} color={activeTab === 'channels' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'channels' && styles.tabTextActive]}>
-                            Rails & Gateways
-                        </Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('channels')}
+                    style={[styles.tabItem, activeTab === 'channels' && styles.tabItemActive]}
+                >
+                    <Ionicons name="git-network" size={14} color={activeTab === 'channels' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'channels' && styles.tabTextActive]}>
+                        Channels
+                    </Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('blacklist')}
-                        style={[styles.tabItem, activeTab === 'blacklist' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="ban" size={16} color={activeTab === 'blacklist' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'blacklist' && styles.tabTextActive]}>
-                            Blacklist ({blacklist.length})
-                        </Text>
-                    </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('blacklist')}
+                    style={[styles.tabItem, activeTab === 'blacklist' && styles.tabItemActive]}
+                >
+                    <Ionicons name="ban" size={14} color={activeTab === 'blacklist' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'blacklist' && styles.tabTextActive]}>
+                        Blacklist ({blacklist.length})
+                    </Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('stress_test')}
-                        style={[styles.tabItem, activeTab === 'stress_test' && styles.tabItemActive]}
-                    >
-                        <Ionicons name="speedometer" size={16} color={activeTab === 'stress_test' ? '#FFFFFF' : T.textSub} />
-                        <Text style={[styles.tabText, activeTab === 'stress_test' && styles.tabTextActive]}>
-                            Stress Test
-                        </Text>
-                    </TouchableOpacity>
-                </ScrollView>
+                <TouchableOpacity
+                    onPress={() => setActiveTab('stress_test')}
+                    style={[styles.tabItem, activeTab === 'stress_test' && styles.tabItemActive]}
+                >
+                    <Ionicons name="speedometer" size={14} color={activeTab === 'stress_test' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'stress_test' && styles.tabTextActive]}>
+                        Stress Test
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={T.navyDark} />
+                    <ActivityIndicator size="large" color={T.gold} />
                     <Text style={styles.loadingText}>Connecting to Live Risk Telemetry...</Text>
                 </View>
             ) : (
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.navyDark} />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.gold} />}
                 >
                     {/* ========================================================================= */}
                     {/* TAB 1: OVERVIEW & REAL-TIME EXPOSURE                                      */}
                     {/* ========================================================================= */}
                     {activeTab === 'overview' && (
                         <View>
-                            {/* Premium Float & Risk Hero Card */}
-                            <View style={styles.heroCard}>
+                            <LinearGradient
+                                colors={[T.navyMid, T.navyDark]}
+                                style={styles.heroCard}
+                            >
                                 <View style={styles.heroHeader}>
-                                    <View style={{ flex: 1 }}>
+                                    <View>
                                         <Text style={styles.heroSub}>REALTIME SYSTEM FLOAT LIABILITY</Text>
                                         <Text style={styles.heroTitle}>
                                             ₦ {totalFloatLiability.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -887,12 +880,12 @@ Actual Integrated Platform Channels:
                                     <View style={[
                                         styles.riskBadge,
                                         riskIndexScore > 75 ? styles.riskBadgeCritical :
-                                        riskIndexScore > 35 ? styles.riskBadgeWarn : styles.riskBadgeSafe
+                                            riskIndexScore > 35 ? styles.riskBadgeWarn : styles.riskBadgeSafe
                                     ]}>
                                         <Text style={[
                                             styles.riskBadgeText,
                                             riskIndexScore > 75 ? styles.riskBadgeTextCritical :
-                                            riskIndexScore > 35 ? styles.riskBadgeTextWarn : styles.riskBadgeTextSafe
+                                                riskIndexScore > 35 ? styles.riskBadgeTextWarn : styles.riskBadgeTextSafe
                                         ]}>
                                             {riskIndexScore > 75 ? 'HIGH RISK' : riskIndexScore > 35 ? 'MODERATE' : 'OPTIMAL'}
                                         </Text>
@@ -910,19 +903,17 @@ Actual Integrated Platform Channels:
                                         ]} />
                                     </View>
                                     <View style={styles.gaugeMeta}>
-                                        <Text style={styles.gaugeMetaText}>Risk Score: {riskIndexScore}/100</Text>
+                                        <Text style={styles.gaugeMetaText}>Risk Index: {riskIndexScore}/100</Text>
                                         <Text style={styles.gaugeMetaText}>{totalUserCount} Active Wallets</Text>
                                     </View>
                                 </View>
-                            </View>
+                            </LinearGradient>
 
-                            {/* 24-Hour Velocity Grid */}
+                            {/* Flow Telemetry Grid */}
                             <View style={styles.metricGrid}>
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <View style={[styles.metricIconWrap, { backgroundColor: T.successBg }]}>
-                                            <Ionicons name="arrow-down-circle" size={18} color={T.success} />
-                                        </View>
+                                        <Ionicons name="arrow-down-circle" size={16} color={T.success} />
                                         <Text style={styles.metricLabel}>24h Inflow</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.success }]}>
@@ -933,9 +924,7 @@ Actual Integrated Platform Channels:
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <View style={[styles.metricIconWrap, { backgroundColor: T.dangerBg }]}>
-                                            <Ionicons name="arrow-up-circle" size={18} color={T.danger} />
-                                        </View>
+                                        <Ionicons name="arrow-up-circle" size={16} color={T.danger} />
                                         <Text style={styles.metricLabel}>24h Outflow</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.danger }]}>
@@ -946,22 +935,18 @@ Actual Integrated Platform Channels:
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <View style={[styles.metricIconWrap, { backgroundColor: T.warningBg }]}>
-                                            <Ionicons name="alert-circle" size={18} color={T.warning} />
-                                        </View>
+                                        <Ionicons name="alert-circle" size={16} color={T.warning} />
                                         <Text style={styles.metricLabel}>24h Failures</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.warning }]}>
                                         {failedTx24h} Tx
                                     </Text>
-                                    <Text style={styles.metricSub}>Gateway Declines</Text>
+                                    <Text style={styles.metricSub}>Gateway Rejections</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <View style={[styles.metricIconWrap, { backgroundColor: T.purpleBg }]}>
-                                            <Ionicons name="shield" size={18} color={T.purple} />
-                                        </View>
+                                        <Ionicons name="shield" size={16} color={T.purple} />
                                         <Text style={styles.metricLabel}>Watchlist</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.purple }]}>
@@ -971,7 +956,7 @@ Actual Integrated Platform Channels:
                                 </View>
                             </View>
 
-                            {/* Emergency Rails Killswitch Matrix */}
+                            {/* Emergency Killswitches for All 8 Providers */}
                             <Text style={styles.sectionHeading}>Emergency Rails Killswitch Matrix</Text>
                             <View style={styles.killswitchGrid}>
                                 {/* Global Freeze */}
@@ -982,10 +967,10 @@ Actual Integrated Platform Channels:
                                         setPolicies(p => ({ ...p, risk_global_freeze: newVal }));
                                         Alert.alert('System Lockdown', newVal ? 'ALL OUTFLOWS HALTED ❄️' : 'System Resumed ✅');
                                     }}
-                                    style={[styles.killswitchCard, policies.risk_global_freeze ? styles.killswitchCardRedActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_global_freeze && styles.killswitchActiveRed]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="snow" size={24} color={policies.risk_global_freeze ? "#FFFFFF" : T.danger} />
+                                    <Ionicons name="snow" size={20} color={policies.risk_global_freeze ? "#FFFFFF" : T.danger} />
                                     <Text style={[styles.killswitchTitle, policies.risk_global_freeze && { color: '#FFFFFF' }]}>
                                         Global Freeze
                                     </Text>
@@ -994,13 +979,13 @@ Actual Integrated Platform Channels:
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* Payvessel Cards */}
+                                {/* Payvessel */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_payvessel_killswitch', 'Payvessel Accounts & Cards')}
-                                    style={[styles.killswitchCard, policies.risk_payvessel_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_payvessel_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="card" size={24} color={policies.risk_payvessel_killswitch ? "#FFFFFF" : T.info} />
+                                    <Ionicons name="card" size={20} color={policies.risk_payvessel_killswitch ? "#FFFFFF" : T.info} />
                                     <Text style={[styles.killswitchTitle, policies.risk_payvessel_killswitch && { color: '#FFFFFF' }]}>
                                         Payvessel Cards
                                     </Text>
@@ -1012,10 +997,10 @@ Actual Integrated Platform Channels:
                                 {/* Bigi Sub */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_bigi_killswitch', 'Bigi Sub Data Engine')}
-                                    style={[styles.killswitchCard, policies.risk_bigi_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_bigi_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="cellular" size={24} color={policies.risk_bigi_killswitch ? "#FFFFFF" : T.success} />
+                                    <Ionicons name="cellular" size={20} color={policies.risk_bigi_killswitch ? "#FFFFFF" : T.success} />
                                     <Text style={[styles.killswitchTitle, policies.risk_bigi_killswitch && { color: '#FFFFFF' }]}>
                                         Bigi Sub VTU
                                     </Text>
@@ -1027,10 +1012,10 @@ Actual Integrated Platform Channels:
                                 {/* Bilal Sada Sub */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_bilal_killswitch', 'Bilal Sada Sub Telecom')}
-                                    style={[styles.killswitchCard, policies.risk_bilal_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_bilal_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="phone-portrait" size={24} color={policies.risk_bilal_killswitch ? "#FFFFFF" : T.gold} />
+                                    <Ionicons name="phone-portrait" size={20} color={policies.risk_bilal_killswitch ? "#FFFFFF" : T.gold} />
                                     <Text style={[styles.killswitchTitle, policies.risk_bilal_killswitch && { color: '#FFFFFF' }]}>
                                         Bilal Sada Sub
                                     </Text>
@@ -1042,10 +1027,10 @@ Actual Integrated Platform Channels:
                                 {/* ClubKonnect */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_clubkonnect_killswitch', 'ClubKonnect Utility & Bills')}
-                                    style={[styles.killswitchCard, policies.risk_clubkonnect_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_clubkonnect_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="flash" size={24} color={policies.risk_clubkonnect_killswitch ? "#FFFFFF" : T.warning} />
+                                    <Ionicons name="flash" size={20} color={policies.risk_clubkonnect_killswitch ? "#FFFFFF" : T.warning} />
                                     <Text style={[styles.killswitchTitle, policies.risk_clubkonnect_killswitch && { color: '#FFFFFF' }]}>
                                         ClubKonnect
                                     </Text>
@@ -1057,10 +1042,10 @@ Actual Integrated Platform Channels:
                                 {/* AgentHub */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_agenthub_killswitch', 'AgentHub KYC (NIN/BVN)')}
-                                    style={[styles.killswitchCard, policies.risk_agenthub_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_agenthub_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="finger-print" size={24} color={policies.risk_agenthub_killswitch ? "#FFFFFF" : T.purple} />
+                                    <Ionicons name="finger-print" size={20} color={policies.risk_agenthub_killswitch ? "#FFFFFF" : T.purple} />
                                     <Text style={[styles.killswitchTitle, policies.risk_agenthub_killswitch && { color: '#FFFFFF' }]}>
                                         AgentHub KYC
                                     </Text>
@@ -1072,10 +1057,10 @@ Actual Integrated Platform Channels:
                                 {/* NineBoost */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_nineboost_killswitch', 'NineBoost SMM Orders')}
-                                    style={[styles.killswitchCard, policies.risk_nineboost_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_nineboost_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="trending-up" size={24} color={policies.risk_nineboost_killswitch ? "#FFFFFF" : '#DB2777'} />
+                                    <Ionicons name="trending-up" size={20} color={policies.risk_nineboost_killswitch ? "#FFFFFF" : '#EC4899'} />
                                     <Text style={[styles.killswitchTitle, policies.risk_nineboost_killswitch && { color: '#FFFFFF' }]}>
                                         NineBoost SMM
                                     </Text>
@@ -1087,10 +1072,10 @@ Actual Integrated Platform Channels:
                                 {/* NOWPayments */}
                                 <TouchableOpacity
                                     onPress={() => handleToggleChannelKillswitch('risk_crypto_killswitch', 'NOWPayments Crypto Outflows')}
-                                    style={[styles.killswitchCard, policies.risk_crypto_killswitch ? styles.killswitchCardWarnActive : styles.killswitchCardNormal]}
+                                    style={[styles.killswitchCard, policies.risk_crypto_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="logo-bitcoin" size={24} color={policies.risk_crypto_killswitch ? "#FFFFFF" : T.warning} />
+                                    <Ionicons name="logo-bitcoin" size={20} color={policies.risk_crypto_killswitch ? "#FFFFFF" : T.warning} />
                                     <Text style={[styles.killswitchTitle, policies.risk_crypto_killswitch && { color: '#FFFFFF' }]}>
                                         NOWPayments
                                     </Text>
@@ -1108,9 +1093,9 @@ Actual Integrated Platform Channels:
                     {activeTab === 'policies' && (
                         <View>
                             <View style={styles.cardHeaderBox}>
-                                <Ionicons name="shield-half" size={24} color={T.navyDark} />
-                                <View style={{ marginLeft: 12, flex: 1 }}>
-                                    <Text style={styles.cardHeaderTitle}>Universal Risk Limit Matrix</Text>
+                                <Ionicons name="shield-half" size={22} color={T.gold} />
+                                <View style={{ marginLeft: 10 }}>
+                                    <Text style={styles.cardHeaderTitle}>Universal Risk Limit Engine</Text>
                                     <Text style={styles.cardHeaderSub}>Live limits applied across Payvessel, Bigi Sub, Bilal, AgentHub & NineBoost</Text>
                                 </View>
                             </View>
@@ -1123,37 +1108,33 @@ Actual Integrated Platform Channels:
                                     onChangeText={setInputMaxSingle}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>Daily Cumulative Outflow Cap (₦)</Text>
-                                <Text style={styles.inputHelper}>Maximum cumulative outflow permitted per user in a 24-hour window.</Text>
+                                <Text style={styles.inputHelper}>Maximum outflow per user in 24 hours.</Text>
                                 <TextInput
                                     value={inputDailyLimit}
                                     onChangeText={setInputDailyLimit}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>Hourly Velocity Throttle (Max Tx/Hour)</Text>
-                                <Text style={styles.inputHelper}>Throttles bots and high-frequency automated debit bursts.</Text>
+                                <Text style={styles.inputHelper}>Throttles bots and high-frequency debit bursts.</Text>
                                 <TextInput
                                     value={inputVelocity}
                                     onChangeText={setInputVelocity}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>Large Transfer Quarantine Threshold (₦)</Text>
-                                <Text style={styles.inputHelper}>Transfers above this amount trigger an automated manager review flag.</Text>
+                                <Text style={styles.inputHelper}>Transfers above this threshold flag a security review.</Text>
                                 <TextInput
                                     value={inputQuarantine}
                                     onChangeText={setInputQuarantine}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>Bigi Sub & BilalSadaSub VTU Rate Limit (₦ / 10 Mins)</Text>
@@ -1163,7 +1144,6 @@ Actual Integrated Platform Channels:
                                     onChangeText={setInputVtuCap}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>NineBoost SMM Single Order Cap (₦)</Text>
@@ -1173,7 +1153,6 @@ Actual Integrated Platform Channels:
                                     onChangeText={setInputNineBoostMax}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>AgentHub Daily Verification Quota / User</Text>
@@ -1183,7 +1162,6 @@ Actual Integrated Platform Channels:
                                     onChangeText={setInputAgentHubQuota}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
 
                                 <Text style={styles.inputLabel}>Single Crypto Withdrawal Cap (₦)</Text>
@@ -1193,47 +1171,46 @@ Actual Integrated Platform Channels:
                                     onChangeText={setInputCryptoMax}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholderTextColor={T.textMuted}
                                 />
                             </View>
 
                             <Text style={styles.sectionHeading}>Security Enforcement Toggles</Text>
                             <View style={styles.policyCard}>
                                 <View style={styles.toggleRow}>
-                                    <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flex: 1, paddingRight: 10 }}>
                                         <Text style={styles.toggleTitle}>Strict KYC Tier 2 Requirement</Text>
                                         <Text style={styles.toggleSub}>Block bank payouts & crypto withdrawals for unverified users.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_require_kyc2_outflows}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_require_kyc2_outflows: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.navyDark }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
 
                                 <View style={styles.toggleRow}>
-                                    <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flex: 1, paddingRight: 10 }}>
                                         <Text style={styles.toggleTitle}>Night-Time Priority Alerts (11PM - 5AM)</Text>
                                         <Text style={styles.toggleSub}>Flags large transfers during off-peak sleep hours.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_offhours_alerts}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_offhours_alerts: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.navyDark }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
 
                                 <View style={[styles.toggleRow, { borderBottomWidth: 0 }]}>
-                                    <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <View style={{ flex: 1, paddingRight: 10 }}>
                                         <Text style={styles.toggleTitle}>Auto-Lock on 5 Failed PINs</Text>
                                         <Text style={styles.toggleSub}>Instantly freezes wallet after brute-force PIN attempts.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_auto_lock_failed_auth}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_auto_lock_failed_auth: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.navyDark }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
@@ -1246,10 +1223,10 @@ Actual Integrated Platform Channels:
                                 activeOpacity={0.85}
                             >
                                 {savingPolicies ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                    <ActivityIndicator color="#070D1E" size="small" />
                                 ) : (
                                     <>
-                                        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                                        <Ionicons name="checkmark-circle" size={18} color="#070D1E" />
                                         <Text style={styles.savePoliciesBtnText}>Save & Deploy Policies</Text>
                                     </>
                                 )}
@@ -1301,74 +1278,52 @@ Actual Integrated Platform Channels:
                             </View>
 
                             <View style={styles.searchBox}>
-                                <Ionicons name="search" size={18} color={T.textMuted} style={{ marginRight: 8 }} />
+                                <Ionicons name="search" size={16} color={T.textSub} style={{ marginRight: 8 }} />
                                 <TextInput
                                     value={txSearch}
                                     onChangeText={handleSearchChange}
                                     placeholder="Search by amount, ref, email, description..."
-                                    placeholderTextColor={T.textMuted}
+                                    placeholderTextColor={T.textSub}
                                     style={styles.searchInput}
                                 />
                             </View>
 
-                            {filteredTx.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <Ionicons name="shield-checkmark" size={52} color={T.success} />
-                                    <Text style={styles.emptyStateTitle}>Queue is Clean</Text>
-                                    <Text style={styles.emptyStateSub}>No transactions match the selected filter criteria.</Text>
-                                </View>
-                            ) : (
-                                filteredTx.map(item => {
-                                    const score = item.fraudScore || 10;
-                                    return (
-                                        <TouchableOpacity
-                                            key={item.id}
-                                            onPress={() => setSelectedTx(item)}
-                                            style={styles.txCard}
-                                            activeOpacity={0.75}
-                                        >
-                                            <View style={styles.txCardLeft}>
-                                                <View style={[
-                                                    styles.fraudBadge,
-                                                    score >= 70 ? styles.fraudBadgeCritical : score >= 40 ? styles.fraudBadgeWarn : styles.fraudBadgeSafe
-                                                ]}>
-                                                    <Text style={[
-                                                        styles.fraudBadgeText,
-                                                        score >= 70 ? { color: T.danger } : score >= 40 ? { color: T.warning } : { color: T.success }
-                                                    ]}>
-                                                        {score}%
-                                                    </Text>
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.txDescription} numberOfLines={1}>
-                                                        {item.description || item.type?.toUpperCase()}
-                                                    </Text>
-                                                    <Text style={styles.txMeta}>
-                                                        {item.user?.full_name || item.user?.email || item.user_id.slice(0, 8)} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={styles.txAmount}>
-                                                    ₦{Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {filteredTx.map(item => {
+                                const score = item.fraudScore || 10;
+                                return (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        onPress={() => setSelectedTx(item)}
+                                        style={styles.txCard}
+                                        activeOpacity={0.75}
+                                    >
+                                        <View style={styles.txCardLeft}>
+                                            <View style={[styles.fraudBadge, score >= 70 ? styles.fraudBadgeCritical : score >= 40 ? styles.fraudBadgeWarn : styles.fraudBadgeSafe]}>
+                                                <Text style={[styles.fraudBadgeText, score >= 70 ? { color: T.danger } : score >= 40 ? { color: T.warning } : { color: T.success }]}>
+                                                    {score}%
                                                 </Text>
-                                                <View style={[
-                                                    styles.statusPill,
-                                                    item.status === 'success' ? styles.statusPillSuccess : styles.statusPillDanger
-                                                ]}>
-                                                    <Text style={[
-                                                        styles.statusPillText,
-                                                        item.status === 'success' ? styles.statusPillTextSuccess : styles.statusPillTextDanger
-                                                    ]}>
-                                                        {item.status.toUpperCase()}
-                                                    </Text>
-                                                </View>
                                             </View>
-                                        </TouchableOpacity>
-                                    );
-                                })
-                            )}
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.txDescription} numberOfLines={1}>
+                                                    {item.description || item.type?.toUpperCase()}
+                                                </Text>
+                                                <Text style={styles.txMeta}>
+                                                    {item.user?.full_name || item.user?.email || item.user_id.slice(0, 8)} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={styles.txAmount}>
+                                                ₦{Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </Text>
+                                            <Text style={[styles.txStatusText, item.status === 'success' ? { color: T.success } : { color: T.danger }]}>
+                                                {item.status.toUpperCase()}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     )}
 
@@ -1383,10 +1338,7 @@ Actual Integrated Platform Channels:
                                 return (
                                     <View key={ch.id} style={styles.channelCard}>
                                         <View style={styles.channelHeader}>
-                                            <View style={[styles.channelIconBox, isPaused ? { backgroundColor: T.dangerBg } : { backgroundColor: T.infoBg }]}>
-                                                <Ionicons name={ch.icon as any} size={22} color={isPaused ? T.danger : T.info} />
-                                            </View>
-                                            <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <View style={{ flex: 1 }}>
                                                 <Text style={styles.channelName}>{ch.name}</Text>
                                                 <Text style={styles.channelProvider}>{ch.provider} • {ch.service}</Text>
                                             </View>
@@ -1398,8 +1350,8 @@ Actual Integrated Platform Channels:
                                             </View>
                                         </View>
                                         <View style={styles.channelFooter}>
-                                            <Text style={styles.channelMeta}>Latency: <Text style={{ fontWeight: '800', color: T.textMain }}>{ch.latencyMs}ms</Text></Text>
-                                            <Text style={styles.channelMeta}>Uptime: <Text style={{ fontWeight: '800', color: T.textMain }}>{ch.lastPing}</Text></Text>
+                                            <Text style={styles.channelMeta}>Latency: {ch.latencyMs}ms</Text>
+                                            <Text style={styles.channelMeta}>Uptime: {ch.lastPing}</Text>
                                             <TouchableOpacity
                                                 onPress={() => handleToggleChannelKillswitch(ch.killswitchKey, ch.name)}
                                                 style={[styles.channelToggleBtn, isPaused ? { backgroundColor: T.success } : { backgroundColor: T.danger }]}
@@ -1427,14 +1379,14 @@ Actual Integrated Platform Channels:
                                     style={styles.addBlacklistBtn}
                                     activeOpacity={0.85}
                                 >
-                                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                                    <Ionicons name="add" size={16} color="#070D1E" />
                                     <Text style={styles.addBlacklistBtnText}>Add Blacklist Entry</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {blacklist.length === 0 ? (
                                 <View style={styles.emptyState}>
-                                    <Ionicons name="shield-checkmark" size={52} color={T.success} />
+                                    <Ionicons name="shield-checkmark" size={44} color={T.success} />
                                     <Text style={styles.emptyStateTitle}>Zero Blacklisted Entities</Text>
                                     <Text style={styles.emptyStateSub}>No account numbers, emails, or phone numbers are blocked.</Text>
                                 </View>
@@ -1442,7 +1394,7 @@ Actual Integrated Platform Channels:
                                 blacklist.map(item => (
                                     <View key={item.id} style={styles.blacklistCard}>
                                         <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                                 <Text style={styles.blacklistTypeBadge}>{item.type.toUpperCase()}</Text>
                                                 <Text style={styles.blacklistValue}>{item.value}</Text>
                                             </View>
@@ -1450,9 +1402,9 @@ Actual Integrated Platform Channels:
                                         </View>
                                         <TouchableOpacity
                                             onPress={() => handleRemoveBlacklistEntry(item.id)}
-                                            style={styles.deleteIconBtn}
+                                            style={{ padding: 6 }}
                                         >
-                                            <Ionicons name="trash-outline" size={20} color={T.danger} />
+                                            <Ionicons name="trash-outline" size={18} color={T.danger} />
                                         </TouchableOpacity>
                                     </View>
                                 ))
@@ -1467,7 +1419,7 @@ Actual Integrated Platform Channels:
                         <View>
                             <View style={styles.stressCard}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Ionicons name="speedometer" size={26} color={T.navyDark} />
+                                    <Ionicons name="speedometer" size={24} color={T.gold} />
                                     <Text style={styles.stressTitle}>Liquidity Surge Stress Simulator</Text>
                                 </View>
                                 <Text style={styles.stressSub}>
@@ -1496,10 +1448,10 @@ Actual Integrated Platform Channels:
                                     activeOpacity={0.85}
                                 >
                                     {simulatingStress ? (
-                                        <ActivityIndicator color="#FFFFFF" size="small" />
+                                        <ActivityIndicator color="#070D1E" size="small" />
                                     ) : (
                                         <>
-                                            <Ionicons name="flash" size={18} color="#FFFFFF" />
+                                            <Ionicons name="flash" size={18} color="#070D1E" />
                                             <Text style={styles.runStressBtnText}>Simulate Liquidity Shock</Text>
                                         </>
                                     )}
@@ -1541,9 +1493,9 @@ Actual Integrated Platform Channels:
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Transaction Details</Text>
+                            <Text style={styles.modalTitle}>Transaction Investigation</Text>
                             <TouchableOpacity onPress={() => setSelectedTx(null)}>
-                                <Ionicons name="close-circle" size={26} color={T.textMuted} />
+                                <Ionicons name="close-circle" size={24} color={T.textSub} />
                             </TouchableOpacity>
                         </View>
 
@@ -1594,7 +1546,7 @@ Actual Integrated Platform Channels:
                                         disabled={actionLoading}
                                         style={styles.btnRefund}
                                     >
-                                        <Ionicons name="arrow-undo" size={20} color="#FFFFFF" />
+                                        <Ionicons name="arrow-undo" size={18} color="#070D1E" />
                                         <Text style={styles.btnRefundText}>Reverse & Refund Wallet</Text>
                                     </TouchableOpacity>
 
@@ -1604,7 +1556,7 @@ Actual Integrated Platform Channels:
                                             disabled={actionLoading}
                                             style={styles.btnFreeze}
                                         >
-                                            <Ionicons name="snow" size={20} color="#FFFFFF" />
+                                            <Ionicons name="snow" size={18} color="#FFFFFF" />
                                             <Text style={styles.btnFreezeText}>
                                                 {selectedTx.user.status === 'suspended' ? 'Reactivate User' : 'Freeze User Account'}
                                             </Text>
@@ -1631,7 +1583,7 @@ Actual Integrated Platform Channels:
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Add Entity to Blacklist</Text>
                             <TouchableOpacity onPress={() => setShowBlacklistModal(false)}>
-                                <Ionicons name="close-circle" size={26} color={T.textMuted} />
+                                <Ionicons name="close-circle" size={24} color={T.textSub} />
                             </TouchableOpacity>
                         </View>
 
@@ -1655,7 +1607,7 @@ Actual Integrated Platform Channels:
                             value={newBlacklistValue}
                             onChangeText={setNewBlacklistValue}
                             placeholder="e.g. 0123456789 or user@example.com"
-                            placeholderTextColor={T.textMuted}
+                            placeholderTextColor={T.textSub}
                             style={styles.numericInput}
                         />
 
@@ -1664,7 +1616,7 @@ Actual Integrated Platform Channels:
                             value={newBlacklistReason}
                             onChangeText={setNewBlacklistReason}
                             placeholder="e.g. Fraud chargeback risk or unauthorized account"
-                            placeholderTextColor={T.textMuted}
+                            placeholderTextColor={T.textSub}
                             style={styles.numericInput}
                         />
 
@@ -1673,7 +1625,7 @@ Actual Integrated Platform Channels:
                             style={styles.savePoliciesBtn}
                             activeOpacity={0.85}
                         >
-                            <Ionicons name="ban" size={20} color="#FFFFFF" />
+                            <Ionicons name="ban" size={18} color="#070D1E" />
                             <Text style={styles.savePoliciesBtnText}>Block Platform-Wide</Text>
                         </TouchableOpacity>
                     </View>
@@ -1692,66 +1644,55 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: T.bg,
     },
     loadingText: {
-        marginTop: 14,
-        fontSize: 14,
+        marginTop: 12,
+        fontSize: 13,
         fontWeight: '700',
         color: T.textSub,
-    },
-    headerIconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#F1F5F9',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     emergencyBanner: {
         backgroundColor: T.danger,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 10,
+        paddingVertical: 8,
         paddingHorizontal: 16,
         gap: 8,
     },
     emergencyBannerText: {
         color: '#FFFFFF',
         fontWeight: '900',
-        fontSize: 12.5,
-        letterSpacing: 0.3,
+        fontSize: 11.5,
+        letterSpacing: 0.5,
     },
-    tabBarWrapper: {
-        backgroundColor: '#FFFFFF',
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: T.navyDark,
+        paddingHorizontal: 4,
+        paddingBottom: 8,
+        justifyContent: 'space-around',
         borderBottomWidth: 1,
         borderBottomColor: T.cardBorder,
-        paddingVertical: 8,
-    },
-    tabBarScroll: {
-        paddingHorizontal: 12,
-        gap: 8,
     },
     tabItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        borderRadius: 20,
-        backgroundColor: '#F1F5F9',
+        gap: 3,
+        paddingVertical: 6,
+        paddingHorizontal: 6,
+        borderRadius: 16,
     },
     tabItemActive: {
-        backgroundColor: T.navyDark,
+        backgroundColor: T.goldBg,
     },
     tabText: {
-        fontSize: 13,
+        fontSize: 10.5,
         fontWeight: '700',
         color: T.textSub,
     },
     tabTextActive: {
-        color: '#FFFFFF',
+        color: T.gold,
         fontWeight: '800',
     },
     scrollContent: {
@@ -1759,17 +1700,11 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     heroCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
-        padding: 20,
+        padding: 18,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: T.cardBorder,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     heroHeader: {
         flexDirection: 'row',
@@ -1778,21 +1713,21 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     heroSub: {
-        fontSize: 11,
-        fontWeight: '800',
+        fontSize: 9.5,
+        fontWeight: '900',
         color: T.gold,
         letterSpacing: 1,
         marginBottom: 4,
     },
     heroTitle: {
-        fontSize: 26,
+        fontSize: 23,
         fontWeight: '900',
-        color: T.textMain,
+        color: '#FFFFFF',
     },
     riskBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     riskBadgeSafe: {
         backgroundColor: T.successBg,
@@ -1804,7 +1739,7 @@ const styles = StyleSheet.create({
         backgroundColor: T.dangerBg,
     },
     riskBadgeText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
         letterSpacing: 0.5,
     },
@@ -1818,256 +1753,240 @@ const styles = StyleSheet.create({
         color: T.danger,
     },
     gaugeContainer: {
-        marginTop: 6,
+        marginTop: 4,
     },
     gaugeTrack: {
-        height: 8,
-        backgroundColor: '#E2E8F0',
-        borderRadius: 4,
+        height: 6,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 3,
         overflow: 'hidden',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     gaugeFill: {
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 3,
     },
     gaugeMeta: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
     gaugeMetaText: {
-        color: T.textMuted,
-        fontSize: 12,
+        color: '#94A3B8',
+        fontSize: 10.5,
         fontWeight: '700',
     },
     metricGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12,
-        marginBottom: 20,
+        gap: 10,
+        marginBottom: 16,
     },
     metricCard: {
         flex: 1,
         minWidth: '47%',
-        backgroundColor: '#FFFFFF',
-        padding: 14,
+        backgroundColor: T.card,
+        padding: 12,
         borderRadius: 16,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1,
     },
     metricCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 8,
-    },
-    metricIconWrap: {
-        width: 28,
-        height: 28,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
+        gap: 6,
+        marginBottom: 6,
     },
     metricLabel: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         color: T.textSub,
     },
     metricValue: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '900',
         marginBottom: 2,
     },
     metricSub: {
-        fontSize: 11,
-        color: T.textMuted,
+        fontSize: 10,
+        color: T.textSub,
         fontWeight: '600',
     },
     sectionHeading: {
-        fontSize: 15,
-        fontWeight: '900',
+        fontSize: 13,
+        fontWeight: '800',
         color: T.textMain,
         marginTop: 6,
-        marginBottom: 12,
-        letterSpacing: 0.2,
+        marginBottom: 10,
+        letterSpacing: 0.3,
     },
     killswitchGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
-        marginBottom: 20,
+        gap: 8,
+        marginBottom: 16,
     },
     killswitchCard: {
         flex: 1,
         minWidth: '47%',
-        borderRadius: 16,
-        padding: 16,
+        backgroundColor: T.card,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
+        borderColor: T.cardBorder,
         alignItems: 'center',
     },
-    killswitchCardNormal: {
-        backgroundColor: '#FFFFFF',
-        borderColor: T.cardBorder,
-    },
-    killswitchCardRedActive: {
+    killswitchActiveRed: {
         backgroundColor: T.danger,
         borderColor: T.danger,
     },
-    killswitchCardWarnActive: {
+    killswitchActiveWarn: {
         backgroundColor: T.warning,
         borderColor: T.warning,
     },
     killswitchTitle: {
-        fontSize: 13,
-        fontWeight: '900',
+        fontSize: 12,
+        fontWeight: '800',
         color: T.textMain,
-        marginTop: 6,
+        marginTop: 4,
     },
     killswitchSub: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '800',
-        color: T.textMuted,
+        color: T.textSub,
         marginTop: 2,
     },
     cardHeaderBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderRadius: 18,
-        marginBottom: 16,
+        backgroundColor: T.navyMid,
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 14,
         borderWidth: 1,
         borderColor: T.cardBorder,
     },
     cardHeaderTitle: {
-        color: T.textMain,
-        fontSize: 15,
+        color: '#FFFFFF',
+        fontSize: 14,
         fontWeight: '900',
     },
     cardHeaderSub: {
-        color: T.textSub,
-        fontSize: 12,
+        color: '#94A3B8',
+        fontSize: 10.5,
         fontWeight: '600',
-        marginTop: 2,
     },
     policyCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 18,
-        padding: 18,
+        backgroundColor: T.card,
+        borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 18,
+        marginBottom: 16,
     },
     inputLabel: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
         color: T.textMain,
-        marginTop: 10,
-        marginBottom: 4,
+        marginTop: 8,
+        marginBottom: 2,
     },
     inputHelper: {
-        fontSize: 11.5,
-        color: T.textMuted,
-        marginBottom: 8,
+        fontSize: 10,
+        color: T.textSub,
+        marginBottom: 6,
     },
     numericInput: {
-        backgroundColor: T.inputBg,
+        backgroundColor: T.navyDark,
         borderWidth: 1,
         borderColor: T.border,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 14,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 13,
         fontWeight: '800',
-        color: T.textMain,
-        marginBottom: 14,
+        color: '#FFFFFF',
+        marginBottom: 12,
     },
     toggleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: 'rgba(51, 65, 85, 0.4)',
     },
     toggleTitle: {
-        fontSize: 13.5,
+        fontSize: 12.5,
         fontWeight: '800',
         color: T.textMain,
         marginBottom: 2,
     },
     toggleSub: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         color: T.textSub,
     },
     savePoliciesBtn: {
-        backgroundColor: T.navyDark,
+        backgroundColor: T.gold,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 16,
+        paddingVertical: 14,
+        borderRadius: 14,
         gap: 8,
         marginBottom: 20,
     },
     savePoliciesBtnText: {
-        color: '#FFFFFF',
+        color: '#070D1E',
         fontWeight: '900',
-        fontSize: 14,
+        fontSize: 13,
     },
     filterRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 12,
-        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 10,
     },
     filterPill: {
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: T.card,
         borderWidth: 1,
         borderColor: T.border,
     },
     filterPillActive: {
-        backgroundColor: T.navyDark,
-        borderColor: T.navyDark,
+        backgroundColor: T.gold,
+        borderColor: T.gold,
     },
     filterPillText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         color: T.textSub,
     },
     filterPillTextActive: {
-        color: '#FFFFFF',
+        color: '#070D1E',
         fontWeight: '900',
     },
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: T.card,
         borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 14,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        marginBottom: 14,
+        borderColor: T.cardBorder,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 12,
     },
     searchInput: {
         flex: 1,
-        fontSize: 13,
-        color: T.textMain,
+        fontSize: 12,
+        color: '#FFFFFF',
         fontWeight: '600',
     },
     emptyState: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 18,
-        padding: 36,
+        backgroundColor: T.card,
+        borderRadius: 16,
+        padding: 30,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -2075,24 +1994,24 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     emptyStateTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '900',
         color: T.textMain,
-        marginTop: 12,
+        marginTop: 10,
         marginBottom: 4,
     },
     emptyStateSub: {
-        fontSize: 12,
-        color: T.textMuted,
+        fontSize: 11,
+        color: T.textSub,
         textAlign: 'center',
     },
     txCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 14,
+        backgroundColor: T.card,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 10,
+        marginBottom: 8,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -2100,14 +2019,14 @@ const styles = StyleSheet.create({
     txCardLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
         flex: 1,
         marginRight: 10,
     },
     fraudBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2121,74 +2040,50 @@ const styles = StyleSheet.create({
         backgroundColor: T.dangerBg,
     },
     fraudBadgeText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
     },
     txDescription: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
         color: T.textMain,
     },
     txMeta: {
-        fontSize: 11,
-        color: T.textMuted,
-        marginTop: 3,
+        fontSize: 10,
+        color: T.textSub,
+        marginTop: 2,
     },
     txAmount: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '900',
         color: T.textMain,
-        marginBottom: 3,
+        marginBottom: 2,
     },
-    statusPill: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 8,
-    },
-    statusPillSuccess: {
-        backgroundColor: T.successBg,
-    },
-    statusPillDanger: {
-        backgroundColor: T.dangerBg,
-    },
-    statusPillText: {
-        fontSize: 10,
-        fontWeight: '900',
-    },
-    statusPillTextSuccess: {
-        color: T.success,
-    },
-    statusPillTextDanger: {
-        color: T.danger,
+    txStatusText: {
+        fontSize: 9,
+        fontWeight: '800',
     },
     channelCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 18,
-        padding: 16,
+        backgroundColor: T.card,
+        borderRadius: 14,
+        padding: 14,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 12,
+        marginBottom: 10,
     },
     channelHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
-    },
-    channelIconBox: {
-        width: 42,
-        height: 42,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
+        marginBottom: 8,
     },
     channelName: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: T.textMain,
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#FFFFFF',
     },
     channelProvider: {
-        fontSize: 11.5,
+        fontSize: 10.5,
         color: T.textSub,
         marginTop: 2,
     },
@@ -2197,18 +2092,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 6,
         backgroundColor: T.successBg,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
     },
     statusDotGreen: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: T.success,
     },
     channelStatusText: {
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: '900',
         color: T.success,
     },
@@ -2217,44 +2112,45 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-        paddingTop: 10,
+        borderTopColor: 'rgba(51, 65, 85, 0.4)',
+        paddingTop: 8,
     },
     channelMeta: {
-        fontSize: 11.5,
+        fontSize: 10,
         color: T.textSub,
+        fontWeight: '600',
     },
     channelToggleBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     channelToggleBtnText: {
         color: '#FFFFFF',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
     },
     addBlacklistBtn: {
-        backgroundColor: T.navyDark,
+        backgroundColor: T.gold,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 12,
-        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        gap: 4,
     },
     addBlacklistBtnText: {
-        color: '#FFFFFF',
-        fontSize: 12,
+        color: '#070D1E',
+        fontSize: 11,
         fontWeight: '900',
     },
     blacklistCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 14,
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 12,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 10,
+        marginBottom: 8,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -2262,270 +2158,122 @@ const styles = StyleSheet.create({
     blacklistTypeBadge: {
         backgroundColor: T.dangerBg,
         color: T.danger,
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '900',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
         borderRadius: 6,
     },
     blacklistValue: {
-        color: T.textMain,
-        fontSize: 13,
+        color: '#FFFFFF',
+        fontSize: 12,
         fontWeight: '800',
     },
     blacklistReason: {
         color: T.textSub,
-        fontSize: 11.5,
-        marginTop: 2,
-    },
-    deleteIconBtn: {
-        padding: 8,
+        fontSize: 10.5,
     },
     stressCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 18,
+        backgroundColor: T.navyMid,
+        borderRadius: 18,
+        padding: 16,
         borderWidth: 1,
-        borderColor: T.cardBorder,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     stressTitle: {
-        color: T.textMain,
-        fontSize: 15.5,
+        color: '#FFFFFF',
+        fontSize: 14.5,
         fontWeight: '900',
-        marginLeft: 10,
+        marginLeft: 8,
     },
     stressSub: {
-        color: T.textSub,
-        fontSize: 12,
-        lineHeight: 18,
-        marginBottom: 14,
+        color: '#94A3B8',
+        fontSize: 11,
+        lineHeight: 16,
+        marginBottom: 12,
     },
     stressLabel: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '800',
-        color: T.navyDark,
-        marginBottom: 10,
+        color: T.gold,
+        marginBottom: 8,
     },
     stressButtonsRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 16,
+        gap: 6,
+        marginBottom: 14,
     },
     stressPill: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 10,
-        borderRadius: 12,
-        backgroundColor: '#F1F5F9',
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: T.navyDark,
         borderWidth: 1,
         borderColor: T.border,
     },
     stressPillActive: {
-        backgroundColor: T.navyDark,
-        borderColor: T.navyDark,
+        backgroundColor: T.gold,
+        borderColor: T.gold,
     },
     stressPillText: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: T.textSub,
-    },
-    stressPillTextActive: {
-        color: '#FFFFFF',
-        fontWeight: '900',
-    },
-    runStressBtn: {
-        backgroundColor: T.navyDark,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 14,
-        gap: 8,
-    },
-    runStressBtnText: {
-        color: '#FFFFFF',
-        fontWeight: '900',
-        fontSize: 13.5,
-    },
-    stressResultBox: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 14,
-        padding: 14,
-        marginTop: 16,
-        borderWidth: 1,
-        borderColor: T.cardBorder,
-    },
-    stressResultTitle: {
-        color: T.navyDark,
-        fontSize: 13,
-        fontWeight: '900',
-        marginBottom: 8,
-    },
-    stressResultRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 6,
-    },
-    stressResultLabel: {
-        fontSize: 12,
-        color: T.textSub,
-    },
-    stressResultVal: {
-        fontSize: 12,
-        fontWeight: '900',
-    },
-    stressRecommendation: {
-        color: T.textSub,
-        fontSize: 11.5,
-        marginTop: 8,
-        lineHeight: 16,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-        justifyContent: 'flex-end',
-    },
-    modalCard: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 22,
-        maxHeight: '85%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    modalTitle: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: T.textMain,
-    },
-    modalAmountBox: {
-        backgroundColor: '#F8FAFC',
-        padding: 18,
-        borderRadius: 16,
-        alignItems: 'center',
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: T.cardBorder,
-    },
-    modalAmountLabel: {
-        color: T.gold,
-        fontSize: 10.5,
-        fontWeight: '900',
-        letterSpacing: 1,
-        marginBottom: 4,
-    },
-    modalAmountValue: {
-        color: T.textMain,
-        fontSize: 26,
-        fontWeight: '900',
-        marginBottom: 4,
-    },
-    modalRefText: {
-        color: T.textMuted,
-        fontSize: 11.5,
-        fontWeight: '600',
-    },
-    riskReasonBox: {
-        backgroundColor: T.dangerBg,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: T.dangerBorder,
-    },
-    riskReasonTitle: {
-        color: T.danger,
-        fontSize: 10.5,
-        fontWeight: '900',
-        letterSpacing: 0.5,
-        marginBottom: 4,
-    },
-    riskReasonItem: {
-        color: T.danger,
-        fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    infoLabel: {
-        fontSize: 12.5,
-        color: T.textSub,
-        fontWeight: '600',
-    },
-    infoValue: {
-        fontSize: 12.5,
-        fontWeight: '800',
-        color: T.textMain,
-    },
-    modalBtnContainer: {
-        marginTop: 20,
-        gap: 10,
-        paddingBottom: 20,
-    },
-    btnRefund: {
-        backgroundColor: T.navyDark,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 14,
-        gap: 8,
-    },
-    btnRefundText: {
-        color: '#FFFFFF',
-        fontWeight: '900',
-        fontSize: 13.5,
-    },
-    btnFreeze: {
-        backgroundColor: T.danger,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 14,
-        gap: 8,
-    },
-    btnFreezeText: {
-        color: '#FFFFFF',
-        fontWeight: '900',
-        fontSize: 13.5,
-    },
-    blacklistTypeRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 14,
-    },
-    typePill: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        backgroundColor: '#F1F5F9',
-        borderWidth: 1,
-        borderColor: T.border,
-    },
-    typePillActive: {
-        backgroundColor: T.navyDark,
-        borderColor: T.navyDark,
-    },
-    typePillText: {
         fontSize: 11,
         fontWeight: '800',
         color: T.textSub,
     },
-    typePillTextActive: {
-        color: '#FFFFFF',
+    stressPillTextActive: {
+        color: '#070D1E',
         fontWeight: '900',
     },
-});
+    runStressBtn: {
+        backgroundColor: T.gold,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 6,
+    },
+    runStressBtnText: {
+        color: '#070D1E',
+        fontWeight: '900',
+        fontSize: 12.5,
+    },
+    stressResultBox: {
+        backgroundColor: T.navyDark,
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 14,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+    },
+    stressResultTitle: {
+        color: T.gold,
+        fontSize: 12,
+        fontWeight: '900',
+        marginBottom: 6,
+    },
+    stressResultRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    stressResultLabel: {
+        fontSize: 11,
+        color: T.textSub,
+    },
+    stressResultVal: {
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    stressRecommendation: {
+        color: '#CBD5E1',
+        fontSize: 10.5,
+        marginTop: 6,
+        lineHeight: 15,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        justifyContent: 'flex-end',
+    },

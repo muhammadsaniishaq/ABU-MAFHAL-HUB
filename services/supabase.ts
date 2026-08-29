@@ -1,157 +1,56 @@
 import 'react-native-url-polyfill/auto';
-import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
-// Custom Storage Adapter using AsyncStorage (No 2KB limit like SecureStore)
-// SSR Safe wrapper to prevent "window is not defined" during build
-const AsyncStorageAdapter = {
-    getItem: (key: string) => {
-        if (typeof window === 'undefined') return Promise.resolve(null);
-        return AsyncStorage.getItem(key);
-    },
-    setItem: (key: string, value: string) => {
-        if (typeof window === 'undefined') return Promise.resolve();
-        return AsyncStorage.setItem(key, value);
-    },
-    removeItem: (key: string) => {
-        if (typeof window === 'undefined') return Promise.resolve();
-        return AsyncStorage.removeItem(key);
-    },
+// Fallback to project defaults if env vars are missing
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://xdfukgghsllzttmewfvi.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkZnVrZ2doc2xsenR0bWV3ZnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAzODU0NDEsImV4cCI6MjA1NTk2MTQ0MX0.m9Vf6QjJ4K5V2Xb8bYv_l_v_F1I-V6K8J3kX9_qL_2g';
+
+const isWeb = Platform.OS === 'web';
+
+// Custom Storage adapter for Expo / React Native Web
+const customStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      if (isWeb && typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+      return await AsyncStorage.getItem(key);
+    } catch (e) {
+      console.warn('Storage getItem error:', e);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    try {
+      if (isWeb && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      } else {
+        await AsyncStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('Storage setItem error:', e);
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    try {
+      if (isWeb && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      } else {
+        await AsyncStorage.removeItem(key);
+      }
+    } catch (e) {
+      console.warn('Storage removeItem error:', e);
+    }
+  },
 };
-
-// Retrieve environment variables (ensure sending .env to EXPO Go or build)
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
-
-// --- LOCAL TESTING TOGGLE ---
-const USE_LOCAL_FUNCTIONS = false; 
-const LOCAL_FUNCTIONS_URL = Platform.OS === 'android' ? 'http://10.0.2.2:54321/functions/v1' : 'http://localhost:54321/functions/v1';
-// ----------------------------
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        storage: AsyncStorageAdapter,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-    },
+  auth: {
+    storage: customStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: isWeb,
+  },
 });
-
-if (USE_LOCAL_FUNCTIONS) {
-    (supabase as any).functions.url = LOCAL_FUNCTIONS_URL;
-}
-
-// Helper to forcefully clear session data (The "Nuclear Option" for stuck sessions)
-export const forceSignOut = async () => {
-    try {
-        await supabase.auth.signOut();
-    } catch (e) {
-        console.warn("Standard signOut failed, proceeding to manual wipe", e);
-    }
-    
-    // Clear AsyncStorage selectively to preserve NIN history, transaction PIN, and biometrics setup
-    try {
-        const allKeys = await AsyncStorage.getAllKeys();
-        const preservedKeys = [
-            'recent_nin_verifications',
-            'recent_phone_verifications',
-            'biometrics_setup_completed',
-            'biometrics_enabled',
-            'data_favorites'
-        ];
-        const keysToRemove = allKeys.filter(k => {
-            const isExplicitlyPreserved = preservedKeys.includes(k);
-            const isPatternPreserved = k.includes('recent_') || 
-                                       k.includes('history') || 
-                                       k.includes('favorite') || 
-                                       k.includes('saved');
-            return !(isExplicitlyPreserved || isPatternPreserved);
-        });
-        await AsyncStorage.multiRemove(keysToRemove);
-        console.log('Cleared session and cache keys, preserving all app history & security settings.');
-    } catch(e) {
-        console.error("AsyncStorage partial clear failed", e);
-        // Fallback to clear if multiRemove fails
-        try {
-            await AsyncStorage.clear();
-        } catch (innerErr) {
-            console.error("AsyncStorage fallback clear failed", innerErr);
-        }
-    }
-
-    if (Platform.OS === 'web') {
-        if (typeof localStorage !== 'undefined') {
-            try {
-                const keysToRemove: string[] = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const k = localStorage.key(i);
-                    if (k && (k.startsWith('sb-') || k.includes('auth') || k === 'has_active_session' || k === 'app_unlocked')) {
-                        keysToRemove.push(k);
-                    }
-                }
-                keysToRemove.forEach(k => localStorage.removeItem(k));
-            } catch (e) {
-                console.warn('Web storage selective clear notice:', e);
-            }
-        }
-    }
-};
-
-// Global OAuth Return Token & PKCE Code Exchange Helper
-export const processOAuthReturn = async (): Promise<boolean> => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
-
-    try {
-        let codeStr: string | null = null;
-        let accessTokenStr: string | null = null;
-        let refreshTokenStr: string | null = null;
-
-        // 1. Search Query Parameters (?code=... or ?access_token=...)
-        const searchParams = new URLSearchParams(window.location.search);
-        codeStr = searchParams.get('code');
-        accessTokenStr = searchParams.get('access_token');
-        refreshTokenStr = searchParams.get('refresh_token');
-
-        // 2. Hash Parameters (#access_token=... or #code=...)
-        if (!codeStr && !accessTokenStr && window.location.hash) {
-            const hashClean = window.location.hash.substring(1);
-            const hashParams = new URLSearchParams(hashClean);
-            codeStr = hashParams.get('code');
-            accessTokenStr = hashParams.get('access_token');
-            refreshTokenStr = hashParams.get('refresh_token');
-        }
-
-        if (codeStr) {
-            const { data, error } = await supabase.auth.exchangeCodeForSession(codeStr);
-            if (!error && data?.session) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-                if (window.opener) {
-                    try {
-                        window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, '*');
-                    } catch (err) {}
-                    window.close();
-                }
-                return true;
-            }
-        } else if (accessTokenStr && refreshTokenStr) {
-            const { data, error } = await supabase.auth.setSession({
-                access_token: accessTokenStr,
-                refresh_token: refreshTokenStr,
-            });
-            if (!error && data?.session) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-                if (window.opener) {
-                    try {
-                        window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, '*');
-                    } catch (err) {}
-                    window.close();
-                }
-                return true;
-            }
-        }
-    } catch (e) {
-        console.log('OAuth return processing notice:', e);
-    }
-    return false;
-};
