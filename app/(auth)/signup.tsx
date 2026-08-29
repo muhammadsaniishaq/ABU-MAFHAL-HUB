@@ -114,7 +114,6 @@ export default function SignupScreen() {
         }
     }, [params.ref, params.referral, params.code]);
 
-    // Visibility & UI States
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showCountryModal, setShowCountryModal] = useState(false);
@@ -122,6 +121,23 @@ export default function SignupScreen() {
     const [loading, setLoading] = useState(false);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showGoogleAuthModal, setShowGoogleAuthModal] = useState(false);
+    const [googleAuthUrl, setGoogleAuthUrl] = useState<string | null>(null);
+
+    // Listen for Auth State changes (e.g. from Google OAuth popup completion)
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+                setShowGoogleAuthModal(false);
+                setSocialLoading(null);
+                router.replace('/dashboard' as any);
+            }
+        });
+
+        return () => {
+            subscription?.unsubscribe();
+        };
+    }, []);
 
     // Realtime Check States
     const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
@@ -131,6 +147,7 @@ export default function SignupScreen() {
     const [checkingEmail, setCheckingEmail] = useState(false);
     const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
     const [checkingPhone, setCheckingPhone] = useState(false);
+
 
     // Camera QR Scanner States & Handlers
     const [permission, requestPermission] = useCameraPermissions();
@@ -700,11 +717,45 @@ export default function SignupScreen() {
             };
 
             if (Platform.OS === 'web') {
-                const { error } = await supabase.auth.signInWithOAuth({
+                // Centered popup window geometry
+                const popupWidth = 500;
+                const popupHeight = 620;
+                const left = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenX + (window.outerWidth - popupWidth) / 2)) : 50;
+                const top = typeof window !== 'undefined' ? Math.max(0, Math.floor(window.screenY + (window.outerHeight - popupHeight) / 2)) : 50;
+
+                const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: provider as any,
-                    options,
+                    options: {
+                        ...options,
+                        skipBrowserRedirect: true,
+                    },
                 });
                 if (error) throw error;
+
+                if (data?.url && typeof window !== 'undefined') {
+                    setGoogleAuthUrl(data.url);
+                    setShowGoogleAuthModal(true);
+
+                    const popup = window.open(
+                        data.url,
+                        'GoogleAuthPopup',
+                        `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`
+                    );
+
+                    if (popup) {
+                        const checkInterval = setInterval(async () => {
+                            if (popup.closed) {
+                                clearInterval(checkInterval);
+                                setSocialLoading(null);
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (session) {
+                                    setShowGoogleAuthModal(false);
+                                    router.replace('/dashboard' as any);
+                                }
+                            }
+                        }, 800);
+                    }
+                }
             } else {
                 options.skipBrowserRedirect = true;
                 const { data, error } = await supabase.auth.signInWithOAuth({
@@ -1422,6 +1473,88 @@ export default function SignupScreen() {
                 </SafeAreaView>
             </Modal>
 
+            {/* Centered Google Auth Modal with App Logo & Name */}
+            <Modal
+                visible={showGoogleAuthModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => {
+                    setShowGoogleAuthModal(false);
+                    setSocialLoading(null);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.googleAuthModalCard, { backgroundColor: isDark ? '#0F172A' : '#FFFFFF', borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#E2E8F0' }]}>
+                        {/* App Logo & Brand Header */}
+                        <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                            <Image 
+                                source={getLogoSource()} 
+                                style={{ width: 50, height: 50, marginBottom: 6 }} 
+                                resizeMode="contain" 
+                            />
+                            <Text style={{ fontSize: 16, fontWeight: '900', color: theme.textPrimary, letterSpacing: 0.5 }}>
+                                ABUMAFHAL
+                            </Text>
+                            <Text style={{ color: '#F59E0B', fontSize: 8.5, fontWeight: '900', letterSpacing: 1 }}>
+                                ROYAL FINTECH
+                            </Text>
+                        </View>
+
+                        {/* Google Auth Status Box */}
+                        <View style={{ backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: isDark ? '#334155' : '#E2E8F0', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                <Image 
+                                    source={require('../../assets/images/google-g.png')} 
+                                    style={{ width: 20, height: 20 }} 
+                                    resizeMode="contain" 
+                                />
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: theme.textPrimary }}>
+                                    Google Secure Sign-Up
+                                </Text>
+                            </View>
+                            <ActivityIndicator size="small" color="#F59E0B" style={{ marginVertical: 6 }} />
+                            <Text style={{ fontSize: 10.5, color: theme.textSecondary, textAlign: 'center', lineHeight: 15 }}>
+                                A centered Google authorization popup is open. Please choose your Google account to create your account securely.
+                            </Text>
+                        </View>
+
+                        {/* Fallback Action to Re-Open Window */}
+                        {googleAuthUrl && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                                        const popupWidth = 500;
+                                        const popupHeight = 620;
+                                        const left = Math.max(0, Math.floor(window.screenX + (window.outerWidth - popupWidth) / 2));
+                                        const top = Math.max(0, Math.floor(window.screenY + (window.outerHeight - popupHeight) / 2));
+                                        window.open(googleAuthUrl, 'GoogleAuthPopup', `width=${popupWidth},height=${popupHeight},left=${left},top=${top},status=no,toolbar=no,menubar=no,location=no,resizable=yes,scrollbars=yes`);
+                                    }
+                                }}
+                                style={{ backgroundColor: '#F59E0B', height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 11.5 }}>
+                                    Re-open Centered Window 🪟
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setShowGoogleAuthModal(false);
+                                setSocialLoading(null);
+                            }}
+                            style={{ paddingVertical: 6, alignItems: 'center' }}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700' }}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
         </View>
     );
 }
@@ -1665,6 +1798,18 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         padding: 16,
         borderWidth: 1,
+    },
+    googleAuthModalCard: {
+        width: '100%',
+        maxWidth: 340,
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
     },
     modalTitle: {
         fontWeight: '800',
