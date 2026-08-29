@@ -74,7 +74,7 @@ const EXECUTIVE_PRESET_ROOMS = [
     id: 'devops-incident',
     title: 'DevOps & API Incident Desk',
     tag: 'GATEWAYS & SERVERS',
-    desc: 'Screen sharing & rapid triage for ClubKonnect APIs and Monnify webhooks.',
+    desc: 'Screen sharing & rapid triage for ClubKonnect/BilalSadaSub APIs and Payvessel webhooks.',
     icon: 'server',
     color: '#0EA5E9',
     bgGradient: ['#0C4A6E', '#0F172A', '#020617'],
@@ -84,7 +84,7 @@ const EXECUTIVE_PRESET_ROOMS = [
     id: 'finance-vault',
     title: 'Finance & Liquidity Vault',
     tag: 'SETTLEMENTS & CASH',
-    desc: 'Automated settlement audits, Paystack liquidity, and cash reserve balancing.',
+    desc: 'Automated settlement audits, Payvessel/Paystack liquidity, and cash reserve balancing.',
     icon: 'wallet',
     color: '#FFD700',
     bgGradient: ['#451A03', '#0F172A', '#020617'],
@@ -103,7 +103,7 @@ const EXECUTIVE_PRESET_ROOMS = [
 ];
 
 const EXECUTIVE_DIRECTIVES = [
-  { title: 'Monnify Webhook Audit', text: '🚨 CRITICAL: Verify Monnify settlement webhooks immediately to ensure incoming wallet top-ups are credited without delay.' },
+  { title: 'Payvessel Webhook Audit', text: '🚨 CRITICAL: Verify Payvessel settlement webhooks immediately to ensure incoming wallet top-ups are credited without delay.' },
   { title: 'Weekend Liquidity Buffer', text: '💳 FINANCE DIRECTIVE: Audit bank reserves & Paystack automated payout limits before peak transaction volume.' },
   { title: 'Telecom Gateway Status', text: '📶 GATEWAY ALERT: MTN SME / Airtel API latency check complete. Maintain backup routing via ClubKonnect server.' },
   { title: 'KYC Document Backlog', text: '📜 COMPLIANCE NOTICE: Support Leads, review all pending Tier-2 KYC identity submissions within 2 hours.' },
@@ -795,7 +795,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       latency: '38ms',
       gateways: {
         clubkonnect: 'ONLINE (99.9%)',
-        monnify: 'SETTLED & ACTIVE',
+        payvessel: 'SETTLED & ACTIVE',
         paystack: 'HEALTHY'
       },
       reserves: '₦12,450,000.00',
@@ -1228,7 +1228,7 @@ export default function RealtimeEnterpriseTeamSuite() {
       setMessages(prev => {
         const updated = prev.map(m => m.id === aiTempId ? {
           ...m,
-          content: `📋 EXECUTIVE OPERATIONS AUDIT\n\n• Gateway Latency: 38ms (Stable)\n• Monnify Settlement Webhooks: Verified\n• ClubKonnect Telecom API: 99.9% uptime\n• Liquidity Reserve Buffer: Adequate for peak volume`
+          content: `📋 EXECUTIVE OPERATIONS AUDIT\n\n• Gateway Latency: 38ms (Stable)\n• Payvessel Settlement Webhooks: Verified\n• ClubKonnect Telecom API: 99.9% uptime\n• Liquidity Reserve Buffer: Adequate for peak volume`
         } : m);
         persistMessagesToStorage(currentRoomId, updated);
         return updated;
@@ -1795,8 +1795,8 @@ export default function RealtimeEnterpriseTeamSuite() {
                           <Text style={[s.metricVal, { color: L.emerald }]}>{gw.clubkonnect || '99.9%'}</Text>
                         </View>
                         <View style={s.metricTile}>
-                          <Text style={s.metricLabel}>Monnify Webhook</Text>
-                          <Text style={[s.metricVal, { color: L.emerald }]}>{gw.monnify || 'ACTIVE'}</Text>
+                          <Text style={s.metricLabel}>Payvessel Webhook</Text>
+                          <Text style={[s.metricVal, { color: L.emerald }]}>{gw.payvessel || 'ACTIVE'}</Text>
                         </View>
                         <View style={s.metricTile}>
                           <Text style={s.metricLabel}>Cash Reserves</Text>
@@ -2896,7 +2896,7 @@ export default function RealtimeEnterpriseTeamSuite() {
             <Text style={s.inputLabel}>Task Description</Text>
             <TextInput
               style={s.modalInput}
-              placeholder="e.g. Audit Monnify webhook gateway response"
+              placeholder="e.g. Audit Payvessel webhook gateway response"
               placeholderTextColor="#94A3B8"
               value={taskTitle}
               onChangeText={setTaskTitle}

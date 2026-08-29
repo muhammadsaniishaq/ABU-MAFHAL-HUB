@@ -386,7 +386,7 @@ export default function LiquidityVaultScreen() {
                     allowDeposit: true,
                     allowWithdrawal: false,
                     depositAccount: {
-                        bankName: 'Sterling Bank / Monnify (AgentHub)',
+                        bankName: 'Sterling Bank / Payvessel (AgentHub)',
                         accountNumber: '9081234567',
                         accountName: 'AgentHub Corporate / ABUMAFHAL',
                         instructions: 'Transfer to this virtual account to top up AgentHub balance.'
@@ -403,7 +403,7 @@ export default function LiquidityVaultScreen() {
                     allowDeposit: true,
                     allowWithdrawal: false,
                     depositAccount: {
-                        bankName: 'Sterling / Monnify (BilalSadaSub)',
+                        bankName: 'Sterling / Payvessel (BilalSadaSub)',
                         accountNumber: '8910293841',
                         accountName: 'BilalSadaSub Telecom',
                         instructions: 'Auto-funding bank account for BilalSadaSub VTU portal.'

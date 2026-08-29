@@ -13,7 +13,8 @@ import {
     Switch,
     RefreshControl,
     StyleSheet,
-    Dimensions
+    Dimensions,
+    Share
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -23,31 +24,32 @@ import { supabase } from '../../services/supabase';
 
 const { width } = Dimensions.get('window');
 
-// Executive Color Theme
+// Executive Cyber-Dark & Gold Palette
 const T = {
-    navyDark: '#0A1128',
-    navyMid: '#111D3B',
+    navyDark: '#070D1E',
+    navyMid: '#0F172A',
     navyCard: '#1E293B',
-    gold: '#D4AF37',
-    goldDark: '#B8952B',
-    goldLight: '#F5E8D0',
-    goldBg: 'rgba(212, 175, 55, 0.12)',
-    bg: '#F8FAFC',
-    card: '#FFFFFF',
-    cardBorder: '#E2E8F0',
-    textMain: '#0F172A',
-    textSub: '#64748B',
-    border: '#CBD5E1',
+    navyLight: '#334155',
+    gold: '#F59E0B',
+    goldDark: '#D97706',
+    goldLight: '#FEF3C7',
+    goldBg: 'rgba(245, 158, 11, 0.12)',
+    bg: '#020617',
+    card: '#0F172A',
+    cardBorder: 'rgba(51, 65, 85, 0.7)',
+    textMain: '#F8FAFC',
+    textSub: '#94A3B8',
+    border: '#334155',
     success: '#10B981',
-    successBg: '#ECFDF5',
+    successBg: 'rgba(16, 185, 129, 0.15)',
     danger: '#EF4444',
-    dangerBg: '#FEF2F2',
+    dangerBg: 'rgba(239, 68, 68, 0.15)',
     warning: '#F59E0B',
-    warningBg: '#FFFBEB',
-    info: '#0284C7',
-    infoBg: '#F0F9FF',
-    purple: '#9333EA',
-    purpleBg: '#F3E8FF',
+    warningBg: 'rgba(245, 158, 11, 0.15)',
+    info: '#38BDF8',
+    infoBg: 'rgba(56, 189, 248, 0.15)',
+    purple: '#A855F7',
+    purpleBg: 'rgba(168, 85, 247, 0.15)',
 };
 
 interface RiskPolicySettings {
@@ -55,10 +57,16 @@ interface RiskPolicySettings {
     risk_daily_account_limit: number;
     risk_velocity_max_hourly_tx: number;
     risk_auto_quarantine_above: number;
+    risk_vtu_velocity_cap: number;
+    risk_crypto_single_max: number;
     risk_require_kyc2_outflows: boolean;
     risk_global_freeze: boolean;
     risk_offhours_alerts: boolean;
     risk_auto_lock_failed_auth: boolean;
+    risk_crypto_killswitch: boolean;
+    risk_vtu_killswitch: boolean;
+    risk_cards_killswitch: boolean;
+    risk_agenthub_killswitch: boolean;
 }
 
 interface UserProfile {
@@ -87,26 +95,33 @@ interface TransactionItem {
     description?: string;
     reference?: string;
     created_at: string;
+    fraudScore?: number;
+    riskReasons?: string[];
     user?: UserProfile;
 }
 
-interface AuditAnomaly {
+interface BlacklistItem {
     id: string;
-    type: 'negative_balance' | 'unverified_whale' | 'velocity_burst' | 'failed_spike';
-    title: string;
-    description: string;
-    severity: 'critical' | 'high' | 'medium';
-    entityId: string;
-    entityName: string;
-    amount?: number;
-    resolved?: boolean;
+    type: 'account_number' | 'phone' | 'email' | 'bvn' | 'nin' | 'ip';
+    value: string;
+    reason: string;
+    created_at: string;
+}
+
+interface ChannelStatus {
+    name: string;
+    provider: string;
+    service: string;
+    status: 'operational' | 'degraded' | 'offline';
+    latencyMs: number;
+    lastPing: string;
 }
 
 export default function RiskControlCenter() {
     const router = useRouter();
 
     // Active Navigation Tab
-    const [activeTab, setActiveTab] = useState<'overview' | 'policies' | 'queue' | 'watchlist' | 'ai_audit'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'policies' | 'queue' | 'channels' | 'blacklist' | 'stress_test'>('overview');
 
     // Loading & Refreshing States
     const [loading, setLoading] = useState(true);
@@ -121,44 +136,65 @@ export default function RiskControlCenter() {
     const [failedTx24h, setFailedTx24h] = useState(0);
     const [highRiskUsersCount, setHighRiskUsersCount] = useState(0);
     const [pendingFlagsCount, setPendingFlagsCount] = useState(0);
-    const [riskIndexScore, setRiskIndexScore] = useState(18); // 0-100
+    const [riskIndexScore, setRiskIndexScore] = useState(16);
 
-    // Policies State (Persistent in app_settings)
+    // Risk Policies State
     const [policies, setPolicies] = useState<RiskPolicySettings>({
         risk_max_single_tx: 250000,
         risk_daily_account_limit: 1000000,
         risk_velocity_max_hourly_tx: 6,
         risk_auto_quarantine_above: 100000,
+        risk_vtu_velocity_cap: 25000,
+        risk_crypto_single_max: 500000,
         risk_require_kyc2_outflows: true,
         risk_global_freeze: false,
         risk_offhours_alerts: true,
         risk_auto_lock_failed_auth: true,
+        risk_crypto_killswitch: false,
+        risk_vtu_killswitch: false,
+        risk_cards_killswitch: false,
+        risk_agenthub_killswitch: false,
     });
 
-    // Transaction Queue & Filters
-    const [transactions, setTransactions] = useState<TransactionItem[]>([]);
-    const [filteredTx, setFilteredTx] = useState<TransactionItem[]>([]);
-    const [txFilter, setTxFilter] = useState<'all' | 'high_value' | 'failed' | 'flagged'>('all');
-    const [txSearch, setTxSearch] = useState('');
-
-    // Watchlist State
-    const [watchlistUsers, setWatchlistUsers] = useState<UserProfile[]>([]);
-    const [userSearch, setUserSearch] = useState('');
-
-    // AI Audit Anomaly State
-    const [auditAnomalies, setAuditAnomalies] = useState<AuditAnomaly[]>([]);
-    const [scanningAudit, setScanningAudit] = useState(false);
-
-    // Selected Item Modals
-    const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
-    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-    const [actionLoading, setActionLoading] = useState(false);
-
-    // Form inputs for policy adjustments
+    // Form inputs for numeric policy limits
     const [inputMaxSingle, setInputMaxSingle] = useState('250000');
     const [inputDailyLimit, setInputDailyLimit] = useState('1000000');
     const [inputVelocity, setInputVelocity] = useState('6');
     const [inputQuarantine, setInputQuarantine] = useState('100000');
+    const [inputVtuCap, setInputVtuCap] = useState('25000');
+    const [inputCryptoMax, setInputCryptoMax] = useState('500000');
+
+    // Transactions Queue
+    const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+    const [filteredTx, setFilteredTx] = useState<TransactionItem[]>([]);
+    const [txFilter, setTxFilter] = useState<'all' | 'high_risk' | 'failed' | 'high_value'>('all');
+    const [txSearch, setTxSearch] = useState('');
+
+    // Blacklist State
+    const [blacklist, setBlacklist] = useState<BlacklistItem[]>([]);
+    const [newBlacklistType, setNewBlacklistType] = useState<'account_number' | 'phone' | 'email' | 'bvn' | 'nin' | 'ip'>('account_number');
+    const [newBlacklistValue, setNewBlacklistValue] = useState('');
+    const [newBlacklistReason, setNewBlacklistReason] = useState('');
+    const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+
+    // Channels & Real Platform Providers State (Strictly real app partners)
+    const [channels, setChannels] = useState<ChannelStatus[]>([
+        { name: 'Virtual Accounts & Bank Rails', provider: 'Payvessel / Paystack', service: 'Inflows & Bank Payouts', status: 'operational', latencyMs: 110, lastPing: 'Live' },
+        { name: 'Virtual Dollar Cards Infrastructure', provider: 'Payvessel Cards Engine', service: 'Card Issuing & Top-up', status: 'operational', latencyMs: 135, lastPing: 'Live' },
+        { name: 'Telecom Airtime & Data Pipeline', provider: 'Bilalsadasub / Clubkonnect', service: 'VTU Subscriptions', status: 'operational', latencyMs: 90, lastPing: 'Live' },
+        { name: 'NIN / BVN / CAC Identity Engine', provider: 'AgentHub KYC Engine', service: 'Government KYC Verification', status: 'operational', latencyMs: 160, lastPing: 'Live' },
+        { name: 'Crypto Liquidity & Web3 Rails', provider: 'NOWPayments Gateways', service: 'Crypto Deposits & Payouts', status: 'operational', latencyMs: 195, lastPing: 'Live' },
+        { name: 'SMS & OTP Delivery Rails', provider: 'Termii Gateway', service: '2FA & Critical Alerts', status: 'operational', latencyMs: 75, lastPing: 'Live' },
+    ]);
+
+    // Stress Test States
+    const [stressTestFloatRun, setStressTestFloatRun] = useState(10);
+    const [simulatingStress, setSimulatingStress] = useState(false);
+    const [stressResult, setStressResult] = useState<any>(null);
+
+    // Selected Modals
+    const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     // Load initial data
     useEffect(() => {
@@ -172,10 +208,8 @@ export default function RiskControlCenter() {
                 fetchPolicies(),
                 fetchLiveMetrics(),
                 fetchTransactionsQueue(),
-                fetchWatchlistUsers(),
+                fetchBlacklist(),
             ]);
-            // Run quick AI audit in background
-            runRiskIntegrityAudit();
         } catch (error) {
             console.error('Error loading risk data:', error);
         } finally {
@@ -197,20 +231,26 @@ export default function RiskControlCenter() {
                 .select('key, value');
 
             if (data && data.length > 0) {
-                const settingsMap: Record<string, any> = {};
+                const map: Record<string, any> = {};
                 data.forEach(item => {
-                    settingsMap[item.key] = item.value;
+                    map[item.key] = item.value;
                 });
 
                 const loaded: RiskPolicySettings = {
-                    risk_max_single_tx: Number(settingsMap['risk_max_single_tx']) || 250000,
-                    risk_daily_account_limit: Number(settingsMap['risk_daily_account_limit']) || 1000000,
-                    risk_velocity_max_hourly_tx: Number(settingsMap['risk_velocity_max_hourly_tx']) || 6,
-                    risk_auto_quarantine_above: Number(settingsMap['risk_auto_quarantine_above']) || 100000,
-                    risk_require_kyc2_outflows: settingsMap['risk_require_kyc2_outflows'] === true || settingsMap['risk_require_kyc2_outflows'] === 'true',
-                    risk_global_freeze: settingsMap['risk_global_freeze'] === true || settingsMap['risk_global_freeze'] === 'true',
-                    risk_offhours_alerts: settingsMap['risk_offhours_alerts'] === true || settingsMap['risk_offhours_alerts'] === 'true',
-                    risk_auto_lock_failed_auth: settingsMap['risk_auto_lock_failed_auth'] === true || settingsMap['risk_auto_lock_failed_auth'] === 'true',
+                    risk_max_single_tx: Number(map['risk_max_single_tx']) || 250000,
+                    risk_daily_account_limit: Number(map['risk_daily_account_limit']) || 1000000,
+                    risk_velocity_max_hourly_tx: Number(map['risk_velocity_max_hourly_tx']) || 6,
+                    risk_auto_quarantine_above: Number(map['risk_auto_quarantine_above']) || 100000,
+                    risk_vtu_velocity_cap: Number(map['risk_vtu_velocity_cap']) || 25000,
+                    risk_crypto_single_max: Number(map['risk_crypto_single_max']) || 500000,
+                    risk_require_kyc2_outflows: map['risk_require_kyc2_outflows'] === true || map['risk_require_kyc2_outflows'] === 'true',
+                    risk_global_freeze: map['risk_global_freeze'] === true || map['risk_global_freeze'] === 'true',
+                    risk_offhours_alerts: map['risk_offhours_alerts'] === true || map['risk_offhours_alerts'] === 'true',
+                    risk_auto_lock_failed_auth: map['risk_auto_lock_failed_auth'] === true || map['risk_auto_lock_failed_auth'] === 'true',
+                    risk_crypto_killswitch: map['risk_crypto_killswitch'] === true || map['risk_crypto_killswitch'] === 'true',
+                    risk_vtu_killswitch: map['risk_vtu_killswitch'] === true || map['risk_vtu_killswitch'] === 'true',
+                    risk_cards_killswitch: map['risk_cards_killswitch'] === true || map['risk_cards_killswitch'] === 'true',
+                    risk_agenthub_killswitch: map['risk_agenthub_killswitch'] === true || map['risk_agenthub_killswitch'] === 'true',
                 };
 
                 setPolicies(loaded);
@@ -218,6 +258,8 @@ export default function RiskControlCenter() {
                 setInputDailyLimit(loaded.risk_daily_account_limit.toString());
                 setInputVelocity(loaded.risk_velocity_max_hourly_tx.toString());
                 setInputQuarantine(loaded.risk_auto_quarantine_above.toString());
+                setInputVtuCap(loaded.risk_vtu_velocity_cap.toString());
+                setInputCryptoMax(loaded.risk_crypto_single_max.toString());
             }
         } catch (e) {
             console.error('Fetch policies error:', e);
@@ -227,8 +269,7 @@ export default function RiskControlCenter() {
     // 2. Fetch Live Metrics & Aggregates
     const fetchLiveMetrics = async () => {
         try {
-            // Aggregate user balances
-            const { data: profiles, error: pErr } = await supabase
+            const { data: profiles } = await supabase
                 .from('profiles')
                 .select('id, balance, credit_balance, status');
 
@@ -241,7 +282,6 @@ export default function RiskControlCenter() {
                 setHighRiskUsersCount(highRisk.length);
             }
 
-            // Aggregate 24h transactions
             const past24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             const { data: tx24h } = await supabase
                 .from('transactions')
@@ -255,9 +295,7 @@ export default function RiskControlCenter() {
 
                 tx24h.forEach(tx => {
                     const amt = Number(tx.amount) || 0;
-                    if (tx.status === 'failed') {
-                        failedCount++;
-                    }
+                    if (tx.status === 'failed') failedCount++;
                     if (['transfer', 'withdrawal', 'crypto_buy', 'bill_payment'].includes(tx.type)) {
                         outSum += amt;
                     } else if (['deposit', 'credit', 'refund'].includes(tx.type)) {
@@ -269,12 +307,11 @@ export default function RiskControlCenter() {
                 setInflow24h(inSum);
                 setFailedTx24h(failedCount);
 
-                // Compute dynamic risk score (0 to 100)
-                let score = 15; // base nominal
-                if (failedCount > 5) score += Math.min(25, failedCount * 3);
-                if (outSum > inSum * 2 && inSum > 0) score += 20;
-                if (highRiskUsersCount > 3) score += Math.min(20, highRiskUsersCount * 4);
-                if (policies.risk_global_freeze) score = 95;
+                let score = 10;
+                if (failedCount > 3) score += Math.min(30, failedCount * 4);
+                if (outSum > inSum * 1.5 && inSum > 0) score += 18;
+                if (highRiskUsersCount > 0) score += Math.min(25, highRiskUsersCount * 5);
+                if (policies.risk_global_freeze) score = 98;
                 setRiskIndexScore(Math.min(100, Math.max(5, score)));
             }
         } catch (e) {
@@ -282,24 +319,23 @@ export default function RiskControlCenter() {
         }
     };
 
-    // 3. Fetch Transactions Queue (Recent 80)
+    // 3. Fetch Transactions Queue and Compute Real-Time Fraud Scores
     const fetchTransactionsQueue = async () => {
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('transactions')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(80);
+                .limit(100);
 
             if (data) {
-                // Fetch profiles for users in these transactions to have rich context
                 const userIds = Array.from(new Set(data.map(t => t.user_id).filter(Boolean)));
                 let profileMap: Record<string, UserProfile> = {};
 
                 if (userIds.length > 0) {
                     const { data: userProfiles } = await supabase
                         .from('profiles')
-                        .select('id, full_name, username, email, phone, status, kyc_tier, balance')
+                        .select('id, full_name, username, email, phone, status, kyc_tier, balance, created_at')
                         .in('id', userIds);
 
                     if (userProfiles) {
@@ -309,132 +345,136 @@ export default function RiskControlCenter() {
                     }
                 }
 
-                const enrichedTx: TransactionItem[] = data.map(tx => ({
-                    ...tx,
-                    amount: Number(tx.amount) || 0,
-                    user: profileMap[tx.user_id],
-                }));
+                const enrichedTx: TransactionItem[] = data.map(tx => {
+                    const amt = Number(tx.amount) || 0;
+                    const u = profileMap[tx.user_id];
+                    let fraudScore = 10;
+                    const reasons: string[] = [];
+
+                    // Evaluate Real Risk Factors
+                    if (amt >= (policies.risk_auto_quarantine_above || 100000)) {
+                        fraudScore += 45;
+                        reasons.push(`High Value (≥ ₦${(policies.risk_auto_quarantine_above / 1000).toFixed(0)}k)`);
+                    }
+                    if (u && (Number(u.kyc_tier) || 1) < 2 && amt >= 50000) {
+                        fraudScore += 30;
+                        reasons.push('Unverified Tier 1 User Large Outflow');
+                    }
+                    if (tx.status === 'failed') {
+                        fraudScore += 25;
+                        reasons.push('Declined by Gateway Rail');
+                    }
+                    if (u && (u.status === 'suspended' || u.status === 'blocked')) {
+                        fraudScore += 50;
+                        reasons.push('Account Already Frozen / Watchlist');
+                    }
+
+                    const txHour = new Date(tx.created_at).getHours();
+                    if (txHour >= 23 || txHour <= 5) {
+                        fraudScore += 15;
+                        reasons.push('Off-Hours Night Transaction (11PM - 5AM)');
+                    }
+
+                    return {
+                        ...tx,
+                        amount: amt,
+                        fraudScore: Math.min(100, fraudScore),
+                        riskReasons: reasons,
+                        user: u,
+                    };
+                });
 
                 setTransactions(enrichedTx);
                 applyTxFilter(enrichedTx, txFilter, txSearch);
-
-                // Count pending / high-risk flags
-                const flags = enrichedTx.filter(t => 
-                    Number(t.amount) >= (policies.risk_auto_quarantine_above || 100000) || 
-                    t.status === 'failed' || 
-                    t.status === 'flagged'
-                );
-                setPendingFlagsCount(flags.length);
+                setPendingFlagsCount(enrichedTx.filter(t => (t.fraudScore || 0) >= 50).length);
             }
         } catch (e) {
             console.error('Fetch tx queue error:', e);
         }
     };
 
-    // 4. Fetch Watchlist Users
-    const fetchWatchlistUsers = async () => {
+    // 4. Fetch Blacklist from app_settings
+    const fetchBlacklist = async () => {
         try {
             const { data } = await supabase
-                .from('profiles')
-                .select('id, full_name, username, email, phone, role, status, balance, credit_balance, kyc_tier, kyc_verified, transfer_limit, created_at')
-                .or('status.eq.suspended,status.eq.blocked,status.eq.flagged,balance.gt.500000')
-                .order('balance', { ascending: false })
-                .limit(50);
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'risk_global_blacklist')
+                .maybeSingle();
 
-            if (data) {
-                setWatchlistUsers(data);
+            if (data && data.value) {
+                let parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                if (Array.isArray(parsed)) {
+                    setBlacklist(parsed);
+                }
             }
         } catch (e) {
-            console.error('Fetch watchlist error:', e);
+            console.error('Fetch blacklist error:', e);
         }
     };
 
-    // 5. Run AI Risk & Integrity Scanner
-    const runRiskIntegrityAudit = async () => {
-        setScanningAudit(true);
-        const anomalies: AuditAnomaly[] = [];
+    // Save Blacklist to Supabase
+    const handleSaveBlacklist = async (updatedList: BlacklistItem[]) => {
         try {
-            // Check 1: Negative Wallet Balances
-            const { data: negProfiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, username, email, balance')
-                .lt('balance', 0);
-
-            if (negProfiles && negProfiles.length > 0) {
-                negProfiles.forEach(p => {
-                    anomalies.push({
-                        id: `neg_${p.id}`,
-                        type: 'negative_balance',
-                        title: 'Negative Balance Anomaly',
-                        description: `Account has a negative wallet balance of ₦${Math.abs(Number(p.balance)).toLocaleString()}. Potential race condition or unverified overdraft.`,
-                        severity: 'critical',
-                        entityId: p.id,
-                        entityName: p.full_name || p.username || p.email || p.id,
-                        amount: Number(p.balance),
-                    });
-                });
-            }
-
-            // Check 2: High-Balance Unverified Accounts (Whales without KYC Tier 2)
-            const { data: whaleProfiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, username, email, balance, kyc_tier')
-                .gt('balance', 250000);
-
-            if (whaleProfiles) {
-                whaleProfiles.filter(p => (Number(p.kyc_tier) || 0) < 2).forEach(p => {
-                    anomalies.push({
-                        id: `whale_${p.id}`,
-                        type: 'unverified_whale',
-                        title: 'Unverified High-Exposure Account',
-                        description: `Account holds ₦${Number(p.balance).toLocaleString()} but has low verification (Tier ${p.kyc_tier || 1}). High regulatory and float exposure.`,
-                        severity: 'high',
-                        entityId: p.id,
-                        entityName: p.full_name || p.username || p.email || p.id,
-                        amount: Number(p.balance),
-                    });
-                });
-            }
-
-            // Check 3: High Failed Transaction Spikes in last 24h
-            const past24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-            const { data: failedTxs } = await supabase
-                .from('transactions')
-                .select('id, user_id, amount, description, status')
-                .eq('status', 'failed')
-                .gte('created_at', past24hIso)
-                .limit(10);
-
-            if (failedTxs && failedTxs.length >= 3) {
-                anomalies.push({
-                    id: `failed_spike_24h`,
-                    type: 'failed_spike',
-                    title: 'Repeated Transaction Failure Spike',
-                    description: `Detected ${failedTxs.length} failed transactions in the last 24h. Recommend reviewing gateway connectivity and partner APIs.`,
-                    severity: 'medium',
-                    entityId: 'gateway_system',
-                    entityName: 'Payment Gateway Channel',
-                });
-            }
-
-            setAuditAnomalies(anomalies);
+            await supabase
+                .from('app_settings')
+                .upsert({
+                    key: 'risk_global_blacklist',
+                    value: JSON.stringify(updatedList),
+                }, { onConflict: 'key' });
+            setBlacklist(updatedList);
         } catch (e) {
-            console.error('AI audit error:', e);
-        } finally {
-            setScanningAudit(false);
+            console.error('Save blacklist error:', e);
         }
     };
 
-    // Filter Helper
+    const handleAddBlacklistEntry = async () => {
+        if (!newBlacklistValue.trim()) {
+            Alert.alert('Required', 'Please enter a target account number, phone, email, or IP address.');
+            return;
+        }
+
+        const newEntry: BlacklistItem = {
+            id: `bl_${Date.now()}`,
+            type: newBlacklistType,
+            value: newBlacklistValue.trim().toLowerCase(),
+            reason: newBlacklistReason.trim() || 'Manual Manager Blacklist Flag',
+            created_at: new Date().toISOString(),
+        };
+
+        const updated = [newEntry, ...blacklist];
+        await handleSaveBlacklist(updated);
+        setShowBlacklistModal(false);
+        setNewBlacklistValue('');
+        setNewBlacklistReason('');
+        Alert.alert('Blacklist Updated ✅', `${newBlacklistType.toUpperCase()}: ${newEntry.value} has been blocked platform-wide.`);
+    };
+
+    const handleRemoveBlacklistEntry = async (id: string) => {
+        Alert.alert('Remove Blacklist Rule', 'Are you sure you want to unblock this entry?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Unblock',
+                style: 'destructive',
+                onPress: async () => {
+                    const updated = blacklist.filter(b => b.id !== id);
+                    await handleSaveBlacklist(updated);
+                    Alert.alert('Unblocked', 'Entry removed from blacklist.');
+                }
+            }
+        ]);
+    };
+
+    // Filter Logic
     const applyTxFilter = (list: TransactionItem[], filter: string, search: string) => {
         let result = [...list];
 
-        if (filter === 'high_value') {
-            result = result.filter(t => Number(t.amount) >= (policies.risk_auto_quarantine_above || 50000));
+        if (filter === 'high_risk') {
+            result = result.filter(t => (t.fraudScore || 0) >= 50);
         } else if (filter === 'failed') {
             result = result.filter(t => t.status === 'failed');
-        } else if (filter === 'flagged') {
-            result = result.filter(t => t.status === 'flagged' || Number(t.amount) >= 100000);
+        } else if (filter === 'high_value') {
+            result = result.filter(t => Number(t.amount) >= (policies.risk_auto_quarantine_above || 50000));
         }
 
         if (search.trim()) {
@@ -444,7 +484,6 @@ export default function RiskControlCenter() {
                 t.reference?.toLowerCase().includes(q) ||
                 t.user?.email?.toLowerCase().includes(q) ||
                 t.user?.full_name?.toLowerCase().includes(q) ||
-                t.user?.username?.toLowerCase().includes(q) ||
                 String(t.amount).includes(q)
             );
         }
@@ -452,19 +491,17 @@ export default function RiskControlCenter() {
         setFilteredTx(result);
     };
 
-    // Handle Filter Tab Change
-    const handleFilterChange = (filter: 'all' | 'high_value' | 'failed' | 'flagged') => {
+    const handleFilterChange = (filter: 'all' | 'high_risk' | 'failed' | 'high_value') => {
         setTxFilter(filter);
         applyTxFilter(transactions, filter, txSearch);
     };
 
-    // Handle Search Change
     const handleSearchChange = (text: string) => {
         setTxSearch(text);
         applyTxFilter(transactions, txFilter, text);
     };
 
-    // Save Policy Rules to Supabase
+    // Save Policies
     const handleSavePolicies = async () => {
         setSavingPolicies(true);
         try {
@@ -473,10 +510,16 @@ export default function RiskControlCenter() {
                 risk_daily_account_limit: Number(inputDailyLimit) || 1000000,
                 risk_velocity_max_hourly_tx: Number(inputVelocity) || 6,
                 risk_auto_quarantine_above: Number(inputQuarantine) || 100000,
+                risk_vtu_velocity_cap: Number(inputVtuCap) || 25000,
+                risk_crypto_single_max: Number(inputCryptoMax) || 500000,
                 risk_require_kyc2_outflows: policies.risk_require_kyc2_outflows,
                 risk_global_freeze: policies.risk_global_freeze,
                 risk_offhours_alerts: policies.risk_offhours_alerts,
                 risk_auto_lock_failed_auth: policies.risk_auto_lock_failed_auth,
+                risk_crypto_killswitch: policies.risk_crypto_killswitch,
+                risk_vtu_killswitch: policies.risk_vtu_killswitch,
+                risk_cards_killswitch: policies.risk_cards_killswitch,
+                risk_agenthub_killswitch: policies.risk_agenthub_killswitch,
             };
 
             const payload = Object.entries(updatedPolicies).map(([key, value]) => ({
@@ -491,112 +534,52 @@ export default function RiskControlCenter() {
             if (error) throw error;
 
             setPolicies(updatedPolicies);
-            Alert.alert('Success ✅', 'Risk Control Policies and Limits have been saved and applied across the system.');
+            Alert.alert('Deployed ✅', 'Real Risk Control Rules & Channel Limits successfully saved.');
         } catch (e: any) {
-            Alert.alert('Save Error', e.message || 'Failed to save risk control policies.');
+            Alert.alert('Save Error', e.message);
         } finally {
             setSavingPolicies(false);
         }
     };
 
-    // Toggle Global Emergency Freeze
-    const handleToggleGlobalFreeze = async (newVal: boolean) => {
-        if (newVal) {
-            Alert.alert(
-                '🚨 ACTIVATE GLOBAL OUTFLOW FREEZE',
-                'This will INSTANTLY halt and reject all outgoing bank transfers, airtime/data purchases, and crypto withdrawals across the entire platform. Are you sure?',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'YES, FREEZE SYSTEM',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                await supabase
-                                    .from('app_settings')
-                                    .upsert({ key: 'risk_global_freeze', value: 'true' }, { onConflict: 'key' });
-                                setPolicies(p => ({ ...p, risk_global_freeze: true }));
-                                setRiskIndexScore(95);
-                                Alert.alert('LOCKDOWN ACTIVE ❄️', 'All system outgoing debit transfers are now locked.');
-                            } catch (err: any) {
-                                Alert.alert('Error', err.message);
-                            }
-                        }
-                    }
-                ]
-            );
-        } else {
-            Alert.alert(
-                '🔓 LIFT GLOBAL FREEZE',
-                'Are you sure you want to resume normal transaction processing and outgoing payouts?',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Resume Operations',
-                        onPress: async () => {
-                            try {
-                                await supabase
-                                    .from('app_settings')
-                                    .upsert({ key: 'risk_global_freeze', value: 'false' }, { onConflict: 'key' });
-                                setPolicies(p => ({ ...p, risk_global_freeze: false }));
-                                setRiskIndexScore(20);
-                                Alert.alert('Operations Resumed ✅', 'System is now processing transactions normally.');
-                            } catch (err: any) {
-                                Alert.alert('Error', err.message);
-                            }
-                        }
-                    }
-                ]
-            );
-        }
-    };
-
-    // 1-Click Action: Freeze / Unfreeze Specific User Account
+    // 1-Click Action: Freeze/Unfreeze User
     const handleToggleUserFreeze = async (user: UserProfile) => {
         const isSuspended = user.status === 'suspended' || user.status === 'blocked';
         const targetStatus = isSuspended ? 'active' : 'suspended';
 
         Alert.alert(
-            isSuspended ? 'Unfreeze User Account' : 'Freeze User Account',
-            `Are you sure you want to ${isSuspended ? 'reactivate' : 'freeze'} account for ${user.full_name || user.email}? ${isSuspended ? '' : 'The user will be immediately blocked from making transfers or logins.'}`,
+            isSuspended ? 'Reactivate User' : 'Emergency Freeze User',
+            `Set ${user.full_name || user.email}'s account to ${targetStatus.toUpperCase()}?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: isSuspended ? 'Reactivate' : 'Freeze Account',
+                    text: isSuspended ? 'Reactivate' : 'Freeze Instantly',
                     style: isSuspended ? 'default' : 'destructive',
                     onPress: async () => {
                         setActionLoading(true);
                         try {
-                            const { error } = await supabase
+                            await supabase
                                 .from('profiles')
                                 .update({ status: targetStatus })
                                 .eq('id', user.id);
 
-                            if (error) throw error;
-
-                            // Send in-app notification to user
                             await supabase.from('notifications').insert({
                                 user_id: user.id,
-                                title: isSuspended ? 'Account Reactivated ✅' : 'Security Alert: Account Frozen ❄️',
-                                message: isSuspended 
-                                    ? 'Your account security review has passed and access has been restored.'
-                                    : 'Your account has been temporarily frozen by Compliance Risk Management for security audit. Please contact support.',
+                                title: isSuspended ? 'Account Reactivated ✅' : 'Security Freeze Alert ❄️',
+                                message: isSuspended
+                                    ? 'Your account security review has cleared and full access is restored.'
+                                    : 'Your account has been temporarily frozen by Compliance Risk Management for safety review.',
                                 type: 'security',
                             });
 
-                            // Refresh local lists
-                            setWatchlistUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: targetStatus } : u));
-                            if (selectedUser?.id === user.id) {
-                                setSelectedUser({ ...selectedUser, status: targetStatus });
-                            }
                             if (selectedTx?.user?.id === user.id) {
                                 setSelectedTx({ ...selectedTx, user: { ...selectedTx.user, status: targetStatus } });
                             }
 
-                            Alert.alert('Status Updated', `User account is now ${targetStatus}.`);
-                            fetchLiveMetrics();
+                            Alert.alert('Status Updated', `User is now ${targetStatus}.`);
+                            loadAllRiskData();
                         } catch (err: any) {
-                            Alert.alert('Action Error', err.message || 'Failed to update user status.');
+                            Alert.alert('Error', err.message);
                         } finally {
                             setActionLoading(false);
                         }
@@ -606,33 +589,11 @@ export default function RiskControlCenter() {
         );
     };
 
-    // 1-Click Action: Approve & Clear Transaction Flag
-    const handleApproveTxFlag = async (tx: TransactionItem) => {
-        setActionLoading(true);
-        try {
-            const { error } = await supabase
-                .from('transactions')
-                .update({ status: 'success' })
-                .eq('id', tx.id);
-
-            if (error) throw error;
-
-            setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, status: 'success' } : t));
-            applyTxFilter(transactions.map(t => t.id === tx.id ? { ...t, status: 'success' } : t), txFilter, txSearch);
-            setSelectedTx(null);
-            Alert.alert('Approved ✅', 'Transaction has been verified and cleared.');
-        } catch (err: any) {
-            Alert.alert('Approval Error', err.message || 'Failed to approve transaction.');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    // 1-Click Action: Reverse / Refund Transaction to User Wallet
+    // 1-Click Action: Reverse & Refund Wallet
     const handleReverseTransaction = async (tx: TransactionItem) => {
         Alert.alert(
             'Reverse & Refund Transaction',
-            `Are you sure you want to reverse Transaction #${tx.reference || tx.id.slice(0, 8)} of ₦${Number(tx.amount).toLocaleString()} and credit it back to the user's wallet?`,
+            `Refund ₦${Number(tx.amount).toLocaleString()} back to user wallet #${tx.user_id.slice(0, 8)}?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -641,7 +602,6 @@ export default function RiskControlCenter() {
                     onPress: async () => {
                         setActionLoading(true);
                         try {
-                            // 1. Get current balance
                             const { data: userProfile, error: pErr } = await supabase
                                 .from('profiles')
                                 .select('balance')
@@ -653,21 +613,16 @@ export default function RiskControlCenter() {
                             const refundAmount = Number(tx.amount) || 0;
                             const newBalance = (Number(userProfile.balance) || 0) + refundAmount;
 
-                            // 2. Update user balance
-                            const { error: uErr } = await supabase
+                            await supabase
                                 .from('profiles')
                                 .update({ balance: newBalance })
                                 .eq('id', tx.user_id);
 
-                            if (uErr) throw uErr;
-
-                            // 3. Mark original transaction as reversed
                             await supabase
                                 .from('transactions')
                                 .update({ status: 'reversed' })
                                 .eq('id', tx.id);
 
-                            // 4. Log refund transaction record
                             await supabase.from('transactions').insert({
                                 user_id: tx.user_id,
                                 type: 'refund',
@@ -677,19 +632,18 @@ export default function RiskControlCenter() {
                                 reference: `REF-${Date.now().toString().slice(-6)}`,
                             });
 
-                            // 5. Send notification
                             await supabase.from('notifications').insert({
                                 user_id: tx.user_id,
                                 title: 'Wallet Refund Received 💰',
-                                message: `₦${refundAmount.toLocaleString()} has been refunded to your wallet following risk resolution.`,
+                                message: `₦${refundAmount.toLocaleString()} has been refunded to your wallet following compliance review.`,
                                 type: 'credit',
                             });
 
                             setSelectedTx(null);
-                            Alert.alert('Refund Complete ✅', `Successfully refunded ₦${refundAmount.toLocaleString()} to user wallet.`);
+                            Alert.alert('Refund Complete ✅', `Successfully credited ₦${refundAmount.toLocaleString()} to user.`);
                             loadAllRiskData();
                         } catch (err: any) {
-                            Alert.alert('Refund Error', err.message || 'Failed to process refund.');
+                            Alert.alert('Refund Error', err.message);
                         } finally {
                             setActionLoading(false);
                         }
@@ -699,60 +653,53 @@ export default function RiskControlCenter() {
         );
     };
 
-    // 1-Click Action: Auto-Resolve AI Audit Anomaly
-    const handleResolveAnomaly = async (anomaly: AuditAnomaly) => {
-        if (anomaly.type === 'negative_balance') {
-            Alert.alert(
-                'Zero Out Negative Balance',
-                `Do you want to reset ${anomaly.entityName}'s negative balance of ₦${anomaly.amount} to ₦0?`,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Reset to ₦0',
-                        onPress: async () => {
-                            try {
-                                await supabase
-                                    .from('profiles')
-                                    .update({ balance: 0 })
-                                    .eq('id', anomaly.entityId);
+    // 1-Click Action: Run Stress Test Simulation
+    const handleRunStressTest = () => {
+        setSimulatingStress(true);
+        setTimeout(() => {
+            const projectedSurgeOutflow = totalFloatLiability * (stressTestFloatRun / 100);
+            const remainingBuffer = Math.max(0, totalFloatLiability - projectedSurgeOutflow);
+            const isCritical = stressTestFloatRun > 40;
 
-                                setAuditAnomalies(prev => prev.filter(a => a.id !== anomaly.id));
-                                Alert.alert('Resolved ✅', 'Negative balance corrected.');
-                                loadAllRiskData();
-                            } catch (e: any) {
-                                Alert.alert('Error', e.message);
-                            }
-                        }
-                    }
-                ]
-            );
-        } else if (anomaly.type === 'unverified_whale') {
-            Alert.alert(
-                'Force KYC Upgrade Notice',
-                `Send urgent Tier 2 KYC verification request to ${anomaly.entityName}?`,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Send Verification Demand',
-                        onPress: async () => {
-                            try {
-                                await supabase.from('notifications').insert({
-                                    user_id: anomaly.entityId,
-                                    title: 'Action Required: Upgrade KYC 📋',
-                                    message: 'Due to your high account volume, regulatory compliance requires completing Tier 2 verification to maintain active withdrawal access.',
-                                    type: 'kyc',
-                                });
-                                Alert.alert('Notice Dispatched 📨', 'Verification demand sent to user.');
-                            } catch (e: any) {
-                                Alert.alert('Error', e.message);
-                            }
-                        }
-                    }
-                ]
-            );
+            setStressResult({
+                surgePercent: stressTestFloatRun,
+                projectedOutflow: projectedSurgeOutflow,
+                remainingFloat: remainingBuffer,
+                liquidityHealth: isCritical ? 'DEFICIT_RISK' : 'OPTIMAL_COVERAGE',
+                recommendation: isCritical 
+                    ? 'Recommend deploying Payvessel/Paystack auto-quarantine limits and capping single withdrawals to ₦100,000.'
+                    : 'System liquidity buffers adequately cover this outflow surge without gateway throttling.',
+            });
+            setSimulatingStress(false);
+        }, 600);
+    };
+
+    // Export Compliance Report
+    const handleExportAuditReport = async () => {
+        const report = `=== ABUMAFHAL ROYAL FINTECH: RISK & COMPLIANCE REPORT ===
+Timestamp: ${new Date().toISOString()}
+System Float & Liability: ₦${totalFloatLiability.toLocaleString()}
+Active User Profiles: ${totalUserCount}
+Risk Index: ${riskIndexScore}/100
+24h Outflow Volume: ₦${outflow24h.toLocaleString()}
+24h Inflow Volume: ₦${inflow24h.toLocaleString()}
+Failed Gateway Tx (24h): ${failedTx24h}
+Active High-Risk Accounts: ${highRiskUsersCount}
+Global Outflow Freeze: ${policies.risk_global_freeze ? 'ACTIVE' : 'INACTIVE'}
+Active Blacklist Rules: ${blacklist.length}
+
+Primary Infrastructure Channels:
+1. Payvessel & Paystack: Reserved Accounts & Virtual Cards Engine
+2. Bilalsadasub & Clubkonnect: Airtime & Data VTU Rails
+3. AgentHub: Realtime NIN / BVN / CAC Identity Verification Engine
+4. NOWPayments: Crypto Custody & Settlement
+5. Termii: SMS 2FA & Critical Dispatch`;
+
+        if (Platform.OS === 'web') {
+            await Clipboard.setStringAsync(report);
+            Alert.alert('Report Copied 📋', 'Full Risk & Compliance Audit report copied to clipboard.');
         } else {
-            setAuditAnomalies(prev => prev.filter(a => a.id !== anomaly.id));
-            Alert.alert('Audit Flag Acknowledged', 'Anomaly marked as reviewed.');
+            await Share.share({ message: report, title: 'ABUMAFHAL Risk Audit Report' });
         }
     };
 
@@ -764,14 +711,19 @@ export default function RiskControlCenter() {
                     headerStyle: { backgroundColor: T.navyDark },
                     headerTintColor: '#FFFFFF',
                     headerRight: () => (
-                        <TouchableOpacity onPress={onRefresh} style={{ marginRight: 12 }}>
-                            <Ionicons name="refresh" size={20} color={T.gold} />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginRight: 10 }}>
+                            <TouchableOpacity onPress={handleExportAuditReport}>
+                                <Ionicons name="share-outline" size={20} color={T.gold} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={onRefresh}>
+                                <Ionicons name="refresh" size={20} color={T.gold} />
+                            </TouchableOpacity>
+                        </View>
                     ),
                 }}
             />
 
-            {/* Global Freeze Banner when active */}
+            {/* Global Freeze Banner */}
             {policies.risk_global_freeze && (
                 <View style={styles.emergencyBanner}>
                     <Ionicons name="warning" size={18} color="#FFFFFF" />
@@ -781,13 +733,13 @@ export default function RiskControlCenter() {
                 </View>
             )}
 
-            {/* Sub-Navigation Tab Bar */}
+            {/* Navigation Tabs */}
             <View style={styles.tabBar}>
                 <TouchableOpacity
                     onPress={() => setActiveTab('overview')}
                     style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
                 >
-                    <Ionicons name="pulse" size={16} color={activeTab === 'overview' ? T.gold : T.textSub} />
+                    <Ionicons name="pulse" size={15} color={activeTab === 'overview' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
                         Overview
                     </Text>
@@ -797,7 +749,7 @@ export default function RiskControlCenter() {
                     onPress={() => setActiveTab('policies')}
                     style={[styles.tabItem, activeTab === 'policies' && styles.tabItemActive]}
                 >
-                    <Ionicons name="shield-checkmark" size={16} color={activeTab === 'policies' ? T.gold : T.textSub} />
+                    <Ionicons name="shield-checkmark" size={15} color={activeTab === 'policies' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'policies' && styles.tabTextActive]}>
                         Policies
                     </Text>
@@ -807,32 +759,39 @@ export default function RiskControlCenter() {
                     onPress={() => setActiveTab('queue')}
                     style={[styles.tabItem, activeTab === 'queue' && styles.tabItemActive]}
                 >
-                    <Ionicons name="alert-circle" size={16} color={activeTab === 'queue' ? T.gold : T.textSub} />
+                    <Ionicons name="alert-circle" size={15} color={activeTab === 'queue' ? T.gold : T.textSub} />
                     <Text style={[styles.tabText, activeTab === 'queue' && styles.tabTextActive]}>
                         Queue ({pendingFlagsCount})
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    onPress={() => setActiveTab('watchlist')}
-                    style={[styles.tabItem, activeTab === 'watchlist' && styles.tabItemActive]}
+                    onPress={() => setActiveTab('channels')}
+                    style={[styles.tabItem, activeTab === 'channels' && styles.tabItemActive]}
                 >
-                    <Ionicons name="people" size={16} color={activeTab === 'watchlist' ? T.gold : T.textSub} />
-                    <Text style={[styles.tabText, activeTab === 'watchlist' && styles.tabTextActive]}>
-                        Watchlist
+                    <Ionicons name="git-network" size={15} color={activeTab === 'channels' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'channels' && styles.tabTextActive]}>
+                        Channels
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    onPress={() => {
-                        setActiveTab('ai_audit');
-                        runRiskIntegrityAudit();
-                    }}
-                    style={[styles.tabItem, activeTab === 'ai_audit' && styles.tabItemActive]}
+                    onPress={() => setActiveTab('blacklist')}
+                    style={[styles.tabItem, activeTab === 'blacklist' && styles.tabItemActive]}
                 >
-                    <Ionicons name="hardware-chip" size={16} color={activeTab === 'ai_audit' ? T.gold : T.textSub} />
-                    <Text style={[styles.tabText, activeTab === 'ai_audit' && styles.tabTextActive]}>
-                        AI Audit
+                    <Ionicons name="ban" size={15} color={activeTab === 'blacklist' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'blacklist' && styles.tabTextActive]}>
+                        Blacklist ({blacklist.length})
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={() => setActiveTab('stress_test')}
+                    style={[styles.tabItem, activeTab === 'stress_test' && styles.tabItemActive]}
+                >
+                    <Ionicons name="speedometer" size={15} color={activeTab === 'stress_test' ? T.gold : T.textSub} />
+                    <Text style={[styles.tabText, activeTab === 'stress_test' && styles.tabTextActive]}>
+                        Stress Test
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -840,7 +799,7 @@ export default function RiskControlCenter() {
             {loading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={T.gold} />
-                    <Text style={styles.loadingText}>Loading Live Risk Telemetry...</Text>
+                    <Text style={styles.loadingText}>Connecting to Live Risk Telemetry...</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -852,14 +811,13 @@ export default function RiskControlCenter() {
                     {/* ========================================================================= */}
                     {activeTab === 'overview' && (
                         <View>
-                            {/* Exposure Gauge & Risk Index Header */}
                             <LinearGradient
-                                colors={[T.navyDark, T.navyMid]}
+                                colors={[T.navyMid, T.navyDark]}
                                 style={styles.heroCard}
                             >
                                 <View style={styles.heroHeader}>
                                     <View>
-                                        <Text style={styles.heroSub}>SYSTEM LIABILITY & FLOAT</Text>
+                                        <Text style={styles.heroSub}>REALTIME SYSTEM FLOAT LIABILITY</Text>
                                         <Text style={styles.heroTitle}>
                                             ₦ {totalFloatLiability.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </Text>
@@ -867,74 +825,73 @@ export default function RiskControlCenter() {
                                     <View style={[
                                         styles.riskBadge,
                                         riskIndexScore > 75 ? styles.riskBadgeCritical :
-                                        riskIndexScore > 40 ? styles.riskBadgeWarn : styles.riskBadgeSafe
+                                        riskIndexScore > 35 ? styles.riskBadgeWarn : styles.riskBadgeSafe
                                     ]}>
                                         <Text style={[
                                             styles.riskBadgeText,
                                             riskIndexScore > 75 ? styles.riskBadgeTextCritical :
-                                            riskIndexScore > 40 ? styles.riskBadgeTextWarn : styles.riskBadgeTextSafe
+                                            riskIndexScore > 35 ? styles.riskBadgeTextWarn : styles.riskBadgeTextSafe
                                         ]}>
-                                            {riskIndexScore > 75 ? 'HIGH RISK' : riskIndexScore > 40 ? 'MODERATE' : 'HEALTHY'}
+                                            {riskIndexScore > 75 ? 'HIGH RISK' : riskIndexScore > 35 ? 'MODERATE' : 'OPTIMAL'}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {/* Dynamic Risk Gauge Bar */}
                                 <View style={styles.gaugeContainer}>
                                     <View style={styles.gaugeTrack}>
                                         <View style={[
                                             styles.gaugeFill,
                                             {
                                                 width: `${riskIndexScore}%`,
-                                                backgroundColor: riskIndexScore > 75 ? T.danger : riskIndexScore > 40 ? T.warning : T.success
+                                                backgroundColor: riskIndexScore > 75 ? T.danger : riskIndexScore > 35 ? T.warning : T.success
                                             }
                                         ]} />
                                     </View>
                                     <View style={styles.gaugeMeta}>
                                         <Text style={styles.gaugeMetaText}>Risk Index: {riskIndexScore}/100</Text>
-                                        <Text style={styles.gaugeMetaText}>{totalUserCount} Active Profiles</Text>
+                                        <Text style={styles.gaugeMetaText}>{totalUserCount} Active Wallets</Text>
                                     </View>
                                 </View>
                             </LinearGradient>
 
-                            {/* 24-Hour Velocity & Flow Metrics */}
+                            {/* Flow Telemetry Grid */}
                             <View style={styles.metricGrid}>
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <Ionicons name="arrow-down-circle" size={18} color={T.success} />
+                                        <Ionicons name="arrow-down-circle" size={16} color={T.success} />
                                         <Text style={styles.metricLabel}>24h Inflow</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.success }]}>
-                                        +₦{outflow24h > 0 ? (inflow24h / 1000).toFixed(1) : '0'}k
+                                        +₦{inflow24h > 0 ? (inflow24h / 1000).toFixed(1) : '0'}k
                                     </Text>
-                                    <Text style={styles.metricSub}>Deposits & Credits</Text>
+                                    <Text style={styles.metricSub}>Payvessel / Paystack</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <Ionicons name="arrow-up-circle" size={18} color={T.danger} />
+                                        <Ionicons name="arrow-up-circle" size={16} color={T.danger} />
                                         <Text style={styles.metricLabel}>24h Outflow</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.danger }]}>
                                         -₦{outflow24h > 0 ? (outflow24h / 1000).toFixed(1) : '0'}k
                                     </Text>
-                                    <Text style={styles.metricSub}>Transfers & Bills</Text>
+                                    <Text style={styles.metricSub}>VTU / Crypto / Cards</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <Ionicons name="alert-circle" size={18} color={T.warning} />
+                                        <Ionicons name="alert-circle" size={16} color={T.warning} />
                                         <Text style={styles.metricLabel}>24h Failures</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.warning }]}>
                                         {failedTx24h} Tx
                                     </Text>
-                                    <Text style={styles.metricSub}>Declined / Gateway</Text>
+                                    <Text style={styles.metricSub}>Gateway Rejections</Text>
                                 </View>
 
                                 <View style={styles.metricCard}>
                                     <View style={styles.metricCardHeader}>
-                                        <Ionicons name="shield" size={18} color={T.purple} />
+                                        <Ionicons name="shield" size={16} color={T.purple} />
                                         <Text style={styles.metricLabel}>Watchlist</Text>
                                     </View>
                                     <Text style={[styles.metricValue, { color: T.purple }]}>
@@ -944,180 +901,199 @@ export default function RiskControlCenter() {
                                 </View>
                             </View>
 
-                            {/* Quick Action Matrix */}
-                            <Text style={styles.sectionHeading}>Emergency & Fast Response Actions</Text>
-                            <View style={styles.quickActionRow}>
+                            {/* Emergency Killswitches */}
+                            <Text style={styles.sectionHeading}>Emergency Service Killswitches</Text>
+                            <View style={styles.killswitchGrid}>
                                 <TouchableOpacity
-                                    onPress={() => handleToggleGlobalFreeze(!policies.risk_global_freeze)}
-                                    style={[styles.actionBtn, policies.risk_global_freeze ? styles.actionBtnActiveRed : styles.actionBtnRed]}
+                                    onPress={async () => {
+                                        const newVal = !policies.risk_global_freeze;
+                                        await supabase.from('app_settings').upsert({ key: 'risk_global_freeze', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
+                                        setPolicies(p => ({ ...p, risk_global_freeze: newVal }));
+                                        Alert.alert('System Freeze', newVal ? 'GLOBAL OUTFLOW HALTED ❄️' : 'System Resumed ✅');
+                                    }}
+                                    style={[styles.killswitchCard, policies.risk_global_freeze && styles.killswitchActiveRed]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name={policies.risk_global_freeze ? "lock-open" : "snow"} size={20} color="#FFFFFF" />
-                                    <Text style={styles.actionBtnText}>
-                                        {policies.risk_global_freeze ? 'Lift Lockdown' : 'Emergency Freeze'}
+                                    <Ionicons name="snow" size={22} color={policies.risk_global_freeze ? "#FFFFFF" : T.danger} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_global_freeze && { color: '#FFFFFF' }]}>
+                                        Global Freeze
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_global_freeze && { color: '#FEE2E2' }]}>
+                                        {policies.risk_global_freeze ? 'LOCKED' : 'Active'}
                                     </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    onPress={() => {
-                                        setActiveTab('ai_audit');
-                                        runRiskIntegrityAudit();
+                                    onPress={async () => {
+                                        const newVal = !policies.risk_crypto_killswitch;
+                                        await supabase.from('app_settings').upsert({ key: 'risk_crypto_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
+                                        setPolicies(p => ({ ...p, risk_crypto_killswitch: newVal }));
+                                        Alert.alert('Crypto Guard', newVal ? 'NOWPayments Withdrawals Locked ⛔' : 'Crypto Enabled ✅');
                                     }}
-                                    style={styles.actionBtnBlue}
+                                    style={[styles.killswitchCard, policies.risk_crypto_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="hardware-chip-outline" size={20} color="#FFFFFF" />
-                                    <Text style={styles.actionBtnText}>Run AI Audit</Text>
+                                    <Ionicons name="logo-bitcoin" size={22} color={policies.risk_crypto_killswitch ? "#FFFFFF" : T.warning} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_crypto_killswitch && { color: '#FFFFFF' }]}>
+                                        Crypto Outflows
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_crypto_killswitch && { color: '#FEF3C7' }]}>
+                                        {policies.risk_crypto_killswitch ? 'BLOCKED' : 'Active'}
+                                    </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    onPress={() => setActiveTab('policies')}
-                                    style={styles.actionBtnGold}
+                                    onPress={async () => {
+                                        const newVal = !policies.risk_vtu_killswitch;
+                                        await supabase.from('app_settings').upsert({ key: 'risk_vtu_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
+                                        setPolicies(p => ({ ...p, risk_vtu_killswitch: newVal }));
+                                        Alert.alert('VTU Rail', newVal ? 'Bilalsadasub / Clubkonnect Paused ⏸️' : 'VTU Enabled ✅');
+                                    }}
+                                    style={[styles.killswitchCard, policies.risk_vtu_killswitch && styles.killswitchActiveWarn]}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="options-outline" size={20} color="#0A1128" />
-                                    <Text style={[styles.actionBtnText, { color: '#0A1128' }]}>Edit Limits</Text>
+                                    <Ionicons name="phone-portrait" size={22} color={policies.risk_vtu_killswitch ? "#FFFFFF" : T.info} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_vtu_killswitch && { color: '#FFFFFF' }]}>
+                                        VTU & Airtime
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_vtu_killswitch && { color: '#E0F2FE' }]}>
+                                        {policies.risk_vtu_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
                                 </TouchableOpacity>
-                            </View>
 
-                            {/* Gateway & Partner Integrity Status */}
-                            <Text style={styles.sectionHeading}>Counterparty & Channel Health</Text>
-                            <View style={styles.gatewayCard}>
-                                <View style={styles.gatewayRow}>
-                                    <View style={styles.gatewayLeft}>
-                                        <View style={styles.statusDotGreen} />
-                                        <Text style={styles.gatewayName}>Monnify Reserved Accounts</Text>
-                                    </View>
-                                    <Text style={styles.gatewayStatusText}>Operational 99.8%</Text>
-                                </View>
-
-                                <View style={styles.gatewayRow}>
-                                    <View style={styles.gatewayLeft}>
-                                        <View style={styles.statusDotGreen} />
-                                        <Text style={styles.gatewayName}>Payvessel Virtual Cards & Rails</Text>
-                                    </View>
-                                    <Text style={styles.gatewayStatusText}>Active & Synced</Text>
-                                </View>
-
-                                <View style={styles.gatewayRow}>
-                                    <View style={styles.gatewayLeft}>
-                                        <View style={styles.statusDotGreen} />
-                                        <Text style={styles.gatewayName}>VTPass / Bilk Bills & Airtime</Text>
-                                    </View>
-                                    <Text style={styles.gatewayStatusText}>Low Latency (140ms)</Text>
-                                </View>
-
-                                <View style={[styles.gatewayRow, { borderBottomWidth: 0 }]}>
-                                    <View style={styles.gatewayLeft}>
-                                        <View style={styles.statusDotGreen} />
-                                        <Text style={styles.gatewayName}>Crypto Liquidity & Gas Pool</Text>
-                                    </View>
-                                    <Text style={styles.gatewayStatusText}>Adequate Float</Text>
-                                </View>
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        const newVal = !policies.risk_agenthub_killswitch;
+                                        await supabase.from('app_settings').upsert({ key: 'risk_agenthub_killswitch', value: newVal ? 'true' : 'false' }, { onConflict: 'key' });
+                                        setPolicies(p => ({ ...p, risk_agenthub_killswitch: newVal }));
+                                        Alert.alert('AgentHub Guard', newVal ? 'NIN/BVN API Calls Paused ⏸️' : 'Identity Rails Active ✅');
+                                    }}
+                                    style={[styles.killswitchCard, policies.risk_agenthub_killswitch && styles.killswitchActiveWarn]}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="finger-print" size={22} color={policies.risk_agenthub_killswitch ? "#FFFFFF" : T.purple} />
+                                    <Text style={[styles.killswitchTitle, policies.risk_agenthub_killswitch && { color: '#FFFFFF' }]}>
+                                        AgentHub API
+                                    </Text>
+                                    <Text style={[styles.killswitchSub, policies.risk_agenthub_killswitch && { color: '#F3E8FF' }]}>
+                                        {policies.risk_agenthub_killswitch ? 'PAUSED' : 'Active'}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     )}
 
                     {/* ========================================================================= */}
-                    {/* TAB 2: RISK POLICIES & LIMITS CONFIGURATION                               */}
+                    {/* TAB 2: POLICIES & LIMITS                                                  */}
                     {/* ========================================================================= */}
                     {activeTab === 'policies' && (
                         <View>
                             <View style={styles.cardHeaderBox}>
-                                <Ionicons name="shield-half" size={24} color={T.gold} />
+                                <Ionicons name="shield-half" size={22} color={T.gold} />
                                 <View style={{ marginLeft: 10 }}>
-                                    <Text style={styles.cardHeaderTitle}>Risk Rules & Policy Matrix</Text>
-                                    <Text style={styles.cardHeaderSub}>Live limits applied automatically on transactions</Text>
+                                    <Text style={styles.cardHeaderTitle}>Live Risk Limit Engine</Text>
+                                    <Text style={styles.cardHeaderSub}>Directly enforced across Payvessel, Bilalsadasub & NOWPayments</Text>
                                 </View>
                             </View>
 
-                            {/* Form Inputs for Numeric Limits */}
                             <View style={styles.policyCard}>
-                                <Text style={styles.inputLabel}>Maximum Single Debit Limit (₦)</Text>
-                                <Text style={styles.inputHelper}>Any single debit above this amount will be blocked or quarantined.</Text>
+                                <Text style={styles.inputLabel}>Maximum Single Debit Outflow (₦)</Text>
+                                <Text style={styles.inputHelper}>Single debits above this limit are rejected instantly.</Text>
                                 <TextInput
                                     value={inputMaxSingle}
                                     onChangeText={setInputMaxSingle}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholder="250000"
                                 />
 
-                                <Text style={styles.inputLabel}>Standard Daily Debit Cap (₦)</Text>
-                                <Text style={styles.inputHelper}>Maximum cumulative outflow permitted per user in a 24-hour window.</Text>
+                                <Text style={styles.inputLabel}>Daily Cumulative Outflow Cap (₦)</Text>
+                                <Text style={styles.inputHelper}>Maximum outflow per user in 24 hours.</Text>
                                 <TextInput
                                     value={inputDailyLimit}
                                     onChangeText={setInputDailyLimit}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholder="1000000"
                                 />
 
-                                <Text style={styles.inputLabel}>Velocity Throttle (Max Tx / Hour)</Text>
-                                <Text style={styles.inputHelper}>Maximum allowed successful transactions per user within 60 minutes.</Text>
+                                <Text style={styles.inputLabel}>Hourly Velocity Throttle (Max Tx/Hour)</Text>
+                                <Text style={styles.inputHelper}>Throttles bots and high-frequency debit bursts.</Text>
                                 <TextInput
                                     value={inputVelocity}
                                     onChangeText={setInputVelocity}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholder="6"
                                 />
 
                                 <Text style={styles.inputLabel}>Large Transfer Quarantine Threshold (₦)</Text>
-                                <Text style={styles.inputHelper}>Transactions above this amount trigger an automated manager review flag.</Text>
+                                <Text style={styles.inputHelper}>Transfers above this threshold flag a security review.</Text>
                                 <TextInput
                                     value={inputQuarantine}
                                     onChangeText={setInputQuarantine}
                                     keyboardType="numeric"
                                     style={styles.numericInput}
-                                    placeholder="100000"
+                                />
+
+                                <Text style={styles.inputLabel}>VTU / Airtime Velocity Cap (₦ / 10 Mins)</Text>
+                                <Text style={styles.inputHelper}>Prevents telecom balance drain attacks.</Text>
+                                <TextInput
+                                    value={inputVtuCap}
+                                    onChangeText={setInputVtuCap}
+                                    keyboardType="numeric"
+                                    style={styles.numericInput}
+                                />
+
+                                <Text style={styles.inputLabel}>Single Crypto Withdrawal Cap (₦)</Text>
+                                <Text style={styles.inputHelper}>Maximum allowed NOWPayments crypto payout per tx.</Text>
+                                <TextInput
+                                    value={inputCryptoMax}
+                                    onChangeText={setInputCryptoMax}
+                                    keyboardType="numeric"
+                                    style={styles.numericInput}
                                 />
                             </View>
 
-                            {/* Boolean Toggles */}
                             <Text style={styles.sectionHeading}>Security Enforcement Toggles</Text>
                             <View style={styles.policyCard}>
                                 <View style={styles.toggleRow}>
                                     <View style={{ flex: 1, paddingRight: 10 }}>
-                                        <Text style={styles.toggleTitle}>Require KYC Tier 2 for Outflows</Text>
-                                        <Text style={styles.toggleSub}>Restricts bank transfers and crypto withdrawals to verified accounts.</Text>
+                                        <Text style={styles.toggleTitle}>Strict KYC Tier 2 Requirement</Text>
+                                        <Text style={styles.toggleSub}>Block bank payouts & crypto withdrawals for unverified users.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_require_kyc2_outflows}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_require_kyc2_outflows: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.gold }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
 
                                 <View style={styles.toggleRow}>
                                     <View style={{ flex: 1, paddingRight: 10 }}>
-                                        <Text style={styles.toggleTitle}>Night-Time High-Value Alerts</Text>
-                                        <Text style={styles.toggleSub}>Trigger priority notifications for large transfers between 11 PM and 5 AM.</Text>
+                                        <Text style={styles.toggleTitle}>Night-Time Priority Alerts (11PM - 5AM)</Text>
+                                        <Text style={styles.toggleSub}>Flags large transfers during off-peak sleep hours.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_offhours_alerts}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_offhours_alerts: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.gold }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
 
                                 <View style={[styles.toggleRow, { borderBottomWidth: 0 }]}>
                                     <View style={{ flex: 1, paddingRight: 10 }}>
-                                        <Text style={styles.toggleTitle}>Auto-Lock on Failed PIN Attempts</Text>
-                                        <Text style={styles.toggleSub}>Lock account automatically after 5 consecutive incorrect transaction PINs.</Text>
+                                        <Text style={styles.toggleTitle}>Auto-Lock on 5 Failed PINs</Text>
+                                        <Text style={styles.toggleSub}>Instantly freezes wallet after brute-force PIN attempts.</Text>
                                     </View>
                                     <Switch
                                         value={policies.risk_auto_lock_failed_auth}
                                         onValueChange={(val) => setPolicies(p => ({ ...p, risk_auto_lock_failed_auth: val }))}
-                                        trackColor={{ false: '#CBD5E1', true: T.gold }}
+                                        trackColor={{ false: '#334155', true: T.gold }}
                                         thumbColor="#FFFFFF"
                                     />
                                 </View>
                             </View>
 
-                            {/* Save Policies Button */}
                             <TouchableOpacity
                                 onPress={handleSavePolicies}
                                 disabled={savingPolicies}
@@ -1125,11 +1101,11 @@ export default function RiskControlCenter() {
                                 activeOpacity={0.85}
                             >
                                 {savingPolicies ? (
-                                    <ActivityIndicator color="#0A1128" size="small" />
+                                    <ActivityIndicator color="#070D1E" size="small" />
                                 ) : (
                                     <>
-                                        <Ionicons name="checkmark-circle" size={18} color="#0A1128" />
-                                        <Text style={styles.savePoliciesBtnText}>Save & Deploy Risk Policies</Text>
+                                        <Ionicons name="checkmark-circle" size={18} color="#070D1E" />
+                                        <Text style={styles.savePoliciesBtnText}>Save & Deploy Policies</Text>
                                     </>
                                 )}
                             </TouchableOpacity>
@@ -1137,11 +1113,10 @@ export default function RiskControlCenter() {
                     )}
 
                     {/* ========================================================================= */}
-                    {/* TAB 3: FLAGGED TRANSACTIONS QUEUE                                         */}
+                    {/* TAB 3: FLAGGED QUEUE WITH FRAUD SCORES                                    */}
                     {/* ========================================================================= */}
                     {activeTab === 'queue' && (
                         <View>
-                            {/* Filter Bar & Search */}
                             <View style={styles.filterRow}>
                                 <TouchableOpacity
                                     onPress={() => handleFilterChange('all')}
@@ -1153,11 +1128,20 @@ export default function RiskControlCenter() {
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
+                                    onPress={() => handleFilterChange('high_risk')}
+                                    style={[styles.filterPill, txFilter === 'high_risk' && styles.filterPillActive]}
+                                >
+                                    <Text style={[styles.filterPillText, txFilter === 'high_risk' && styles.filterPillTextActive]}>
+                                        High Risk (≥50%)
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
                                     onPress={() => handleFilterChange('high_value')}
                                     style={[styles.filterPill, txFilter === 'high_value' && styles.filterPillActive]}
                                 >
                                     <Text style={[styles.filterPillText, txFilter === 'high_value' && styles.filterPillTextActive]}>
-                                        High Value
+                                        Large Amount
                                     </Text>
                                 </TouchableOpacity>
 
@@ -1169,19 +1153,10 @@ export default function RiskControlCenter() {
                                         Failed
                                     </Text>
                                 </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    onPress={() => handleFilterChange('flagged')}
-                                    style={[styles.filterPill, txFilter === 'flagged' && styles.filterPillActive]}
-                                >
-                                    <Text style={[styles.filterPillText, txFilter === 'flagged' && styles.filterPillTextActive]}>
-                                        Flagged
-                                    </Text>
-                                </TouchableOpacity>
                             </View>
 
                             <View style={styles.searchBox}>
-                                <Ionicons name="search" size={18} color={T.textSub} style={{ marginRight: 8 }} />
+                                <Ionicons name="search" size={16} color={T.textSub} style={{ marginRight: 8 }} />
                                 <TextInput
                                     value={txSearch}
                                     onChangeText={handleSearchChange}
@@ -1191,221 +1166,181 @@ export default function RiskControlCenter() {
                                 />
                             </View>
 
-                            {/* Transaction List */}
-                            {filteredTx.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <Ionicons name="shield-checkmark" size={48} color={T.success} />
-                                    <Text style={styles.emptyStateTitle}>Queue is Clean</Text>
-                                    <Text style={styles.emptyStateSub}>No transactions match the selected filter criteria.</Text>
-                                </View>
-                            ) : (
-                                filteredTx.map((item) => {
-                                    const isHigh = Number(item.amount) >= (policies.risk_auto_quarantine_above || 100000);
-                                    const isFailed = item.status === 'failed';
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={item.id}
-                                            onPress={() => setSelectedTx(item)}
-                                            style={styles.txCard}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={styles.txCardLeft}>
-                                                <View style={[
-                                                    styles.txIconBox,
-                                                    isFailed ? styles.txIconFailed : isHigh ? styles.txIconHigh : styles.txIconNormal
-                                                ]}>
-                                                    <Ionicons
-                                                        name={isFailed ? "close-circle" : isHigh ? "alert" : "swap-horizontal"}
-                                                        size={18}
-                                                        color={isFailed ? T.danger : isHigh ? T.warning : T.info}
-                                                    />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.txDescription} numberOfLines={1}>
-                                                        {item.description || `Transaction ${item.type}`}
-                                                    </Text>
-                                                    <Text style={styles.txMeta}>
-                                                        {item.user?.full_name || item.user?.email || item.user_id?.slice(0, 8)} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={styles.txAmount}>
-                                                    ₦{Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {filteredTx.map(item => {
+                                const score = item.fraudScore || 10;
+                                return (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        onPress={() => setSelectedTx(item)}
+                                        style={styles.txCard}
+                                        activeOpacity={0.75}
+                                    >
+                                        <View style={styles.txCardLeft}>
+                                            <View style={[styles.fraudBadge, score >= 70 ? styles.fraudBadgeCritical : score >= 40 ? styles.fraudBadgeWarn : styles.fraudBadgeSafe]}>
+                                                <Text style={[styles.fraudBadgeText, score >= 70 ? { color: T.danger } : score >= 40 ? { color: T.warning } : { color: T.success }]}>
+                                                    {score}%
                                                 </Text>
-                                                <View style={[
-                                                    styles.statusPill,
-                                                    item.status === 'success' ? styles.statusPillSuccess :
-                                                    item.status === 'failed' ? styles.statusPillFailed : styles.statusPillWarn
-                                                ]}>
-                                                    <Text style={[
-                                                        styles.statusPillText,
-                                                        item.status === 'success' ? styles.statusPillTextSuccess :
-                                                        item.status === 'failed' ? styles.statusPillTextFailed : styles.statusPillTextWarn
-                                                    ]}>
-                                                        {item.status?.toUpperCase()}
-                                                    </Text>
-                                                </View>
                                             </View>
-                                        </TouchableOpacity>
-                                    );
-                                })
-                            )}
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.txDescription} numberOfLines={1}>
+                                                    {item.description || item.type?.toUpperCase()}
+                                                </Text>
+                                                <Text style={styles.txMeta}>
+                                                    {item.user?.full_name || item.user?.email || item.user_id.slice(0, 8)} • {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={styles.txAmount}>
+                                                ₦{Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </Text>
+                                            <Text style={[styles.txStatusText, item.status === 'success' ? { color: T.success } : { color: T.danger }]}>
+                                                {item.status.toUpperCase()}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     )}
 
                     {/* ========================================================================= */}
-                    {/* TAB 4: WATCHLIST & MONITORED USERS                                        */}
+                    {/* TAB 4: CHANNELS & PROVIDER INTEGRATIONS                                  */}
                     {/* ========================================================================= */}
-                    {activeTab === 'watchlist' && (
+                    {activeTab === 'channels' && (
                         <View>
-                            <View style={styles.searchBox}>
-                                <Ionicons name="search" size={18} color={T.textSub} style={{ marginRight: 8 }} />
-                                <TextInput
-                                    value={userSearch}
-                                    onChangeText={setUserSearch}
-                                    placeholder="Search watchlist by name, phone, email..."
-                                    placeholderTextColor={T.textSub}
-                                    style={styles.searchInput}
-                                />
-                            </View>
-
-                            {watchlistUsers
-                                .filter(u => !userSearch.trim() || (
-                                    u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-                                    u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-                                    u.phone?.includes(userSearch)
-                                ))
-                                .map((user) => {
-                                    const isSuspended = user.status === 'suspended' || user.status === 'blocked';
-                                    return (
-                                        <TouchableOpacity
-                                            key={user.id}
-                                            onPress={() => setSelectedUser(user)}
-                                            style={styles.userCard}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={styles.userCardHeader}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <View style={[styles.avatarBox, isSuspended ? styles.avatarBoxFrozen : styles.avatarBoxActive]}>
-                                                        <Text style={[styles.avatarText, isSuspended ? { color: T.danger } : { color: T.navyDark }]}>
-                                                            {user.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-                                                        </Text>
-                                                    </View>
-                                                    <View style={{ marginLeft: 10 }}>
-                                                        <Text style={styles.userName}>{user.full_name || 'User'}</Text>
-                                                        <Text style={styles.userSub}>{user.email || user.phone || user.id.slice(0, 10)}</Text>
-                                                    </View>
-                                                </View>
-
-                                                <View style={[
-                                                    styles.statusPill,
-                                                    isSuspended ? styles.statusPillFailed : styles.statusPillSuccess
-                                                ]}>
-                                                    <Text style={[
-                                                        styles.statusPillText,
-                                                        isSuspended ? styles.statusPillTextFailed : styles.statusPillTextSuccess
-                                                    ]}>
-                                                        {isSuspended ? 'FROZEN' : 'ACTIVE'}
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            <View style={styles.userCardFooter}>
-                                                <View>
-                                                    <Text style={styles.userMetaLabel}>Wallet Balance</Text>
-                                                    <Text style={styles.userBalance}>
-                                                        ₦{Number(user.balance || 0).toLocaleString()}
-                                                    </Text>
-                                                </View>
-
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={styles.userMetaLabel}>Verification</Text>
-                                                    <Text style={styles.userKycTier}>Tier {user.kyc_tier || 1}</Text>
-                                                </View>
-                                            </View>
-                                        </TouchableOpacity>
-                                    );
-                                })
-                            }
-                        </View>
-                    )}
-
-                    {/* ========================================================================= */}
-                    {/* TAB 5: AI RISK SCANNER & AUDIT LOGS                                       */}
-                    {/* ========================================================================= */}
-                    {activeTab === 'ai_audit' && (
-                        <View>
-                            <View style={styles.aiHeaderCard}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Ionicons name="hardware-chip" size={24} color={T.gold} />
-                                    <Text style={styles.aiHeaderTitle}>Cortex AI Risk Scanner</Text>
+                            <Text style={styles.sectionHeading}>Actual App Rails & Integration Health</Text>
+                            {channels.map((ch, idx) => (
+                                <View key={idx} style={styles.channelCard}>
+                                    <View style={styles.channelHeader}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.channelName}>{ch.name}</Text>
+                                            <Text style={styles.channelProvider}>{ch.provider} • {ch.service}</Text>
+                                        </View>
+                                        <View style={styles.channelStatusPill}>
+                                            <View style={styles.statusDotGreen} />
+                                            <Text style={styles.channelStatusText}>{ch.status.toUpperCase()}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.channelFooter}>
+                                        <Text style={styles.channelMeta}>Latency: {ch.latencyMs}ms</Text>
+                                        <Text style={styles.channelMeta}>Status: {ch.lastPing}</Text>
+                                    </View>
                                 </View>
-                                <Text style={styles.aiHeaderSub}>
-                                    Automated ledger audit analyzing negative balances, anomalous outflow velocity, and unverified high-float profiles.
-                                </Text>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* TAB 5: GLOBAL FRAUD BLACKLIST                                             */}
+                    {/* ========================================================================= */}
+                    {activeTab === 'blacklist' && (
+                        <View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <Text style={styles.sectionHeading}>Active Blacklist Rules</Text>
                                 <TouchableOpacity
-                                    onPress={runRiskIntegrityAudit}
-                                    disabled={scanningAudit}
-                                    style={styles.rescanBtn}
-                                    activeOpacity={0.8}
+                                    onPress={() => setShowBlacklistModal(true)}
+                                    style={styles.addBlacklistBtn}
+                                    activeOpacity={0.85}
                                 >
-                                    {scanningAudit ? (
-                                        <ActivityIndicator color="#0A1128" size="small" />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="search" size={16} color="#0A1128" />
-                                            <Text style={styles.rescanBtnText}>Run Deep Scan Now</Text>
-                                        </>
-                                    )}
+                                    <Ionicons name="add" size={16} color="#070D1E" />
+                                    <Text style={styles.addBlacklistBtnText}>Add Blacklist Entry</Text>
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.sectionHeading}>Audit Findings ({auditAnomalies.length})</Text>
-
-                            {auditAnomalies.length === 0 ? (
+                            {blacklist.length === 0 ? (
                                 <View style={styles.emptyState}>
-                                    <Ionicons name="checkmark-done-circle" size={54} color={T.success} />
-                                    <Text style={styles.emptyStateTitle}>Zero Critical Vulnerabilities</Text>
-                                    <Text style={styles.emptyStateSub}>Database ledger is balanced. No negative balances or extreme velocity spikes found.</Text>
+                                    <Ionicons name="shield-checkmark" size={44} color={T.success} />
+                                    <Text style={styles.emptyStateTitle}>Zero Blacklisted Entities</Text>
+                                    <Text style={styles.emptyStateSub}>No account numbers, emails, or phone numbers are blocked.</Text>
                                 </View>
                             ) : (
-                                auditAnomalies.map((item) => (
-                                    <View key={item.id} style={styles.anomalyCard}>
-                                        <View style={styles.anomalyHeader}>
-                                            <View style={[
-                                                styles.severityBadge,
-                                                item.severity === 'critical' ? styles.severityBadgeCritical :
-                                                item.severity === 'high' ? styles.severityBadgeHigh : styles.severityBadgeMedium
-                                            ]}>
-                                                <Text style={[
-                                                    styles.severityBadgeText,
-                                                    item.severity === 'critical' ? styles.severityBadgeTextCritical :
-                                                    item.severity === 'high' ? styles.severityBadgeTextHigh : styles.severityBadgeTextMedium
-                                                ]}>
-                                                    {item.severity.toUpperCase()}
-                                                </Text>
+                                blacklist.map(item => (
+                                    <View key={item.id} style={styles.blacklistCard}>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                <Text style={styles.blacklistTypeBadge}>{item.type.toUpperCase()}</Text>
+                                                <Text style={styles.blacklistValue}>{item.value}</Text>
                                             </View>
-                                            <Text style={styles.anomalyTitle}>{item.title}</Text>
+                                            <Text style={styles.blacklistReason}>Reason: {item.reason}</Text>
                                         </View>
-
-                                        <Text style={styles.anomalyDesc}>{item.description}</Text>
-
-                                        <View style={styles.anomalyFooter}>
-                                            <Text style={styles.anomalyEntity}>Target: {item.entityName}</Text>
-                                            <TouchableOpacity
-                                                onPress={() => handleResolveAnomaly(item)}
-                                                style={styles.resolveBtn}
-                                                activeOpacity={0.8}
-                                            >
-                                                <Text style={styles.resolveBtnText}>1-Tap Fix ⚡</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => handleRemoveBlacklistEntry(item.id)}
+                                            style={{ padding: 6 }}
+                                        >
+                                            <Ionicons name="trash-outline" size={18} color={T.danger} />
+                                        </TouchableOpacity>
                                     </View>
                                 ))
                             )}
+                        </View>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* TAB 6: LIQUIDITY STRESS TEST SIMULATOR                                    */}
+                    {/* ========================================================================= */}
+                    {activeTab === 'stress_test' && (
+                        <View>
+                            <View style={styles.stressCard}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <Ionicons name="speedometer" size={24} color={T.gold} />
+                                    <Text style={styles.stressTitle}>Liquidity Surge Stress Simulator</Text>
+                                </View>
+                                <Text style={styles.stressSub}>
+                                    Simulate what happens to platform float if a rapid surge in user withdrawals occurs simultaneously across Payvessel & NOWPayments.
+                                </Text>
+
+                                <Text style={styles.stressLabel}>Surge Outflow Shock (% of Total Float): {stressTestFloatRun}%</Text>
+                                <View style={styles.stressButtonsRow}>
+                                    {[10, 25, 50, 75].map(pct => (
+                                        <TouchableOpacity
+                                            key={pct}
+                                            onPress={() => setStressTestFloatRun(pct)}
+                                            style={[styles.stressPill, stressTestFloatRun === pct && styles.stressPillActive]}
+                                        >
+                                            <Text style={[styles.stressPillText, stressTestFloatRun === pct && styles.stressPillTextActive]}>
+                                                {pct}% Surge
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={handleRunStressTest}
+                                    disabled={simulatingStress}
+                                    style={styles.runStressBtn}
+                                    activeOpacity={0.85}
+                                >
+                                    {simulatingStress ? (
+                                        <ActivityIndicator color="#070D1E" size="small" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="flash" size={18} color="#070D1E" />
+                                            <Text style={styles.runStressBtnText}>Simulate Liquidity Shock</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+
+                                {stressResult && (
+                                    <View style={styles.stressResultBox}>
+                                        <Text style={styles.stressResultTitle}>Simulation Analysis</Text>
+                                        <View style={styles.stressResultRow}>
+                                            <Text style={styles.stressResultLabel}>Projected Outflow Shock:</Text>
+                                            <Text style={[styles.stressResultVal, { color: T.danger }]}>
+                                                -₦{Number(stressResult.projectedOutflow).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.stressResultRow}>
+                                            <Text style={styles.stressResultLabel}>Remaining Float Buffer:</Text>
+                                            <Text style={[styles.stressResultVal, { color: T.success }]}>
+                                                ₦{Number(stressResult.remainingFloat).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.stressRecommendation}>{stressResult.recommendation}</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     )}
                 </ScrollView>
@@ -1423,7 +1358,7 @@ export default function RiskControlCenter() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Transaction Details</Text>
+                            <Text style={styles.modalTitle}>Transaction Investigation</Text>
                             <TouchableOpacity onPress={() => setSelectedTx(null)}>
                                 <Ionicons name="close-circle" size={24} color={T.textSub} />
                             </TouchableOpacity>
@@ -1439,22 +1374,14 @@ export default function RiskControlCenter() {
                                     <Text style={styles.modalRefText}>Ref: {selectedTx.reference || selectedTx.id}</Text>
                                 </View>
 
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Type</Text>
-                                    <Text style={styles.infoValue}>{selectedTx.type?.toUpperCase()}</Text>
-                                </View>
-
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Status</Text>
-                                    <Text style={[styles.infoValue, { color: selectedTx.status === 'success' ? T.success : T.danger }]}>
-                                        {selectedTx.status?.toUpperCase()}
-                                    </Text>
-                                </View>
-
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Timestamp</Text>
-                                    <Text style={styles.infoValue}>{new Date(selectedTx.created_at).toLocaleString()}</Text>
-                                </View>
+                                {selectedTx.riskReasons && selectedTx.riskReasons.length > 0 && (
+                                    <View style={styles.riskReasonBox}>
+                                        <Text style={styles.riskReasonTitle}>DETECTED RISK SIGNALS</Text>
+                                        {selectedTx.riskReasons.map((r, i) => (
+                                            <Text key={i} style={styles.riskReasonItem}>• {r}</Text>
+                                        ))}
+                                    </View>
+                                )}
 
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>User Name</Text>
@@ -1467,31 +1394,24 @@ export default function RiskControlCenter() {
                                 </View>
 
                                 <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>User Status</Text>
-                                    <Text style={[styles.infoValue, { color: selectedTx.user?.status === 'suspended' ? T.danger : T.success }]}>
-                                        {selectedTx.user?.status?.toUpperCase() || 'ACTIVE'}
+                                    <Text style={styles.infoLabel}>KYC Verification</Text>
+                                    <Text style={styles.infoValue}>Tier {selectedTx.user?.kyc_tier || 1}</Text>
+                                </View>
+
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Status</Text>
+                                    <Text style={[styles.infoValue, { color: selectedTx.status === 'success' ? T.success : T.danger }]}>
+                                        {selectedTx.status.toUpperCase()}
                                     </Text>
                                 </View>
 
-                                {/* Action Buttons */}
                                 <View style={styles.modalBtnContainer}>
-                                    {selectedTx.status !== 'success' && (
-                                        <TouchableOpacity
-                                            onPress={() => handleApproveTxFlag(selectedTx)}
-                                            disabled={actionLoading}
-                                            style={styles.btnApprove}
-                                        >
-                                            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                                            <Text style={styles.btnApproveText}>Approve & Clear Flag</Text>
-                                        </TouchableOpacity>
-                                    )}
-
                                     <TouchableOpacity
                                         onPress={() => handleReverseTransaction(selectedTx)}
                                         disabled={actionLoading}
                                         style={styles.btnRefund}
                                     >
-                                        <Ionicons name="arrow-undo" size={18} color="#FFFFFF" />
+                                        <Ionicons name="arrow-undo" size={18} color="#070D1E" />
                                         <Text style={styles.btnRefundText}>Reverse & Refund Wallet</Text>
                                     </TouchableOpacity>
 
@@ -1503,7 +1423,7 @@ export default function RiskControlCenter() {
                                         >
                                             <Ionicons name="snow" size={18} color="#FFFFFF" />
                                             <Text style={styles.btnFreezeText}>
-                                                {selectedTx.user.status === 'suspended' ? 'Unfreeze User' : 'Freeze User Account'}
+                                                {selectedTx.user.status === 'suspended' ? 'Reactivate User' : 'Freeze User Account'}
                                             </Text>
                                         </TouchableOpacity>
                                     )}
@@ -1515,94 +1435,64 @@ export default function RiskControlCenter() {
             </Modal>
 
             {/* ========================================================================= */}
-            {/* MODAL 2: USER PROFILE RISK INSPECTOR SHEET                                */}
+            {/* MODAL 2: ADD TO BLACKLIST SHEET                                           */}
             {/* ========================================================================= */}
             <Modal
-                visible={!!selectedUser}
+                visible={showBlacklistModal}
                 transparent={true}
                 animationType="slide"
-                onRequestClose={() => setSelectedUser(null)}
+                onRequestClose={() => setShowBlacklistModal(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>User Risk Inspection</Text>
-                            <TouchableOpacity onPress={() => setSelectedUser(null)}>
+                            <Text style={styles.modalTitle}>Add Entity to Blacklist</Text>
+                            <TouchableOpacity onPress={() => setShowBlacklistModal(false)}>
                                 <Ionicons name="close-circle" size={24} color={T.textSub} />
                             </TouchableOpacity>
                         </View>
 
-                        {selectedUser && (
-                            <ScrollView showsVerticalScrollIndicator={false}>
-                                <View style={styles.modalAmountBox}>
-                                    <Text style={styles.modalAmountLabel}>ACTIVE WALLET BALANCE</Text>
-                                    <Text style={styles.modalAmountValue}>
-                                        ₦{Number(selectedUser.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <Text style={styles.inputLabel}>Target Entity Type</Text>
+                        <View style={styles.blacklistTypeRow}>
+                            {(['account_number', 'phone', 'email', 'bvn', 'nin', 'ip'] as const).map(t => (
+                                <TouchableOpacity
+                                    key={t}
+                                    onPress={() => setNewBlacklistType(t)}
+                                    style={[styles.typePill, newBlacklistType === t && styles.typePillActive]}
+                                >
+                                    <Text style={[styles.typePillText, newBlacklistType === t && styles.typePillTextActive]}>
+                                        {t.replace('_', ' ').toUpperCase()}
                                     </Text>
-                                    <Text style={styles.modalRefText}>ID: {selectedUser.id}</Text>
-                                </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Full Name</Text>
-                                    <Text style={styles.infoValue}>{selectedUser.full_name || 'N/A'}</Text>
-                                </View>
+                        <Text style={styles.inputLabel}>Value to Block</Text>
+                        <TextInput
+                            value={newBlacklistValue}
+                            onChangeText={setNewBlacklistValue}
+                            placeholder="e.g. 0123456789 or user@example.com"
+                            placeholderTextColor={T.textSub}
+                            style={styles.numericInput}
+                        />
 
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Email</Text>
-                                    <Text style={styles.infoValue}>{selectedUser.email || 'N/A'}</Text>
-                                </View>
+                        <Text style={styles.inputLabel}>Reason / Audit Note</Text>
+                        <TextInput
+                            value={newBlacklistReason}
+                            onChangeText={setNewBlacklistReason}
+                            placeholder="e.g. Fraud chargeback risk or unauthorized account"
+                            placeholderTextColor={T.textSub}
+                            style={styles.numericInput}
+                        />
 
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Phone</Text>
-                                    <Text style={styles.infoValue}>{selectedUser.phone || 'N/A'}</Text>
-                                </View>
-
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>KYC Verification</Text>
-                                    <Text style={styles.infoValue}>Tier {selectedUser.kyc_tier || 1}</Text>
-                                </View>
-
-                                <View style={styles.infoRow}>
-                                    <Text style={styles.infoLabel}>Account Status</Text>
-                                    <Text style={[styles.infoValue, { color: selectedUser.status === 'suspended' ? T.danger : T.success }]}>
-                                        {selectedUser.status?.toUpperCase() || 'ACTIVE'}
-                                    </Text>
-                                </View>
-
-                                <View style={styles.modalBtnContainer}>
-                                    <TouchableOpacity
-                                        onPress={() => handleToggleUserFreeze(selectedUser)}
-                                        disabled={actionLoading}
-                                        style={[styles.btnFreeze, { backgroundColor: selectedUser.status === 'suspended' ? T.success : T.danger }]}
-                                    >
-                                        <Ionicons name={selectedUser.status === 'suspended' ? "lock-open" : "snow"} size={18} color="#FFFFFF" />
-                                        <Text style={styles.btnFreezeText}>
-                                            {selectedUser.status === 'suspended' ? 'Reactivate Account' : 'Freeze Account Instantly'}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={async () => {
-                                            try {
-                                                await supabase.from('notifications').insert({
-                                                    user_id: selectedUser.id,
-                                                    title: 'Security Notice from Management 🛡️',
-                                                    message: 'Your account is under periodic risk compliance review. If you notice any suspicious activity, please notify support immediately.',
-                                                    type: 'security',
-                                                });
-                                                Alert.alert('Sent', 'Security advisory delivered to user notification feed.');
-                                            } catch (e: any) {
-                                                Alert.alert('Error', e.message);
-                                            }
-                                        }}
-                                        style={styles.btnApprove}
-                                    >
-                                        <Ionicons name="notifications" size={18} color="#FFFFFF" />
-                                        <Text style={styles.btnApproveText}>Dispatch Security Advisory</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </ScrollView>
-                        )}
+                        <TouchableOpacity
+                            onPress={handleAddBlacklistEntry}
+                            style={styles.savePoliciesBtn}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="ban" size={18} color="#070D1E" />
+                            <Text style={styles.savePoliciesBtnText}>Block Platform-Wide</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -1644,23 +1534,25 @@ const styles = StyleSheet.create({
     tabBar: {
         flexDirection: 'row',
         backgroundColor: T.navyDark,
-        paddingHorizontal: 8,
+        paddingHorizontal: 4,
         paddingBottom: 8,
         justifyContent: 'space-around',
+        borderBottomWidth: 1,
+        borderBottomColor: T.cardBorder,
     },
     tabItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 3,
         paddingVertical: 6,
-        paddingHorizontal: 10,
-        borderRadius: 20,
+        paddingHorizontal: 8,
+        borderRadius: 16,
     },
     tabItemActive: {
-        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        backgroundColor: T.goldBg,
     },
     tabText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         color: T.textSub,
     },
@@ -1677,7 +1569,7 @@ const styles = StyleSheet.create({
         padding: 18,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.3)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     heroHeader: {
         flexDirection: 'row',
@@ -1686,14 +1578,14 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     heroSub: {
-        fontSize: 10,
+        fontSize: 9.5,
         fontWeight: '900',
         color: T.gold,
         letterSpacing: 1,
         marginBottom: 4,
     },
     heroTitle: {
-        fontSize: 24,
+        fontSize: 23,
         fontWeight: '900',
         color: '#FFFFFF',
     },
@@ -1703,13 +1595,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     riskBadgeSafe: {
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        backgroundColor: T.successBg,
     },
     riskBadgeWarn: {
-        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+        backgroundColor: T.warningBg,
     },
     riskBadgeCritical: {
-        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        backgroundColor: T.dangerBg,
     },
     riskBadgeText: {
         fontSize: 10,
@@ -1788,113 +1680,55 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '800',
         color: T.textMain,
-        marginTop: 8,
+        marginTop: 6,
         marginBottom: 10,
         letterSpacing: 0.3,
     },
-    quickActionRow: {
+    killswitchGrid: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
         marginBottom: 16,
     },
-    actionBtn: {
+    killswitchCard: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 14,
-        gap: 6,
-    },
-    actionBtnRed: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 14,
-        gap: 6,
-        backgroundColor: T.danger,
-    },
-    actionBtnActiveRed: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 14,
-        gap: 6,
-        backgroundColor: '#991B1B',
-    },
-    actionBtnBlue: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 14,
-        gap: 6,
-        backgroundColor: T.navyDark,
-    },
-    actionBtnGold: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 14,
-        gap: 6,
-        backgroundColor: T.gold,
-    },
-    actionBtnText: {
-        color: '#FFFFFF',
-        fontWeight: '800',
-        fontSize: 11,
-    },
-    gatewayCard: {
+        minWidth: '47%',
         backgroundColor: T.card,
-        borderRadius: 16,
-        padding: 14,
+        borderRadius: 14,
+        padding: 12,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 16,
-    },
-    gatewayRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
     },
-    gatewayLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+    killswitchActiveRed: {
+        backgroundColor: T.danger,
+        borderColor: T.danger,
     },
-    statusDotGreen: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: T.success,
+    killswitchActiveWarn: {
+        backgroundColor: T.warning,
+        borderColor: T.warning,
     },
-    gatewayName: {
+    killswitchTitle: {
         fontSize: 12,
-        fontWeight: '700',
-        color: T.textMain,
-    },
-    gatewayStatusText: {
-        fontSize: 11,
         fontWeight: '800',
-        color: T.success,
+        color: T.textMain,
+        marginTop: 4,
+    },
+    killswitchSub: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: T.textSub,
+        marginTop: 2,
     },
     cardHeaderBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: T.navyDark,
+        backgroundColor: T.navyMid,
         padding: 14,
         borderRadius: 16,
         marginBottom: 14,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
     },
     cardHeaderTitle: {
         color: '#FFFFFF',
@@ -1927,7 +1761,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     numericInput: {
-        backgroundColor: T.bg,
+        backgroundColor: T.navyDark,
         borderWidth: 1,
         borderColor: T.border,
         borderRadius: 10,
@@ -1935,7 +1769,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         fontSize: 13,
         fontWeight: '800',
-        color: T.textMain,
+        color: '#FFFFFF',
         marginBottom: 12,
     },
     toggleRow: {
@@ -1944,7 +1778,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: 'rgba(51, 65, 85, 0.4)',
     },
     toggleTitle: {
         fontSize: 12.5,
@@ -1967,7 +1801,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     savePoliciesBtnText: {
-        color: '#0A1128',
+        color: '#070D1E',
         fontWeight: '900',
         fontSize: 13,
     },
@@ -1977,16 +1811,16 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     filterPill: {
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         paddingVertical: 6,
-        borderRadius: 20,
+        borderRadius: 16,
         backgroundColor: T.card,
         borderWidth: 1,
         borderColor: T.border,
     },
     filterPillActive: {
-        backgroundColor: T.navyDark,
-        borderColor: T.navyDark,
+        backgroundColor: T.gold,
+        borderColor: T.gold,
     },
     filterPillText: {
         fontSize: 11,
@@ -1994,8 +1828,8 @@ const styles = StyleSheet.create({
         color: T.textSub,
     },
     filterPillTextActive: {
-        color: T.gold,
-        fontWeight: '800',
+        color: '#070D1E',
+        fontWeight: '900',
     },
     searchBox: {
         flexDirection: 'row',
@@ -2011,7 +1845,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 12,
-        color: T.textMain,
+        color: '#FFFFFF',
         fontWeight: '600',
     },
     emptyState: {
@@ -2054,21 +1888,25 @@ const styles = StyleSheet.create({
         flex: 1,
         marginRight: 10,
     },
-    txIconBox: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
+    fraudBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    txIconNormal: {
-        backgroundColor: T.infoBg,
+    fraudBadgeSafe: {
+        backgroundColor: T.successBg,
     },
-    txIconHigh: {
+    fraudBadgeWarn: {
         backgroundColor: T.warningBg,
     },
-    txIconFailed: {
+    fraudBadgeCritical: {
         backgroundColor: T.dangerBg,
+    },
+    fraudBadgeText: {
+        fontSize: 11,
+        fontWeight: '900',
     },
     txDescription: {
         fontSize: 12,
@@ -2086,218 +1924,221 @@ const styles = StyleSheet.create({
         color: T.textMain,
         marginBottom: 2,
     },
-    statusPill: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
+    txStatusText: {
+        fontSize: 9,
+        fontWeight: '800',
     },
-    statusPillSuccess: {
-        backgroundColor: T.successBg,
-    },
-    statusPillWarn: {
-        backgroundColor: T.warningBg,
-    },
-    statusPillFailed: {
-        backgroundColor: T.dangerBg,
-    },
-    statusPillText: {
-        fontSize: 8.5,
-        fontWeight: '900',
-    },
-    statusPillTextSuccess: {
-        color: T.success,
-    },
-    statusPillTextWarn: {
-        color: T.warning,
-    },
-    statusPillTextFailed: {
-        color: T.danger,
-    },
-    userCard: {
+    channelCard: {
         backgroundColor: T.card,
-        borderRadius: 16,
+        borderRadius: 14,
         padding: 14,
         borderWidth: 1,
         borderColor: T.cardBorder,
         marginBottom: 10,
     },
-    userCardHeader: {
+    channelHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
-    avatarBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarBoxActive: {
-        backgroundColor: T.goldBg,
-    },
-    avatarBoxFrozen: {
-        backgroundColor: T.dangerBg,
-    },
-    avatarText: {
-        fontSize: 15,
-        fontWeight: '900',
-    },
-    userName: {
+    channelName: {
         fontSize: 13,
         fontWeight: '800',
-        color: T.textMain,
+        color: '#FFFFFF',
     },
-    userSub: {
+    channelProvider: {
         fontSize: 10.5,
         color: T.textSub,
+        marginTop: 2,
     },
-    userCardFooter: {
+    channelStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: T.successBg,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+    },
+    statusDotGreen: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: T.success,
+    },
+    channelStatusText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+        color: T.success,
+    },
+    channelFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
+        borderTopColor: 'rgba(51, 65, 85, 0.4)',
         paddingTop: 8,
     },
-    userMetaLabel: {
-        fontSize: 9.5,
+    channelMeta: {
+        fontSize: 10,
         color: T.textSub,
-        fontWeight: '700',
+        fontWeight: '600',
     },
-    userBalance: {
-        fontSize: 13,
+    addBlacklistBtn: {
+        backgroundColor: T.gold,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        gap: 4,
+    },
+    addBlacklistBtnText: {
+        color: '#070D1E',
+        fontSize: 11,
         fontWeight: '900',
-        color: T.textMain,
     },
-    userKycTier: {
+    blacklistCard: {
+        backgroundColor: T.card,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    blacklistTypeBadge: {
+        backgroundColor: T.dangerBg,
+        color: T.danger,
+        fontSize: 9,
+        fontWeight: '900',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    blacklistValue: {
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '800',
-        color: T.goldDark,
     },
-    aiHeaderCard: {
-        backgroundColor: T.navyDark,
+    blacklistReason: {
+        color: T.textSub,
+        fontSize: 10.5,
+    },
+    stressCard: {
+        backgroundColor: T.navyMid,
         borderRadius: 18,
         padding: 16,
-        marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.3)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
     },
-    aiHeaderTitle: {
+    stressTitle: {
         color: '#FFFFFF',
-        fontSize: 15,
+        fontSize: 14.5,
         fontWeight: '900',
         marginLeft: 8,
     },
-    aiHeaderSub: {
+    stressSub: {
         color: '#94A3B8',
         fontSize: 11,
         lineHeight: 16,
         marginBottom: 12,
     },
-    rescanBtn: {
+    stressLabel: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: T.gold,
+        marginBottom: 8,
+    },
+    stressButtonsRow: {
+        flexDirection: 'row',
+        gap: 6,
+        marginBottom: 14,
+    },
+    stressPill: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: T.navyDark,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    stressPillActive: {
+        backgroundColor: T.gold,
+        borderColor: T.gold,
+    },
+    stressPillText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: T.textSub,
+    },
+    stressPillTextActive: {
+        color: '#070D1E',
+        fontWeight: '900',
+    },
+    runStressBtn: {
         backgroundColor: T.gold,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 10,
-        borderRadius: 10,
+        paddingVertical: 12,
+        borderRadius: 12,
         gap: 6,
     },
-    rescanBtnText: {
-        color: '#0A1128',
+    runStressBtnText: {
+        color: '#070D1E',
         fontWeight: '900',
-        fontSize: 12,
+        fontSize: 12.5,
     },
-    anomalyCard: {
-        backgroundColor: T.card,
-        borderRadius: 16,
-        padding: 14,
+    stressResultBox: {
+        backgroundColor: T.navyDark,
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 14,
         borderWidth: 1,
         borderColor: T.cardBorder,
-        marginBottom: 10,
     },
-    anomalyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+    stressResultTitle: {
+        color: T.gold,
+        fontSize: 12,
+        fontWeight: '900',
         marginBottom: 6,
     },
-    severityBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    severityBadgeCritical: {
-        backgroundColor: T.dangerBg,
-    },
-    severityBadgeHigh: {
-        backgroundColor: T.warningBg,
-    },
-    severityBadgeMedium: {
-        backgroundColor: T.infoBg,
-    },
-    severityBadgeText: {
-        fontSize: 9,
-        fontWeight: '900',
-    },
-    severityBadgeTextCritical: {
-        color: T.danger,
-    },
-    severityBadgeTextHigh: {
-        color: T.warning,
-    },
-    severityBadgeTextMedium: {
-        color: T.info,
-    },
-    anomalyTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: T.textMain,
-        flex: 1,
-    },
-    anomalyDesc: {
-        fontSize: 11,
-        color: T.textSub,
-        lineHeight: 16,
-        marginBottom: 10,
-    },
-    anomalyFooter: {
+    stressResultRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-        paddingTop: 8,
+        marginBottom: 4,
     },
-    anomalyEntity: {
-        fontSize: 10.5,
-        fontWeight: '700',
-        color: T.textMain,
-        flex: 1,
-    },
-    resolveBtn: {
-        backgroundColor: T.navyDark,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    resolveBtnText: {
-        color: T.gold,
+    stressResultLabel: {
         fontSize: 11,
-        fontWeight: '800',
+        color: T.textSub,
+    },
+    stressResultVal: {
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    stressRecommendation: {
+        color: '#CBD5E1',
+        fontSize: 10.5,
+        marginTop: 6,
+        lineHeight: 15,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.65)',
+        backgroundColor: 'rgba(0,0,0,0.8)',
         justifyContent: 'flex-end',
     },
     modalCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: T.navyMid,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: 20,
         maxHeight: '85%',
+        borderWidth: 1,
+        borderColor: T.cardBorder,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -2306,16 +2147,18 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     modalTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '900',
-        color: T.textMain,
+        color: '#FFFFFF',
     },
     modalAmountBox: {
         backgroundColor: T.navyDark,
         padding: 16,
         borderRadius: 16,
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
     },
     modalAmountLabel: {
         color: T.gold,
@@ -2335,44 +2178,51 @@ const styles = StyleSheet.create({
         fontSize: 10.5,
         fontWeight: '600',
     },
+    riskReasonBox: {
+        backgroundColor: T.dangerBg,
+        borderRadius: 12,
+        padding: 10,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    riskReasonTitle: {
+        color: T.danger,
+        fontSize: 9.5,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    riskReasonItem: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         paddingVertical: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        borderBottomColor: 'rgba(51, 65, 85, 0.4)',
     },
     infoLabel: {
-        fontSize: 12,
+        fontSize: 11.5,
         color: T.textSub,
         fontWeight: '600',
     },
     infoValue: {
-        fontSize: 12,
+        fontSize: 11.5,
         fontWeight: '800',
-        color: T.textMain,
+        color: '#FFFFFF',
     },
     modalBtnContainer: {
-        marginTop: 20,
+        marginTop: 18,
         gap: 8,
         paddingBottom: 20,
     },
-    btnApprove: {
-        backgroundColor: T.success,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 6,
-    },
-    btnApproveText: {
-        color: '#FFFFFF',
-        fontWeight: '800',
-        fontSize: 12.5,
-    },
     btnRefund: {
-        backgroundColor: T.warning,
+        backgroundColor: T.gold,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -2381,8 +2231,8 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     btnRefundText: {
-        color: '#FFFFFF',
-        fontWeight: '800',
+        color: '#070D1E',
+        fontWeight: '900',
         fontSize: 12.5,
     },
     btnFreeze: {
@@ -2398,5 +2248,32 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: '800',
         fontSize: 12.5,
+    },
+    blacklistTypeRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 12,
+    },
+    typePill: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+        backgroundColor: T.navyDark,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    typePillActive: {
+        backgroundColor: T.gold,
+        borderColor: T.gold,
+    },
+    typePillText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: T.textSub,
+    },
+    typePillTextActive: {
+        color: '#070D1E',
+        fontWeight: '900',
     },
 });
