@@ -72,10 +72,15 @@ const toSafeDate = (d: any): Date => {
     return new Date();
 };
 
+// Module-level in-memory cache for 0.00ms instant transitions
+let _memoryTxCache: any[] = [];
+let _cachedUserId = '';
+
+
 export default function HistoryScreen() {
     const router = useRouter();
-    const [history, setHistory] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<any[]>(_memoryTxCache);
+    const [loading, setLoading] = useState(_memoryTxCache.length === 0);
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
@@ -84,16 +89,24 @@ export default function HistoryScreen() {
     const [exportReceiptData, setExportReceiptData] = useState<ReceiptData | null>(null);
     const { settings } = useAppSettings();
 
-    const currentUserIdRef = useRef('');
+    const currentUserIdRef = useRef(_cachedUserId);
+    const isFetchingRef = useRef(false);
+    const realtimeSubRef = useRef<any>(null);
 
     useEffect(() => {
         initHistory();
+        return () => {
+            if (realtimeSubRef.current) {
+                supabase.removeChannel(realtimeSubRef.current);
+                realtimeSubRef.current = null;
+            }
+        };
     }, []);
 
     useFocusEffect(
         useCallback(() => {
             if (currentUserIdRef.current) {
-                fetchLiveHistory(currentUserIdRef.current);
+                fetchLiveHistory(currentUserIdRef.current, true);
             } else {
                 initHistory();
             }
@@ -102,15 +115,29 @@ export default function HistoryScreen() {
 
     const initHistory = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                currentUserIdRef.current = user.id;
-                // 1. Instant Cache Load (0ms Render)
-                await loadCachedHistory(user.id);
-                // 2. Fresh Network Sync in background
-                fetchLiveHistory(user.id);
-                // 3. Realtime Subscription Setup
-                setupRealtimeListener(user.id);
+            // 1. Fast local session lookup (0ms)
+            const { data: { session } } = await supabase.auth.getSession();
+            let userId = session?.user?.id;
+
+            if (!userId) {
+                const { data: { user } } = await supabase.auth.getUser();
+                userId = user?.id;
+            }
+
+            if (userId) {
+                currentUserIdRef.current = userId;
+                _cachedUserId = userId;
+
+                // 2. Instant Local Storage Load (0ms Render)
+                if (_memoryTxCache.length === 0) {
+                    await loadCachedHistory(userId);
+                }
+
+                // 3. Fast Parallel Live Network Sync
+                fetchLiveHistory(userId, true);
+
+                // 4. Setup Realtime Listener Once
+                setupRealtimeListener(userId);
             } else {
                 setLoading(false);
             }
@@ -127,6 +154,7 @@ export default function HistoryScreen() {
                 const parsed = JSON.parse(cachedStr);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     const rehydrated = parsed.map(mapTransactionRecord);
+                    _memoryTxCache = rehydrated;
                     setHistory(rehydrated);
                     setLoading(false);
                 }
@@ -138,6 +166,7 @@ export default function HistoryScreen() {
 
     const saveCachedHistory = async (userId: string, data: any[]) => {
         try {
+            _memoryTxCache = data;
             await AsyncStorage.setItem(`@user_tx_history_v7_${userId}`, JSON.stringify(data));
         } catch (e) {}
     };
@@ -237,48 +266,42 @@ export default function HistoryScreen() {
         };
     };
 
-    const fetchLiveHistory = async (userId: string) => {
+    const fetchLiveHistory = async (userId: string, isSilent = false) => {
+        if (!userId || isFetchingRef.current) return;
+        isFetchingRef.current = true;
+
+        if (!isSilent && history.length === 0) {
+            setLoading(true);
+        }
+
         try {
-            // 1. Fetch Standard Transactions (Airtime, Data, Bills, Deposits, Transfers, Cards, etc.)
-            let standardTxList: any[] = [];
-            try {
-                const { data, error: txErr } = await supabase
+            // Parallelized Fast Fetching (All 3 queries run simultaneously in 1 network roundtrip)
+            const [txRes, verifRes, smmRes] = await Promise.allSettled([
+                supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(300);
-                if (data) standardTxList = data;
-                if (txErr) console.warn('Transactions query notice:', txErr.message);
-            } catch (err) {
-                console.warn('Transactions fetch error:', err);
-            }
-
-            // 2. Fetch Verification History (NIN, BVN, CAC, Slips)
-            let verifTxList: any[] = [];
-            try {
-                const { data: vData } = await supabase
+                    .limit(150),
+                supabase
                     .from('verification_history')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(150);
-                if (vData) verifTxList = vData;
-            } catch (_) {}
-
-            // 3. Fetch Social Boost Orders (SMM)
-            let smmOrdersList: any[] = [];
-            try {
-                const { data: sData } = await supabase
+                    .limit(80),
+                supabase
                     .from('smm_orders')
                     .select('*')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false })
-                    .limit(50);
-                if (sData) smmOrdersList = sData;
-            } catch (_) {}
+                    .limit(40),
+            ]);
 
-            // Transform verification records into standard format with true extracted amount
+            const standardTxList: any[] = (txRes.status === 'fulfilled' && txRes.value.data) ? txRes.value.data : [];
+            const verifTxList: any[] = (verifRes.status === 'fulfilled' && verifRes.value.data) ? verifRes.value.data : [];
+            const smmOrdersList: any[] = (smmRes.status === 'fulfilled' && smmRes.value.data) ? smmRes.value.data : [];
+
+            // Transform verification records into standard format
             const mappedVerif = verifTxList.map(v => {
                 const d = v.details || {};
                 const exactAmount = d.amount ?? d.price ?? d.fee ?? d.amount_paid ?? v.amount_paid ?? v.price ?? v.amount ?? 0;
@@ -336,48 +359,48 @@ export default function HistoryScreen() {
                 (a, b) => b.dateObj.getTime() - a.dateObj.getTime()
             );
 
+            _memoryTxCache = mappedCombined;
             setHistory(mappedCombined);
             saveCachedHistory(userId, mappedCombined);
         } catch (error) {
             console.error('Error fetching live history:', error);
         } finally {
+            isFetchingRef.current = false;
             setRefreshing(false);
             setLoading(false);
         }
     };
 
     const setupRealtimeListener = (userId: string) => {
+        if (realtimeSubRef.current) return;
         const channel = supabase
-            .channel(`user_tx_sync_${userId}_${Date.now()}`)
+            .channel(`user_tx_sync_${userId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
-                fetchLiveHistory(userId);
+                fetchLiveHistory(userId, true);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'verification_history', filter: `user_id=eq.${userId}` }, () => {
-                fetchLiveHistory(userId);
+                fetchLiveHistory(userId, true);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'smm_orders', filter: `user_id=eq.${userId}` }, () => {
-                fetchLiveHistory(userId);
+                fetchLiveHistory(userId, true);
             })
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        realtimeSubRef.current = channel;
     };
 
-
     const handleRefresh = useCallback(() => {
-
         setRefreshing(true);
         if (Platform.OS !== 'web') {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
         if (currentUserIdRef.current) {
-            fetchLiveHistory(currentUserIdRef.current);
+            fetchLiveHistory(currentUserIdRef.current, false);
         } else {
             initHistory();
         }
     }, []);
+
 
     const copyToClipboard = async (text: string, label: string = 'Reference') => {
         await Clipboard.setStringAsync(text);
