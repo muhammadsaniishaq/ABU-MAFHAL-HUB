@@ -756,15 +756,19 @@ export default function SignupScreen() {
                 ? window.location.origin
                 : Linking.createURL('/login');
 
+            const queryParams: Record<string, string> = {
+                access_type: 'offline',
+                prompt: 'select_account',
+            };
+            if (referralCode && referralCode.trim()) {
+                queryParams.referral_code = referralCode.trim();
+            }
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
                     redirectTo: redirectUrl,
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'select_account',
-                    },
-                    data: referralCode ? { referral_code: referralCode.trim() } : undefined,
+                    queryParams,
                 },
             });
             if (error) throw error;
@@ -789,15 +793,17 @@ export default function SignupScreen() {
                 ? (typeof window !== 'undefined' ? window.location.origin : 'https://abumafhal.com.ng')
                 : Linking.createURL('/login');
 
-            const refCodeToPass = referralCode ? referralCode.trim() : '';
+            const queryParams: Record<string, string> = {
+                access_type: 'offline',
+                prompt: 'select_account',
+            };
+            if (referralCode && referralCode.trim()) {
+                queryParams.referral_code = referralCode.trim();
+            }
 
-            const options: any = {
+            const options = {
                 redirectTo: redirectUrl,
-                queryParams: {
-                    access_type: 'offline',
-                    prompt: 'select_account',
-                },
-                data: refCodeToPass ? { referral_code: refCodeToPass } : undefined,
+                queryParams,
             };
 
             const { error } = await supabase.auth.signInWithOAuth({
