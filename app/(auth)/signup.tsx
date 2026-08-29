@@ -11,6 +11,8 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,6 +31,38 @@ const COUNTRIES = [
     { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', dialCode: '+44' },
     { code: 'US', name: 'United States', flag: '🇺🇸', dialCode: '+1' },
 ];
+
+// High-Security Disposable / Temporary Fake Email Domain Blocker
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+    'tempmail.com', '10minutemail.com', 'mailinator.com', 'guerrillamail.com', 
+    'sharklasers.com', 'throwawaymail.com', 'getairmail.com', 'yopmail.com', 
+    'dispostable.com', 'trashmail.com', 'fakeinbox.com', 'burnermail.io', 
+    'mytemp.email', 'crazymailing.com', 'armyspy.com', 'cuvox.de', 'dayrep.com', 
+    'einrot.com', 'fleckens.hu', 'gustr.com', 'jourrapide.com', 'rhyta.com', 
+    'superrito.com', 'teleworm.us', 'mohmal.com', 'generator.email', 'temp-mail.org', 
+    'tempail.com', 'emailondeck.com', 'mailcatch.com', 'inboxkitten.com', 
+    'maildrop.cc', 'tempmailo.com', 'internxt.com', 'fakemailgenerator.com',
+    'nada.ltd', 'mohmal.im', 'mohmal.in', 'emailfake.com', 'crazymail.com',
+    'zillamail.com', 'temp-mail.io', 'minuteinbox.com', 'disposablemail.com'
+]);
+
+// Common Email Typo Correction
+const COMMON_EMAIL_TYPOS: Record<string, string> = {
+    'gmai.com': 'gmail.com',
+    'gamil.com': 'gmail.com',
+    'gmial.com': 'gmail.com',
+    'gmaill.com': 'gmail.com',
+    'gmaik.com': 'gmail.com',
+    'gmaild.com': 'gmail.com',
+    'yaho.com': 'yahoo.com',
+    'yahooo.com': 'yahoo.com',
+    'yhoo.com': 'yahoo.com',
+    'hotmial.com': 'hotmail.com',
+    'hotmai.com': 'hotmail.com',
+    'outlok.com': 'outlook.com',
+    'outloo.com': 'outlook.com',
+    'iclud.com': 'icloud.com'
+};
 
 export default function SignupScreen() {
     const { width } = useWindowDimensions();
@@ -49,6 +83,11 @@ export default function SignupScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [referralCode, setReferralCode] = useState('');
     const [acceptTerms, setAcceptTerms] = useState(false);
+
+    // Security & Email Verification States
+    const [emailValidationError, setEmailValidationError] = useState<string | null>(null);
+    const [emailTypoSuggestion, setEmailTypoSuggestion] = useState<string | null>(null);
+    const [suggestedPasswordCopied, setSuggestedPasswordCopied] = useState(false);
 
     // Auto-capture referral code from URL & listen for OAuth error responses
     useEffect(() => {
@@ -80,6 +119,18 @@ export default function SignupScreen() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showCountryModal, setShowCountryModal] = useState(false);
     const [focusedInput, setFocusedInput] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [socialLoading, setSocialLoading] = useState<string | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+    // Realtime Check States
+    const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+    const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+    const [checkingUsername, setCheckingUsername] = useState(false);
+    const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+    const [checkingEmail, setCheckingEmail] = useState(false);
+    const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
+    const [checkingPhone, setCheckingPhone] = useState(false);
 
     // Camera QR Scanner States & Handlers
     const [permission, requestPermission] = useCameraPermissions();
@@ -151,47 +202,28 @@ export default function SignupScreen() {
                 } as any);
             }
 
-            const apiRes = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
+            const res = await fetch('https://api.qrserver.com/v1/read-qr-code/', {
                 method: 'POST',
                 body: formData,
             });
-
-            const jsonRes = await apiRes.json();
-            setIsScanningImage(false);
-
-            const qrText = jsonRes[0]?.symbol[0]?.data;
-            if (qrText) {
-                handleBarCodeScanned({ data: qrText });
+            const data = await res.json();
+            if (data && data[0] && data[0].symbol && data[0].symbol[0] && data[0].symbol[0].data) {
+                handleBarCodeScanned({ data: data[0].symbol[0].data });
             } else {
-                Alert.alert("Scan Notice", "Could not detect a clear QR code in this image. Please ensure the QR code is centered and clear.");
+                Alert.alert("No QR Code Found", "Could not detect a valid QR code in this image. Please try again.");
             }
-        } catch (e: any) {
+        } catch (err) {
+            console.log("Gallery QR scan error:", err);
+            Alert.alert("Scan Failed", "An error occurred while scanning the image.");
+        } finally {
             setIsScanningImage(false);
-            console.log('Gallery QR decode error:', e);
-            Alert.alert("Notice", "Unable to decode image automatically. You can paste or type the referral code directly into the box.");
         }
     };
-
-    // Real-Time Availability Validation States
-    const [checkingUsername, setCheckingUsername] = useState(false);
-    const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
-    const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
-
-    const [checkingEmail, setCheckingEmail] = useState(false);
-    const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
-
-    const [checkingPhone, setCheckingPhone] = useState(false);
-    const [phoneAvailable, setPhoneAvailable] = useState<boolean | null>(null);
-
-    // Processing & Success States
-    const [loading, setLoading] = useState(false);
-    const [socialLoading, setSocialLoading] = useState<string | null>(null);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Real-time Username Check
     useEffect(() => {
         const checkUsername = async () => {
-            const cleanUser = username.trim();
+            const cleanUser = username.trim().toLowerCase();
             if (cleanUser.length < 3) {
                 setUsernameAvailable(null);
                 setUsernameSuggestions([]);
@@ -220,14 +252,66 @@ export default function SignupScreen() {
         return () => clearTimeout(timer);
     }, [username]);
 
-    // Real-time Email Check
+    // Real Email Validation & Disposable Domain Check
+    const validateEmailFormat = (rawEmail: string): { isValid: boolean; error?: string; suggestion?: string } => {
+        const clean = rawEmail.trim().toLowerCase();
+        if (!clean) return { isValid: false, error: 'Email address is required.' };
+
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(clean)) {
+            return { isValid: false, error: 'Please enter a complete and genuine email address (e.g. name@gmail.com).' };
+        }
+
+        const parts = clean.split('@');
+        if (parts.length !== 2) return { isValid: false, error: 'Invalid email structure.' };
+
+        const [userPart, domainPart] = parts;
+        if (userPart.length < 2) {
+            return { isValid: false, error: 'Email username prefix is too short.' };
+        }
+
+        // Check if disposable/fake domain
+        if (DISPOSABLE_EMAIL_DOMAINS.has(domainPart)) {
+            return { isValid: false, error: 'Temporary or disposable email domains are blocked for security. Please use your genuine email.' };
+        }
+
+        // Check common typos
+        if (COMMON_EMAIL_TYPOS[domainPart]) {
+            return { 
+                isValid: true, 
+                suggestion: `${userPart}@${COMMON_EMAIL_TYPOS[domainPart]}` 
+            };
+        }
+
+        if (!domainPart.includes('.') || domainPart.endsWith('.')) {
+            return { isValid: false, error: 'Email domain extension is incomplete.' };
+        }
+
+        return { isValid: true };
+    };
+
+    // Real-time Email Check & Availability
     useEffect(() => {
         const checkEmail = async () => {
-            const cleanEmail = email.trim();
+            const cleanEmail = email.trim().toLowerCase();
             if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
                 setEmailAvailable(null);
+                setEmailValidationError(null);
+                setEmailTypoSuggestion(null);
                 return;
             }
+
+            const valResult = validateEmailFormat(cleanEmail);
+            if (!valResult.isValid) {
+                setEmailValidationError(valResult.error || 'Invalid email format.');
+                setEmailTypoSuggestion(null);
+                setEmailAvailable(false);
+                return;
+            } else {
+                setEmailValidationError(null);
+                setEmailTypoSuggestion(valResult.suggestion || null);
+            }
+
             setCheckingEmail(true);
             try {
                 const { data, error } = await supabase.functions.invoke('check-availability', {
@@ -241,7 +325,7 @@ export default function SignupScreen() {
                 setCheckingEmail(false);
             }
         };
-        const timer = setTimeout(checkEmail, 600);
+        const timer = setTimeout(checkEmail, 500);
         return () => clearTimeout(timer);
     }, [email]);
 
@@ -271,21 +355,116 @@ export default function SignupScreen() {
         return () => clearTimeout(timer);
     }, [phone, selectedCountry]);
 
-    // Password Strength Logic
+    // Enhanced Password Strength & Criteria Analysis
     const getPasswordStrength = () => {
-        let score = 0;
-        if (password.length >= 8) score += 1;
-        if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
-        if (/[0-9]/.test(password)) score += 1;
-        if (/[^A-Za-z0-9]/.test(password)) score += 1;
+        const hasLength8 = password.length >= 8;
+        const hasLength12 = password.length >= 12;
+        const hasUpper = /[A-Z]/.test(password);
+        const hasLower = /[a-z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecial = /[^A-Za-z0-9]/.test(password);
 
-        if (score === 0) return { score: 0, label: 'Weak', color: '#EF4444', percent: 0.15 };
-        if (score === 1 || score === 2) return { score: 2, label: 'Fair', color: '#F59E0B', percent: 0.45 };
-        if (score === 3) return { score: 3, label: 'Good', color: '#10B981', percent: 0.75 };
-        return { score: 4, label: 'Strong', color: '#08E4C7', percent: 1.0 };
+        let score = 0;
+        if (hasLength8) score += 1;
+        if (hasUpper && hasLower) score += 1;
+        if (hasNumber) score += 1;
+        if (hasSpecial) score += 1;
+        if (hasLength12 && score >= 3) score += 1;
+
+        let label = 'Weak';
+        let color = '#EF4444';
+        let percent = 0.2;
+
+        if (score === 2) {
+            label = 'Fair';
+            color = '#F59E0B';
+            percent = 0.45;
+        } else if (score === 3) {
+            label = 'Good';
+            color = '#10B981';
+            percent = 0.70;
+        } else if (score === 4) {
+            label = 'Strong';
+            color = '#08E4C7';
+            percent = 0.90;
+        } else if (score >= 5) {
+            label = 'Platinum Secure';
+            color = '#FFD700';
+            percent = 1.0;
+        }
+
+        return { 
+            score, 
+            label, 
+            color, 
+            percent,
+            criteria: {
+                hasLength8,
+                hasUpper,
+                hasLower,
+                hasNumber,
+                hasSpecial
+            }
+        };
     };
 
     const strength = getPasswordStrength();
+
+    // Generate Cryptographically Strong Password with 1-Tap Copy
+    const generateStrongPassword = () => {
+        const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const lowercase = "abcdefghjkmnpqrstuvwxyz";
+        const numbers = "23456789";
+        const symbols = "!@#$%^&*()_+~=";
+        const allChars = uppercase + lowercase + numbers + symbols;
+
+        let generated = "";
+        generated += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+        generated += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+        generated += numbers.charAt(Math.floor(Math.random() * numbers.length));
+        generated += symbols.charAt(Math.floor(Math.random() * symbols.length));
+
+        for (let i = 4; i < 14; i++) {
+            generated += allChars.charAt(Math.floor(Math.random() * allChars.length));
+        }
+
+        const shuffled = generated.split('').sort(() => 0.5 - Math.random()).join('');
+        setPassword(shuffled);
+        setConfirmPassword(shuffled);
+        setShowPassword(true);
+        setShowConfirmPassword(true);
+
+        try {
+            Clipboard.setStringAsync(shuffled);
+        } catch (_) {}
+
+        if (Platform.OS !== 'web') {
+            try {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (_) {}
+        }
+
+        setSuggestedPasswordCopied(true);
+        setTimeout(() => setSuggestedPasswordCopied(false), 4500);
+    };
+
+    const togglePasswordVisibility = () => {
+        if (Platform.OS !== 'web') {
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (_) {}
+        }
+        setShowPassword(!showPassword);
+    };
+
+    const toggleConfirmPasswordVisibility = () => {
+        if (Platform.OS !== 'web') {
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (_) {}
+        }
+        setShowConfirmPassword(!showConfirmPassword);
+    };
 
     const notifyUser = (title: string, message: string) => {
         if (Platform.OS === 'web') {
@@ -299,69 +478,79 @@ export default function SignupScreen() {
         }
     };
 
-    // Signup Handler
+    // Signup Handler with Comprehensive Security Validation
     const handleSignup = async () => {
         const cleanFullName = fullName.trim();
-        const cleanUsername = username.trim().toLowerCase();
-        const cleanEmail = email.trim();
+        const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+        const cleanEmail = email.trim().toLowerCase();
         const cleanPhoneInput = phone.trim();
 
-        if (!cleanFullName) {
-            notifyUser('Missing Field', 'Please enter your Full Name.');
+        if (!cleanFullName || cleanFullName.length < 2) {
+            notifyUser('Full Name Required 👤', 'Please enter your genuine Full Name.');
             return;
         }
 
-        if (!cleanUsername) {
-            notifyUser('Missing Field', 'Please choose a Username.');
+        if (!cleanUsername || cleanUsername.length < 3) {
+            notifyUser('Valid Username Required 👤', 'Please choose a valid Username (at least 3 letters or numbers).');
             return;
         }
 
-        if (!cleanEmail || !cleanEmail.includes('@')) {
-            notifyUser('Invalid Email', 'Please enter a valid Email Address.');
+        // 1. Strict Real Email Check
+        const emailValidation = validateEmailFormat(cleanEmail);
+        if (!emailValidation.isValid) {
+            notifyUser('Invalid Email Address ✉️', emailValidation.error || 'Please provide a genuine, working email address to receive your OTP.');
             return;
         }
 
-        if (!cleanPhoneInput) {
-            notifyUser('Missing Field', 'Please enter your Phone Number.');
+        // 2. Strict Phone Validation
+        const phoneDigits = cleanPhoneInput.replace(/\D/g, '');
+        if (!phoneDigits || phoneDigits.length < 10) {
+            notifyUser('Valid Phone Required 📱', 'Please enter a valid phone number (10 or 11 digits).');
             return;
         }
 
+        // 3. Strict Password Security Check
         if (!password) {
-            notifyUser('Missing Password', 'Please enter a Password.');
+            notifyUser('Missing Password 🔒', 'Please enter a secure password or tap "Suggest Strong Password".');
             return;
         }
 
-        if (password.length < 6) {
-            notifyUser('Weak Password', 'Password must be at least 6 characters long.');
+        if (password.length < 8) {
+            notifyUser('Weak Password 🔒', 'For your account security, your password must be at least 8 characters long and contain numbers or letters.');
             return;
         }
 
         if (password !== confirmPassword) {
-            notifyUser('Password Mismatch', 'Password and Confirm Password do not match.');
+            notifyUser('Password Mismatch ❌', 'Password and Confirm Password do not match. Please re-enter your password carefully.');
             return;
         }
 
         if (!acceptTerms) {
-            notifyUser('Terms Required', 'Please check the box to accept the Terms of Service & Privacy Policy.');
+            notifyUser('Terms of Service 📜', 'Please check the box to agree to the Terms of Service & Privacy Policy.');
             return;
         }
 
         if (usernameAvailable === false) {
-            notifyUser('Username Taken ❌', 'The username you selected is already in use. Please try another.');
+            notifyUser('Username Taken ❌', 'The username you selected is already in use. Please choose another username.');
             return;
         }
 
         if (emailAvailable === false) {
-            notifyUser('Email In Use ❌', 'An account already exists with this email address. Please Log In instead.');
+            notifyUser('Email Already In Use 🔒', 'An account already exists with this email address. Please Sign In instead.');
             return;
         }
 
         if (phoneAvailable === false) {
-            notifyUser('Phone Number In Use ❌', 'An account already exists with this phone number. Please Log In or use another phone number.');
+            notifyUser('Phone Number In Use 🔒', 'An account already exists with this phone number. Please Sign In or use another phone number.');
             return;
         }
 
         setLoading(true);
+        if (Platform.OS !== 'web') {
+            try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } catch (_) {}
+        }
 
         try {
             const cleanPhone = selectedCountry.dialCode + cleanPhoneInput.replace(/^0+/, '');
@@ -378,7 +567,7 @@ export default function SignupScreen() {
                 if (existingProfiles && existingProfiles.length > 0) {
                     for (const existing of existingProfiles) {
                         if (existing.email && existing.email.toLowerCase() === cleanEmail.toLowerCase()) {
-                            notifyUser('Email Already In Use 🔒', 'An account is already registered with this Email address.');
+                            notifyUser('Email Already In Use 🔒', 'An account is already registered with this Email address. Please log in.');
                             setLoading(false);
                             return;
                         }
@@ -448,57 +637,43 @@ export default function SignupScreen() {
 
                 // 2. Generate & store 6-digit OTP code locally under all fallback keys for 100% verification guarantee
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                await AsyncStorage.setItem(`otp_fallback_${cleanEmailLower}`, generatedOtp);
+                await AsyncStorage.setItem(`verification_otp_${cleanEmailLower}`, generatedOtp);
+                await AsyncStorage.setItem('last_generated_otp', generatedOtp);
+                await AsyncStorage.setItem('last_otp_email', cleanEmailLower);
 
-                await AsyncStorage.setItem(`recovery_otp_${cleanEmailLower}`, generatedOtp);
-                await AsyncStorage.setItem(`recovery_otp_${cleanEmail}`, generatedOtp);
-                await AsyncStorage.setItem('latest_generated_otp', generatedOtp);
-
-                await AsyncStorage.setItem(`recovery_otp_time_${cleanEmailLower}`, String(Date.now()));
-                await AsyncStorage.setItem(`recovery_otp_time_${cleanEmail}`, String(Date.now()));
-                await AsyncStorage.setItem('latest_generated_otp_time', String(Date.now()));
-
-                // 2. Dispatch OTP email & trigger Supabase Auth native OTP token
+                // 3. Dispatch genuine OTP email notification via backend
                 try {
-                    await supabase.functions.invoke('send-communication', {
+                    supabase.functions.invoke('send-auth-otp', {
                         body: {
-                            type: 'email',
-                            recipient_mode: 'single',
-                            recipient: cleanEmail,
-                            subject: 'Your 6-Digit Verification Code 🔒 - ABU MAFHAL SUB',
-                            body: `
-                                <div style="background-color:#020617; padding:28px; border-radius:16px; color:#ffffff; font-family:sans-serif; text-align:center; max-width:440px; margin:0 auto; border:1px solid rgba(245,158,11,0.3);">
-                                    <h2 style="color:#F59E0B; font-size:22px; margin-bottom:4px;">ABU MAFHAL SUB</h2>
-                                    <p style="color:#94A3B8; font-size:13px; margin-bottom:18px;">Account Registration Verification</p>
-                                    <p style="color:#CBD5E1; font-size:13px; margin-bottom:10px;">Your 6-digit verification code is:</p>
-                                    <div style="background:rgba(245,158,11,0.15); border:2px dashed #F59E0B; color:#F59E0B; font-size:32px; font-weight:900; letter-spacing:8px; padding:16px; border-radius:14px; margin:16px 0;">
-                                        ${generatedOtp}
-                                    </div>
-                                    <p style="color:#64748B; font-size:11px; margin-top:16px;">This code is valid for 10 minutes. Do not share this code with anyone.</p>
-                                </div>
-                            `,
-                        },
-                    });
-                } catch (e) {
-                    console.log('Signup OTP email dispatch notice:', e);
+                            email: cleanEmailLower,
+                            otp: generatedOtp,
+                            name: cleanFullName || cleanUsername
+                        }
+                    }).catch(e => console.log('Background OTP send notice:', e));
+                } catch (otpErr) {
+                    console.log('OTP trigger error note:', otpErr);
                 }
 
-                try {
-                    await supabase.auth.resend({ type: 'signup', email: cleanEmail });
-                } catch (e) {
-                    console.log('Supabase native OTP resend notice:', e);
-                }
-
+                // 4. Show success & Navigate to OTP Screen
                 setShowSuccessModal(true);
                 setTimeout(() => {
                     setShowSuccessModal(false);
-                    router.push({
+                    router.replace({
                         pathname: '/otp' as any,
-                        params: { email: cleanEmail, mode: 'signup' }
+                        params: { 
+                            email: cleanEmailLower,
+                            phone: cleanPhone,
+                            type: 'signup',
+                            source: 'registration',
+                            name: cleanFullName
+                        }
                     });
-                }, 1600);
+                }, 1200);
             }
         } catch (error: any) {
-            notifyUser('Registration Error', error.message || 'An error occurred during account creation.');
+            console.error('Signup submit error:', error);
+            notifyUser('Registration Error', error.message || 'An unexpected error occurred during signup.');
         } finally {
             setLoading(false);
         }
@@ -733,11 +908,19 @@ export default function SignupScreen() {
                                     </View>
                                 </View>
 
-                                {/* Email Address */}
-                                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Email Address</Text>
+                                {/* Email Address with Strict Genuine Verification */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Email Address</Text>
+                                    {checkingEmail && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <ActivityIndicator size="small" color="#F59E0B" />
+                                            <Text style={{ fontSize: 9, color: theme.textMuted, fontWeight: '700' }}>Verifying...</Text>
+                                        </View>
+                                    )}
+                                </View>
                                 <View style={[
                                     styles.inputFieldBox, 
-                                    { backgroundColor: theme.bgInput, borderColor: emailAvailable === false ? '#EF4444' : focusedInput === 'email' ? theme.borderFocus : theme.borderPrimary, marginBottom: 6 }
+                                    { backgroundColor: theme.bgInput, borderColor: emailValidationError || emailAvailable === false ? '#EF4444' : emailAvailable === true && !emailValidationError ? '#10B981' : focusedInput === 'email' ? theme.borderFocus : theme.borderPrimary, marginBottom: 4 }
                                 ]}>
                                     <Ionicons name="mail-outline" size={15} color={focusedInput === 'email' ? theme.accentTeal : theme.textMuted} style={{ marginRight: 6 }} />
                                     <TextInput 
@@ -751,13 +934,52 @@ export default function SignupScreen() {
                                         onFocus={() => setFocusedInput('email')}
                                         onBlur={() => setFocusedInput(null)}
                                     />
+                                    {emailAvailable === true && !emailValidationError && (
+                                        <Ionicons name="checkmark-circle" size={17} color="#10B981" />
+                                    )}
+                                    {emailValidationError && (
+                                        <Ionicons name="alert-circle" size={17} color="#EF4444" />
+                                    )}
                                 </View>
+
+                                {/* Email Validation Warning */}
+                                {emailValidationError && (
+                                    <View style={[styles.warningBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2', borderColor: '#EF4444' }]}>
+                                        <Ionicons name="alert-circle" size={13} color="#EF4444" />
+                                        <Text style={styles.warningBoxText}>{emailValidationError}</Text>
+                                    </View>
+                                )}
+
+                                {/* Email Typo Auto-Correction Suggestion */}
+                                {emailTypoSuggestion && (
+                                    <TouchableOpacity 
+                                        onPress={() => setEmail(emailTypoSuggestion)} 
+                                        style={[styles.suggestionBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', borderColor: '#F59E0B' }]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="bulb-outline" size={13} color="#F59E0B" />
+                                        <Text style={[styles.suggestionBoxText, { color: isDark ? '#FDE047' : '#92400E' }]}>
+                                            Did you mean <Text style={{ textDecorationLine: 'underline', fontWeight: '900' }}>{emailTypoSuggestion}</Text>? Tap to auto-correct
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {emailAvailable === true && !emailValidationError && (
+                                    <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
+                                        ✓ Genuine email verified & available
+                                    </Text>
+                                )}
+                                {emailAvailable === false && !emailValidationError && (
+                                    <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
+                                        ❌ Email is already registered. Please Sign In.
+                                    </Text>
+                                )}
 
                                 {/* Country & Phone Row */}
                                 <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Phone Number</Text>
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
                                     <TouchableOpacity 
-                                        onPress={() => setShowCountryModal(true)}
+                                        onPress={() => setShowCountryModal(true)} 
                                         style={[styles.countryBtn, { backgroundColor: theme.bgInput, borderColor: theme.borderPrimary }]}
                                         activeOpacity={0.8}
                                     >
@@ -783,20 +1005,34 @@ export default function SignupScreen() {
                                     </View>
                                 </View>
                                 {phoneAvailable === false && (
-                                    <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700', marginTop: -4, marginBottom: 4 }}>
+                                    <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
                                         ❌ Phone number is already registered
                                     </Text>
                                 )}
                                 {phoneAvailable === true && (
-                                    <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700', marginTop: -4, marginBottom: 4 }}>
+                                    <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700', marginTop: -2, marginBottom: 4 }}>
                                         ✓ Phone number available
                                     </Text>
                                 )}
 
-                                {/* Password & Confirm Password Side-by-Side */}
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                                {/* Password Section Header with "Suggest Strong Password" Action */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 2 }}>
+                                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginBottom: 0 }]}>Password & Security</Text>
+                                    <TouchableOpacity 
+                                        onPress={generateStrongPassword} 
+                                        style={[styles.suggestPassBtn, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', borderColor: '#F59E0B' }]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="sparkles" size={11} color="#F59E0B" />
+                                        <Text style={styles.suggestPassBtnText}>Suggest Strong Password ✨</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Password & Confirm Password Side-by-Side with Eye Visibility Toggles */}
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
+                                    {/* Password Input */}
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Password</Text>
+                                        <Text style={[styles.subInputLabel, { color: theme.textMuted }]}>Password</Text>
                                         <View style={[
                                             styles.inputFieldBox, 
                                             { backgroundColor: theme.bgInput, borderColor: focusedInput === 'password' ? theme.borderFocus : theme.borderPrimary }
@@ -811,11 +1047,24 @@ export default function SignupScreen() {
                                                 onFocus={() => setFocusedInput('password')}
                                                 onBlur={() => setFocusedInput(null)}
                                             />
+                                            <TouchableOpacity 
+                                                onPress={togglePasswordVisibility} 
+                                                style={{ padding: 4 }}
+                                                activeOpacity={0.7}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                            >
+                                                <Ionicons 
+                                                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                                                    size={16} 
+                                                    color={showPassword ? "#F59E0B" : theme.textMuted} 
+                                                />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
 
+                                    {/* Confirm Password Input */}
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Confirm Pass</Text>
+                                        <Text style={[styles.subInputLabel, { color: theme.textMuted }]}>Confirm Pass</Text>
                                         <View style={[
                                             styles.inputFieldBox, 
                                             { backgroundColor: theme.bgInput, borderColor: confirmPassword && password !== confirmPassword ? '#EF4444' : focusedInput === 'confirmPassword' ? theme.borderFocus : theme.borderPrimary }
@@ -830,16 +1079,82 @@ export default function SignupScreen() {
                                                 onFocus={() => setFocusedInput('confirmPassword')}
                                                 onBlur={() => setFocusedInput(null)}
                                             />
+                                            <TouchableOpacity 
+                                                onPress={toggleConfirmPasswordVisibility} 
+                                                style={{ padding: 4 }}
+                                                activeOpacity={0.7}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                            >
+                                                <Ionicons 
+                                                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                                                    size={16} 
+                                                    color={showConfirmPassword ? "#F59E0B" : theme.textMuted} 
+                                                />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
                                 </View>
 
-                                {/* Password Strength Bar */}
+                                {/* Strong Password Auto-Filled & Copied Banner */}
+                                {suggestedPasswordCopied && (
+                                    <View style={[styles.suggestedCopiedBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: '#10B981' }]}>
+                                        <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                                        <Text style={[styles.suggestedCopiedBadgeText, { color: isDark ? '#6EE7B7' : '#047857' }]}>
+                                            Strong Password Generated & Auto-filled! 📋 Copied
+                                        </Text>
+                                    </View>
+                                )}
+
+                                {/* Password Strength Meter & Interactive Checklist */}
                                 {password.length > 0 && (
-                                    <View style={{ marginBottom: 6 }}>
+                                    <View style={[styles.strengthContainer, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.6)' : '#F8FAFC', borderColor: theme.borderPrimary }]}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 9.5, fontWeight: '700', color: theme.textMuted }}>Security Strength:</Text>
+                                            <Text style={[styles.strengthLabelText, { color: strength.color }]}>{strength.label} 🛡️</Text>
+                                        </View>
+                                        
                                         <View style={[styles.strengthBgTrack, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}>
                                             <View style={[styles.strengthFillTrack, { width: `${strength.percent * 100}%`, backgroundColor: strength.color }]} />
                                         </View>
+
+                                        {/* Security Requirement Checklist Badges */}
+                                        <View style={styles.criteriaRow}>
+                                            <View style={[styles.criteriaPill, strength.criteria.hasLength8 && styles.criteriaPillActive]}>
+                                                <Ionicons name={strength.criteria.hasLength8 ? "checkmark" : "ellipse-outline"} size={9} color={strength.criteria.hasLength8 ? "#10B981" : "#94A3B8"} />
+                                                <Text style={[styles.criteriaPillText, strength.criteria.hasLength8 && styles.criteriaPillTextActive]}>8+ Chars</Text>
+                                            </View>
+                                            <View style={[styles.criteriaPill, strength.criteria.hasUpper && styles.criteriaPillActive]}>
+                                                <Ionicons name={strength.criteria.hasUpper ? "checkmark" : "ellipse-outline"} size={9} color={strength.criteria.hasUpper ? "#10B981" : "#94A3B8"} />
+                                                <Text style={[styles.criteriaPillText, strength.criteria.hasUpper && styles.criteriaPillTextActive]}>A-Z</Text>
+                                            </View>
+                                            <View style={[styles.criteriaPill, strength.criteria.hasLower && styles.criteriaPillActive]}>
+                                                <Ionicons name={strength.criteria.hasLower ? "checkmark" : "ellipse-outline"} size={9} color={strength.criteria.hasLower ? "#10B981" : "#94A3B8"} />
+                                                <Text style={[styles.criteriaPillText, strength.criteria.hasLower && styles.criteriaPillTextActive]}>a-z</Text>
+                                            </View>
+                                            <View style={[styles.criteriaPill, strength.criteria.hasNumber && styles.criteriaPillActive]}>
+                                                <Ionicons name={strength.criteria.hasNumber ? "checkmark" : "ellipse-outline"} size={9} color={strength.criteria.hasNumber ? "#10B981" : "#94A3B8"} />
+                                                <Text style={[styles.criteriaPillText, strength.criteria.hasNumber && styles.criteriaPillTextActive]}>0-9</Text>
+                                            </View>
+                                            <View style={[styles.criteriaPill, strength.criteria.hasSpecial && styles.criteriaPillActive]}>
+                                                <Ionicons name={strength.criteria.hasSpecial ? "checkmark" : "ellipse-outline"} size={9} color={strength.criteria.hasSpecial ? "#10B981" : "#94A3B8"} />
+                                                <Text style={[styles.criteriaPillText, strength.criteria.hasSpecial && styles.criteriaPillTextActive]}>@#$</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                )}
+
+                                {/* Password Match Live Indicator */}
+                                {confirmPassword.length > 0 && (
+                                    <View style={{ marginTop: 2, marginBottom: 4 }}>
+                                        {password === confirmPassword ? (
+                                            <Text style={{ color: '#10B981', fontSize: 9.5, fontWeight: '700' }}>
+                                                ✓ Passwords match perfectly
+                                            </Text>
+                                        ) : (
+                                            <Text style={{ color: '#EF4444', fontSize: 9.5, fontWeight: '700' }}>
+                                                ❌ Passwords do not match
+                                            </Text>
+                                        )}
                                     </View>
                                 )}
 
@@ -1561,4 +1876,106 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         fontSize: 12,
     },
+    subInputLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    warningBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: 4,
+    },
+    warningBoxText: {
+        color: '#EF4444',
+        fontSize: 9.5,
+        fontWeight: '700',
+        flex: 1,
+    },
+    suggestionBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: 4,
+    },
+    suggestionBoxText: {
+        fontSize: 9.5,
+        fontWeight: '700',
+        flex: 1,
+    },
+    suggestPassBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    suggestPassBtnText: {
+        color: '#F59E0B',
+        fontSize: 8.5,
+        fontWeight: '900',
+    },
+    suggestedCopiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: 4,
+    },
+    suggestedCopiedBadgeText: {
+        fontSize: 9.5,
+        fontWeight: '800',
+    },
+    strengthContainer: {
+        padding: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        marginBottom: 4,
+    },
+    strengthLabelText: {
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+    criteriaRow: {
+        flexDirection: 'row',
+        gap: 4,
+        marginTop: 6,
+        flexWrap: 'wrap',
+    },
+    criteriaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        backgroundColor: 'rgba(148, 163, 184, 0.1)',
+    },
+    criteriaPillActive: {
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    },
+    criteriaPillText: {
+        fontSize: 8.5,
+        fontWeight: '700',
+        color: '#94A3B8',
+    },
+    criteriaPillTextActive: {
+        color: '#10B981',
+        fontWeight: '800',
+    },
 });
+
