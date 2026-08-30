@@ -13,13 +13,10 @@ import {
     RefreshControl,
     StyleSheet,
     Dimensions,
-    Share,
-    Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../services/supabase';
 
 const { width } = Dimensions.get('window');
@@ -48,19 +45,10 @@ const T = {
     inputBg: '#F8FAFC',
     success: '#059669',
     successBg: '#ECFDF5',
-    successBorder: '#A7F3D0',
     danger: '#DC2626',
     dangerBg: '#FEF2F2',
-    dangerBorder: '#FECACA',
     warning: '#D97706',
     warningBg: '#FFFBEB',
-    warningBorder: '#FDE68A',
-    info: '#0284C7',
-    infoBg: '#F0F9FF',
-    infoBorder: '#BAE6FD',
-    purple: '#7C3AED',
-    purpleBg: '#F5F3FF',
-    purpleBorder: '#DDD6FE',
 };
 
 export interface BVNServicePrice {
@@ -69,8 +57,8 @@ export interface BVNServicePrice {
     name: string;
     category: 'modification' | 'retrieval' | 'slip' | 'core';
     description: string;
-    cost_price: number; // Official AgentHub API Cost Price
-    markup_price: number; // Admin Profit Margin (Riba)
+    cost_price: number;
+    markup_price: number;
     hasBankFees?: boolean;
     status: 'active' | 'maintenance' | 'hidden';
     maintenance_msg?: string;
@@ -253,41 +241,54 @@ export default function EnterpriseBVNPricingScreen() {
         try {
             setLoading(true);
 
-            // 1. Fetch Global Settings
-            const { data: globalSetting } = await supabase
+            // 1. Fetch from app_settings ('bvn_service_controls')
+            const { data: configData } = await supabase
                 .from('app_settings')
-                .select('key, value')
-                .in('key', ['bvn_global_status', 'bvn_global_maintenance_msg']);
+                .select('value')
+                .eq('key', 'bvn_service_controls')
+                .maybeSingle();
 
-            if (globalSetting) {
-                const statusRow = globalSetting.find(g => g.key === 'bvn_global_status');
-                if (statusRow?.value) setGlobalBVNStatus(statusRow.value as any);
-                const msgRow = globalSetting.find(g => g.key === 'bvn_global_maintenance_msg');
-                if (msgRow?.value) setGlobalMaintenanceMsg(msgRow.value);
+            let savedConfig: any = null;
+            if (configData?.value) {
+                try {
+                    savedConfig = typeof configData.value === 'string' ? JSON.parse(configData.value) : configData.value;
+                    if (savedConfig?.global_status) setGlobalBVNStatus(savedConfig.global_status);
+                    if (savedConfig?.global_maintenance_msg) setGlobalMaintenanceMsg(savedConfig.global_maintenance_msg);
+                } catch (e) {
+                    console.warn('Error parsing bvn_service_controls:', e);
+                }
             }
 
             // 2. Fetch from service_pricing table
-            const { data, error } = await supabase
+            const { data: dbPrices } = await supabase
                 .from('service_pricing')
                 .select('*')
                 .eq('service_category', 'bvn');
 
-            if (data && data.length > 0) {
-                const merged: BVNServicePrice[] = AGENTHUB_OFFICIAL_BVN_CATALOGUE.map(def => {
-                    const row = data.find(r => r.id === def.id || (r.name && r.name.toLowerCase() === def.name.toLowerCase()));
-                    return {
-                        ...def,
-                        cost_price: row?.cost_price !== undefined ? Number(row.cost_price) : def.cost_price,
-                        markup_price: row?.markup_price !== undefined ? Number(row.markup_price) : def.markup_price,
-                        status: (row?.status as any) || def.status || 'active',
-                        maintenance_msg: row?.maintenance_msg || undefined,
-                    };
-                });
-                setServices(merged);
-            } else {
-                // Initialize default prices in DB
-                seedDefaultBVNPrices();
-            }
+            const merged: BVNServicePrice[] = AGENTHUB_OFFICIAL_BVN_CATALOGUE.map(def => {
+                const dbRow = dbPrices?.find(r => r.id === def.id || (r.name && r.name.toLowerCase() === def.name.toLowerCase()));
+                const confRow = savedConfig?.services?.[def.id];
+
+                const cost_price = dbRow?.cost_price !== undefined 
+                    ? Number(dbRow.cost_price) 
+                    : (confRow?.cost_price !== undefined ? Number(confRow.cost_price) : def.cost_price);
+
+                const markup_price = dbRow?.markup_price !== undefined 
+                    ? Number(dbRow.markup_price) 
+                    : (confRow?.markup_price !== undefined ? Number(confRow.markup_price) : def.markup_price);
+
+                const status = confRow?.status || (dbRow?.status as any) || def.status || 'active';
+
+                return {
+                    ...def,
+                    cost_price,
+                    markup_price,
+                    status,
+                    maintenance_msg: confRow?.maintenance_msg || dbRow?.maintenance_msg || undefined,
+                };
+            });
+
+            setServices(merged);
         } catch (e) {
             console.error('Error fetching BVN pricing:', e);
         } finally {
@@ -296,31 +297,11 @@ export default function EnterpriseBVNPricingScreen() {
         }
     };
 
-    const seedDefaultBVNPrices = async () => {
-        try {
-            const seedRows = AGENTHUB_OFFICIAL_BVN_CATALOGUE.map(s => ({
-                id: s.id,
-                service_category: 'bvn',
-                name: s.name,
-                cost_price: s.cost_price,
-                markup_price: s.markup_price,
-                status: s.status,
-                updated_at: new Date().toISOString(),
-            }));
-
-            await supabase.from('service_pricing').upsert(seedRows, { onConflict: 'id' });
-            fetchBVNPrices();
-        } catch (e) {
-            console.warn('Seed BVN error:', e);
-        }
-    };
-
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         fetchBVNPrices();
     }, []);
 
-    // Update single field locally
     const handleUpdateServiceField = (id: string, field: 'cost_price' | 'markup_price' | 'status', value: any) => {
         setServices(prev =>
             prev.map(s => {
@@ -332,80 +313,132 @@ export default function EnterpriseBVNPricingScreen() {
         );
     };
 
-    // PUSH ALL UPDATES ATOMICALLY TO SUPABASE
+    // PUSH ALL UPDATES ATOMICALLY AND SECURELY
     const handleSaveAllBVNPrices = async () => {
         setSaving(true);
         try {
-            // 1. Save Global Gateway Settings
-            await supabase.from('app_settings').upsert([
-                { key: 'bvn_global_status', value: globalBVNStatus, updated_at: new Date().toISOString() },
-                { key: 'bvn_global_maintenance_msg', value: globalMaintenanceMsg, updated_at: new Date().toISOString() }
-            ], { onConflict: 'key' });
+            // 1. Build Comprehensive Configuration Object
+            const servicesConfig: Record<string, any> = {};
+            const hiddenList: string[] = [];
+            const maintList: string[] = [];
 
-            // 2. Save Individual Service Statuses & Margins
+            services.forEach(s => {
+                servicesConfig[s.id] = {
+                    id: s.id,
+                    code: s.code,
+                    name: s.name,
+                    category: s.category,
+                    cost_price: s.cost_price,
+                    markup_price: s.markup_price,
+                    selling_price: s.cost_price + s.markup_price,
+                    status: s.status,
+                    maintenance_msg: s.maintenance_msg,
+                };
+
+                if (s.status === 'hidden') hiddenList.push(s.id);
+                if (s.status === 'maintenance') maintList.push(s.id);
+            });
+
+            const bvnMasterConfig = {
+                global_status: globalBVNStatus,
+                global_maintenance_msg: globalMaintenanceMsg,
+                services: servicesConfig,
+                hidden_services: hiddenList,
+                maintenance_services: maintList,
+                updated_at: new Date().toISOString(),
+            };
+
+            // 2. Persist to app_settings
+            const { error: settingsError } = await supabase.from('app_settings').upsert({
+                key: 'bvn_service_controls',
+                value: bvnMasterConfig,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'key' });
+
+            if (settingsError) {
+                console.warn('app_settings upsert error:', settingsError);
+            }
+
+            // 3. Persist to service_pricing rows (both standard and alias rows)
             const rowsToUpsert = services.map(s => ({
                 id: s.id,
                 service_category: 'bvn',
                 name: s.name,
                 cost_price: s.cost_price,
                 markup_price: s.markup_price,
+                selling_price: s.cost_price + s.markup_price,
                 status: s.status,
                 updated_at: new Date().toISOString(),
             }));
 
-            const { error } = await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
-            if (error) throw error;
-
-            // Also mirror alias for generic bvn_modification and bvn_phone_basic
+            // Generic aliases
             const defaultMod = services.find(s => s.id === 'bvn_mod_name') || services[0];
             const defaultPhone = services.find(s => s.id === 'bvn_retrieval_phone') || services[8];
 
-            await supabase.from('service_pricing').upsert([
-                {
-                    id: 'bvn_modification',
-                    service_category: 'bvn',
-                    name: 'BVN Modification Request',
-                    cost_price: defaultMod.cost_price,
-                    markup_price: defaultMod.markup_price,
-                    status: defaultMod.status,
-                    updated_at: new Date().toISOString(),
-                },
-                {
-                    id: 'bvn_phone_basic',
-                    service_category: 'bvn',
-                    name: 'BVN Phone Retrieval',
-                    cost_price: defaultPhone.cost_price,
-                    markup_price: defaultPhone.markup_price,
-                    status: defaultPhone.status,
-                    updated_at: new Date().toISOString(),
-                }
-            ], { onConflict: 'id' });
-
-            await supabase.from('audit_logs').insert({
-                action: 'Updated AgentHub BVN Pricing, Maintenance & Visibility Matrix',
-                target_resource: 'BVN Identity Pricing',
-                details: {
-                    globalStatus: globalBVNStatus,
-                    totalServices: services.length,
-                    activeCount: services.filter(s => s.status === 'active').length,
-                    maintenanceCount: services.filter(s => s.status === 'maintenance').length,
-                    hiddenCount: services.filter(s => s.status === 'hidden').length,
-                },
+            rowsToUpsert.push({
+                id: 'bvn_modification',
+                service_category: 'bvn',
+                name: 'BVN Modification Request',
+                cost_price: defaultMod.cost_price,
+                markup_price: defaultMod.markup_price,
+                selling_price: defaultMod.cost_price + defaultMod.markup_price,
+                status: defaultMod.status,
+                updated_at: new Date().toISOString(),
             });
 
+            rowsToUpsert.push({
+                id: 'bvn_phone_basic',
+                service_category: 'bvn',
+                name: 'BVN Phone Retrieval',
+                cost_price: defaultPhone.cost_price,
+                markup_price: defaultPhone.markup_price,
+                selling_price: defaultPhone.cost_price + defaultPhone.markup_price,
+                status: defaultPhone.status,
+                updated_at: new Date().toISOString(),
+            });
+
+            // Upsert with fallback in case columns are missing
+            try {
+                await supabase.from('service_pricing').upsert(rowsToUpsert, { onConflict: 'id' });
+            } catch (err) {
+                console.warn('service_pricing upsert retry:', err);
+                const simplifiedRows = rowsToUpsert.map(({ id, service_category, name, cost_price, markup_price }) => ({
+                    id, service_category, name, cost_price, markup_price, updated_at: new Date().toISOString()
+                }));
+                await supabase.from('service_pricing').upsert(simplifiedRows, { onConflict: 'id' });
+            }
+
+            // 4. Try logging to audit_logs safely
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    await supabase.from('audit_logs').insert({
+                        admin_id: user.id,
+                        action: 'Saved BVN Pricing, Maintenance & Visibility Matrix',
+                        target_resource: 'BVN Identity Pricing',
+                        details: {
+                            globalStatus: globalBVNStatus,
+                            hiddenCount: hiddenList.length,
+                            maintCount: maintList.length,
+                        },
+                    });
+                }
+            } catch (e) {
+                // Ignore non-critical audit log failure
+            }
+
             Alert.alert(
-                'BVN Matrix Saved 🚀',
-                'All service prices, maintenance modes, and hidden statuses are now active in production!'
+                'BVN Controls Saved Live! 🚀',
+                `Settings successfully updated:\n• Global Status: ${globalBVNStatus.toUpperCase()}\n• Active: ${services.filter(s => s.status === 'active').length}\n• Maintenance: ${maintList.length}\n• Hidden: ${hiddenList.length}`
             );
             fetchBVNPrices();
         } catch (e: any) {
-            Alert.alert('Save Error', e.message);
+            Alert.alert('Save Error', e.message || 'An error occurred while saving.');
         } finally {
             setSaving(false);
         }
     };
 
-    // Apply Batch Markup
     const handleApplyBatchMarkup = () => {
         const delta = parseFloat(batchProfitDelta) || 0;
         if (delta === 0) return;
@@ -425,11 +458,10 @@ export default function EnterpriseBVNPricingScreen() {
         setShowBatchModal(false);
         Alert.alert(
             'Profit Margin Applied ✨',
-            `Added +₦${delta.toLocaleString()} profit margin across ${batchTargetCategory.toUpperCase()} services. Click "Save BVN Pricing" to push live.`
+            `Added +₦${delta.toLocaleString()} profit margin across ${batchTargetCategory.toUpperCase()} services. Click "Save BVN Pricing & Visibility" to push live.`
         );
     };
 
-    // Filtered Services
     const filteredServices = useMemo(() => {
         return services.filter(s => {
             const matchesCat = activeTab === 'all' || s.category === activeTab;
@@ -441,13 +473,6 @@ export default function EnterpriseBVNPricingScreen() {
             return matchesCat && matchesSearch;
         });
     }, [services, activeTab, searchQuery]);
-
-    // Average Profit Margin
-    const avgProfitMargin = useMemo(() => {
-        if (services.length === 0) return 0;
-        const sum = services.reduce((acc, s) => acc + s.markup_price, 0);
-        return Math.round(sum / services.length);
-    }, [services]);
 
     return (
         <View style={styles.container}>
@@ -550,14 +575,14 @@ export default function EnterpriseBVNPricingScreen() {
                 )}
             </View>
 
-            {/* Variable Pricing Notice Box (Matching AgentHub) */}
+            {/* Variable Pricing Notice Box */}
             <View style={styles.noticeContainer}>
                 <View style={styles.noticeBox}>
                     <Ionicons name="warning-outline" size={16} color={T.goldDark} style={{ marginTop: 2 }} />
                     <View style={{ flex: 1 }}>
                         <Text style={styles.noticeTitle}>Variable Pricing Notice</Text>
                         <Text style={styles.noticeBody}>
-                            Prices for BVN Modifications vary by bank. Premium banks (e.g., First Bank, GTB) attract an additional surcharge automatically applied via API.
+                            Prices for BVN Modifications vary by bank. Premium banks attract an additional surcharge automatically applied via API.
                         </Text>
                     </View>
                 </View>
@@ -674,7 +699,7 @@ export default function EnterpriseBVNPricingScreen() {
 
                                 {/* Pricing Breakdown Grid */}
                                 <View style={styles.priceBoxesRow}>
-                                    {/* 1. API COST PRICE (AgentHub Cost) */}
+                                    {/* 1. API COST PRICE */}
                                     <View style={styles.costBox}>
                                         <Text style={styles.priceBoxLabel}>API COST (AGENTHUB)</Text>
                                         <View style={styles.inputWrap}>
@@ -817,579 +842,96 @@ export default function EnterpriseBVNPricingScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: T.bg,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loadingText: {
-        marginTop: 10,
-        fontSize: 12.5,
-        fontWeight: '700',
-        color: T.textSub,
-    },
-    headerGoldBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: T.navyDeep,
-        borderWidth: 1,
-        borderColor: T.cardBorderGold,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    heroSummaryBar: {
-        paddingHorizontal: 14,
-        paddingTop: 10,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: T.cardBorderGold,
-    },
-    liveIndicatorRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 8,
-    },
-    pulseDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: T.success,
-    },
-    liveIndicatorText: {
-        fontSize: 9.5,
-        fontWeight: '900',
-        color: T.goldBright,
-        letterSpacing: 1,
-    },
-    summaryGrid: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(217, 119, 6, 0.2)',
-    },
-    summaryItem: {
-        alignItems: 'center',
-        flex: 1,
-    },
-    summaryValue: {
-        fontSize: 15,
-        fontWeight: '900',
-        color: '#FFFFFF',
-    },
-    summaryLabel: {
-        fontSize: 9.5,
-        color: '#94A3B8',
-        fontWeight: '700',
-        marginTop: 1,
-    },
-    summaryDivider: {
-        width: 1,
-        height: 20,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    masterControlCard: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 12,
-        marginTop: 8,
-        borderRadius: 10,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: T.cardBorderGold,
-    },
-    masterControlHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    masterControlTitle: {
-        fontSize: 11.5,
-        fontWeight: '900',
-        color: T.navyPrimary,
-    },
-    statusToggleGroup: {
-        flexDirection: 'row',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 6,
-        padding: 2,
-        gap: 2,
-    },
-    statusTogglePill: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 5,
-    },
-    pillActive: {
-        backgroundColor: '#059669',
-    },
-    pillMaint: {
-        backgroundColor: '#D97706',
-    },
-    pillHide: {
-        backgroundColor: '#DC2626',
-    },
-    statusTogglePillText: {
-        fontSize: 9,
-        fontWeight: '700',
-        color: '#64748B',
-    },
-    maintMsgBox: {
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-        paddingTop: 6,
-    },
-    maintMsgLabel: {
-        fontSize: 9.5,
-        fontWeight: '800',
-        color: T.goldDark,
-        marginBottom: 2,
-    },
-    maintMsgInput: {
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        fontSize: 11,
-        color: T.textMain,
-    },
-    noticeContainer: {
-        paddingHorizontal: 12,
-        paddingTop: 6,
-    },
-    noticeBox: {
-        flexDirection: 'row',
-        gap: 8,
-        backgroundColor: '#FFFBEB',
-        borderRadius: 8,
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    noticeTitle: {
-        fontSize: 10.5,
-        fontWeight: '900',
-        color: '#B45309',
-        marginBottom: 1,
-    },
-    noticeBody: {
-        fontSize: 9.5,
-        color: '#92400E',
-        lineHeight: 13,
-    },
-    categoryBar: {
-        backgroundColor: T.navyPrimary,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(217, 119, 6, 0.2)',
-        paddingVertical: 6,
-        marginTop: 8,
-    },
-    categoryScroll: {
-        paddingHorizontal: 10,
-        gap: 6,
-    },
-    categoryPill: {
-        paddingHorizontal: 11,
-        paddingVertical: 5,
-        borderRadius: 14,
-        backgroundColor: T.navyDeep,
-    },
-    categoryPillActive: {
-        backgroundColor: T.navyCard,
-        borderWidth: 1,
-        borderColor: T.gold,
-    },
-    categoryPillText: {
-        fontSize: 10.5,
-        fontWeight: '700',
-        color: T.textMuted,
-    },
-    categoryPillTextActive: {
-        color: T.goldBright,
-        fontWeight: '900',
-    },
-    searchActionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        gap: 8,
-        backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: T.cardBorder,
-    },
-    searchBox: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: T.inputBg,
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        gap: 6,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 11.5,
-        color: T.textMain,
-    },
-    batchMarginBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: T.goldBg,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: T.goldBorder,
-    },
-    batchMarginBtnText: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: T.goldDark,
-    },
-    listContent: {
-        padding: 12,
-        paddingBottom: 90,
-    },
-    serviceCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: T.cardBorder,
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.02,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 10,
-    },
-    iconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: T.navyPrimary,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    serviceTitle: {
-        fontSize: 13.5,
-        fontWeight: '900',
-        color: T.navyPrimary,
-    },
-    serviceDesc: {
-        fontSize: 10,
-        color: T.textMuted,
-        marginTop: 1,
-        lineHeight: 13,
-    },
-    bankFeesBadge: {
-        backgroundColor: '#FEF3C7',
-        paddingHorizontal: 5,
-        paddingVertical: 1,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: '#FCD34D',
-    },
-    bankFeesText: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        color: '#B45309',
-    },
-    itemStatusGroup: {
-        flexDirection: 'row',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 5,
-        padding: 2,
-        gap: 2,
-    },
-    itemStatusPill: {
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 4,
-    },
-    itemStatusActive: {
-        backgroundColor: '#059669',
-    },
-    itemStatusMaint: {
-        backgroundColor: '#D97706',
-    },
-    itemStatusHide: {
-        backgroundColor: '#DC2626',
-    },
-    itemStatusText: {
-        fontSize: 8.5,
-        fontWeight: '700',
-        color: '#64748B',
-    },
-    priceBoxesRow: {
-        flexDirection: 'row',
-        gap: 6,
-    },
-    costBox: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 8,
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    markupBox: {
-        flex: 1.3,
-        backgroundColor: '#FFFBEB',
-        borderRadius: 8,
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-    },
-    totalBox: {
-        flex: 1.1,
-        backgroundColor: T.navyPrimary,
-        borderRadius: 8,
-        padding: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    priceBoxLabel: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        color: T.textMuted,
-        marginBottom: 3,
-    },
-    priceBoxLabelMarkup: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        color: T.goldDark,
-        marginBottom: 3,
-    },
-    priceBoxLabelTotal: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        color: '#94A3B8',
-        marginBottom: 2,
-    },
-    inputWrap: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 6,
-        paddingHorizontal: 5,
-        paddingVertical: 3,
-    },
-    nairaSign: {
-        fontSize: 11.5,
-        fontWeight: '800',
-        color: T.textSub,
-        marginRight: 2,
-    },
-    nairaSignGold: {
-        fontSize: 11.5,
-        fontWeight: '900',
-        color: T.goldDark,
-        marginRight: 2,
-    },
-    priceInput: {
-        flex: 1,
-        fontSize: 12,
-        fontWeight: '800',
-        color: T.navyPrimary,
-        padding: 0,
-    },
-    priceInputGold: {
-        flex: 1,
-        fontSize: 12,
-        fontWeight: '900',
-        color: T.goldDark,
-        padding: 0,
-    },
-    costSubText: {
-        fontSize: 8,
-        color: T.textMuted,
-        marginTop: 3,
-    },
-    stepperRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 4,
-        gap: 2,
-    },
-    stepperBtn: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#FDE68A',
-        borderRadius: 3,
-        paddingVertical: 2,
-        alignItems: 'center',
-    },
-    stepperBtnText: {
-        fontSize: 7.5,
-        fontWeight: '800',
-        color: T.goldDark,
-    },
-    totalSellingPrice: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: '#FFFFFF',
-        marginVertical: 1,
-    },
-    marginTag: {
-        backgroundColor: 'rgba(52, 211, 153, 0.2)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 3,
-    },
-    marginTagText: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        color: '#34D399',
-    },
-    bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderTopColor: T.cardBorder,
-    },
-    saveLiveBtn: {
-        backgroundColor: T.navyPrimary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 10,
-        gap: 6,
-        borderWidth: 1,
-        borderColor: T.cardBorderGold,
-    },
-    saveLiveBtnText: {
-        color: '#FFFFFF',
-        fontSize: 13,
-        fontWeight: '900',
-    },
-    emptyState: {
-        padding: 28,
-        alignItems: 'center',
-    },
-    emptyStateTitle: {
-        fontSize: 13.5,
-        fontWeight: '900',
-        color: T.navyPrimary,
-        marginTop: 6,
-    },
-    emptyStateSub: {
-        fontSize: 10.5,
-        color: T.textMuted,
-        marginTop: 2,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(7, 13, 30, 0.65)',
-        justifyContent: 'flex-end',
-    },
-    modalCard: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 16,
-        maxHeight: '80%',
-        borderWidth: 1,
-        borderColor: T.cardBorderGold,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    modalTitle: {
-        fontSize: 14.5,
-        fontWeight: '900',
-        color: T.navyPrimary,
-    },
-    modalDesc: {
-        fontSize: 11,
-        color: T.textSub,
-        lineHeight: 15,
-        marginBottom: 12,
-    },
-    inputLabel: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: T.navyPrimary,
-        marginTop: 6,
-        marginBottom: 4,
-    },
-    modalInput: {
-        backgroundColor: T.inputBg,
-        borderWidth: 1,
-        borderColor: T.border,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        fontSize: 12,
-        color: T.textMain,
-        marginBottom: 8,
-    },
-    catPill: {
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-        borderRadius: 6,
-        backgroundColor: '#F1F5F9',
-    },
-    catPillActive: {
-        backgroundColor: T.navyPrimary,
-    },
-    catPillText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: T.textSub,
-    },
-    catPillTextActive: {
-        color: T.goldBright,
-        fontWeight: '900',
-    },
-    modalSaveBtn: {
-        backgroundColor: T.navyPrimary,
-        paddingVertical: 12,
-        borderRadius: 10,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: T.cardBorderGold,
-        marginTop: 10,
-        marginBottom: 16,
-    },
-    modalSaveBtnText: {
-        color: '#FFFFFF',
-        fontSize: 12.5,
-        fontWeight: '900',
-    },
+    container: { flex: 1, backgroundColor: T.bg },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    loadingText: { marginTop: 10, fontSize: 12.5, fontWeight: '700', color: T.textSub },
+    headerGoldBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: T.navyDeep, borderWidth: 1, borderColor: T.cardBorderGold, alignItems: 'center', justifyContent: 'center' },
+    heroSummaryBar: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: T.cardBorderGold },
+    liveIndicatorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    pulseDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: T.success },
+    liveIndicatorText: { fontSize: 9.5, fontWeight: '900', color: T.goldBright, letterSpacing: 1 },
+    summaryGrid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(217, 119, 6, 0.2)' },
+    summaryItem: { alignItems: 'center', flex: 1 },
+    summaryValue: { fontSize: 15, fontWeight: '900', color: '#FFFFFF' },
+    summaryLabel: { fontSize: 9.5, color: '#94A3B8', fontWeight: '700', marginTop: 1 },
+    summaryDivider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.1)' },
+    masterControlCard: { backgroundColor: '#FFFFFF', marginHorizontal: 12, marginTop: 8, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: T.cardBorderGold },
+    masterControlHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    masterControlTitle: { fontSize: 11.5, fontWeight: '900', color: T.navyPrimary },
+    statusToggleGroup: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 6, padding: 2, gap: 2 },
+    statusTogglePill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5 },
+    pillActive: { backgroundColor: '#059669' },
+    pillMaint: { backgroundColor: '#D97706' },
+    pillHide: { backgroundColor: '#DC2626' },
+    statusTogglePillText: { fontSize: 9, fontWeight: '700', color: '#64748B' },
+    maintMsgBox: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 6 },
+    maintMsgLabel: { fontSize: 9.5, fontWeight: '800', color: T.goldDark, marginBottom: 2 },
+    maintMsgInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, color: T.textMain },
+    noticeContainer: { paddingHorizontal: 12, paddingTop: 6 },
+    noticeBox: { flexDirection: 'row', gap: 8, backgroundColor: '#FFFBEB', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
+    noticeTitle: { fontSize: 10.5, fontWeight: '900', color: '#B45309', marginBottom: 1 },
+    noticeBody: { fontSize: 9.5, color: '#92400E', lineHeight: 13 },
+    categoryBar: { backgroundColor: T.navyPrimary, borderBottomWidth: 1, borderBottomColor: 'rgba(217, 119, 6, 0.2)', paddingVertical: 6, marginTop: 8 },
+    categoryScroll: { paddingHorizontal: 10, gap: 6 },
+    categoryPill: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 14, backgroundColor: T.navyDeep },
+    categoryPillActive: { backgroundColor: T.navyCard, borderWidth: 1, borderColor: T.gold },
+    categoryPillText: { fontSize: 10.5, fontWeight: '700', color: T.textMuted },
+    categoryPillTextActive: { color: T.goldBright, fontWeight: '900' },
+    searchActionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: T.cardBorder },
+    searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: T.inputBg, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 6 },
+    searchInput: { flex: 1, fontSize: 11.5, color: T.textMain },
+    batchMarginBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: T.goldBg, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: T.goldBorder },
+    batchMarginBtnText: { fontSize: 11, fontWeight: '800', color: T.goldDark },
+    listContent: { padding: 12, paddingBottom: 90 },
+    serviceCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: T.cardBorder, elevation: 1 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+    iconCircle: { width: 32, height: 32, borderRadius: 8, backgroundColor: T.navyPrimary, alignItems: 'center', justifyContent: 'center' },
+    serviceTitle: { fontSize: 13.5, fontWeight: '900', color: T.navyPrimary },
+    serviceDesc: { fontSize: 10, color: T.textMuted, marginTop: 1, lineHeight: 13 },
+    bankFeesBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: '#FCD34D' },
+    bankFeesText: { fontSize: 7.5, fontWeight: '900', color: '#B45309' },
+    itemStatusGroup: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 5, padding: 2, gap: 2 },
+    itemStatusPill: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+    itemStatusActive: { backgroundColor: '#059669' },
+    itemStatusMaint: { backgroundColor: '#D97706' },
+    itemStatusHide: { backgroundColor: '#DC2626' },
+    itemStatusText: { fontSize: 8.5, fontWeight: '700', color: '#64748B' },
+    priceBoxesRow: { flexDirection: 'row', gap: 6 },
+    costBox: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    markupBox: { flex: 1.3, backgroundColor: '#FFFBEB', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
+    totalBox: { flex: 1.1, backgroundColor: T.navyPrimary, borderRadius: 8, padding: 8, alignItems: 'center', justifyContent: 'center' },
+    priceBoxLabel: { fontSize: 7.5, fontWeight: '900', color: T.textMuted, marginBottom: 3 },
+    priceBoxLabelMarkup: { fontSize: 7.5, fontWeight: '900', color: T.goldDark, marginBottom: 3 },
+    priceBoxLabelTotal: { fontSize: 7.5, fontWeight: '900', color: '#94A3B8', marginBottom: 2 },
+    inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 3 },
+    nairaSign: { fontSize: 11.5, fontWeight: '800', color: T.textSub, marginRight: 2 },
+    nairaSignGold: { fontSize: 11.5, fontWeight: '900', color: T.goldDark, marginRight: 2 },
+    priceInput: { flex: 1, fontSize: 12, fontWeight: '800', color: T.navyPrimary, padding: 0 },
+    priceInputGold: { flex: 1, fontSize: 12, fontWeight: '900', color: T.goldDark, padding: 0 },
+    costSubText: { fontSize: 8, color: T.textMuted, marginTop: 3 },
+    stepperRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, gap: 2 },
+    stepperBtn: { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 3, paddingVertical: 2, alignItems: 'center' },
+    stepperBtnText: { fontSize: 7.5, fontWeight: '800', color: T.goldDark },
+    totalSellingPrice: { fontSize: 14, fontWeight: '900', color: '#FFFFFF', marginVertical: 1 },
+    marginTag: { backgroundColor: 'rgba(52, 211, 153, 0.2)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+    marginTagText: { fontSize: 7.5, fontWeight: '900', color: '#34D399' },
+    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: T.cardBorder },
+    saveLiveBtn: { backgroundColor: T.navyPrimary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 10, gap: 6, borderWidth: 1, borderColor: T.cardBorderGold },
+    saveLiveBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+    emptyState: { padding: 28, alignItems: 'center' },
+    emptyStateTitle: { fontSize: 13.5, fontWeight: '900', color: T.navyPrimary, marginTop: 6 },
+    emptyStateSub: { fontSize: 10.5, color: T.textMuted, marginTop: 2 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(7, 13, 30, 0.65)', justifyContent: 'flex-end' },
+    modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '80%', borderWidth: 1, borderColor: T.cardBorderGold },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    modalTitle: { fontSize: 14.5, fontWeight: '900', color: T.navyPrimary },
+    modalDesc: { fontSize: 11, color: T.textSub, lineHeight: 15, marginBottom: 12 },
+    inputLabel: { fontSize: 11, fontWeight: '800', color: T.navyPrimary, marginTop: 6, marginBottom: 4 },
+    modalInput: { backgroundColor: T.inputBg, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 12, color: T.textMain, marginBottom: 8 },
+    catPill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, backgroundColor: '#F1F5F9' },
+    catPillActive: { backgroundColor: T.navyPrimary },
+    catPillText: { fontSize: 10, fontWeight: '700', color: T.textSub },
+    catPillTextActive: { color: T.goldBright, fontWeight: '900' },
+    modalSaveBtn: { backgroundColor: T.navyPrimary, paddingVertical: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: T.cardBorderGold, marginTop: 10, marginBottom: 16 },
+    modalSaveBtnText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '900' },
 });

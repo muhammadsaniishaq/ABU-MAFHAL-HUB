@@ -41,35 +41,56 @@ export default function NINServicesScreen() {
 
     const fetchServiceVisibilityAndMaintenance = async () => {
         try {
-            // 1. Global Settings
-            const { data: globalSettings } = await supabase
-                .from('app_settings')
-                .select('key, value')
-                .in('key', ['nin_global_status', 'nin_global_maintenance_msg']);
+            const map: Record<string, { status: string; msg?: string }> = {};
 
-            if (globalSettings) {
-                const gStatus = globalSettings.find(s => s.key === 'nin_global_status');
-                if (gStatus?.value) setGlobalNINStatus(gStatus.value as any);
-                const gMsg = globalSettings.find(s => s.key === 'nin_global_maintenance_msg');
-                if (gMsg?.value) setGlobalNINMsg(gMsg.value);
+            // 1. Fetch nin_service_controls from app_settings
+            const { data: configData } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'nin_service_controls')
+                .maybeSingle();
+
+            if (configData?.value) {
+                try {
+                    const parsed = typeof configData.value === 'string' ? JSON.parse(configData.value) : configData.value;
+                    if (parsed?.global_status) setGlobalNINStatus(parsed.global_status);
+                    if (parsed?.global_maintenance_msg) setGlobalNINMsg(parsed.global_maintenance_msg);
+                    if (parsed?.services) {
+                        Object.entries(parsed.services).forEach(([id, svc]: [string, any]) => {
+                            map[id] = {
+                                status: svc.status || 'active',
+                                msg: svc.maintenance_msg,
+                            };
+                        });
+                    }
+                    if (Array.isArray(parsed?.hidden_services)) {
+                        parsed.hidden_services.forEach((id: string) => {
+                            map[id] = { ...(map[id] || {}), status: 'hidden' };
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Error parsing nin_service_controls in user app:', e);
+                }
             }
 
-            // 2. Individual Service Statuses
+            // 2. Also overlay with service_pricing if any
             const { data: pricingRows } = await supabase
                 .from('service_pricing')
                 .select('id, status, maintenance_msg')
                 .eq('service_category', 'nin');
 
             if (pricingRows && pricingRows.length > 0) {
-                const map: Record<string, { status: string; msg?: string }> = {};
                 pricingRows.forEach(row => {
-                    map[row.id] = {
-                        status: row.status || 'active',
-                        msg: row.maintenance_msg || undefined,
-                    };
+                    if (row.status) {
+                        map[row.id] = {
+                            status: row.status,
+                            msg: row.maintenance_msg || map[row.id]?.msg,
+                        };
+                    }
                 });
-                setServiceStatuses(map);
             }
+
+            setServiceStatuses(map);
         } catch (e) {
             console.warn('Failed to load NIN service statuses', e);
         }
@@ -90,7 +111,7 @@ export default function NINServicesScreen() {
             return;
         }
 
-        const currentStatusObj = serviceStatuses[service.pricingId];
+        const currentStatusObj = serviceStatuses[service.pricingId] || serviceStatuses[service.id];
         if (currentStatusObj && currentStatusObj.status === 'maintenance') {
             setAlertConfig({
                 visible: true,
@@ -104,10 +125,12 @@ export default function NINServicesScreen() {
         router.push(service.route as any);
     };
 
-    // Filter out services hidden by Admin
+    // Filter out services marked as HIDDEN by Admin (checking both service.id and service.pricingId)
     const visibleServices = SERVICES.filter(service => {
-        const itemStatus = serviceStatuses[service.pricingId]?.status;
-        return itemStatus !== 'hidden';
+        const statusById = serviceStatuses[service.id]?.status;
+        const statusByPricingId = serviceStatuses[service.pricingId]?.status;
+        const isHidden = statusById === 'hidden' || statusByPricingId === 'hidden';
+        return !isHidden;
     });
 
     return (

@@ -139,16 +139,55 @@ export default function BVNModificationScreen() {
         }
     };
 
+    const [hiddenTypes, setHiddenTypes] = useState<string[]>([]);
+    const [maintenanceTypes, setMaintenanceTypes] = useState<Record<string, string>>({});
+
     const fetchAllServicePrices = async () => {
         try {
+            const newMap: Record<string, number> = { ...DEFAULT_PRICES };
+            const hiddenSet = new Set<string>();
+            const maintObj: Record<string, string> = {};
+
+            // 1. Fetch bvn_service_controls from app_settings
+            const { data: configData } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'bvn_service_controls')
+                .maybeSingle();
+
+            if (configData?.value) {
+                try {
+                    const parsed = typeof configData.value === 'string' ? JSON.parse(configData.value) : configData.value;
+                    if (parsed?.services) {
+                        MODIFICATION_TYPES.forEach(item => {
+                            const conf = parsed.services[item.priceId];
+                            if (conf) {
+                                if (conf.selling_price) newMap[item.code] = Number(conf.selling_price);
+                                else if (conf.cost_price !== undefined && conf.markup_price !== undefined) {
+                                    newMap[item.code] = Number(conf.cost_price) + Number(conf.markup_price);
+                                }
+                                if (conf.status === 'hidden') hiddenSet.add(item.code);
+                                if (conf.status === 'maintenance') maintObj[item.code] = conf.maintenance_msg || 'Service is undergoing routine server maintenance.';
+                            }
+                        });
+                    }
+                    if (Array.isArray(parsed?.hidden_services)) {
+                        MODIFICATION_TYPES.forEach(item => {
+                            if (parsed.hidden_services.includes(item.priceId)) hiddenSet.add(item.code);
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Error parsing bvn_service_controls in modification:', e);
+                }
+            }
+
+            // 2. Fetch service_pricing
             const { data } = await supabase
                 .from('service_pricing')
-                .select('id, cost_price, markup_price, selling_price')
+                .select('id, cost_price, markup_price, selling_price, status, maintenance_msg')
                 .eq('service_category', 'bvn');
 
             if (data && data.length > 0) {
-                const newMap: Record<string, number> = { ...DEFAULT_PRICES };
-                
                 MODIFICATION_TYPES.forEach(item => {
                     const found = data.find(d => d.id === item.priceId);
                     if (found) {
@@ -158,10 +197,22 @@ export default function BVNModificationScreen() {
                         if (total > 0) {
                             newMap[item.code] = total;
                         }
+                        if (found.status === 'hidden') hiddenSet.add(item.code);
+                        if (found.status === 'maintenance') maintObj[item.code] = found.maintenance_msg || 'Service is undergoing routine server maintenance.';
                     }
                 });
+            }
 
-                setPriceMap(newMap);
+            setPriceMap(newMap);
+            setHiddenTypes(Array.from(hiddenSet));
+            setMaintenanceTypes(maintObj);
+
+            // If current serviceCode is hidden, switch to first visible type
+            const visibleList = MODIFICATION_TYPES.filter(m => !hiddenSet.has(m.code));
+            if (visibleList.length > 0 && hiddenSet.has(serviceCode)) {
+                setServiceCode(visibleList[0].code);
+                setServicePrice(newMap[visibleList[0].code] || DEFAULT_PRICES[visibleList[0].code] || 6000);
+            } else {
                 setServicePrice(newMap[serviceCode] || DEFAULT_PRICES[serviceCode] || 6000);
             }
         } catch (e) {
@@ -175,6 +226,10 @@ export default function BVNModificationScreen() {
     }, []);
 
     const handleSelectModificationType = (code: string) => {
+        if (maintenanceTypes[code]) {
+            showAlert("Under Maintenance", maintenanceTypes[code], "warning");
+            return;
+        }
         setServiceCode(code);
         setServicePrice(priceMap[code] || DEFAULT_PRICES[code] || 6000);
     };
@@ -430,23 +485,34 @@ export default function BVNModificationScreen() {
                             </View>
 
                             <View style={styles.modTypeGrid}>
-                                {MODIFICATION_TYPES.map((type) => {
+                                {MODIFICATION_TYPES.filter(t => !hiddenTypes.includes(t.code)).map((type) => {
                                     const isSelected = serviceCode === type.code;
+                                    const isMaint = !!maintenanceTypes[type.code];
                                     const itemFee = priceMap[type.code] || DEFAULT_PRICES[type.code] || 6000;
                                     return (
                                         <TouchableOpacity
                                             key={type.code}
-                                            style={[styles.modTypeCard, isSelected && styles.modTypeCardActive]}
+                                            style={[
+                                                styles.modTypeCard, 
+                                                isSelected && styles.modTypeCardActive,
+                                                isMaint && { borderColor: '#FDE68A', backgroundColor: '#FFFDF5' }
+                                            ]}
                                             onPress={() => handleSelectModificationType(type.code)}
                                             activeOpacity={0.85}
                                         >
                                             <View style={styles.modTypeTop}>
-                                                <Ionicons name={type.icon as any} size={17} color={isSelected ? '#B45309' : '#070D1E'} />
-                                                <View style={[styles.feePill, isSelected && styles.feePillActive]}>
-                                                    <Text style={[styles.feePillText, isSelected && styles.feePillTextActive]}>
-                                                        ₦{itemFee.toLocaleString()}
-                                                    </Text>
-                                                </View>
+                                                <Ionicons name={type.icon as any} size={17} color={isSelected ? '#B45309' : (isMaint ? '#B45309' : '#070D1E')} />
+                                                {isMaint ? (
+                                                    <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 }}>
+                                                        <Text style={{ fontSize: 7.5, fontWeight: '900', color: '#B45309' }}>MAINT</Text>
+                                                    </View>
+                                                ) : (
+                                                    <View style={[styles.feePill, isSelected && styles.feePillActive]}>
+                                                        <Text style={[styles.feePillText, isSelected && styles.feePillTextActive]}>
+                                                            ₦{itemFee.toLocaleString()}
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
                                             <Text style={[styles.modTypeTitle, isSelected && styles.modTypeTitleActive]}>
                                                 {type.label}
