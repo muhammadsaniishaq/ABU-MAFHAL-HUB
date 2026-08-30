@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../services/supabase';
@@ -22,14 +22,24 @@ const BANK_CODES = [
 ];
 
 const MODIFICATION_TYPES = [
-    { code: '620', label: 'Change of Name' },
-    { code: '621', label: 'Change of Date of Birth' },
-    { code: '622', label: 'Change of Phone Number' },
-    { code: '623', label: 'Name & Phone' },
-    { code: '624', label: 'DOB & Phone' },
-    { code: '625', label: 'Full Modification' },
-    { code: '626', label: 'Name & DOB' },
+    { code: '620', label: 'Change of Name', priceId: 'bvn_mod_name' },
+    { code: '621', label: 'Change of Date of Birth', priceId: 'bvn_mod_dob' },
+    { code: '622', label: 'Change of Phone Number', priceId: 'bvn_mod_phone' },
+    { code: '623', label: 'Name & Phone', priceId: 'bvn_mod_name_phone' },
+    { code: '624', label: 'DOB & Phone', priceId: 'bvn_mod_dob_phone' },
+    { code: '626', label: 'Name & DOB', priceId: 'bvn_mod_name_dob' },
+    { code: '625', label: 'Full Modification', priceId: 'bvn_mod_name_dob' },
 ];
+
+const DEFAULT_PRICES: Record<string, number> = {
+    '620': 6000,
+    '621': 6000,
+    '622': 6000,
+    '623': 8500,
+    '624': 8500,
+    '626': 8500,
+    '625': 9000,
+};
 
 export default function BVNModificationScreen() {
     const insets = useSafeAreaInsets();
@@ -65,7 +75,8 @@ export default function BVNModificationScreen() {
 
     const [loading, setLoading] = useState(false);
     const [userBalance, setUserBalance] = useState<number | null>(null);
-    const [servicePrice, setServicePrice] = useState<number>(1500);
+    const [priceMap, setPriceMap] = useState<Record<string, number>>(DEFAULT_PRICES);
+    const [servicePrice, setServicePrice] = useState<number>(DEFAULT_PRICES['620']);
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
@@ -95,41 +106,46 @@ export default function BVNModificationScreen() {
         }
     };
 
-    const fetchServicePrice = async (currentCode: string = serviceCode) => {
+    const fetchAllServicePrices = async () => {
         try {
-            const codeToPriceIdMap: Record<string, string> = {
-                '620': 'bvn_mod_name',
-                '621': 'bvn_mod_dob',
-                '622': 'bvn_mod_phone',
-                '623': 'bvn_mod_name_phone',
-                '624': 'bvn_mod_dob_phone',
-                '626': 'bvn_mod_name_dob',
-                '625': 'bvn_mod_name_dob',
-            };
-
-            const targetPriceId = codeToPriceIdMap[currentCode] || 'bvn_mod_name';
-
             const { data } = await supabase
                 .from('service_pricing')
                 .select('id, cost_price, markup_price, selling_price')
-                .in('id', [targetPriceId, 'bvn_modification']);
+                .eq('service_category', 'bvn');
 
             if (data && data.length > 0) {
-                const specific = data.find(d => d.id === targetPriceId) || data[0];
-                const total = specific.selling_price 
-                    ? Number(specific.selling_price) 
-                    : (Number(specific.cost_price || 0) + Number(specific.markup_price || 0));
-                if (total > 0) setServicePrice(total);
+                const newMap: Record<string, number> = { ...DEFAULT_PRICES };
+                
+                MODIFICATION_TYPES.forEach(item => {
+                    const found = data.find(d => d.id === item.priceId);
+                    if (found) {
+                        const total = found.selling_price
+                            ? Number(found.selling_price)
+                            : (Number(found.cost_price || 0) + Number(found.markup_price || 0));
+                        if (total > 0) {
+                            newMap[item.code] = total;
+                        }
+                    }
+                });
+
+                setPriceMap(newMap);
+                setServicePrice(newMap[serviceCode] || DEFAULT_PRICES[serviceCode] || 6000);
             }
         } catch (e) {
-            console.warn('Failed to load BVN modification price', e);
+            console.warn('Failed to load BVN modification prices', e);
         }
     };
 
     useEffect(() => {
         fetchWalletBalance();
-        fetchServicePrice(serviceCode);
-    }, [serviceCode]);
+        fetchAllServicePrices();
+    }, []);
+
+    // Whenever serviceCode changes, update servicePrice immediately
+    const handleSelectModificationType = (code: string) => {
+        setServiceCode(code);
+        setServicePrice(priceMap[code] || DEFAULT_PRICES[code] || 6000);
+    };
 
     const showAlert = (title: string, message: string, type: AlertType = 'error') => {
         setAlertConfig({
@@ -172,8 +188,9 @@ export default function BVNModificationScreen() {
             return;
         }
 
-        if (userBalance !== null && userBalance < servicePrice) {
-            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${servicePrice.toLocaleString()}. Please fund your wallet to proceed.`);
+        const requiredFee = priceMap[serviceCode] || servicePrice;
+        if (userBalance !== null && userBalance < requiredFee) {
+            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${requiredFee.toLocaleString()}. Please fund your wallet to proceed.`);
             return;
         }
 
@@ -225,7 +242,7 @@ export default function BVNModificationScreen() {
                 const data = res.data?.data || res.data || {};
                 const requestId = data.request_id || data.requestId || ref;
 
-                showAlert("Submitted", "BVN Modification request submitted successfully.", "success");
+                showAlert("Submitted", `BVN Modification request submitted successfully (Fee: ₦${requiredFee.toLocaleString()}).`, "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -236,7 +253,8 @@ export default function BVNModificationScreen() {
                         ...payload,
                         ...data,
                         request_id: requestId,
-                        status: data.status || 'PROCESSING'
+                        status: data.status || 'PROCESSING',
+                        fee: requiredFee,
                     },
                 });
 
@@ -278,24 +296,26 @@ export default function BVNModificationScreen() {
     };
 
     const selectedBank = BANK_CODES.find(b => b.code === bankCode) || BANK_CODES[5];
+    const currentPriceDisplay = priceMap[serviceCode] || servicePrice;
 
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
+            {/* Header */}
             <LinearGradient
                 colors={['#0B192C', '#06101E']}
-                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 20 }]}
+                style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 16 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
                         <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={styles.noticeBadge}
+                    <TouchableOpacity
                         onPress={() => setShowTermsModal(true)}
-                        activeOpacity={0.8}
+                        style={styles.noticeBadge}
+                        activeOpacity={0.7}
                     >
                         <Ionicons name="information-circle-outline" size={13} color="#D4AF37" style={{ marginRight: 3 }} />
                         <Text style={styles.noticeBadgeText}>Guidelines</Text>
@@ -322,7 +342,7 @@ export default function BVNModificationScreen() {
                 </View>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
                 {activeTab === 'submit' ? (
                     <View style={styles.formCard}>
                         {/* Bank Picker */}
@@ -358,21 +378,30 @@ export default function BVNModificationScreen() {
                             </View>
                         )}
 
-                        {/* Modification Type Selector */}
-                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>MODIFICATION TYPE</Text>
+                        {/* Modification Type Selector with Live Prices */}
+                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>MODIFICATION TYPE & PRICING</Text>
                         <View style={styles.typeGrid}>
                             {MODIFICATION_TYPES.map((type) => {
                                 const isSelected = serviceCode === type.code;
+                                const itemFee = priceMap[type.code] || DEFAULT_PRICES[type.code] || 6000;
                                 return (
                                     <TouchableOpacity
                                         key={type.code}
                                         style={[styles.typeCard, isSelected && styles.typeCardActive]}
-                                        onPress={() => setServiceCode(type.code)}
+                                        onPress={() => handleSelectModificationType(type.code)}
                                         activeOpacity={0.8}
                                     >
-                                        <Text style={[styles.typeText, isSelected && styles.typeTextActive]}>
-                                            {type.label}
-                                        </Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.typeText, isSelected && styles.typeTextActive]}>
+                                                {type.label}
+                                            </Text>
+                                            <Text style={[styles.typePriceTag, isSelected && styles.typePriceTagActive]}>
+                                                ₦{itemFee.toLocaleString()}
+                                            </Text>
+                                        </View>
+                                        {isSelected && (
+                                            <Ionicons name="checkmark-circle" size={16} color="#D4AF37" />
+                                        )}
                                     </TouchableOpacity>
                                 );
                             })}
@@ -451,6 +480,20 @@ export default function BVNModificationScreen() {
                             </View>
                         )}
 
+                        {/* Price Summary Banner */}
+                        <View style={styles.priceSummaryCard}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.priceSummaryLabel}>TOTAL MODIFICATION FEE</Text>
+                                <Text style={styles.priceSummaryAmount}>₦{currentPriceDisplay.toLocaleString()}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.walletBalanceLabel}>Wallet Balance</Text>
+                                <Text style={[styles.walletBalanceAmount, (userBalance !== null && userBalance < currentPriceDisplay) ? { color: '#EF4444' } : { color: '#10B981' }]}>
+                                    ₦{userBalance !== null ? userBalance.toLocaleString() : '0.00'}
+                                </Text>
+                            </View>
+                        </View>
+
                         <TouchableOpacity
                             style={[styles.submitBtn, loading && { opacity: 0.7 }]}
                             onPress={handleSubmitModification}
@@ -460,7 +503,7 @@ export default function BVNModificationScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#0B192C" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Modification (₦{servicePrice.toLocaleString()})</Text>
+                                <Text style={styles.submitBtnText}>Submit Modification (₦{currentPriceDisplay.toLocaleString()})</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -548,41 +591,48 @@ const styles = StyleSheet.create({
     titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
     subText: { color: '#94a3b8', fontSize: 11, marginTop: 1, marginBottom: 10 },
     tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 },
-    tabButton: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
+    tabButton: { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8 },
     tabButtonActive: { backgroundColor: '#D4AF37' },
-    tabButtonText: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
-    tabButtonTextActive: { color: '#0B192C', fontWeight: '800' },
-    content: { flex: 1, paddingHorizontal: 14, paddingTop: 12 },
-    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
-    inputLabel: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 4, letterSpacing: 0.2 },
-    dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 42, backgroundColor: '#ffffff', marginBottom: 6 },
-    dropdownButtonText: { fontSize: 13, fontWeight: '700', color: '#0B192C' },
-    bankPickerList: { backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10, overflow: 'hidden' },
-    bankPickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+    tabButtonText: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
+    tabButtonTextActive: { color: '#0B192C', fontWeight: '900' },
+    content: { flex: 1, paddingHorizontal: 14, paddingTop: 14 },
+    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' },
+    inputLabel: { fontSize: 10.5, fontWeight: '800', color: '#0B192C', marginBottom: 4, textTransform: 'uppercase' },
+    sectionHeader: { fontSize: 11, fontWeight: '900', color: '#0B192C', marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 4 },
+    dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+    dropdownButtonText: { fontSize: 12, fontWeight: '700', color: '#0B192C' },
+    bankPickerList: { backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', marginTop: 4, padding: 4 },
+    bankPickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
     bankPickerItemActive: { backgroundColor: '#FEF9E7' },
-    bankPickerText: { fontSize: 12, color: '#334155', fontWeight: '600' },
-    bankPickerTextActive: { color: '#0B192C', fontWeight: '800' },
-    typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-    typeCard: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+    bankPickerText: { fontSize: 11, color: '#475569', fontWeight: '600' },
+    bankPickerTextActive: { color: '#B45309', fontWeight: '800' },
+    typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
+    typeCard: { width: '48.5%', flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
     typeCardActive: { backgroundColor: '#FEF9E7', borderColor: '#D4AF37' },
-    typeText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
-    typeTextActive: { color: '#0B192C', fontWeight: '800' },
-    sectionHeader: { fontSize: 11, fontWeight: '900', color: '#B45309', marginBottom: 8, letterSpacing: 0.5 },
+    typeText: { fontSize: 10.5, fontWeight: '700', color: '#475569' },
+    typeTextActive: { color: '#B45309', fontWeight: '900' },
+    typePriceTag: { fontSize: 10, fontWeight: '800', color: '#059669', marginTop: 1 },
+    typePriceTagActive: { color: '#B45309', fontWeight: '900' },
     grid2: { flexDirection: 'row', gap: 8 },
-    input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, height: 42, fontSize: 13, color: '#0B192C', backgroundColor: '#ffffff' },
-    submitBtn: { backgroundColor: '#D4AF37', height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-    submitBtnText: { color: '#0B192C', fontSize: 13, fontWeight: '800' },
+    input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 12, color: '#0B192C' },
+    priceSummaryCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0B192C', borderRadius: 10, padding: 12, marginTop: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    priceSummaryLabel: { fontSize: 8.5, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 },
+    priceSummaryAmount: { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginTop: 1 },
+    walletBalanceLabel: { fontSize: 8.5, fontWeight: '700', color: '#94a3b8' },
+    walletBalanceAmount: { fontSize: 13, fontWeight: '900', marginTop: 1 },
+    submitBtn: { backgroundColor: '#D4AF37', paddingVertical: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    submitBtnText: { color: '#0B192C', fontSize: 13, fontWeight: '900' },
     trackInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    trackBtn: { backgroundColor: '#D4AF37', height: 42, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    trackBtnText: { color: '#0B192C', fontSize: 11, fontWeight: '800' },
-    statusResultCard: { backgroundColor: '#FEF9E7', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)', marginTop: 8 },
-    statusResultTitle: { fontSize: 11, fontWeight: '800', color: '#B45309', marginBottom: 4 },
-    statusResultVal: { fontSize: 12, fontWeight: '700', color: '#0B192C' },
-    statusResultMsg: { fontSize: 11, color: '#64748b', marginTop: 2 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    modalCard: { width: '100%', maxWidth: 320, backgroundColor: '#ffffff', borderRadius: 14, padding: 16, alignItems: 'center' },
-    modalTitle: { fontSize: 15, fontWeight: '900', color: '#0B192C', marginBottom: 4 },
-    modalBody: { fontSize: 11, color: '#475569', textAlign: 'center', lineHeight: 16, marginBottom: 10 },
-    modalBtn: { backgroundColor: '#0B192C', width: '100%', height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    modalBtnText: { color: '#D4AF37', fontSize: 12, fontWeight: '800' },
+    trackBtn: { backgroundColor: '#D4AF37', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    trackBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
+    statusResultCard: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#cbd5e1', marginTop: 6 },
+    statusResultTitle: { fontSize: 12, fontWeight: '800', color: '#0B192C', marginBottom: 4 },
+    statusResultVal: { fontSize: 11, color: '#10B981', fontWeight: '700' },
+    statusResultMsg: { fontSize: 10.5, color: '#475569', marginTop: 4 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 16, width: '100%', maxWidth: 360, alignItems: 'center' },
+    modalTitle: { fontSize: 14, fontWeight: '800', color: '#0B192C', marginBottom: 6 },
+    modalBody: { fontSize: 11.5, color: '#475569', textAlign: 'center', lineHeight: 16, marginBottom: 14 },
+    modalBtn: { backgroundColor: '#D4AF37', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
+    modalBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
 });
