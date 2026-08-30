@@ -1,8 +1,20 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Modal, StyleSheet } from 'react-native';
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    ScrollView,
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Modal,
+    StyleSheet,
+    Dimensions
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../services/supabase';
@@ -10,25 +22,45 @@ import { api } from '../../../services/api';
 import { verificationHistory } from '../../../services/verificationHistory';
 import BrandAlertModal, { AlertType } from '../../../components/BrandAlertModal';
 
-const BANK_CODES = [
-    { code: '701', name: 'Agency Banking' },
-    { code: '702', name: 'Heritage Bank' },
-    { code: '703', name: 'Bank of Agriculture' },
-    { code: '704', name: 'NIBSS MFB' },
-    { code: '705', name: 'Enterprise Bank' },
-    { code: '706', name: 'First Bank' },
-    { code: '707', name: 'Keystone Bank' },
-    { code: '708', name: 'FCMB' },
+const { width } = Dimensions.get('window');
+
+// Clean Bank Directory (Internal codes preserved for AgentHub API, hidden from UI)
+const NIGERIAN_BANKS = [
+    { code: '706', name: 'First Bank of Nigeria', icon: 'business-outline', isPremium: true },
+    { code: '709', name: 'Guaranty Trust Bank (GTBank)', icon: 'business-outline', isPremium: true },
+    { code: '710', name: 'Access Bank', icon: 'business-outline', isPremium: false },
+    { code: '711', name: 'Zenith Bank', icon: 'business-outline', isPremium: false },
+    { code: '712', name: 'United Bank for Africa (UBA)', icon: 'business-outline', isPremium: false },
+    { code: '708', name: 'First City Monument Bank (FCMB)', icon: 'business-outline', isPremium: false },
+    { code: '713', name: 'Stanbic IBTC Bank', icon: 'business-outline', isPremium: false },
+    { code: '714', name: 'Fidelity Bank', icon: 'business-outline', isPremium: false },
+    { code: '715', name: 'Union Bank of Nigeria', icon: 'business-outline', isPremium: false },
+    { code: '716', name: 'Sterling Bank', icon: 'business-outline', isPremium: false },
+    { code: '717', name: 'Wema Bank / ALAT', icon: 'business-outline', isPremium: false },
+    { code: '707', name: 'Keystone Bank', icon: 'business-outline', isPremium: false },
+    { code: '702', name: 'Heritage Bank', icon: 'business-outline', isPremium: false },
+    { code: '718', name: 'Polaris Bank', icon: 'business-outline', isPremium: false },
+    { code: '719', name: 'Jaiz Bank (Islamic)', icon: 'business-outline', isPremium: false },
+    { code: '720', name: 'Taj Bank', icon: 'business-outline', isPremium: false },
+    { code: '721', name: 'Lotus Bank', icon: 'business-outline', isPremium: false },
+    { code: '722', name: 'Kuda Microfinance Bank', icon: 'phone-portrait-outline', isPremium: false },
+    { code: '723', name: 'OPay Digital Services', icon: 'phone-portrait-outline', isPremium: false },
+    { code: '724', name: 'PalmPay Limited', icon: 'phone-portrait-outline', isPremium: false },
+    { code: '725', name: 'Moniepoint MFB', icon: 'phone-portrait-outline', isPremium: false },
+    { code: '701', name: 'Agency Banking / MFB Agent', icon: 'people-outline', isPremium: false },
+    { code: '703', name: 'Bank of Agriculture (BOA)', icon: 'leaf-outline', isPremium: false },
+    { code: '704', name: 'NIBSS MFB Portal', icon: 'shield-outline', isPremium: false },
+    { code: '705', name: 'Enterprise Bank', icon: 'business-outline', isPremium: false },
 ];
 
 const MODIFICATION_TYPES = [
-    { code: '620', label: 'Change of Name', priceId: 'bvn_mod_name' },
-    { code: '621', label: 'Change of Date of Birth', priceId: 'bvn_mod_dob' },
-    { code: '622', label: 'Change of Phone Number', priceId: 'bvn_mod_phone' },
-    { code: '623', label: 'Name & Phone', priceId: 'bvn_mod_name_phone' },
-    { code: '624', label: 'DOB & Phone', priceId: 'bvn_mod_dob_phone' },
-    { code: '626', label: 'Name & DOB', priceId: 'bvn_mod_name_dob' },
-    { code: '625', label: 'Full Modification', priceId: 'bvn_mod_name_dob' },
+    { code: '620', label: 'Change of Name', priceId: 'bvn_mod_name', icon: 'person-outline', desc: 'First, Middle, or Surname update' },
+    { code: '621', label: 'Change of Date of Birth', priceId: 'bvn_mod_dob', icon: 'calendar-outline', desc: 'DOB correction on BVN' },
+    { code: '622', label: 'Change of Phone Number', priceId: 'bvn_mod_phone', icon: 'call-outline', desc: 'Registered telephone change' },
+    { code: '623', label: 'Name & Phone', priceId: 'bvn_mod_name_phone', icon: 'person-add-outline', desc: 'Combined Name & Phone update' },
+    { code: '624', label: 'DOB & Phone', priceId: 'bvn_mod_dob_phone', icon: 'today-outline', desc: 'Combined DOB & Phone update' },
+    { code: '626', label: 'Name & DOB', priceId: 'bvn_mod_name_dob', icon: 'create-outline', desc: 'Combined Name & DOB correction' },
+    { code: '625', label: 'Full Modification', priceId: 'bvn_mod_name_dob', icon: 'layers-outline', desc: 'Comprehensive record overhaul' },
 ];
 
 const DEFAULT_PRICES: Record<string, number> = {
@@ -46,9 +78,10 @@ export default function BVNModificationScreen() {
     const [activeTab, setActiveTab] = useState<'submit' | 'status'>('submit');
 
     // Selected Bank and Modification Type
-    const [bankCode, setBankCode] = useState('706'); // First Bank by default
-    const [serviceCode, setServiceCode] = useState('620'); // Name Change by default
-    const [showBankPicker, setShowBankPicker] = useState(false);
+    const [bankCode, setBankCode] = useState('706'); // First Bank default
+    const [serviceCode, setServiceCode] = useState('620'); // Name Change default
+    const [showBankModal, setShowBankModal] = useState(false);
+    const [bankSearch, setBankSearch] = useState('');
 
     // Primary Identifiers
     const [nin, setNin] = useState('');
@@ -141,7 +174,6 @@ export default function BVNModificationScreen() {
         fetchAllServicePrices();
     }, []);
 
-    // Whenever serviceCode changes, update servicePrice immediately
     const handleSelectModificationType = (code: string) => {
         setServiceCode(code);
         setServicePrice(priceMap[code] || DEFAULT_PRICES[code] || 6000);
@@ -155,6 +187,17 @@ export default function BVNModificationScreen() {
             type,
         });
     };
+
+    const selectedBank = useMemo(() => {
+        return NIGERIAN_BANKS.find(b => b.code === bankCode) || NIGERIAN_BANKS[0];
+    }, [bankCode]);
+
+    const filteredBanks = useMemo(() => {
+        if (!bankSearch.trim()) return NIGERIAN_BANKS;
+        return NIGERIAN_BANKS.filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()));
+    }, [bankSearch]);
+
+    const currentPriceDisplay = priceMap[serviceCode] || servicePrice;
 
     const handleSubmitModification = async () => {
         const cleanNin = nin.trim().replace(/\D/g, '');
@@ -188,9 +231,9 @@ export default function BVNModificationScreen() {
             return;
         }
 
-        const requiredFee = priceMap[serviceCode] || servicePrice;
+        const requiredFee = currentPriceDisplay;
         if (userBalance !== null && userBalance < requiredFee) {
-            showAlert("Insufficient Balance", `Your balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${requiredFee.toLocaleString()}. Please fund your wallet to proceed.`);
+            showAlert("Insufficient Balance", `Your wallet balance is ₦${userBalance.toLocaleString()}. Required fee is ₦${requiredFee.toLocaleString()}. Please top up your wallet.`);
             return;
         }
 
@@ -242,7 +285,7 @@ export default function BVNModificationScreen() {
                 const data = res.data?.data || res.data || {};
                 const requestId = data.request_id || data.requestId || ref;
 
-                showAlert("Submitted", `BVN Modification request submitted successfully (Fee: ₦${requiredFee.toLocaleString()}).`, "success");
+                showAlert("Submitted Successfully", `BVN Modification request submitted. (Fee: ₦${requiredFee.toLocaleString()})`, "success");
 
                 await verificationHistory.save({
                     service_category: 'bvn',
@@ -252,6 +295,7 @@ export default function BVNModificationScreen() {
                     details: {
                         ...payload,
                         ...data,
+                        bank_name: selectedBank.name,
                         request_id: requestId,
                         status: data.status || 'PROCESSING',
                         fee: requiredFee,
@@ -295,225 +339,251 @@ export default function BVNModificationScreen() {
         }
     };
 
-    const selectedBank = BANK_CODES.find(b => b.code === bankCode) || BANK_CODES[5];
-    const currentPriceDisplay = priceMap[serviceCode] || servicePrice;
-
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="light" />
 
-            {/* Header */}
+            {/* Header Hero */}
             <LinearGradient
-                colors={['#0B192C', '#06101E']}
+                colors={['#070D1E', '#0A1128', '#0F172A']}
                 style={[styles.headerGradient, { paddingTop: Math.max(insets.top, 20) + 6, paddingBottom: 16 }]}
             >
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
                         <Ionicons name="chevron-back" size={18} color="#ffffff" />
                     </TouchableOpacity>
+                    <View style={styles.headerTitleWrap}>
+                        <Text style={styles.titleText}>BVN Modification</Text>
+                        <Text style={styles.subText}>Official Government Identity Correction</Text>
+                    </View>
                     <TouchableOpacity
                         onPress={() => setShowTermsModal(true)}
                         style={styles.noticeBadge}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="information-circle-outline" size={13} color="#D4AF37" style={{ marginRight: 3 }} />
-                        <Text style={styles.noticeBadgeText}>Guidelines</Text>
+                        <Ionicons name="shield-checkmark" size={13} color="#D4AF37" style={{ marginRight: 3 }} />
+                        <Text style={styles.noticeBadgeText}>Rules</Text>
                     </TouchableOpacity>
                 </View>
-                <Text style={styles.titleText}>BVN Modification</Text>
-                <Text style={styles.subText}>Correct or update details on BVN records</Text>
 
+                {/* Sub Navigation Segment */}
                 <View style={styles.tabContainer}>
                     <TouchableOpacity 
                         style={[styles.tabButton, activeTab === 'submit' && styles.tabButtonActive]}
                         onPress={() => setActiveTab('submit')}
                         activeOpacity={0.8}
                     >
-                        <Text style={[styles.tabButtonText, activeTab === 'submit' && styles.tabButtonTextActive]}>Submit</Text>
+                        <Ionicons name="create-outline" size={14} color={activeTab === 'submit' ? '#070D1E' : '#94A3B8'} style={{ marginRight: 4 }} />
+                        <Text style={[styles.tabButtonText, activeTab === 'submit' && styles.tabButtonTextActive]}>Submit Correction</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.tabButton, activeTab === 'status' && styles.tabButtonActive]}
                         onPress={() => setActiveTab('status')}
                         activeOpacity={0.8}
                     >
+                        <Ionicons name="time-outline" size={14} color={activeTab === 'status' ? '#070D1E' : '#94A3B8'} style={{ marginRight: 4 }} />
                         <Text style={[styles.tabButtonText, activeTab === 'status' && styles.tabButtonTextActive]}>Track Status</Text>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 {activeTab === 'submit' ? (
-                    <View style={styles.formCard}>
-                        {/* Bank Picker */}
-                        <Text style={styles.inputLabel}>ENROLLING BANK</Text>
-                        <TouchableOpacity 
-                            style={styles.dropdownButton}
-                            onPress={() => setShowBankPicker(!showBankPicker)}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.dropdownButtonText}>{selectedBank.name} ({selectedBank.code})</Text>
-                            <Ionicons name={showBankPicker ? "chevron-up" : "chevron-down"} size={16} color="#0B192C" />
-                        </TouchableOpacity>
-
-                        {showBankPicker && (
-                            <View style={styles.bankPickerList}>
-                                {BANK_CODES.map((bank) => (
-                                    <TouchableOpacity
-                                        key={bank.code}
-                                        style={[styles.bankPickerItem, bankCode === bank.code && styles.bankPickerItemActive]}
-                                        onPress={() => {
-                                            setBankCode(bank.code);
-                                            setShowBankPicker(false);
-                                        }}
-                                    >
-                                        <Text style={[styles.bankPickerText, bankCode === bank.code && styles.bankPickerTextActive]}>
-                                            {bank.name} ({bank.code})
-                                        </Text>
-                                        {bankCode === bank.code && (
-                                            <Ionicons name="checkmark-circle" size={14} color="#D4AF37" />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
+                    <View>
+                        {/* STEP 1: SELECT ENROLLING BANK */}
+                        <View style={styles.sectionCard}>
+                            <View style={styles.cardHeaderRow}>
+                                <View style={styles.stepNumberBadge}>
+                                    <Text style={styles.stepNumberText}>1</Text>
+                                </View>
+                                <Text style={styles.sectionCardTitle}>ENROLLING BANK</Text>
                             </View>
-                        )}
 
-                        {/* Modification Type Selector with Live Prices */}
-                        <Text style={[styles.inputLabel, { marginTop: 14 }]}>MODIFICATION TYPE & PRICING</Text>
-                        <View style={styles.typeGrid}>
-                            {MODIFICATION_TYPES.map((type) => {
-                                const isSelected = serviceCode === type.code;
-                                const itemFee = priceMap[type.code] || DEFAULT_PRICES[type.code] || 6000;
-                                return (
-                                    <TouchableOpacity
-                                        key={type.code}
-                                        style={[styles.typeCard, isSelected && styles.typeCardActive]}
-                                        onPress={() => handleSelectModificationType(type.code)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.typeText, isSelected && styles.typeTextActive]}>
+                            <TouchableOpacity 
+                                style={styles.bankSelectButton}
+                                onPress={() => setShowBankModal(true)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.bankIconCircle}>
+                                    <Ionicons name={selectedBank.icon as any} size={18} color="#D4AF37" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.bankSelectedName}>{selectedBank.name}</Text>
+                                    <Text style={styles.bankSelectedSub}>Tap to change enrolling institution</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* STEP 2: SELECT MODIFICATION TYPE */}
+                        <View style={styles.sectionCard}>
+                            <View style={styles.cardHeaderRow}>
+                                <View style={styles.stepNumberBadge}>
+                                    <Text style={styles.stepNumberText}>2</Text>
+                                </View>
+                                <Text style={styles.sectionCardTitle}>MODIFICATION TYPE</Text>
+                            </View>
+
+                            <View style={styles.modTypeGrid}>
+                                {MODIFICATION_TYPES.map((type) => {
+                                    const isSelected = serviceCode === type.code;
+                                    const itemFee = priceMap[type.code] || DEFAULT_PRICES[type.code] || 6000;
+                                    return (
+                                        <TouchableOpacity
+                                            key={type.code}
+                                            style={[styles.modTypeCard, isSelected && styles.modTypeCardActive]}
+                                            onPress={() => handleSelectModificationType(type.code)}
+                                            activeOpacity={0.85}
+                                        >
+                                            <View style={styles.modTypeTop}>
+                                                <Ionicons name={type.icon as any} size={17} color={isSelected ? '#B45309' : '#070D1E'} />
+                                                <View style={[styles.feePill, isSelected && styles.feePillActive]}>
+                                                    <Text style={[styles.feePillText, isSelected && styles.feePillTextActive]}>
+                                                        ₦{itemFee.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.modTypeTitle, isSelected && styles.modTypeTitleActive]}>
                                                 {type.label}
                                             </Text>
-                                            <Text style={[styles.typePriceTag, isSelected && styles.typePriceTagActive]}>
-                                                ₦{itemFee.toLocaleString()}
-                                            </Text>
+                                            <Text style={styles.modTypeDesc} numberOfLines={1}>{type.desc}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        {/* STEP 3: CURRENT BVN IDENTIFIERS */}
+                        <View style={styles.sectionCard}>
+                            <View style={styles.cardHeaderRow}>
+                                <View style={styles.stepNumberBadge}>
+                                    <Text style={styles.stepNumberText}>3</Text>
+                                </View>
+                                <Text style={styles.sectionCardTitle}>CURRENT BVN INFORMATION</Text>
+                            </View>
+
+                            <View style={styles.grid2}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>NIN (11 Digits)</Text>
+                                    <TextInput style={styles.input} placeholder="National NIN" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={nin} onChangeText={setNin} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>BVN (11 Digits)</Text>
+                                    <TextInput style={styles.input} placeholder="Current BVN" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={bvn} onChangeText={setBvn} />
+                                </View>
+                            </View>
+
+                            <View style={[styles.grid2, { marginTop: 10 }]}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Old First Name</Text>
+                                    <TextInput style={styles.input} placeholder="Current First Name" placeholderTextColor="#94a3b8" value={oldFirstName} onChangeText={setOldFirstName} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Old Surname</Text>
+                                    <TextInput style={styles.input} placeholder="Current Surname" placeholderTextColor="#94a3b8" value={oldSurname} onChangeText={setOldSurname} />
+                                </View>
+                            </View>
+
+                            <Text style={[styles.inputLabel, { marginTop: 10 }]}>Old Middle Name (Optional)</Text>
+                            <TextInput style={styles.input} placeholder="Current Middle Name" placeholderTextColor="#94a3b8" value={oldMiddleName} onChangeText={setOldMiddleName} />
+                        </View>
+
+                        {/* STEP 4: NEW REQUESTED CHANGES */}
+                        <View style={styles.sectionCard}>
+                            <View style={styles.cardHeaderRow}>
+                                <View style={styles.stepNumberBadge}>
+                                    <Text style={styles.stepNumberText}>4</Text>
+                                </View>
+                                <Text style={styles.sectionCardTitle}>NEW REQUESTED DETAILS</Text>
+                            </View>
+
+                            {isNameRequired && (
+                                <>
+                                    <View style={styles.grid2}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.inputLabel}>New First Name</Text>
+                                            <TextInput style={styles.input} placeholder="New First Name" placeholderTextColor="#94a3b8" value={newFirstName} onChangeText={setNewFirstName} />
                                         </View>
-                                        {isSelected && (
-                                            <Ionicons name="checkmark-circle" size={16} color="#D4AF37" />
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.inputLabel}>New Surname</Text>
+                                            <TextInput style={styles.input} placeholder="New Surname" placeholderTextColor="#94a3b8" value={newSurname} onChangeText={setNewSurname} />
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>New Middle Name (Optional)</Text>
+                                    <TextInput style={styles.input} placeholder="New Middle Name" placeholderTextColor="#94a3b8" value={newMiddleName} onChangeText={setNewMiddleName} />
+                                </>
+                            )}
 
-                        {/* Primary Identifiers */}
-                        <Text style={[styles.sectionHeader, { marginTop: 16 }]}>PRIMARY IDENTIFIERS</Text>
-                        <View style={styles.grid2}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>NIN (11 Digits)</Text>
-                                <TextInput style={styles.input} placeholder="NIN" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={nin} onChangeText={setNin} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>BVN (11 Digits)</Text>
-                                <TextInput style={styles.input} placeholder="BVN" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={bvn} onChangeText={setBvn} />
-                            </View>
-                        </View>
-
-                        <View style={[styles.grid2, { marginTop: 10 }]}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>Old First Name</Text>
-                                <TextInput style={styles.input} placeholder="First Name" placeholderTextColor="#94a3b8" value={oldFirstName} onChangeText={setOldFirstName} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>Old Surname</Text>
-                                <TextInput style={styles.input} placeholder="Surname" placeholderTextColor="#94a3b8" value={oldSurname} onChangeText={setOldSurname} />
-                            </View>
-                        </View>
-
-                        <Text style={[styles.inputLabel, { marginTop: 10 }]}>Old Middle Name (Optional)</Text>
-                        <TextInput style={styles.input} placeholder="Middle Name" placeholderTextColor="#94a3b8" value={oldMiddleName} onChangeText={setOldMiddleName} />
-
-                        {/* Modification Fields */}
-                        <Text style={[styles.sectionHeader, { marginTop: 16 }]}>NEW DETAILS</Text>
-
-                        {isNameRequired && (
-                            <>
-                                <View style={styles.grid2}>
+                            {isDobRequired && (
+                                <View style={[styles.grid2, { marginTop: 8 }]}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.inputLabel}>New First Name</Text>
-                                        <TextInput style={styles.input} placeholder="New First" placeholderTextColor="#94a3b8" value={newFirstName} onChangeText={setNewFirstName} />
+                                        <Text style={styles.inputLabel}>Old DOB (YYYY-MM-DD)</Text>
+                                        <TextInput style={styles.input} placeholder="1990-01-01" placeholderTextColor="#94a3b8" value={oldDob} onChangeText={setOldDob} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.inputLabel}>New Surname</Text>
-                                        <TextInput style={styles.input} placeholder="New Surname" placeholderTextColor="#94a3b8" value={newSurname} onChangeText={setNewSurname} />
+                                        <Text style={styles.inputLabel}>New DOB (YYYY-MM-DD)</Text>
+                                        <TextInput style={styles.input} placeholder="1992-05-15" placeholderTextColor="#94a3b8" value={newDob} onChangeText={setNewDob} />
                                     </View>
                                 </View>
-                                <Text style={[styles.inputLabel, { marginTop: 10 }]}>New Middle Name (Optional)</Text>
-                                <TextInput style={styles.input} placeholder="New Middle" placeholderTextColor="#94a3b8" value={newMiddleName} onChangeText={setNewMiddleName} />
-                            </>
-                        )}
+                            )}
 
-                        {isDobRequired && (
-                            <View style={[styles.grid2, { marginTop: 8 }]}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Old DOB (YYYY-MM-DD)</Text>
-                                    <TextInput style={styles.input} placeholder="1990-01-01" placeholderTextColor="#94a3b8" value={oldDob} onChangeText={setOldDob} />
+                            {isPhoneRequired && (
+                                <View style={[styles.grid2, { marginTop: 8 }]}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputLabel}>Old Phone (Optional)</Text>
+                                        <TextInput style={styles.input} placeholder="Old Phone" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={oldPhone} onChangeText={setOldPhone} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputLabel}>New Phone Number</Text>
+                                        <TextInput style={styles.input} placeholder="New Phone" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={newPhone} onChangeText={setNewPhone} />
+                                    </View>
                                 </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>New DOB (YYYY-MM-DD)</Text>
-                                    <TextInput style={styles.input} placeholder="1992-05-15" placeholderTextColor="#94a3b8" value={newDob} onChangeText={setNewDob} />
-                                </View>
-                            </View>
-                        )}
+                            )}
+                        </View>
 
-                        {isPhoneRequired && (
-                            <View style={[styles.grid2, { marginTop: 8 }]}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Old Phone (Optional)</Text>
-                                    <TextInput style={styles.input} placeholder="Old Phone" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={oldPhone} onChangeText={setOldPhone} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>New Phone Number</Text>
-                                    <TextInput style={styles.input} placeholder="New Phone" placeholderTextColor="#94a3b8" keyboardType="numeric" maxLength={11} value={newPhone} onChangeText={setNewPhone} />
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Price Summary Banner */}
-                        <View style={styles.priceSummaryCard}>
+                        {/* Price & Balance Executive Card */}
+                        <View style={styles.priceExecutiveCard}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.priceSummaryLabel}>TOTAL MODIFICATION FEE</Text>
-                                <Text style={styles.priceSummaryAmount}>₦{currentPriceDisplay.toLocaleString()}</Text>
+                                <Text style={styles.execPriceLabel}>TOTAL CHARGE</Text>
+                                <Text style={styles.execPriceValue}>₦{currentPriceDisplay.toLocaleString()}</Text>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={styles.walletBalanceLabel}>Wallet Balance</Text>
-                                <Text style={[styles.walletBalanceAmount, (userBalance !== null && userBalance < currentPriceDisplay) ? { color: '#EF4444' } : { color: '#10B981' }]}>
+                            <View style={styles.execDivider} />
+                            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                <Text style={styles.execWalletLabel}>WALLET BALANCE</Text>
+                                <Text style={[styles.execWalletValue, (userBalance !== null && userBalance < currentPriceDisplay) ? { color: '#EF4444' } : { color: '#34D399' }]}>
                                     ₦{userBalance !== null ? userBalance.toLocaleString() : '0.00'}
                                 </Text>
                             </View>
                         </View>
 
                         <TouchableOpacity
-                            style={[styles.submitBtn, loading && { opacity: 0.7 }]}
+                            style={[styles.submitActionBtn, loading && { opacity: 0.7 }]}
                             onPress={handleSubmitModification}
                             disabled={loading}
-                            activeOpacity={0.8}
+                            activeOpacity={0.85}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#0B192C" size="small" />
+                                <ActivityIndicator color="#070D1E" size="small" />
                             ) : (
-                                <Text style={styles.submitBtnText}>Submit Modification (₦{currentPriceDisplay.toLocaleString()})</Text>
+                                <>
+                                    <Ionicons name="checkmark-done-circle" size={19} color="#070D1E" />
+                                    <Text style={styles.submitActionBtnText}>
+                                        Submit Modification (₦{currentPriceDisplay.toLocaleString()})
+                                    </Text>
+                                </>
                             )}
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    <View style={styles.formCard}>
-                        <Text style={styles.inputLabel}>Request ID or Reference</Text>
+                    <View style={styles.sectionCard}>
+                        <Text style={styles.sectionCardTitle}>LIVE STATUS TRACKER</Text>
+                        <Text style={styles.trackerSub}>Enter your Request ID or Reference number to verify status in real-time.</Text>
+                        
                         <View style={styles.trackInputRow}>
                             <TextInput
                                 style={[styles.input, { flex: 1, marginRight: 8 }]}
-                                placeholder="Request ID or Reference"
+                                placeholder="e.g. REF-MOD-171829302..."
                                 placeholderTextColor="#94a3b8"
                                 value={trackingQuery}
                                 onChangeText={setTrackingQuery}
@@ -525,17 +595,22 @@ export default function BVNModificationScreen() {
                                 activeOpacity={0.8}
                             >
                                 {trackingLoading ? (
-                                    <ActivityIndicator size="small" color="#0B192C" />
+                                    <ActivityIndicator size="small" color="#070D1E" />
                                 ) : (
-                                    <Text style={styles.trackBtnText}>Check</Text>
+                                    <Text style={styles.trackBtnText}>Query</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
 
                         {statusResult && (
                             <View style={styles.statusResultCard}>
-                                <Text style={styles.statusResultTitle}>Status Result</Text>
-                                <Text style={styles.statusResultVal}>Status: {statusResult.current_status || statusResult.status || 'PROCESSING'}</Text>
+                                <View style={styles.statusResultHeader}>
+                                    <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                                    <Text style={styles.statusResultTitle}>Portal Feedback</Text>
+                                </View>
+                                <Text style={styles.statusResultVal}>
+                                    Current Status: <Text style={{ color: '#059669', fontWeight: '900' }}>{statusResult.current_status || statusResult.status || 'PROCESSING'}</Text>
+                                </Text>
                                 {statusResult.message && (
                                     <Text style={styles.statusResultMsg}>{statusResult.message}</Text>
                                 )}
@@ -545,6 +620,68 @@ export default function BVNModificationScreen() {
                 )}
             </ScrollView>
 
+            {/* ========================================================================= */}
+            {/* MODAL: CLEAN BANK PICKER WITH SEARCH (NO CODES SHOWN)                     */}
+            {/* ========================================================================= */}
+            <Modal
+                visible={showBankModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowBankModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Select Enrolling Bank</Text>
+                            <TouchableOpacity onPress={() => setShowBankModal(false)}>
+                                <Ionicons name="close-circle" size={22} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Search Input */}
+                        <View style={styles.modalSearchBox}>
+                            <Ionicons name="search" size={16} color="#94A3B8" />
+                            <TextInput
+                                value={bankSearch}
+                                onChangeText={setBankSearch}
+                                placeholder="Search bank name (e.g. First Bank, GTBank)..."
+                                placeholderTextColor="#94A3B8"
+                                style={styles.modalSearchInput}
+                            />
+                        </View>
+
+                        <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                            {filteredBanks.map((bank) => {
+                                const isSelected = bankCode === bank.code;
+                                return (
+                                    <TouchableOpacity
+                                        key={bank.code}
+                                        style={[styles.bankModalItem, isSelected && styles.bankModalItemActive]}
+                                        onPress={() => {
+                                            setBankCode(bank.code);
+                                            setShowBankModal(false);
+                                            setBankSearch('');
+                                        }}
+                                    >
+                                        <View style={[styles.bankModalIconWrap, isSelected && styles.bankModalIconWrapActive]}>
+                                            <Ionicons name={bank.icon as any} size={16} color={isSelected ? '#B45309' : '#070D1E'} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.bankModalText, isSelected && styles.bankModalTextActive]}>
+                                                {bank.name}
+                                            </Text>
+                                        </View>
+                                        {isSelected && (
+                                            <Ionicons name="checkmark-circle" size={18} color="#D4AF37" />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Terms Modal */}
             <Modal
                 visible={showTermsModal}
@@ -552,19 +689,20 @@ export default function BVNModificationScreen() {
                 animationType="fade"
                 onRequestClose={() => setShowTermsModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
-                        <Ionicons name="shield-checkmark" size={24} color="#D4AF37" style={{ marginBottom: 6 }} />
-                        <Text style={styles.modalTitle}>Modification Rules</Text>
-                        <Text style={styles.modalBody}>
-                            Ensure all entered details strictly match official government supporting documents.
+                <View style={styles.modalOverlayCenter}>
+                    <View style={styles.modalCardCenter}>
+                        <Ionicons name="shield-checkmark" size={26} color="#D4AF37" style={{ marginBottom: 6 }} />
+                        <Text style={styles.termsModalTitle}>Official Modification Rules</Text>
+                        <Text style={styles.termsModalBody}>
+                            1. Ensure all requested modifications strictly match official legal supporting documents (NIN, Court Affidavit, or Newspaper Publication).{'\n\n'}
+                            2. Submissions are processed directly through authorized government verification pipelines.
                         </Text>
                         <TouchableOpacity
-                            style={styles.modalBtn}
+                            style={styles.termsModalBtn}
                             onPress={() => setShowTermsModal(false)}
                             activeOpacity={0.8}
                         >
-                            <Text style={styles.modalBtnText}>I Understand</Text>
+                            <Text style={styles.termsModalBtnText}>I Understand</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -582,57 +720,77 @@ export default function BVNModificationScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f8fafc' },
+    container: { flex: 1, backgroundColor: '#F8FAFC' },
     headerGradient: { paddingHorizontal: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
-    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    backButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(212,175,55,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
-    noticeBadgeText: { color: '#D4AF37', fontSize: 10, fontWeight: '700' },
-    titleText: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
-    subText: { color: '#94a3b8', fontSize: 11, marginTop: 1, marginBottom: 10 },
-    tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 },
-    tabButton: { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8 },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    headerTitleWrap: { alignItems: 'center' },
+    backButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    noticeBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    noticeBadgeText: { color: '#D4AF37', fontSize: 10.5, fontWeight: '800' },
+    titleText: { color: '#ffffff', fontSize: 17, fontWeight: '900' },
+    subText: { color: '#94a3b8', fontSize: 10.5, marginTop: 1 },
+    tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 3, marginTop: 4 },
+    tabButton: { flex: 1, flexDirection: 'row', paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
     tabButtonActive: { backgroundColor: '#D4AF37' },
-    tabButtonText: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
-    tabButtonTextActive: { color: '#0B192C', fontWeight: '900' },
-    content: { flex: 1, paddingHorizontal: 14, paddingTop: 14 },
-    formCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' },
-    inputLabel: { fontSize: 10.5, fontWeight: '800', color: '#0B192C', marginBottom: 4, textTransform: 'uppercase' },
-    sectionHeader: { fontSize: 11, fontWeight: '900', color: '#0B192C', marginBottom: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 4 },
-    dropdownButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
-    dropdownButtonText: { fontSize: 12, fontWeight: '700', color: '#0B192C' },
-    bankPickerList: { backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', marginTop: 4, padding: 4 },
-    bankPickerItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
-    bankPickerItemActive: { backgroundColor: '#FEF9E7' },
-    bankPickerText: { fontSize: 11, color: '#475569', fontWeight: '600' },
-    bankPickerTextActive: { color: '#B45309', fontWeight: '800' },
-    typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
-    typeCard: { width: '48.5%', flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1' },
-    typeCardActive: { backgroundColor: '#FEF9E7', borderColor: '#D4AF37' },
-    typeText: { fontSize: 10.5, fontWeight: '700', color: '#475569' },
-    typeTextActive: { color: '#B45309', fontWeight: '900' },
-    typePriceTag: { fontSize: 10, fontWeight: '800', color: '#059669', marginTop: 1 },
-    typePriceTagActive: { color: '#B45309', fontWeight: '900' },
+    tabButtonText: { color: '#94a3b8', fontSize: 11.5, fontWeight: '700' },
+    tabButtonTextActive: { color: '#070D1E', fontWeight: '900' },
+    content: { flex: 1, paddingHorizontal: 12, paddingTop: 12 },
+    sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
+    cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+    stepNumberBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#070D1E', alignItems: 'center', justifyContent: 'center' },
+    stepNumberText: { color: '#D4AF37', fontSize: 9.5, fontWeight: '900' },
+    sectionCardTitle: { fontSize: 11, fontWeight: '900', color: '#070D1E', letterSpacing: 0.5 },
+    bankSelectButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, padding: 10, gap: 10 },
+    bankIconCircle: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#070D1E', alignItems: 'center', justifyContent: 'center' },
+    bankSelectedName: { fontSize: 13, fontWeight: '800', color: '#070D1E' },
+    bankSelectedSub: { fontSize: 10, color: '#64748B', marginTop: 1 },
+    modTypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    modTypeCard: { width: '48.8%', backgroundColor: '#F8FAFC', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' },
+    modTypeCardActive: { backgroundColor: '#FEF9E7', borderColor: '#D4AF37' },
+    modTypeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    feePill: { backgroundColor: '#ECFDF5', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 },
+    feePillActive: { backgroundColor: '#FEF3C7' },
+    feePillText: { fontSize: 9.5, fontWeight: '900', color: '#059669' },
+    feePillTextActive: { color: '#B45309' },
+    modTypeTitle: { fontSize: 11, fontWeight: '800', color: '#070D1E', marginBottom: 1 },
+    modTypeTitleActive: { color: '#B45309' },
+    modTypeDesc: { fontSize: 9, color: '#64748B' },
+    inputLabel: { fontSize: 10, fontWeight: '800', color: '#070D1E', marginBottom: 3, textTransform: 'uppercase' },
     grid2: { flexDirection: 'row', gap: 8 },
-    input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 12, color: '#0B192C' },
-    priceSummaryCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0B192C', borderRadius: 10, padding: 12, marginTop: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
-    priceSummaryLabel: { fontSize: 8.5, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 },
-    priceSummaryAmount: { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginTop: 1 },
-    walletBalanceLabel: { fontSize: 8.5, fontWeight: '700', color: '#94a3b8' },
-    walletBalanceAmount: { fontSize: 13, fontWeight: '900', marginTop: 1 },
-    submitBtn: { backgroundColor: '#D4AF37', paddingVertical: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    submitBtnText: { color: '#0B192C', fontSize: 13, fontWeight: '900' },
+    input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 12, color: '#070D1E' },
+    priceExecutiveCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#070D1E', borderRadius: 12, padding: 12, marginVertical: 8, borderWidth: 1, borderColor: 'rgba(212,175,55,0.3)' },
+    execPriceLabel: { fontSize: 8.5, fontWeight: '900', color: '#D4AF37', letterSpacing: 0.5 },
+    execPriceValue: { fontSize: 17, fontWeight: '900', color: '#FFFFFF', marginTop: 1 },
+    execDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.12)' },
+    execWalletLabel: { fontSize: 8.5, fontWeight: '700', color: '#94A3B8' },
+    execWalletValue: { fontSize: 13, fontWeight: '900', marginTop: 1 },
+    submitActionBtn: { backgroundColor: '#D4AF37', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 10, gap: 6 },
+    submitActionBtnText: { color: '#070D1E', fontSize: 13, fontWeight: '900' },
+    trackerSub: { fontSize: 10.5, color: '#64748B', marginBottom: 10 },
     trackInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     trackBtn: { backgroundColor: '#D4AF37', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    trackBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
-    statusResultCard: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#cbd5e1', marginTop: 6 },
-    statusResultTitle: { fontSize: 12, fontWeight: '800', color: '#0B192C', marginBottom: 4 },
-    statusResultVal: { fontSize: 11, color: '#10B981', fontWeight: '700' },
+    trackBtnText: { color: '#070D1E', fontSize: 12, fontWeight: '800' },
+    statusResultCard: { backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#CBD5E1', marginTop: 6 },
+    statusResultHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+    statusResultTitle: { fontSize: 12, fontWeight: '800', color: '#070D1E' },
+    statusResultVal: { fontSize: 11, color: '#0F172A', fontWeight: '700' },
     statusResultMsg: { fontSize: 10.5, color: '#475569', marginTop: 4 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    modalCard: { backgroundColor: '#ffffff', borderRadius: 14, padding: 16, width: '100%', maxWidth: 360, alignItems: 'center' },
-    modalTitle: { fontSize: 14, fontWeight: '800', color: '#0B192C', marginBottom: 6 },
-    modalBody: { fontSize: 11.5, color: '#475569', textAlign: 'center', lineHeight: 16, marginBottom: 14 },
-    modalBtn: { backgroundColor: '#D4AF37', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
-    modalBtnText: { color: '#0B192C', fontSize: 12, fontWeight: '800' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(7, 13, 30, 0.65)', justifyContent: 'flex-end' },
+    modalCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '80%' },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    modalTitle: { fontSize: 14.5, fontWeight: '900', color: '#070D1E' },
+    modalSearchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, gap: 6, marginBottom: 8 },
+    modalSearchInput: { flex: 1, fontSize: 11.5, color: '#070D1E' },
+    bankModalItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8, gap: 8, marginBottom: 3 },
+    bankModalItemActive: { backgroundColor: '#FEF9E7' },
+    bankModalIconWrap: { width: 28, height: 28, borderRadius: 6, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+    bankModalIconWrapActive: { backgroundColor: '#FEF3C7' },
+    bankModalText: { fontSize: 12, fontWeight: '700', color: '#070D1E' },
+    bankModalTextActive: { color: '#B45309', fontWeight: '900' },
+    modalOverlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalCardCenter: { backgroundColor: '#ffffff', borderRadius: 14, padding: 16, width: '100%', maxWidth: 360, alignItems: 'center' },
+    termsModalTitle: { fontSize: 14, fontWeight: '800', color: '#070D1E', marginBottom: 6 },
+    termsModalBody: { fontSize: 11, color: '#475569', textAlign: 'center', lineHeight: 16, marginBottom: 14 },
+    termsModalBtn: { backgroundColor: '#D4AF37', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
+    termsModalBtnText: { color: '#070D1E', fontSize: 12, fontWeight: '800' },
 });
