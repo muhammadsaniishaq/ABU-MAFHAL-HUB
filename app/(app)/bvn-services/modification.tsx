@@ -388,7 +388,11 @@ export default function BVNModificationScreen() {
                 </View>
             </LinearGradient>
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 140 }} 
+                showsVerticalScrollIndicator={false}
+            >
                 {activeTab === 'submit' ? (
                     <View>
                         {/* STEP 1: SELECT ENROLLING BANK */}
@@ -557,6 +561,7 @@ export default function BVNModificationScreen() {
                             </View>
                         </View>
 
+                        {/* Elevated Submit Button */}
                         <TouchableOpacity
                             style={[styles.submitActionBtn, loading && { opacity: 0.7 }]}
                             onPress={handleSubmitModification}
@@ -764,7 +769,7 @@ const styles = StyleSheet.create({
     execDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.12)' },
     execWalletLabel: { fontSize: 8.5, fontWeight: '700', color: '#94A3B8' },
     execWalletValue: { fontSize: 13, fontWeight: '900', marginTop: 1 },
-    submitActionBtn: { backgroundColor: '#D4AF37', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 10, gap: 6 },
+    submitActionBtn: { backgroundColor: '#D4AF37', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 10, gap: 6, marginTop: 10, marginBottom: 30 },
     submitActionBtnText: { color: '#070D1E', fontSize: 13, fontWeight: '900' },
     trackerSub: { fontSize: 10.5, color: '#64748B', marginBottom: 10 },
     trackInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
